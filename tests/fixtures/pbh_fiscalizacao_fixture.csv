@@ -1,0 +1,4 @@
+ID_FISCALIZACAO_ELETRONICA;DESC_LOC_CONTROLADOR_TRANSITO;DESC_TIPO_CONTROLADOR_TRANSITO;VELOCIDADE_REGULAMENTAR;SENTIDO;SENTIDO_FISCALIZADO;NUM_SERIE_ATUAL;COD_SECUNDARIA;GEOMETRIA
+1461;Av. do Contorno, Esq. Av. dos Andradas;Detector de Avanço de Semáforo;60;Santa Efigênia-Santa Tereza;Único;1061;BRI1061;POINT (612616.59 7796867.80)
+1650;Av. Cristóvão Colombo entre R. Paraíba e Av. Getúlio Vargas;Detector de Invasão de Faixa de Exclusiva - MOVE;60;Av. do Contorno-Av. Getúlio Vargas;Único;1311;BRI1311;POINT (611479.67 7794880.18)
+9999;Rua Sem Geometria;Controlador Eletrônico de Velocidade;40;Centro;Único;0000;BRI0000;

@@ -1,0 +1,48 @@
+{
+  "records": [
+    {
+      "CONCESSIONÁRIA": "ARTERIS FERNÃO DIAS",
+      "ESTADO": "ATIVO",
+      "IMAGENS": "GERANDO",
+      "IDENTIFICADOR": "AFD060",
+      "EQUIPAMENTO": "R07326",
+      "MARCA": "PERKONS",
+      "MODELO": "SMARTPK PROI",
+      "UF": "SP",
+      "MUNICÍPIO": "MAIRIPORA",
+      "BR": 381,
+      "LOCAL": 59.795,
+      "SENTIDO": "CRESCENTE",
+      "FAIXAS": 2,
+      "VALIDADE DO CERTIFICADO": "2026-12-09T08:00:00.000Z",
+      "TIPO EQUIPAMENTO": "CONTROLADOR",
+      "LATITUDE": -23.288997,
+      "LONGITUDE": -46.587841,
+      "VELOCIDADE LEVE": 80,
+      "VELOCIDADE PESADO": 60,
+      "link": "https://drive.google.com/file/d/exemplo/view?usp=sharing"
+    },
+    {
+      "CONCESSIONÁRIA": "CCR VIAOESTE",
+      "ESTADO": "INATIVO",
+      "IMAGENS": "NAO GERANDO",
+      "IDENTIFICADOR": "VOS123",
+      "EQUIPAMENTO": "R09999",
+      "MARCA": "TRS",
+      "MODELO": "TS-300",
+      "UF": "SP",
+      "MUNICÍPIO": "BAURU",
+      "BR": 374,
+      "LOCAL": 120.0,
+      "SENTIDO": "DECRESCENTE",
+      "FAIXAS": 1,
+      "VALIDADE DO CERTIFICADO": "2025-01-01T08:00:00.000Z",
+      "TIPO EQUIPAMENTO": "REDUTOR",
+      "LATITUDE": -22.3145,
+      "LONGITUDE": -49.0606,
+      "VELOCIDADE LEVE": 60,
+      "VELOCIDADE PESADO": 60,
+      "link": null
+    }
+  ]
+}

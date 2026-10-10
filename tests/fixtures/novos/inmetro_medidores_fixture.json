@@ -1,0 +1,107 @@
+[
+  {
+    "SiglaUf": "AC",
+    "Estado": "Acre",
+    "Municipio": "RIO BRANCO",
+    "LocalVerificacao": "BR 364 KM 123,830",
+    "DataUltimaVerificacao": "04/08/2026",
+    "DataValidade": "03/08/2027",
+    "UltimoResultado": "Aprovado",
+    "TipoMedidor": "Fixo",
+    "Faixas": [
+      {"NumeroFaixa": "1", "NumeroInmetro": "15030378", "NumeroSerie": "FLICD0426A01117", "Sentido": "CRESCENTE", "VelocidadeNominal": "40"},
+      {"NumeroFaixa": "2", "NumeroInmetro": "15030378", "NumeroSerie": "FLICD0426A01117", "Sentido": "CRESCENTE", "VelocidadeNominal": "40"},
+      {"NumeroFaixa": "3", "NumeroInmetro": "15030378", "NumeroSerie": "FLICD0426A01117", "Sentido": "DECRESCENTE", "VelocidadeNominal": "40"},
+      {"NumeroFaixa": "4", "NumeroInmetro": "15030378", "NumeroSerie": "FLICD0426A01117", "Sentido": "DECRESCENTE", "VelocidadeNominal": "40"}
+    ],
+    "Historico": [
+      {"NumeroCertificado": "15020223", "NumeroEnsaio": "1", "Ano": "2026", "DataLaudo": "04/08/2026", "DataValidade": "03/08/2027", "TipoServico": "Inicial", "Resultado": "Aprovado"}
+    ],
+    "Proprietario": {"Nome": "DATA TRAFFIC S/A", "Municipio": "APARECIDA DE GOIÂNIA", "Estado": "GO"}
+  },
+  {
+    "SiglaUf": "AC",
+    "Estado": "Acre",
+    "Municipio": "RIO BRANCO",
+    "LocalVerificacao": "BR 364 KM 123,830 (reverificacao)",
+    "DataUltimaVerificacao": "05/08/2026",
+    "DataValidade": "04/08/2027",
+    "UltimoResultado": "Aprovado",
+    "TipoMedidor": "Fixo",
+    "Faixas": [
+      {"NumeroFaixa": "1", "NumeroInmetro": "15030378", "NumeroSerie": "FLICD0426A01117", "Sentido": "CRESCENTE", "VelocidadeNominal": "40"},
+      {"NumeroFaixa": "2", "NumeroInmetro": "15030378", "NumeroSerie": "FLICD0426A01117", "Sentido": "CRESCENTE", "VelocidadeNominal": "40"}
+    ],
+    "Historico": [
+      {"NumeroCertificado": "15020223", "NumeroEnsaio": "1", "Ano": "2026", "DataLaudo": "04/08/2026", "DataValidade": "03/08/2027", "TipoServico": "Inicial", "Resultado": "Aprovado"},
+      {"NumeroCertificado": "15020299", "NumeroEnsaio": "1", "Ano": "2027", "DataLaudo": "05/08/2026", "DataValidade": "04/08/2027", "TipoServico": "Periódica", "Resultado": "Aprovado"}
+    ],
+    "Proprietario": {"Nome": "DATA TRAFFIC S/A", "Municipio": "APARECIDA DE GOIÂNIA", "Estado": "GO"}
+  },
+  {
+    "SiglaUf": "AC",
+    "Estado": "Acre",
+    "Municipio": "RIO BRANCO",
+    "LocalVerificacao": "BR 364 KM 124,4",
+    "DataUltimaVerificacao": "03/07/2025",
+    "DataValidade": "02/07/2026",
+    "UltimoResultado": "Aprovado",
+    "TipoMedidor": "Estático ou Portátil",
+    "Faixas": [
+      {"NumeroFaixa": "1", "NumeroInmetro": "14826019", "NumeroSerie": "FLICD2106A00575", "Sentido": "CRESCENTE", "VelocidadeNominal": "60"},
+      {"NumeroFaixa": "2", "NumeroInmetro": "14826019", "NumeroSerie": "FLICD2106A00575", "Sentido": "CRESCENTE", "VelocidadeNominal": "60"}
+    ],
+    "Historico": [
+      {"NumeroCertificado": "15020220", "NumeroEnsaio": "2", "Ano": "2024", "DataLaudo": "04/07/2024", "DataValidade": "03/07/2025", "TipoServico": "Periódica", "Resultado": "Aprovado"}
+    ],
+    "Proprietario": {"Nome": "PREFEITURA DE RIO BRANCO", "Municipio": "RIO BRANCO", "Estado": "AC"}
+  },
+  {
+    "SiglaUf": "SP",
+    "Estado": "São Paulo",
+    "Municipio": "SÃO PAULO",
+    "LocalVerificacao": "AV. PAULISTA",
+    "DataUltimaVerificacao": "01/09/2026",
+    "DataValidade": "31/08/2027",
+    "UltimoResultado": "Reparado",
+    "TipoMedidor": "Fixo",
+    "Faixas": [
+      {"NumeroFaixa": "1", "NumeroInmetro": "111", "NumeroSerie": "SER-A", "Sentido": "CRESCENTE", "VelocidadeNominal": "50"},
+      {"NumeroFaixa": "2", "NumeroInmetro": "111", "NumeroSerie": "SER-A", "Sentido": "DECRESCENTE", "VelocidadeNominal": "50"},
+      {"NumeroFaixa": "3", "NumeroInmetro": "222", "NumeroSerie": "SER-B", "Sentido": "CRESCENTE", "VelocidadeNominal": "60"}
+    ],
+    "Historico": [
+      {"NumeroCertificado": "C-111", "NumeroEnsaio": "1", "Ano": "2026", "DataLaudo": "01/09/2026", "DataValidade": "31/08/2027", "TipoServico": "Periódica", "Resultado": "Reparado"}
+    ],
+    "Proprietario": {"Nome": "CET", "Municipio": "SÃO PAULO", "Estado": "SP"}
+  },
+  {
+    "SiglaUf": "GO",
+    "Estado": "Goiás",
+    "Municipio": "GOIÂNIA",
+    "LocalVerificacao": "GO-469 KM 027+244M",
+    "DataUltimaVerificacao": "10/06/2026",
+    "DataValidade": "09/06/2027",
+    "UltimoResultado": "Aprovado",
+    "TipoMedidor": "Estático",
+    "Faixas": [
+      {"NumeroFaixa": "1", "NumeroInmetro": "333", "NumeroSerie": "SER-C", "Sentido": "CRESCENTE", "VelocidadeNominal": "40"},
+      {"NumeroFaixa": "2", "NumeroInmetro": "333", "NumeroSerie": "SER-C", "Sentido": "CRESCENTE", "VelocidadeNominal": "80"}
+    ],
+    "Historico": [],
+    "Proprietario": {"Nome": "DETRAN-GO", "Municipio": "GOIÂNIA", "Estado": "GO"}
+  },
+  {
+    "SiglaUf": "TO",
+    "Estado": "Tocantins",
+    "Municipio": "PALMAS",
+    "LocalVerificacao": null,
+    "DataUltimaVerificacao": null,
+    "DataValidade": null,
+    "UltimoResultado": null,
+    "TipoMedidor": "",
+    "Faixas": [],
+    "Historico": [],
+    "Proprietario": {}
+  }
+]

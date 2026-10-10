@@ -153,10 +153,11 @@ class ColetorANTT(ColetorBase):
             "modelo": nz.pick(raw, "Modelo", "modelo"),
             "velocidade_leves": nz.to_float(
                 nz.pick(raw, "VelocidadeLeves", "velocidade_leves",
-                        "VelLeves", "Velocidade")),
+                        "velocidade_leve", "VelLeves", "Velocidade")),
             "velocidade_pesados": nz.to_float(
                 nz.pick(raw, "VelocidadePesados", "velocidade_pesados",
-                        "VelPesados")),
+                        "velocidade_pesado", "VelPesados",
+                        "VelocidadePesado")),
             "sentido": nz.normalizar_sentido(nz.pick(raw, "Sentido", "sentido")),
             "sentido_original": nz.pick(raw, "Sentido", "sentido"),
             "observacoes": nz.pick(raw, "Observacao", "Observação",
