@@ -45,6 +45,32 @@
   .err{background:#fdecea;border:1px solid #f5b7b1;border-radius:6px;padding:8px 10px;font-size:13px}
   .vel{font-weight:600;color:var(--vermelho)}
   a{color:var(--azul)}
+  /* ---- responsivo: celular / tablet / desktop ---- */
+  @media (max-width: 860px){
+    table thead{display:none}
+    table, table tbody, table tr, table td{display:block;width:100%}
+    table{border-collapse:separate}
+    table tr{border:1px solid var(--borda);border-radius:10px;margin:8px 0;padding:8px 10px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+    table td{border:0;padding:3px 0;display:flex;justify-content:space-between;gap:12px}
+    table td:before{content:attr(data-label);color:#6b7280;font-size:12px;font-weight:600}
+    th{position:static}
+  }
+  @media (max-width: 720px){
+    header{padding:9px 12px}
+    header h1{font-size:15px}
+    header .sub{font-size:11.5px}
+    #controles{flex-direction:column;align-items:stretch;gap:10px;padding:10px 12px}
+    #controles label{width:100%}
+    #controles input[type=text],#controles input[type=number],#controles input[type=range]{width:100%}
+    #controles button{width:100%}
+    .chk{flex-direction:row!important}
+    #mapa{height:52vh;min-height:300px}
+    #barra,#resultado{padding-left:12px;padding-right:12px}
+    #festa .msg{padding:18px 16px;max-width:94vw}
+    #festa .msg h2{font-size:22px}
+    #festa .msg .feito{font-size:30px;letter-spacing:4px}
+    .balao{font-size:34px}
+  }
 </style>
 </head>
 <body>
@@ -210,13 +236,15 @@
       }
       var via = (loc.via || {});
       var vel = velDoPonto(p);
-      linhas.push("<tr><td>" + escapeHtml(p.id) + "</td><td>" +
-        escapeHtml([via.codigo, via.nome].filter(Boolean).join(" · ") || "—") + "</td><td>" +
-        (loc.km != null ? escapeHtml(loc.km) : "—") + "</td><td>" +
-        (vel != null ? "<span class='vel'>" + escapeHtml(vel) + "</span>" : "—") + "</td><td>" +
-        escapeHtml(sentidoDoPonto(p) || "—") + "</td><td>" +
-        (loc.distancia_metros != null ? Math.round(loc.distancia_metros) + " m" : "—") + "</td><td>" +
-        escapeHtml(loc.qualidade || "—") + "</td></tr>");
+      linhas.push("<tr>" +
+        "<td data-label='ID'>" + escapeHtml(p.id) + "</td>" +
+        "<td data-label='Via'>" + escapeHtml([via.codigo, via.nome].filter(Boolean).join(" · ") || "—") + "</td>" +
+        "<td data-label='km'>" + (loc.km != null ? escapeHtml(loc.km) : "—") + "</td>" +
+        "<td data-label='Velocidade'>" + (vel != null ? "<span class='vel'>" + escapeHtml(vel) + "</span>" : "—") + "</td>" +
+        "<td data-label='Sentido'>" + escapeHtml(sentidoDoPonto(p) || "—") + "</td>" +
+        "<td data-label='Distância'>" + (loc.distancia_metros != null ? Math.round(loc.distancia_metros) + " m" : "—") + "</td>" +
+        "<td data-label='Posição'>" + escapeHtml(loc.qualidade || "—") + "</td>" +
+        "</tr>");
     });
     var tabela = "";
     if (pontos.length){
@@ -294,6 +322,9 @@
   });
   // Slider do raio: arrasta e o mapa/circulo acompanham; solta e consulta de novo
   elRaioVal.textContent = fmtRaio(parseInt(elRaio.value, 10));
+  // mantem o mapa justo quando a tela muda de tamanho/rotacao (celular)
+  window.addEventListener("resize", function(){ setTimeout(function(){ map.invalidateSize(); }, 200); });
+  window.addEventListener("orientationchange", function(){ setTimeout(function(){ map.invalidateSize(); }, 350); });
   elRaio.addEventListener("input", function(){
     var r = parseInt(elRaio.value, 10);
     elRaioVal.textContent = fmtRaio(r);
