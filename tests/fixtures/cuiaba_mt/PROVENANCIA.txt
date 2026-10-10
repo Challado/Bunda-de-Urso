@@ -1,0 +1,24 @@
+Fixture: Cuiaba MT - noticia de fiscalizacao eletronica (2015)
+=============================================================
+
+Arquivo: noticia_fixture.html
+Recorte verbatim (com tags minimas) do conteudo publicado na pagina oficial:
+
+  URL pagina : https://www.cuiaba.mt.gov.br/noticias/comeca-campanha-de-esclarecimento-sobre-a-fiscalizacao-eletronica
+  URL final  : (mesma; HTTP 200, text/html; charset=UTF-8, 46117 bytes)
+  Coletado em: 10/10/2026 (curl -sSL -A "RadarBrasil/1.0")
+  sha256 da pagina original: 646c5e3a (prefixo do arquivo salvo em /tmp/radarpesq/)
+
+Conteudo estruturado: NAO EXISTE.
+  - A pagina e uma NOTICIA de 23/11/2015.
+  - Descreve em texto: 15 pontos, 30 novos equipamentos, 14 radares fixos,
+    3 lombadas eletronicas, 13 avancos semaforicos; cita nove ruas/avenidas.
+  - Unico download da pagina: um PDF de "processo seletivo" (sem relacao
+    com radares) -> por isso o descobridor classifica como "documento".
+  - Link apenas generico para o portal de Dados Abertos da transparencia
+    (http://transparencia.cuiaba.mt.gov.br/.../#/dados/dados-abertos).
+  - Sem CSV/JSON/GeoJSON/KML/XLS => tem_dataset_estruturado = False.
+
+Uso: teste offline do conector coletor/fontes/cuiaba_mt.py (nenhum acesso a
+rede). O recorte preserva as frases e os numeros citados; e apenas um recorte
+reduzido, sem alterar o sentido do texto original.

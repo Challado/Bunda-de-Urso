@@ -1,0 +1,24 @@
+Fixture: Boa Vista RR - noticia de instalacao de radares (2024)
+==============================================================
+
+Arquivo: noticia_fixture.html
+Recorte verbatim (com tags minimas) do conteudo publicado na pagina oficial:
+
+  URL pagina : https://boavista.rr.gov.br/noticias/2024/1/prefeitura-instala-novos-equipamentos-de-fiscalizacao-eletronica-para-reduzir-acidentes-em-boa-vista
+  URL final  : (mesma; HTTP 200, text/html; charset=UTF-8, 38567 bytes)
+  Coletado em: 10/10/2026 (curl -sSL -A "RadarBrasil/1.0")
+  sha256 da pagina original: c32e7bd1 (prefixo do arquivo salvo em /tmp/radarpesq/)
+
+Conteudo estruturado: NAO EXISTE.
+  - A pagina e uma NOTICIA de 2024 (SMST / Prefeitura de Boa Vista).
+  - Declara "8 novos equipamentos" (dez/2023-jan/2024) e "total de 18 radares".
+  - A relacao de locais aparece, apos "Veja onde os novos radares estao
+    instalados:", APENAS como imagem:
+      https://boavista.rr.gov.br/storage/2024/radar.png
+      (HTTP 200, image/png, 35095 bytes, 1132x556; nao legivel pela stdlib).
+    A imagem NAO foi redistribuida nesta fixture (apenas referenciada por
+    URL no HTML); o teste nao a baixa e nao a le.
+  - Sem CSV/JSON/GeoJSON/KML/XLS => tem_dataset_estruturado = False.
+
+Uso: teste offline do conector coletor/fontes/boavista_rr.py (nenhum acesso a
+rede). O recorte preserva as frases e os numeros citados.
