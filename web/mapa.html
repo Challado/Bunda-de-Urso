@@ -325,15 +325,26 @@
   // mantem o mapa justo quando a tela muda de tamanho/rotacao (celular)
   window.addEventListener("resize", function(){ setTimeout(function(){ map.invalidateSize(); }, 200); });
   window.addEventListener("orientationchange", function(){ setTimeout(function(){ map.invalidateSize(); }, 350); });
+  var pendente = null;   // hoisted no IIFE; guarda a consulta agendada
   elRaio.addEventListener("input", function(){
+    // ENQUANTO ARRASTA: so o visual acompanha (numero + circulo); NAO consulta.
     var r = parseInt(elRaio.value, 10);
     elRaioVal.textContent = fmtRaio(r);
     if (ultimo){
       desenharCirculo(ultimo.lat, ultimo.lon, r);
       enquadrar(ultimo.lat, ultimo.lon, r);
-      clearTimeout(reTimer);
-      reTimer = setTimeout(function(){ consultar(ultimo.lat, ultimo.lon, r); }, 350);
     }
+    if (pendente){ clearTimeout(pendente); pendente = null; }
+    elBarra.textContent = "Ajustando o raio… solte para consultar.";
+  });
+  elRaio.addEventListener("change", function(){
+    // SOLTOU a barrinha: conta 1s e so entao consulta.
+    var r = parseInt(elRaio.value, 10);
+    if (pendente) clearTimeout(pendente);
+    pendente = setTimeout(function(){
+      pendente = null;
+      if (ultimo) consultar(ultimo.lat, ultimo.lon, r);
+    }, 1000);
   });
   // Link direto: ?lat=..&lon=..&raio=..  (consulta sozinho)
   //            ?local=1             (usa a localização do navegador)
