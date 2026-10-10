@@ -25,6 +25,14 @@ AGENDA = {
 }
 
 
+class ColetorSemOrigem(ColetorANTT):
+    """Conector que nao consegue resolver URL (portal fora do ar)."""
+
+    @classmethod
+    def resolver_url(cls):
+        return None
+
+
 def _ts(dt):
     return dt.strftime("%Y-%m-%dT%H:%M:%S+00:00")
 
@@ -73,10 +81,11 @@ class TestTick(unittest.TestCase):
                         agora=self._agora(minutes=1), forcar=["antt"])
         self.assertEqual(res[0]["acao"], "executado")
 
-    def test_sem_url_direta_pula(self):
-        res = self._run()
+    def test_sem_origem_pula(self):
+        agenda = {"antt": dict(AGENDA["antt"], conector=ColetorSemOrigem)}
+        res = self._run(agenda=agenda)
         self.assertEqual(res[0]["acao"], "pulado")
-        self.assertEqual(res[0]["motivo"], "sem_url_direta")
+        self.assertEqual(res[0]["motivo"], "sem_origem")
 
     def test_dry_run_nao_coleta(self):
         res = self._run(arquivos={"antt": common.ANTT_FIXTURE}, dry_run=True)

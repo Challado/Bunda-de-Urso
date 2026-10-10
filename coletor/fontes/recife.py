@@ -36,6 +36,27 @@ class ColetorRecife(ColetorBase):
         "status_integracao": "ok",
     }
 
+    # -- resolucao de URL -------------------------------------------------
+    CKAN_BASE = "https://dados.recife.pe.gov.br"
+    CKAN_DATASET = "9acffb30-ed06-4b16-84ff-710478f18760"
+    URL_FALLBACK = ("https://dados.recife.pe.gov.br/dataset/"
+                    "9acffb30-ed06-4b16-84ff-710478f18760/resource/"
+                    "36c2b47b-f439-4895-8b65-3f3dda36a4a7/download/"
+                    "lista-de-equipamentos-de-fiscalizacao-de-transito.csv")
+
+    @classmethod
+    def resolver_url(cls):
+        """URL direta da lista de fiscalizacao (API CKAN); fallback fixo."""
+        try:
+            from coletor.fontes import ckan
+            url = ckan.url_do_mais_novo(cls.CKAN_BASE, cls.CKAN_DATASET, "CSV",
+                                        r"fiscalizacao-de-transito")
+            if url:
+                return url
+        except Exception:                                  # noqa: BLE001
+            pass
+        return cls.URL_FALLBACK
+
     def carregar(self, origem):
         if origem and os.path.exists(origem):
             with open(origem, "rb") as f:
