@@ -112,6 +112,24 @@ class TestDAERRS(unittest.TestCase):
                                side_effect=RuntimeError("portal fora")):
             self.assertEqual(ColetorDAERRS.resolver_planilhas(), [])
 
+    def test_resolver_url_devolve_as_planilhas(self):
+        """O tick entrega resolver_url() direto ao carregar(); tem de ser a
+        LISTA de CSVs (nao a pagina HTML, que daria 0 linhas)."""
+        pagina = '<a href="https://crbm.bm.rs.gov.br/radar-movel">x</a>'
+        cprv = ('<a href="https://docs.google.com/spreadsheets/d/'
+                'AAAAAAAAAAAAAAAAAAAAAAAA/export?format=pdf">1</a>')
+        with mock.patch.object(http, "baixar",
+                               side_effect=[_resp(pagina), _resp(cprv)]):
+            urls = ColetorDAERRS.resolver_url()
+        self.assertEqual(len(urls), 1)
+        self.assertTrue(urls[0].endswith("export?format=csv"))
+
+    def test_resolver_url_erro_quando_sem_planilha(self):
+        with mock.patch.object(http, "baixar",
+                               side_effect=RuntimeError("portal fora")):
+            with self.assertRaises(http.ErroFonte):
+                ColetorDAERRS.resolver_url()
+
     def test_carregar_lista_de_urls_usa_http_baixar(self):
         with open(fx("daer_rs_trechos_fixture.csv"), "rb") as f:
             csv_bytes = f.read()
