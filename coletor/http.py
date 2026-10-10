@@ -21,16 +21,28 @@ Camada unica de rede do coletor.  Portada do conector de referencia
 
 Nada aqui roda em tempo de requisicao da API.
 """
-import email.utils
 import os
-import ssl
-import time
-import urllib.error
-import urllib.parse
-import urllib.request
-from datetime import datetime, timezone
+import sys
 
-from core import config
+# --- anti-sombreamento da stdlib -------------------------------------------
+# Quando um script de coletor/ roda POR CAMINHO (ex.: ``python3 coletor/tick.py``,
+# que e como o cron chama), o proprio diretorio coletor/ entra em ``sys.path[0]``.
+# Um modulo local chamado ``http.py`` passaria entao a sombrear a stdlib ``http``,
+# e ``urllib.request`` (que faz ``import http.client``) quebraria com import
+# circular. Garantimos que coletor/ NUNCA permanece no ``sys.path``.
+_AQUI = os.path.dirname(os.path.abspath(__file__))
+sys.path[:] = [p for p in sys.path
+               if os.path.abspath(p or os.getcwd()) != _AQUI]
+
+import email.utils                       # noqa: E402
+import ssl                               # noqa: E402
+import time                              # noqa: E402
+import urllib.error                      # noqa: E402
+import urllib.parse                      # noqa: E402
+import urllib.request                    # noqa: E402
+from datetime import datetime, timezone  # noqa: E402
+
+from core import config                  # noqa: E402
 
 __all__ = ("ErroFonte", "NaoModificado", "ErroRetentavel", "url_checada",
            "baixar")
