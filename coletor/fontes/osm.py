@@ -35,6 +35,7 @@ import urllib.parse
 import urllib.request
 
 from core import config
+from coletor import http
 from coletor.base import ColetorBase
 from coletor.fontes import normalizacao as nz
 
@@ -110,28 +111,11 @@ class ColetorOSM(ColetorBase):
         )
 
     def _consultar_overpass(self, query, bbox=None):
-        """POST na Overpass com backoff/Retry-After (rate limit)."""
+        """POST na Overpass via coletor.http (retry/Retry-After no downloader)."""
         corpo = urllib.parse.urlencode({"data": query}).encode("utf-8")
-        ultimo_erro = None
-        for tentativa in range(1, self.TENTATIVAS + 1):
-            req = urllib.request.Request(
-                self.ENDPOINT, data=corpo,
-                headers={"User-Agent": config.USER_AGENT,
-                         "Content-Type": "application/x-www-form-urlencoded"})
-            try:
-                with urllib.request.urlopen(
-                        req, timeout=config.DEFAULT_TIMEOUT) as resp:
-                    return resp.read()
-            except urllib.error.HTTPError as exc:
-                ultimo_erro = exc
-                if exc.code == 429 or 500 <= exc.code < 600:
-                    if tentativa == self.TENTATIVAS:
-                        raise
-                    time.sleep(_espera_backoff(
-                        tentativa, exc.headers.get("Retry-After")))
-                    continue
-                raise
-        raise ultimo_erro                                  # pragma: no cover
+        baixado, _headers, _url_final = http.baixar(
+            self.ENDPOINT, method="POST", data=corpo)
+        return baixado
 
     # -- carregar ----------------------------------------------------------
     def carregar(self, origem):
@@ -156,11 +140,8 @@ class ColetorOSM(ColetorBase):
         if os.path.exists(ref):
             with open(ref, "rb") as f:
                 return f.read()
-        req = urllib.request.Request(ref,
-                                     headers={"User-Agent": config.USER_AGENT})
-        with urllib.request.urlopen(
-                req, timeout=config.DEFAULT_TIMEOUT) as resp:
-            return resp.read()
+        corpo, _headers, _url_final = http.baixar(ref)
+        return corpo
 
     @staticmethod
     def _parse(conteudo):

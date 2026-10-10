@@ -5,6 +5,7 @@ Duas fases: bounding box em SQL + Haversine na aplicacao (sem PostGIS).
 LIMIT so depois do calculo de distancia (spec 9.4).
 """
 import datetime
+import json
 
 from . import db as dbmod
 from . import geo
@@ -42,12 +43,48 @@ def _bbox_clause(lat_min, lat_max, lon_min, lon_max, cruza):
             [lat_min, lat_max, lon_min, lon_max])
 
 
+def _uf_original(conn, pid):
+    """UF derivada do payload original quando NAO ha municipio cadastrado.
+
+    Nao inventa nada: le o campo 'uf'/sigla ja publicado pela propria fonte
+    (spec: texto administrativo sem IBGE nao vira codigo, mas a sigla de UF
+    publicada e um dado real da origem).
+    """
+    for r in dbmod.query_all(
+            conn, "SELECT r.payload_original AS p "
+            "FROM VINCULO_REGISTRO_PONTO vp "
+            "JOIN REGISTRO_FONTE r ON r.id=vp.registro_id "
+            "WHERE vp.ponto_id=? ORDER BY r.id", (pid,)):
+        try:
+            d = json.loads(r["p"])
+        except (ValueError, TypeError):
+            continue
+        if not isinstance(d, dict):
+            continue
+        baixo = {str(k).strip().lower(): v for k, v in d.items()}
+        for chave in ("uf", "sigla uf", "siglauf", "estado uf", "uf_sigla"):
+            v = baixo.get(chave)
+            if not v:
+                continue
+            s = str(v).strip().upper()
+            if len(s) == 2 and s.isalpha():
+                return s
+    return None
+
+
+def _uf_do_ponto(conn, row):
+    """UF do ponto: municipio cadastrado; senao a UF publicada na origem."""
+    uf = row["uf"] if "uf" in row.keys() else None
+    return (uf or _uf_original(conn, row["ponto_id"]) or "").upper() or None
+
+
 def _filtros_extra(filtros):
     clauses = []
     params = []
-    if filtros.get("uf"):
-        clauses.append("u.sigla = ?")
-        params.append(filtros["uf"].upper())
+    # O filtro de UF NAO entra em SQL: a UF pode vir do municipio OU do
+    # payload original (ponto sem municipio cadastrado). Filtra-se em
+    # Python com _uf_do_ponto (spec: nao inventar IBGE, mas nao descartar
+    # a UF real publicada pela fonte).
     if filtros.get("municipio_ibge"):
         clauses.append("m.codigo_ibge = ?")
         params.append(filtros["municipio_ibge"])
@@ -93,9 +130,12 @@ def buscar_pontos(conn, lat, lon, raio, filtros=None, limite=100, cursor=None):
     sql = _PONTO_SQL + " WHERE " + where
     rows = dbmod.query_all(conn, sql, bbox_params + extra_params)
 
+    uf_filtro = (filtros.get("uf") or "").upper() or None
     dentro = []
     for r in rows:
         if r["latitude"] is None or r["longitude"] is None:
+            continue
+        if uf_filtro and _uf_do_ponto(conn, r) != uf_filtro:
             continue
         dist = geo.haversine_m(lat, lon, r["latitude"], r["longitude"])
         if dist <= raio:
@@ -164,9 +204,50 @@ def _row_to_base(r, distancia_metros=None):
     }
 
 
+def _resolver_velocidades(limites):
+    """Agrupa limites por (categoria, faixa) e NUNCA arbitra conflito.
+
+    Quando a mesma categoria/faixa traz mais de um valor publicado, a
+    velocidade resolvida fica None e todos os valores ficam expostos em
+    `valores_publicados_kmh` (spec 8/17.4: nao fabricar valor consolidado).
+    Retorna (resolvidos, conflitos).
+    """
+    por_escopo = {}
+    for lim in limites:
+        escopo = (lim["categoria_veiculo"], lim["faixa_id"])
+        por_escopo.setdefault(escopo, []).append(lim)
+    resolvidos, conflitos = [], []
+    for (categoria, faixa), obs in sorted(
+            por_escopo.items(), key=lambda kv: (kv[0][0] or "",
+                                                kv[0][1] or "")):
+        valores = sorted({o["velocidade_kmh"] for o in obs
+                          if o["velocidade_kmh"] is not None})
+        if len(valores) > 1:
+            conflitos.append({
+                "campo": "limite_velocidade", "categoria": categoria,
+                "faixa_id": faixa, "valores_kmh": valores})
+        resolvidos.append({
+            "categoria": categoria, "faixa_id": faixa,
+            "velocidade_kmh": valores[0] if len(valores) == 1 else None,
+            "estado": "conflitante" if len(valores) > 1 else "sem_conflito",
+            "valores_publicados_kmh": valores,
+        })
+    return resolvidos, conflitos
+
+
+def _top_velocidade(resolvidos, categoria):
+    """Limite de escopo geral (sem faixa) para a categoria, se nao conflitar."""
+    for r in resolvidos:
+        if r["categoria"] == categoria and r["faixa_id"] is None:
+            return r["velocidade_kmh"]
+    return None
+
+
 def montar_registro(conn, r, distancia_metros=None, incluir_operacoes=True):
     pid = r["ponto_id"]
     reg = _row_to_base(r, distancia_metros)
+    if reg["localizacao"].get("uf") is None:
+        reg["localizacao"]["uf"] = _uf_original(conn, pid)
 
     faixas = []
     for f in dbmod.query_all(
@@ -197,6 +278,12 @@ def montar_registro(conn, r, distancia_metros=None, incluir_operacoes=True):
             "fonte_registro_id": lim["registro_fonte_id"],
         })
     reg["limites_velocidade"] = limites
+    resolvidos, conflitos_velocidade = _resolver_velocidades(limites)
+    reg["velocidades_resolvidas"] = resolvidos
+    reg["velocidade_leves_kmh"] = _top_velocidade(resolvidos, "leves")
+    reg["velocidade_pesados_kmh"] = _top_velocidade(resolvidos, "pesados")
+    reg["velocidade_geral_kmh"] = _top_velocidade(resolvidos, "geral")
+    reg["conflitos"] = conflitos_velocidade
     reg["quantidade_faixas_declarada"] = None
 
     regimes = []
@@ -291,11 +378,11 @@ def montar_registro(conn, r, distancia_metros=None, incluir_operacoes=True):
     reg["fontes"] = _fontes_do_ponto(conn, pid)
     reg["operacoes"] = (operacoes_do_ponto(conn, pid)
                         if incluir_operacoes else [])
-    reg["conflitos"] = []
     reg["primeira_observacao"] = None
     reg["ultima_confirmacao"] = None
     reg["ultima_coleta"] = reg["fontes"][0]["coletado_em"] if reg["fontes"] else None
-    reg["confianca"] = "nao_avaliada"
+    reg["confianca"] = ("conflitante" if conflitos_velocidade
+                        else "nao_avaliada")
     reg["observacoes"] = r["observacoes"]
     reg["proveniencia_campos"] = {}
     return reg
@@ -1018,3 +1105,90 @@ def listar_snapshots(conn, limite=50):
                             if s["anterior_id"] else None),
         })
     return out
+
+
+# =========================================================================
+# /api/v1/trafego — OBSERVACAO AGREGADA DE TRAFEGO
+# =========================================================================
+# Velocidade de PASSAGEM observada, JAMAIS limite regulamentado da via.
+_TRAFEGO_SQL = """
+SELECT o.id AS observacao_id, o.ponto_id AS ponto_id,
+       o.equipamento_id AS equipamento_id, o.faixa_id AS faixa_id,
+       o.instante_observacao AS instante_observacao,
+       o.data_observacao AS data_observacao,
+       o.velocidade_publicada AS velocidade_publicada,
+       o.velocidade_kmh AS velocidade_kmh, o.volume_total AS volume_total,
+       o.registro_fonte_id AS registro_fonte_id,
+       c.codigo AS categoria, s.codigo AS sentido
+FROM OBSERVACAO_TRAFEGO o
+LEFT JOIN CATEGORIA_VEICULO c ON c.id = o.categoria_veiculo_id
+LEFT JOIN SENTIDO s ON s.id = o.sentido_id
+"""
+
+
+def montar_observacao_trafego(conn, r):
+    fontes = _fontes_por_registro(conn, r["registro_fonte_id"])
+    return {
+        "id": "OT-%d" % r["observacao_id"],
+        "tipo_registro": "observacao_trafego",
+        "ponto_id": ("P-%d" % r["ponto_id"]) if r["ponto_id"] else None,
+        "equipamento_id": (("E-%d" % r["equipamento_id"])
+                           if r["equipamento_id"] else None),
+        "faixa_id": ("F-%d" % r["faixa_id"]) if r["faixa_id"] else None,
+        "categoria_veiculo": r["categoria"],
+        "sentido": r["sentido"],
+        "data_observacao": r["data_observacao"],
+        "instante_observacao": r["instante_observacao"],
+        "velocidade_publicada": r["velocidade_publicada"],
+        "velocidade_observada_kmh": r["velocidade_kmh"],
+        "volume_total": r["volume_total"],
+        "fonte": (fontes[0] if fontes else None),
+    }
+
+
+def buscar_trafego(conn, limite=100, ponto_id=None, cursor=None):
+    """Observacoes agregadas de trafego (mais recentes primeiro)."""
+    clauses, params = [], []
+    if ponto_id is not None:
+        clauses.append("o.ponto_id = ?")
+        params.append(int(ponto_id))
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    rows = dbmod.query_all(
+        conn, _TRAFEGO_SQL + where + " ORDER BY o.id DESC", params)
+    total = len(rows)
+    offset = _offset_cursor(cursor)
+    recorte = rows[offset:offset + limite]
+    proximo = None
+    if offset + limite < total:
+        proximo = str(offset + limite)
+    recs = [montar_observacao_trafego(conn, r) for r in recorte]
+    return recs, {"total_observacoes": total, "retornados": len(recs),
+                  "proximo_cursor": proximo}
+
+
+# =========================================================================
+# /api/v1/radares/busca — BUSCA CADASTRAL (sem coordenada/raio)
+# =========================================================================
+# Mesma projecao de /radares. Cobertura parcial: ausencia de resultado NAO
+# prova ausencia de fiscalizacao.
+def buscar_cadastral(conn, filtros=None, limite=100, cursor=None):
+    filtros = filtros or {}
+    clauses, params = _filtros_extra(filtros)
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    rows = dbmod.query_all(conn, _PONTO_SQL + where + " ORDER BY p.id",
+                           params)
+    uf_filtro = (filtros.get("uf") or "").upper() or None
+    if uf_filtro:
+        rows = [r for r in rows if _uf_do_ponto(conn, r) == uf_filtro]
+    total = len(rows)
+    offset = _offset_cursor(cursor)
+    recorte = rows[offset:offset + limite]
+    proximo = None
+    if offset + limite < total:
+        proximo = str(offset + limite)
+    recs = [montar_registro(
+        conn, r,
+        incluir_operacoes=filtros.get("incluir_operacoes", True))
+        for r in recorte]
+    return recs, {"total_pontos": total, "retornados": len(recs),
+                  "proximo_cursor": proximo}

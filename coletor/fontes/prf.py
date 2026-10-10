@@ -48,6 +48,7 @@ import urllib.request
 from html.parser import HTMLParser
 
 from core import config
+from coletor import http
 from coletor.base import ColetorBase
 from coletor.fontes import normalizacao as nz
 
@@ -57,10 +58,9 @@ from coletor.fontes import normalizacao as nz
 # --------------------------------------------------------------------------
 
 def _baixar(url):
-    """GET simples com o User-Agent do projeto (so no coletor)."""
-    req = urllib.request.Request(url, headers={"User-Agent": config.USER_AGENT})
-    with urllib.request.urlopen(req, timeout=config.DEFAULT_TIMEOUT) as resp:
-        return resp.read()
+    """GET via coletor.http (HTTPS verificado, redirects e retry)."""
+    corpo, _headers, _url_final = http.baixar(url)
+    return corpo
 
 
 def _limpa(texto):

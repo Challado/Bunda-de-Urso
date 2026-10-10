@@ -56,6 +56,7 @@ PARAMS = [
     ("rodovia", "string", False, "codigo", "codigo de rodovia/via"),
     ("sentido", "string", False, "codigo cadastrado", "sentido"),
     ("em", "datetime", False, "ISO8601", "instante de referencia temporal"),
+    ("ponto_id", "string", False, "P-<n>", "filtra /api/v1/trafego por ponto"),
     ("limite", "inteiro", False, "1..1000", "itens por pagina (padrao 100)"),
     ("cursor", "string", False, "opaco", "cursor estavel de paginacao"),
     ("versao_esquema", "string", False, "string", "versao de contrato"),
@@ -63,7 +64,9 @@ PARAMS = [
 
 ENDPOINTS_AJUDA = {
     "/api/v1/radares": ["GET", "POST"],
+    "/api/v1/radares/busca": ["GET", "POST"],
     "/api/v1/radares/{id}": ["GET"],
+    "/api/v1/trafego": ["GET", "POST"],
     "/api/v1/trechos": ["GET", "POST"],
     "/api/v1/operacoes": ["GET", "POST"],
     "/api/v1/equipamentos/{id}": ["GET"],
@@ -83,7 +86,11 @@ ENDPOINTS_ADMINISTRATIVOS = {
 
 ENDPOINTS_DESC = {
     "/api/v1/radares": "Pontos de fiscalizacao (radar instalado) num raio.",
+    "/api/v1/radares/busca": ("Busca cadastral por UF/rodovia/municipio, "
+                              "sem coordenada; cobertura parcial."),
     "/api/v1/radares/{id}": "Um ponto de fiscalizacao por id (P-<n>).",
+    "/api/v1/trafego": ("Observacoes agregadas de trafego: velocidade de "
+                        "PASSAGEM, nunca limite regulamentado da via."),
     "/api/v1/trechos": ("TRECHO ELEGIVEL para radar portatil: NAO e radar "
                         "nem operacao; indica apenas que PODE haver "
                         "fiscalizacao (spec 11.5)."),
@@ -109,7 +116,13 @@ ENDPOINTS_PARAMS = {
                         "modalidade", "fiscalizacao_pontual", "uf",
                         "municipio_ibge", "rodovia", "sentido", "em",
                         "limite", "cursor", "versao_esquema"],
+    "/api/v1/radares/busca": ["formato", "delimitador", "detalhado",
+                              "incluir_inativos", "tipo_radar", "modalidade",
+                              "uf", "municipio_ibge", "rodovia",
+                              "limite", "cursor"],
     "/api/v1/radares/{id}": ["formato", "delimitador", "detalhado"],
+    "/api/v1/trafego": ["formato", "delimitador", "ponto_id",
+                        "limite", "cursor"],
     "/api/v1/trechos": ["lat", "lon", "raio", "formato", "delimitador",
                         "uf", "municipio_ibge", "rodovia", "sentido",
                         "limite", "cursor"],
@@ -160,8 +173,16 @@ COLS_ATUALIZACOES = (
     "linhas_rejeitadas", "registros_criados", "registros_alterados",
     "erro_codigo", "erro_detalhe", "artefato_id", "artefato_hash",
 )
+COLS_TRAFEGO = (
+    "id", "tipo_registro", "ponto_id", "equipamento_id", "faixa_id",
+    "categoria_veiculo", "sentido", "data_observacao",
+    "instante_observacao", "velocidade_publicada",
+    "velocidade_observada_kmh", "volume_total", "fonte_json",
+)
 COLS_POR_ENDPOINT = {
     "/api/v1/radares": list(campos.TXT_COLUMNS),
+    "/api/v1/radares/busca": list(campos.TXT_COLUMNS),
+    "/api/v1/trafego": list(COLS_TRAFEGO),
     "/api/v1/trechos": list(COLS_TRECHOS),
     "/api/v1/operacoes": list(COLS_OPERACOES),
     "/api/v1/equipamentos/{id}": list(COLS_EQUIPAMENTO),
@@ -508,6 +529,18 @@ def handle_request(environ, stdin_bytes=b""):
                              "informe o id do equipamento (E-<n>)")
             return _equipamento(conn, resto, formato, delimitador)
 
+        if caminho in ("/api/v1/trafego", "/api/v1/trafego/"):
+            if metodo not in ("GET", "POST"):
+                return _erro(405, "metodo_nao_permitido",
+                             "metodo %s nao permitido" % metodo)
+            return _trafego(conn, params, formato, delimitador)
+
+        if caminho in ("/api/v1/radares/busca", "/api/v1/radares/busca/"):
+            if metodo not in ("GET", "POST"):
+                return _erro(405, "metodo_nao_permitido",
+                             "metodo %s nao permitido" % metodo)
+            return _busca(conn, params, formato, delimitador)
+
         if caminho.startswith("/api/v1/radares"):
             resto = caminho[len("/api/v1/radares"):].strip("/")
             if resto:
@@ -723,6 +756,79 @@ def _coord(params):
         return None, None, None, _erro(
             422, "raio_invalido", "raio inteiro 1..50000")
     return lat, lon, raio, None
+
+
+# ---------------------------------------------------------------------------
+# /api/v1/radares/busca — BUSCA CADASTRAL (sem coordenada)
+# ---------------------------------------------------------------------------
+def _busca(conn, params, formato, delimitador):
+    filtros = {}
+    for nome in ("uf", "municipio_ibge", "rodovia", "tipo_radar",
+                 "modalidade"):
+        if params.get(nome):
+            filtros[nome] = str(params[nome])
+    try:
+        filtros["incluir_inativos"] = _bool_param(
+            params.get("incluir_inativos"), False)
+    except ValueError as exc:
+        return _erro(422, "parametro_invalido", str(exc))
+    limite = _param_limite(params)
+    if limite is None:
+        return _erro(422, "limite_invalido", "limite inteiro 1..1000")
+    records, res = consultas.buscar_cadastral(
+        conn, filtros, limite, params.get("cursor"))
+    st = consultas.status_base(conn)
+    resultado = {
+        "encontrado": bool(res["total_pontos"]),
+        "total_pontos": res["total_pontos"],
+        "total_equipamentos": sum(len(r.get("equipamentos") or [])
+                                  for r in records),
+        "retornados": res["retornados"],
+        "proximo_cursor": res["proximo_cursor"],
+        "total_operacoes": 0, "operacoes": [], "trechos": [],
+        "pontos": records,
+        "status": "parcial",
+    }
+    meta = _envelope(st, {"filtros": filtros, "busca": "cadastral"},
+                     resultado)
+    rows = [_linha_por_colunas(r, campos.TXT_COLUMNS) for r in records]
+    return _resposta_tabela(formato, _envelope_dict(meta), rows,
+                            list(campos.TXT_COLUMNS), delimitador, meta)
+
+
+# ---------------------------------------------------------------------------
+# /api/v1/trafego — OBSERVACAO AGREGADA (nao e limite legal)
+# ---------------------------------------------------------------------------
+def _trafego(conn, params, formato, delimitador):
+    limite = _param_limite(params)
+    if limite is None:
+        return _erro(422, "limite_invalido", "limite inteiro 1..1000")
+    ponto_id = None
+    if params.get("ponto_id"):
+        try:
+            ponto_id = int(str(params["ponto_id"]).upper().replace("P-", ""))
+        except (TypeError, ValueError):
+            return _erro(422, "parametro_invalido", "ponto_id invalido",
+                         campo="ponto_id")
+    records, res = consultas.buscar_trafego(
+        conn, limite, ponto_id, params.get("cursor"))
+    st = consultas.status_base(conn)
+    resultado = {
+        "encontrado": bool(res["total_observacoes"]),
+        "total_observacoes": res["total_observacoes"],
+        "retornados": res["retornados"],
+        "proximo_cursor": res["proximo_cursor"],
+        "total_pontos": 0, "total_equipamentos": 0, "total_operacoes": 0,
+        "pontos": [], "operacoes": [], "trechos": [],
+        "observacoes_trafego": records,
+        "status": "parcial",
+        "aviso": ("velocidade_observada_kmh e velocidade de PASSAGEM, "
+                  "nunca limite regulamentado da via"),
+    }
+    meta = _envelope(st, {"ponto_id": ponto_id}, resultado)
+    rows = [_linha_por_colunas(o, COLS_TRAFEGO) for o in records]
+    return _resposta_tabela(formato, _envelope_dict(meta), rows,
+                            list(COLS_TRAFEGO), delimitador, meta)
 
 
 # ---------------------------------------------------------------------------
