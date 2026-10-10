@@ -1,0 +1,1111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Radares: Cariacica - ES</name>
+    <description>Acesse: https://www.cariacica.es.gov.br/secretaria/29#! para mais informações sobre os equipamentos de fiscalização eletrônica de Velocidade das vias do Município de Cariacica - ES.</description>
+    <Style id="icon-1541-A52714-labelson">
+      <IconStyle>
+        <color>ff1427a5</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+    <Folder>
+      <name>Radares</name>
+      <Placemark>
+        <name>Mário Gurgel</name>
+        <description><![CDATA[nome: Radar<br>descrição: https://www.cariacica.es.gov.br/secretaria/29#!<br>id: 9<br>X: 357272.994000000006054<br>Y: 7751153.898000000044703<br>Qtdd_faixa: 3<br>Qtdd_Radar: 2<br>Codigo: 12665<br>Equipament: CARIA8862<br>Modelo: 1: SMARTPK FROD<br>Marca: 1: Perkons<br>tipo: Avenida<br>km: 2<br>metro: 77<br>Bairro: ALTO LAGE<br>Via: Principal<br>Class: Rodovia<br>tipo_pista: Múltipla<br>limite: 60<br>data_aferi: 2024/07/14<br>Empresa: SITRAN<br>num_inmetr: 15234441<br>Volume: 23.037<br>num: ]]></description>
+        <styleUrl>#icon-1541-A52714-labelson</styleUrl>
+        <ExtendedData>
+          <Data name="nome">
+            <value>Radar</value>
+          </Data>
+          <Data name="descrição">
+            <value>https://www.cariacica.es.gov.br/secretaria/29#!</value>
+          </Data>
+          <Data name="id">
+            <value>9</value>
+          </Data>
+          <Data name="X">
+            <value>357272.994000000006054</value>
+          </Data>
+          <Data name="Y">
+            <value>7751153.898000000044703</value>
+          </Data>
+          <Data name="Qtdd_faixa">
+            <value>3</value>
+          </Data>
+          <Data name="Qtdd_Radar">
+            <value>2</value>
+          </Data>
+          <Data name="Codigo">
+            <value>12665</value>
+          </Data>
+          <Data name="Equipament">
+            <value>CARIA8862</value>
+          </Data>
+          <Data name="Modelo">
+            <value>1: SMARTPK FROD</value>
+          </Data>
+          <Data name="Marca">
+            <value>1: Perkons</value>
+          </Data>
+          <Data name="tipo">
+            <value>Avenida</value>
+          </Data>
+          <Data name="km">
+            <value>2</value>
+          </Data>
+          <Data name="metro">
+            <value>77</value>
+          </Data>
+          <Data name="Bairro">
+            <value>ALTO LAGE</value>
+          </Data>
+          <Data name="Via">
+            <value>Principal</value>
+          </Data>
+          <Data name="Class">
+            <value>Rodovia</value>
+          </Data>
+          <Data name="tipo_pista">
+            <value>Múltipla</value>
+          </Data>
+          <Data name="limite">
+            <value>60</value>
+          </Data>
+          <Data name="data_aferi">
+            <value>2024/07/14</value>
+          </Data>
+          <Data name="Empresa">
+            <value>SITRAN</value>
+          </Data>
+          <Data name="num_inmetr">
+            <value>15234441</value>
+          </Data>
+          <Data name="Volume">
+            <value>23.037</value>
+          </Data>
+          <Data name="num">
+            <value/>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -40.367228,-20.3323,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Mário Gurgel</name>
+        <description><![CDATA[nome: Radar<br>descrição: https://www.cariacica.es.gov.br/secretaria/29#!<br>id: 8<br>X: 357272.994000000006054<br>Y: 7751153.898000000044703<br>Qtdd_faixa: 3<br>Qtdd_Radar: 2<br>Codigo: 12664<br>Equipament: CARIA8861<br>Modelo: 1: SMARTPK FROD<br>Marca: 1: Perkons<br>tipo: Avenida<br>km: 2<br>metro: 77<br>Bairro: ALTO LAGE<br>Via: Principal<br>Class: Rodovia<br>tipo_pista: Múltipla<br>limite: 60<br>data_aferi: 2024/06/30<br>Empresa: SITRAN<br>num_inmetr: 15234440<br>Volume: 28.581<br>num: ]]></description>
+        <styleUrl>#icon-1541-A52714-labelson</styleUrl>
+        <ExtendedData>
+          <Data name="nome">
+            <value>Radar</value>
+          </Data>
+          <Data name="descrição">
+            <value>https://www.cariacica.es.gov.br/secretaria/29#!</value>
+          </Data>
+          <Data name="id">
+            <value>8</value>
+          </Data>
+          <Data name="X">
+            <value>357272.994000000006054</value>
+          </Data>
+          <Data name="Y">
+            <value>7751153.898000000044703</value>
+          </Data>
+          <Data name="Qtdd_faixa">
+            <value>3</value>
+          </Data>
+          <Data name="Qtdd_Radar">
+            <value>2</value>
+          </Data>
+          <Data name="Codigo">
+            <value>12664</value>
+          </Data>
+          <Data name="Equipament">
+            <value>CARIA8861</value>
+          </Data>
+          <Data name="Modelo">
+            <value>1: SMARTPK FROD</value>
+          </Data>
+          <Data name="Marca">
+            <value>1: Perkons</value>
+          </Data>
+          <Data name="tipo">
+            <value>Avenida</value>
+          </Data>
+          <Data name="km">
+            <value>2</value>
+          </Data>
+          <Data name="metro">
+            <value>77</value>
+          </Data>
+          <Data name="Bairro">
+            <value>ALTO LAGE</value>
+          </Data>
+          <Data name="Via">
+            <value>Principal</value>
+          </Data>
+          <Data name="Class">
+            <value>Rodovia</value>
+          </Data>
+          <Data name="tipo_pista">
+            <value>Múltipla</value>
+          </Data>
+          <Data name="limite">
+            <value>60</value>
+          </Data>
+          <Data name="data_aferi">
+            <value>2024/06/30</value>
+          </Data>
+          <Data name="Empresa">
+            <value>SITRAN</value>
+          </Data>
+          <Data name="num_inmetr">
+            <value>15234440</value>
+          </Data>
+          <Data name="Volume">
+            <value>28.581</value>
+          </Data>
+          <Data name="num">
+            <value/>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -40.367228,-20.3323,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Mário Gurgel</name>
+        <description><![CDATA[nome: Radar<br>descrição: https://www.cariacica.es.gov.br/secretaria/29#!<br>id: 10<br>X: 358140.282999999995809<br>Y: 7751074.356999999843538<br>Qtdd_faixa: 4<br>Qtdd_Radar: 1<br>Codigo: 12660<br>Equipament: CARIA8858<br>Modelo: 1: SMARTPK FROD<br>Marca: 1: Perkons<br>tipo: Avenida<br>km: 1<br>metro: 72<br>Bairro: JARDIM AMÉRICA<br>Via: Principal<br>Class: Rodovia<br>tipo_pista: Múltipla<br>limite: 60<br>data_aferi: 2024/07/21<br>Empresa: SITRAN<br>num_inmetr: 15245576<br>Volume: 26.234<br>num: ]]></description>
+        <styleUrl>#icon-1541-A52714-labelson</styleUrl>
+        <ExtendedData>
+          <Data name="nome">
+            <value>Radar</value>
+          </Data>
+          <Data name="descrição">
+            <value>https://www.cariacica.es.gov.br/secretaria/29#!</value>
+          </Data>
+          <Data name="id">
+            <value>10</value>
+          </Data>
+          <Data name="X">
+            <value>358140.282999999995809</value>
+          </Data>
+          <Data name="Y">
+            <value>7751074.356999999843538</value>
+          </Data>
+          <Data name="Qtdd_faixa">
+            <value>4</value>
+          </Data>
+          <Data name="Qtdd_Radar">
+            <value>1</value>
+          </Data>
+          <Data name="Codigo">
+            <value>12660</value>
+          </Data>
+          <Data name="Equipament">
+            <value>CARIA8858</value>
+          </Data>
+          <Data name="Modelo">
+            <value>1: SMARTPK FROD</value>
+          </Data>
+          <Data name="Marca">
+            <value>1: Perkons</value>
+          </Data>
+          <Data name="tipo">
+            <value>Avenida</value>
+          </Data>
+          <Data name="km">
+            <value>1</value>
+          </Data>
+          <Data name="metro">
+            <value>72</value>
+          </Data>
+          <Data name="Bairro">
+            <value>JARDIM AMÉRICA</value>
+          </Data>
+          <Data name="Via">
+            <value>Principal</value>
+          </Data>
+          <Data name="Class">
+            <value>Rodovia</value>
+          </Data>
+          <Data name="tipo_pista">
+            <value>Múltipla</value>
+          </Data>
+          <Data name="limite">
+            <value>60</value>
+          </Data>
+          <Data name="data_aferi">
+            <value>2024/07/21</value>
+          </Data>
+          <Data name="Empresa">
+            <value>SITRAN</value>
+          </Data>
+          <Data name="num_inmetr">
+            <value>15245576</value>
+          </Data>
+          <Data name="Volume">
+            <value>26.234</value>
+          </Data>
+          <Data name="num">
+            <value/>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -40.358928,-20.333083,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Mário Gurgel</name>
+        <description><![CDATA[nome: Radar<br>descrição: https://www.cariacica.es.gov.br/secretaria/29#!<br>id: 11<br>X: 358092.927000000025146<br>Y: 7751084.113000000827014<br>Qtdd_faixa: 4<br>Qtdd_Radar: 2<br>Codigo: 12662<br>Equipament: CARIA8860<br>Modelo: 1: SMARTPK FROD<br>Marca: 1: Perkons<br>tipo: Avenida<br>km: 1<br>metro: 8<br>Bairro: JARDIM AMÉRICA<br>Via: Principal<br>Class: Rodovia<br>tipo_pista: Múltipla<br>limite: 60<br>data_aferi: 2024/07/21<br>Empresa: SITRAN<br>num_inmetr: 15245575<br>Volume: 22.408<br>num: ]]></description>
+        <styleUrl>#icon-1541-A52714-labelson</styleUrl>
+        <ExtendedData>
+          <Data name="nome">
+            <value>Radar</value>
+          </Data>
+          <Data name="descrição">
+            <value>https://www.cariacica.es.gov.br/secretaria/29#!</value>
+          </Data>
+          <Data name="id">
+            <value>11</value>
+          </Data>
+          <Data name="X">
+            <value>358092.927000000025146</value>
+          </Data>
+          <Data name="Y">
+            <value>7751084.113000000827014</value>
+          </Data>
+          <Data name="Qtdd_faixa">
+            <value>4</value>
+          </Data>
+          <Data name="Qtdd_Radar">
+            <value>2</value>
+          </Data>
+          <Data name="Codigo">
+            <value>12662</value>
+          </Data>
+          <Data name="Equipament">
+            <value>CARIA8860</value>
+          </Data>
+          <Data name="Modelo">
+            <value>1: SMARTPK FROD</value>
+          </Data>
+          <Data name="Marca">
+            <value>1: Perkons</value>
+          </Data>
+          <Data name="tipo">
+            <value>Avenida</value>
+          </Data>
+          <Data name="km">
+            <value>1</value>
+          </Data>
+          <Data name="metro">
+            <value>8</value>
+          </Data>
+          <Data name="Bairro">
+            <value>JARDIM AMÉRICA</value>
+          </Data>
+          <Data name="Via">
+            <value>Principal</value>
+          </Data>
+          <Data name="Class">
+            <value>Rodovia</value>
+          </Data>
+          <Data name="tipo_pista">
+            <value>Múltipla</value>
+          </Data>
+          <Data name="limite">
+            <value>60</value>
+          </Data>
+          <Data name="data_aferi">
+            <value>2024/07/21</value>
+          </Data>
+          <Data name="Empresa">
+            <value>SITRAN</value>
+          </Data>
+          <Data name="num_inmetr">
+            <value>15245575</value>
+          </Data>
+          <Data name="Volume">
+            <value>22.408</value>
+          </Data>
+          <Data name="num">
+            <value/>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -40.359381,-20.332992,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Mário Gurgel</name>
+        <description><![CDATA[nome: Radar<br>descrição: https://www.cariacica.es.gov.br/secretaria/29#!<br>id: 7<br>X: 358092.927000000025146<br>Y: 7751084.113000000827014<br>Qtdd_faixa: 4<br>Qtdd_Radar: 2<br>Codigo: 12661<br>Equipament: CARIA8859<br>Modelo: 1: SMARTPK FROD<br>Marca: 1: Perkons<br>tipo: Avenida<br>km: 1<br>metro: 8<br>Bairro: JARDIM AMÉRICA<br>Via: Principal<br>Class: Rodovia<br>tipo_pista: Múltipla<br>limite: 60<br>data_aferi: 2024/07/21<br>Empresa: SITRAN<br>num_inmetr: 15234442<br>Volume: 23.572<br>num: ]]></description>
+        <styleUrl>#icon-1541-A52714-labelson</styleUrl>
+        <ExtendedData>
+          <Data name="nome">
+            <value>Radar</value>
+          </Data>
+          <Data name="descrição">
+            <value>https://www.cariacica.es.gov.br/secretaria/29#!</value>
+          </Data>
+          <Data name="id">
+            <value>7</value>
+          </Data>
+          <Data name="X">
+            <value>358092.927000000025146</value>
+          </Data>
+          <Data name="Y">
+            <value>7751084.113000000827014</value>
+          </Data>
+          <Data name="Qtdd_faixa">
+            <value>4</value>
+          </Data>
+          <Data name="Qtdd_Radar">
+            <value>2</value>
+          </Data>
+          <Data name="Codigo">
+            <value>12661</value>
+          </Data>
+          <Data name="Equipament">
+            <value>CARIA8859</value>
+          </Data>
+          <Data name="Modelo">
+            <value>1: SMARTPK FROD</value>
+          </Data>
+          <Data name="Marca">
+            <value>1: Perkons</value>
+          </Data>
+          <Data name="tipo">
+            <value>Avenida</value>
+          </Data>
+          <Data name="km">
+            <value>1</value>
+          </Data>
+          <Data name="metro">
+            <value>8</value>
+          </Data>
+          <Data name="Bairro">
+            <value>JARDIM AMÉRICA</value>
+          </Data>
+          <Data name="Via">
+            <value>Principal</value>
+          </Data>
+          <Data name="Class">
+            <value>Rodovia</value>
+          </Data>
+          <Data name="tipo_pista">
+            <value>Múltipla</value>
+          </Data>
+          <Data name="limite">
+            <value>60</value>
+          </Data>
+          <Data name="data_aferi">
+            <value>2024/07/21</value>
+          </Data>
+          <Data name="Empresa">
+            <value>SITRAN</value>
+          </Data>
+          <Data name="num_inmetr">
+            <value>15234442</value>
+          </Data>
+          <Data name="Volume">
+            <value>23.572</value>
+          </Data>
+          <Data name="num">
+            <value/>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -40.359381,-20.332992,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Mário Gurgel</name>
+        <description><![CDATA[nome: Radar<br>descrição: https://www.cariacica.es.gov.br/secretaria/29#!<br>id: 6<br>X: 358201.037000000011176<br>Y: 7751092.998999999836087<br>Qtdd_faixa: 4<br>Qtdd_Radar: 1<br>Codigo: 12659<br>Equipament: CARIA8857<br>Modelo: 1: SMARTPK FROD<br>Marca: 1: Perkons<br>tipo: Avenida<br>km: 1<br>metro: 68<br>Bairro: JARDIM AMÉRICA<br>Via: Principal<br>Class: Rodovia<br>tipo_pista: Múltipla<br>limite: 60<br>data_aferi: 2024/07/21<br>Empresa: SITRAN<br>num_inmetr: 15234443<br>Volume: 28.792<br>num: ]]></description>
+        <styleUrl>#icon-1541-A52714-labelson</styleUrl>
+        <ExtendedData>
+          <Data name="nome">
+            <value>Radar</value>
+          </Data>
+          <Data name="descrição">
+            <value>https://www.cariacica.es.gov.br/secretaria/29#!</value>
+          </Data>
+          <Data name="id">
+            <value>6</value>
+          </Data>
+          <Data name="X">
+            <value>358201.037000000011176</value>
+          </Data>
+          <Data name="Y">
+            <value>7751092.998999999836087</value>
+          </Data>
+          <Data name="Qtdd_faixa">
+            <value>4</value>
+          </Data>
+          <Data name="Qtdd_Radar">
+            <value>1</value>
+          </Data>
+          <Data name="Codigo">
+            <value>12659</value>
+          </Data>
+          <Data name="Equipament">
+            <value>CARIA8857</value>
+          </Data>
+          <Data name="Modelo">
+            <value>1: SMARTPK FROD</value>
+          </Data>
+          <Data name="Marca">
+            <value>1: Perkons</value>
+          </Data>
+          <Data name="tipo">
+            <value>Avenida</value>
+          </Data>
+          <Data name="km">
+            <value>1</value>
+          </Data>
+          <Data name="metro">
+            <value>68</value>
+          </Data>
+          <Data name="Bairro">
+            <value>JARDIM AMÉRICA</value>
+          </Data>
+          <Data name="Via">
+            <value>Principal</value>
+          </Data>
+          <Data name="Class">
+            <value>Rodovia</value>
+          </Data>
+          <Data name="tipo_pista">
+            <value>Múltipla</value>
+          </Data>
+          <Data name="limite">
+            <value>60</value>
+          </Data>
+          <Data name="data_aferi">
+            <value>2024/07/21</value>
+          </Data>
+          <Data name="Empresa">
+            <value>SITRAN</value>
+          </Data>
+          <Data name="num_inmetr">
+            <value>15234443</value>
+          </Data>
+          <Data name="Volume">
+            <value>28.792</value>
+          </Data>
+          <Data name="num">
+            <value/>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -40.358344,-20.332919,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Delegado Federal Geraldo Guimarães</name>
+        <description><![CDATA[nome: Radar<br>descrição: https://www.cariacica.es.gov.br/secretaria/29#!<br>id: 5<br>X: 357386.015000000013970<br>Y: 7752636.004999999888241<br>Qtdd_faixa: 2<br>Qtdd_Radar: 1<br>Codigo: 12673<br>Equipament: CARIA8869<br>Modelo: 1: SMARTPK FROD<br>Marca: 1: Perkons<br>tipo: Avenida<br>km: <br>metro: <br>Bairro: MORADA DE SANTA FÉ<br>Via: Principal<br>Class: Rodovia<br>tipo_pista: Simples<br>limite: 50<br>data_aferi: 2024/07/07<br>Empresa: SITRAN<br>num_inmetr: 15278160<br>Volume: <br>num: 510]]></description>
+        <styleUrl>#icon-1541-A52714-labelson</styleUrl>
+        <ExtendedData>
+          <Data name="nome">
+            <value>Radar</value>
+          </Data>
+          <Data name="descrição">
+            <value>https://www.cariacica.es.gov.br/secretaria/29#!</value>
+          </Data>
+          <Data name="id">
+            <value>5</value>
+          </Data>
+          <Data name="X">
+            <value>357386.015000000013970</value>
+          </Data>
+          <Data name="Y">
+            <value>7752636.004999999888241</value>
+          </Data>
+          <Data name="Qtdd_faixa">
+            <value>2</value>
+          </Data>
+          <Data name="Qtdd_Radar">
+            <value>1</value>
+          </Data>
+          <Data name="Codigo">
+            <value>12673</value>
+          </Data>
+          <Data name="Equipament">
+            <value>CARIA8869</value>
+          </Data>
+          <Data name="Modelo">
+            <value>1: SMARTPK FROD</value>
+          </Data>
+          <Data name="Marca">
+            <value>1: Perkons</value>
+          </Data>
+          <Data name="tipo">
+            <value>Avenida</value>
+          </Data>
+          <Data name="km">
+            <value/>
+          </Data>
+          <Data name="metro">
+            <value/>
+          </Data>
+          <Data name="Bairro">
+            <value>MORADA DE SANTA FÉ</value>
+          </Data>
+          <Data name="Via">
+            <value>Principal</value>
+          </Data>
+          <Data name="Class">
+            <value>Rodovia</value>
+          </Data>
+          <Data name="tipo_pista">
+            <value>Simples</value>
+          </Data>
+          <Data name="limite">
+            <value>50</value>
+          </Data>
+          <Data name="data_aferi">
+            <value>2024/07/07</value>
+          </Data>
+          <Data name="Empresa">
+            <value>SITRAN</value>
+          </Data>
+          <Data name="num_inmetr">
+            <value>15278160</value>
+          </Data>
+          <Data name="Volume">
+            <value/>
+          </Data>
+          <Data name="num">
+            <value>510</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -40.366028,-20.318919,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Delegado Federal Geraldo Guimarães</name>
+        <description><![CDATA[nome: Radar<br>descrição: https://www.cariacica.es.gov.br/secretaria/29#!<br>id: 4<br>X: 358173.467999999993481<br>Y: 7752045.368000000715256<br>Qtdd_faixa: 2<br>Qtdd_Radar: 1<br>Codigo: 12672<br>Equipament: CARIA8867<br>Modelo: 1: SMARTPK FROD<br>Marca: 1: Perkons<br>tipo: Avenida<br>km: <br>metro: <br>Bairro: MORADA DE SANTA FÉ<br>Via: Principal<br>Class: Rodovia<br>tipo_pista: Simples<br>limite: 50<br>data_aferi: 2024/07/07<br>Empresa: SITRAN<br>num_inmetr: 15278159<br>Volume: <br>num: 189]]></description>
+        <styleUrl>#icon-1541-A52714-labelson</styleUrl>
+        <ExtendedData>
+          <Data name="nome">
+            <value>Radar</value>
+          </Data>
+          <Data name="descrição">
+            <value>https://www.cariacica.es.gov.br/secretaria/29#!</value>
+          </Data>
+          <Data name="id">
+            <value>4</value>
+          </Data>
+          <Data name="X">
+            <value>358173.467999999993481</value>
+          </Data>
+          <Data name="Y">
+            <value>7752045.368000000715256</value>
+          </Data>
+          <Data name="Qtdd_faixa">
+            <value>2</value>
+          </Data>
+          <Data name="Qtdd_Radar">
+            <value>1</value>
+          </Data>
+          <Data name="Codigo">
+            <value>12672</value>
+          </Data>
+          <Data name="Equipament">
+            <value>CARIA8867</value>
+          </Data>
+          <Data name="Modelo">
+            <value>1: SMARTPK FROD</value>
+          </Data>
+          <Data name="Marca">
+            <value>1: Perkons</value>
+          </Data>
+          <Data name="tipo">
+            <value>Avenida</value>
+          </Data>
+          <Data name="km">
+            <value/>
+          </Data>
+          <Data name="metro">
+            <value/>
+          </Data>
+          <Data name="Bairro">
+            <value>MORADA DE SANTA FÉ</value>
+          </Data>
+          <Data name="Via">
+            <value>Principal</value>
+          </Data>
+          <Data name="Class">
+            <value>Rodovia</value>
+          </Data>
+          <Data name="tipo_pista">
+            <value>Simples</value>
+          </Data>
+          <Data name="limite">
+            <value>50</value>
+          </Data>
+          <Data name="data_aferi">
+            <value>2024/07/07</value>
+          </Data>
+          <Data name="Empresa">
+            <value>SITRAN</value>
+          </Data>
+          <Data name="num_inmetr">
+            <value>15278159</value>
+          </Data>
+          <Data name="Volume">
+            <value/>
+          </Data>
+          <Data name="num">
+            <value>189</value>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -40.358533,-20.324314,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Mário Gurgel</name>
+        <description><![CDATA[nome: Radar<br>descrição: https://www.cariacica.es.gov.br/secretaria/29#!<br>id: 3<br>X: 354610.324999999953434<br>Y: 7750410.541000000201166<br>Qtdd_faixa: 2<br>Qtdd_Radar: 2<br>Codigo: 12671<br>Equipament: CARIA8868<br>Modelo: 1: SMARTPK FROD<br>Marca: 1: Perkons<br>tipo: Avenida<br>km: 5<br>metro: 78<br>Bairro: SÃO FRANCISCO<br>Via: Principal<br>Class: Rodovia<br>tipo_pista: Múltipla<br>limite: 60<br>data_aferi: 2024/07/14<br>Empresa: SITRAN<br>num_inmetr: 15278157<br>Volume: 28.079<br>num: ]]></description>
+        <styleUrl>#icon-1541-A52714-labelson</styleUrl>
+        <ExtendedData>
+          <Data name="nome">
+            <value>Radar</value>
+          </Data>
+          <Data name="descrição">
+            <value>https://www.cariacica.es.gov.br/secretaria/29#!</value>
+          </Data>
+          <Data name="id">
+            <value>3</value>
+          </Data>
+          <Data name="X">
+            <value>354610.324999999953434</value>
+          </Data>
+          <Data name="Y">
+            <value>7750410.541000000201166</value>
+          </Data>
+          <Data name="Qtdd_faixa">
+            <value>2</value>
+          </Data>
+          <Data name="Qtdd_Radar">
+            <value>2</value>
+          </Data>
+          <Data name="Codigo">
+            <value>12671</value>
+          </Data>
+          <Data name="Equipament">
+            <value>CARIA8868</value>
+          </Data>
+          <Data name="Modelo">
+            <value>1: SMARTPK FROD</value>
+          </Data>
+          <Data name="Marca">
+            <value>1: Perkons</value>
+          </Data>
+          <Data name="tipo">
+            <value>Avenida</value>
+          </Data>
+          <Data name="km">
+            <value>5</value>
+          </Data>
+          <Data name="metro">
+            <value>78</value>
+          </Data>
+          <Data name="Bairro">
+            <value>SÃO FRANCISCO</value>
+          </Data>
+          <Data name="Via">
+            <value>Principal</value>
+          </Data>
+          <Data name="Class">
+            <value>Rodovia</value>
+          </Data>
+          <Data name="tipo_pista">
+            <value>Múltipla</value>
+          </Data>
+          <Data name="limite">
+            <value>60</value>
+          </Data>
+          <Data name="data_aferi">
+            <value>2024/07/14</value>
+          </Data>
+          <Data name="Empresa">
+            <value>SITRAN</value>
+          </Data>
+          <Data name="num_inmetr">
+            <value>15278157</value>
+          </Data>
+          <Data name="Volume">
+            <value>28.079</value>
+          </Data>
+          <Data name="num">
+            <value/>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -40.392789,-20.338814,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Mário Gurgel</name>
+        <description><![CDATA[nome: Radar<br>descrição: https://www.cariacica.es.gov.br/secretaria/29#!<br>id: 2<br>X: 354610.324999999953434<br>Y: 7750410.541000000201166<br>Qtdd_faixa: 2<br>Qtdd_Radar: 2<br>Codigo: 12670<br>Equipament: CARIA8866<br>Modelo: 1: SMARTPK FROD<br>Marca: 1: Perkons<br>tipo: Avenida<br>km: 5<br>metro: 78<br>Bairro: SÃO FRANCISCO<br>Via: Marginal<br>Class: Rodovia<br>tipo_pista: Simples<br>limite: 60<br>data_aferi: 2024/07/14<br>Empresa: SITRAN<br>num_inmetr: 15278158<br>Volume: 17.330<br>num: ]]></description>
+        <styleUrl>#icon-1541-A52714-labelson</styleUrl>
+        <ExtendedData>
+          <Data name="nome">
+            <value>Radar</value>
+          </Data>
+          <Data name="descrição">
+            <value>https://www.cariacica.es.gov.br/secretaria/29#!</value>
+          </Data>
+          <Data name="id">
+            <value>2</value>
+          </Data>
+          <Data name="X">
+            <value>354610.324999999953434</value>
+          </Data>
+          <Data name="Y">
+            <value>7750410.541000000201166</value>
+          </Data>
+          <Data name="Qtdd_faixa">
+            <value>2</value>
+          </Data>
+          <Data name="Qtdd_Radar">
+            <value>2</value>
+          </Data>
+          <Data name="Codigo">
+            <value>12670</value>
+          </Data>
+          <Data name="Equipament">
+            <value>CARIA8866</value>
+          </Data>
+          <Data name="Modelo">
+            <value>1: SMARTPK FROD</value>
+          </Data>
+          <Data name="Marca">
+            <value>1: Perkons</value>
+          </Data>
+          <Data name="tipo">
+            <value>Avenida</value>
+          </Data>
+          <Data name="km">
+            <value>5</value>
+          </Data>
+          <Data name="metro">
+            <value>78</value>
+          </Data>
+          <Data name="Bairro">
+            <value>SÃO FRANCISCO</value>
+          </Data>
+          <Data name="Via">
+            <value>Marginal</value>
+          </Data>
+          <Data name="Class">
+            <value>Rodovia</value>
+          </Data>
+          <Data name="tipo_pista">
+            <value>Simples</value>
+          </Data>
+          <Data name="limite">
+            <value>60</value>
+          </Data>
+          <Data name="data_aferi">
+            <value>2024/07/14</value>
+          </Data>
+          <Data name="Empresa">
+            <value>SITRAN</value>
+          </Data>
+          <Data name="num_inmetr">
+            <value>15278158</value>
+          </Data>
+          <Data name="Volume">
+            <value>17.330</value>
+          </Data>
+          <Data name="num">
+            <value/>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -40.392789,-20.338814,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Mário Gurgel</name>
+        <description><![CDATA[nome: Radar<br>descrição: https://www.cariacica.es.gov.br/secretaria/29#!<br>id: 1<br>X: 354669.367000000027474<br>Y: 7750459.623999999836087<br>Qtdd_faixa: 2<br>Qtdd_Radar: 1<br>Codigo: 12668<br>Equipament: CARIA8865A<br>Modelo: 1: SMARTPK FROD<br>Marca: 1: Perkons<br>tipo: Avenida<br>km: 5<br>metro: 65<br>Bairro: SÃO FRANCISCO<br>Via: Principal<br>Class: Rodovia<br>tipo_pista: Múltipla<br>limite: 60<br>data_aferi: 2024/07/07<br>Empresa: SITRAN<br>num_inmetr: 15278156<br>Volume: 10.036<br>num: ]]></description>
+        <styleUrl>#icon-1541-A52714-labelson</styleUrl>
+        <ExtendedData>
+          <Data name="nome">
+            <value>Radar</value>
+          </Data>
+          <Data name="descrição">
+            <value>https://www.cariacica.es.gov.br/secretaria/29#!</value>
+          </Data>
+          <Data name="id">
+            <value>1</value>
+          </Data>
+          <Data name="X">
+            <value>354669.367000000027474</value>
+          </Data>
+          <Data name="Y">
+            <value>7750459.623999999836087</value>
+          </Data>
+          <Data name="Qtdd_faixa">
+            <value>2</value>
+          </Data>
+          <Data name="Qtdd_Radar">
+            <value>1</value>
+          </Data>
+          <Data name="Codigo">
+            <value>12668</value>
+          </Data>
+          <Data name="Equipament">
+            <value>CARIA8865A</value>
+          </Data>
+          <Data name="Modelo">
+            <value>1: SMARTPK FROD</value>
+          </Data>
+          <Data name="Marca">
+            <value>1: Perkons</value>
+          </Data>
+          <Data name="tipo">
+            <value>Avenida</value>
+          </Data>
+          <Data name="km">
+            <value>5</value>
+          </Data>
+          <Data name="metro">
+            <value>65</value>
+          </Data>
+          <Data name="Bairro">
+            <value>SÃO FRANCISCO</value>
+          </Data>
+          <Data name="Via">
+            <value>Principal</value>
+          </Data>
+          <Data name="Class">
+            <value>Rodovia</value>
+          </Data>
+          <Data name="tipo_pista">
+            <value>Múltipla</value>
+          </Data>
+          <Data name="limite">
+            <value>60</value>
+          </Data>
+          <Data name="data_aferi">
+            <value>2024/07/07</value>
+          </Data>
+          <Data name="Empresa">
+            <value>SITRAN</value>
+          </Data>
+          <Data name="num_inmetr">
+            <value>15278156</value>
+          </Data>
+          <Data name="Volume">
+            <value>10.036</value>
+          </Data>
+          <Data name="num">
+            <value/>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -40.392219,-20.338375,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Mário Gurgel</name>
+        <description><![CDATA[nome: Radar<br>descrição: https://www.cariacica.es.gov.br/secretaria/29#!<br>id: 13<br>X: -40.378527777777997<br>Y: -20.336472222222000<br>Qtdd_faixa: 4<br>Qtdd_Radar: 2<br>Codigo: 12663<br>Equipament: CARIA8863<br>Modelo: 1: SMARTPK FROD<br>Marca: 1: Perkons<br>tipo: Avenida<br>km: 4<br>metro: 3<br>Bairro: VILA PALESTINA<br>Via: Principal<br>Class: Rodovia<br>tipo_pista: Múltipla<br>limite: 60<br>data_aferi: 2024/06/30<br>Empresa: SITRAN<br>num_inmetr: 15245578<br>Volume: 13.805<br>num: ]]></description>
+        <styleUrl>#icon-1541-A52714-labelson</styleUrl>
+        <ExtendedData>
+          <Data name="nome">
+            <value>Radar</value>
+          </Data>
+          <Data name="descrição">
+            <value>https://www.cariacica.es.gov.br/secretaria/29#!</value>
+          </Data>
+          <Data name="id">
+            <value>13</value>
+          </Data>
+          <Data name="X">
+            <value>-40.378527777777997</value>
+          </Data>
+          <Data name="Y">
+            <value>-20.336472222222000</value>
+          </Data>
+          <Data name="Qtdd_faixa">
+            <value>4</value>
+          </Data>
+          <Data name="Qtdd_Radar">
+            <value>2</value>
+          </Data>
+          <Data name="Codigo">
+            <value>12663</value>
+          </Data>
+          <Data name="Equipament">
+            <value>CARIA8863</value>
+          </Data>
+          <Data name="Modelo">
+            <value>1: SMARTPK FROD</value>
+          </Data>
+          <Data name="Marca">
+            <value>1: Perkons</value>
+          </Data>
+          <Data name="tipo">
+            <value>Avenida</value>
+          </Data>
+          <Data name="km">
+            <value>4</value>
+          </Data>
+          <Data name="metro">
+            <value>3</value>
+          </Data>
+          <Data name="Bairro">
+            <value>VILA PALESTINA</value>
+          </Data>
+          <Data name="Via">
+            <value>Principal</value>
+          </Data>
+          <Data name="Class">
+            <value>Rodovia</value>
+          </Data>
+          <Data name="tipo_pista">
+            <value>Múltipla</value>
+          </Data>
+          <Data name="limite">
+            <value>60</value>
+          </Data>
+          <Data name="data_aferi">
+            <value>2024/06/30</value>
+          </Data>
+          <Data name="Empresa">
+            <value>SITRAN</value>
+          </Data>
+          <Data name="num_inmetr">
+            <value>15245578</value>
+          </Data>
+          <Data name="Volume">
+            <value>13.805</value>
+          </Data>
+          <Data name="num">
+            <value/>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -40.378528,-20.336472,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>Mário Gurgel</name>
+        <description><![CDATA[nome: Radar<br>descrição: https://www.cariacica.es.gov.br/secretaria/29#!<br>id: 12<br>X: -40.378111111110996<br>Y: -20.336222222221998<br>Qtdd_faixa: 4<br>Qtdd_Radar: 2<br>Codigo: 12676<br>Equipament: CARIA8864<br>Modelo: 1: SMARTPK FROD<br>Marca: 1: Perkons<br>tipo: Avenida<br>km: 4<br>metro: 3<br>Bairro: VILA PALESTINA<br>Via: Principal<br>Class: Rodovia<br>tipo_pista: Múltipla<br>limite: 60<br>data_aferi: 2024/06/30<br>Empresa: SITRAN<br>num_inmetr: 15245577<br>Volume: 31.819<br>num: ]]></description>
+        <styleUrl>#icon-1541-A52714-labelson</styleUrl>
+        <ExtendedData>
+          <Data name="nome">
+            <value>Radar</value>
+          </Data>
+          <Data name="descrição">
+            <value>https://www.cariacica.es.gov.br/secretaria/29#!</value>
+          </Data>
+          <Data name="id">
+            <value>12</value>
+          </Data>
+          <Data name="X">
+            <value>-40.378111111110996</value>
+          </Data>
+          <Data name="Y">
+            <value>-20.336222222221998</value>
+          </Data>
+          <Data name="Qtdd_faixa">
+            <value>4</value>
+          </Data>
+          <Data name="Qtdd_Radar">
+            <value>2</value>
+          </Data>
+          <Data name="Codigo">
+            <value>12676</value>
+          </Data>
+          <Data name="Equipament">
+            <value>CARIA8864</value>
+          </Data>
+          <Data name="Modelo">
+            <value>1: SMARTPK FROD</value>
+          </Data>
+          <Data name="Marca">
+            <value>1: Perkons</value>
+          </Data>
+          <Data name="tipo">
+            <value>Avenida</value>
+          </Data>
+          <Data name="km">
+            <value>4</value>
+          </Data>
+          <Data name="metro">
+            <value>3</value>
+          </Data>
+          <Data name="Bairro">
+            <value>VILA PALESTINA</value>
+          </Data>
+          <Data name="Via">
+            <value>Principal</value>
+          </Data>
+          <Data name="Class">
+            <value>Rodovia</value>
+          </Data>
+          <Data name="tipo_pista">
+            <value>Múltipla</value>
+          </Data>
+          <Data name="limite">
+            <value>60</value>
+          </Data>
+          <Data name="data_aferi">
+            <value>2024/06/30</value>
+          </Data>
+          <Data name="Empresa">
+            <value>SITRAN</value>
+          </Data>
+          <Data name="num_inmetr">
+            <value>15245577</value>
+          </Data>
+          <Data name="Volume">
+            <value>31.819</value>
+          </Data>
+          <Data name="num">
+            <value/>
+          </Data>
+        </ExtendedData>
+        <Point>
+          <coordinates>
+            -40.378111,-20.336222,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+  </Document>
+</kml>
