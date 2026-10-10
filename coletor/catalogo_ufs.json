@@ -27,8 +27,9 @@
       "tipo_esperado": "cadastro_equipamento",
       "estado_integracao": "pendente_lai",
       "nosso_modulo": null,
-      "observacao": "Publicacao de 2013; dado historico, NAO comprova operacao em 2026. Solicitar cadastro atual via LAI ao Detran-AC/DERACRE.",
-      "cobertura_estadual_confirmada": false
+      "observacao": "Publicacao de 2013 (historico) em agencia.ac.gov.br (HTTP 503 em 10/10/2026); portal atual https://www.detran.ac.gov.br/ so oferece consulta de autos/convênios, sem cadastro. Solicitar cadastro atual via LAI (Detran-AC/DERACRE). Modulo diagnostico: detran_ac.",
+      "cobertura_estadual_confirmada": false,
+      "modulo_diagnostico": "detran_ac"
     },
     {
       "uf": "AL",
@@ -39,8 +40,9 @@
       "tipo_esperado": "institucional_sem_lista",
       "estado_integracao": "sem_publicacao",
       "nosso_modulo": null,
-      "observacao": "Apenas canal institucional; dados de cameras nao provam radar de velocidade. Sem lista publicada; solicitar via LAI.",
-      "cobertura_estadual_confirmada": false
+      "observacao": "Apenas canal institucional do DER-AL (alagoasdigital); https://www.der.al.gov.br/ fora do ar em 10/10/2026. DMT Maceio tambem institucional. Sem lista publicada; solicitar relacao via LAI. Modulo diagnostico: der_al.",
+      "cobertura_estadual_confirmada": false,
+      "modulo_diagnostico": "der_al"
     },
     {
       "uf": "AP",
@@ -49,8 +51,8 @@
       "url_pagina": "https://macapa.ap.gov.br/radares-de-macapa-passam-a-ter-velocidade-maxima-permitida-de-60-km-h-a-partir-desta-terca-21/",
       "classificacao_evidencia": "lista_localizacao_historica",
       "tipo_esperado": "cadastro_equipamento",
-      "estado_integracao": "pendente",
-      "nosso_modulo": null,
+      "estado_integracao": "implementado",
+      "nosso_modulo": "ctmac_ap",
       "observacao": "Lista de 17 locais divulgada em 2022; localizar publicacao recente, documentos tecnicos e coordenadas.",
       "cobertura_estadual_confirmada": false
     },
@@ -61,8 +63,8 @@
       "url_pagina": "https://www.manaus.am.gov.br/noticia/transito/fiscalizacao-eletronica-salvar-vidas/",
       "classificacao_evidencia": "lista_localizacao",
       "tipo_esperado": "cadastro_equipamento",
-      "estado_integracao": "pendente",
-      "nosso_modulo": null,
+      "estado_integracao": "parcial",
+      "nosso_modulo": "immu_am",
       "observacao": "Lista de equipamentos e locais de 2026; validar arquivo, atualizacoes e status posterior.",
       "cobertura_estadual_confirmada": false
     },
@@ -73,8 +75,8 @@
       "url_pagina": "https://www.ba.gov.br/infraestrutura/12046/mapas",
       "classificacao_evidencia": "geoarquivo_oficial",
       "tipo_esperado": "cadastro_equipamento",
-      "estado_integracao": "pendente",
-      "nosso_modulo": null,
+      "estado_integracao": "parcial",
+      "nosso_modulo": "seinfra_ba",
       "observacao": "Pagina oficial com KML, mapa web e PDF; descobrir links atuais e testar geometria/atributos. Fonte adicional: SEINFRA_BA_ESTATICOS.",
       "cobertura_estadual_confirmada": false
     },
@@ -85,8 +87,8 @@
       "url_pagina": "https://mapas.fortaleza.ce.gov.br/mapa/538/equipamentos-de-fiscalizacao-eletronica",
       "classificacao_evidencia": "geoarquivo_oficial",
       "tipo_esperado": "cadastro_equipamento",
-      "estado_integracao": "pendente",
-      "nosso_modulo": null,
+      "estado_integracao": "implementado",
+      "nosso_modulo": "amc_ce",
       "observacao": "2026: GeoJSON/KML/SHP/CSV com campos sitio/status/finalidade/endereco/viasentido/bairro/faixas. Fonte adicional CKAN: AMC_FORTALEZA_CKAN.",
       "cobertura_estadual_confirmada": false
     },
@@ -97,8 +99,8 @@
       "url_pagina": "https://detran.df.gov.br/wp-content/uploads/2022/10/Equipamentos_Eletronicos.pdf",
       "classificacao_evidencia": "geoportal_documentado",
       "tipo_esperado": "cadastro_equipamento",
-      "estado_integracao": "pendente",
-      "nosso_modulo": null,
+      "estado_integracao": "parcial",
+      "nosso_modulo": "detran_df",
       "observacao": "Documento ensina consultar a camada Equipamentos Eletronicos no Geoportal; nao e lista tabular. Identificar WMS/WFS/ArcGIS. Historico adicional: DER_DF_HISTORICO (pardais 2011).",
       "cobertura_estadual_confirmada": false
     },
@@ -109,8 +111,8 @@
       "url_pagina": "https://cariacica.es.gov.br/pagina/ler/861/mapa-radares",
       "classificacao_evidencia": "lista_documentos",
       "tipo_esperado": "cadastro_equipamento",
-      "estado_integracao": "pendente",
-      "nosso_modulo": null,
+      "estado_integracao": "implementado",
+      "nosso_modulo": "cariacica_es",
       "observacao": "Publica mapa, estudos tecnicos e PDF de faixas; municipio NAO cobre todo o Espirito Santo.",
       "cobertura_estadual_confirmada": false
     },
@@ -121,8 +123,8 @@
       "url_pagina": "https://goias.gov.br/goinfra/relatorio-de-equipamentos-de-monitoramento-da-goinfra/",
       "classificacao_evidencia": "relatorio_oficial",
       "tipo_esperado": "cadastro_equipamento",
-      "estado_integracao": "pendente",
-      "nosso_modulo": null,
+      "estado_integracao": "implementado",
+      "nosso_modulo": "goinfra",
       "observacao": "Atualizado 07/10/2026: codigos, series, tipos, rodovias, km, coordenadas, velocidades, datas e estudos. Fonte adicional: GOINFRA_ESTUDOS.",
       "cobertura_estadual_confirmada": false
     },
@@ -133,8 +135,8 @@
       "url_pagina": "https://www.detran.ma.gov.br/inicio/paginas/Pagina.xhtml?id=23582",
       "classificacao_evidencia": "lista_localizacao",
       "tipo_esperado": "cadastro_equipamento",
-      "estado_integracao": "pendente",
-      "nosso_modulo": null,
+      "estado_integracao": "implementado",
+      "nosso_modulo": "detran_ma",
       "observacao": "Detran-MA declara divulgar localizacao e informacoes de radares estaduais. Fonte adicional municipal: SMTT_SAO_LUIS.",
       "cobertura_estadual_confirmada": false
     },
@@ -165,8 +167,8 @@
       "url_pagina": "https://www.campogrande.ms.gov.br/cgnoticias/noticia/novos-radares-operam-em-carater-educativo-ate-14-de-julho/",
       "classificacao_evidencia": "lista_localizacao",
       "tipo_esperado": "cadastro_equipamento",
-      "estado_integracao": "pendente",
-      "nosso_modulo": null,
+      "estado_integracao": "implementado",
+      "nosso_modulo": "agetran_ms",
       "observacao": "Publicacao 26/06/2026 informa locais e inicio de fiscalizacao em 15/07; cidades fora da capital NAO cobertas.",
       "cobertura_estadual_confirmada": false
     },
@@ -189,8 +191,8 @@
       "url_pagina": "https://seguranca.belem.pa.gov.br/portarias-de-ativacao-e-desativacao-de-radares/",
       "classificacao_evidencia": "lista_documentos",
       "tipo_esperado": "cadastro_equipamento",
-      "estado_integracao": "pendente",
-      "nosso_modulo": null,
+      "estado_integracao": "parcial",
+      "nosso_modulo": "segbell_pa",
       "observacao": "Portarias de ativacao/desativacao com identificadores; reunir situacao temporal e complementar com relacao de radares.",
       "cobertura_estadual_confirmada": false
     },
@@ -201,8 +203,8 @@
       "url_pagina": "https://www.joaopessoa.pb.gov.br/noticias/secretarias-e-orgaos/semob/semobjp-orienta-populacao-sobre-novos-locais-com-radares-medidores-de-velocidade/",
       "classificacao_evidencia": "lista_localizacao",
       "tipo_esperado": "cadastro_equipamento",
-      "estado_integracao": "pendente",
-      "nosso_modulo": null,
+      "estado_integracao": "parcial",
+      "nosso_modulo": "semob_pb",
       "observacao": "Prefeitura aponta portal.semobjp.pb.gov.br para a lista completa; conferir versao vigente.",
       "cobertura_estadual_confirmada": false
     },
@@ -239,8 +241,9 @@
       "tipo_esperado": "cadastro_equipamento",
       "estado_integracao": "pendente_lai",
       "nosso_modulo": null,
-      "observacao": "Publicacao de 2019 (historico); conferir listagem atual e solicitar dados STRANS/DER-PI via LAI.",
-      "cobertura_estadual_confirmada": false
+      "observacao": "Publicacao de 2019 (historico) ANUNCIA divulgacao mensal da lista (sem publica-la); STRANS fora do ar em 10/10/2026 (strans.teresina.pi.gov.br) e Prefeitura/DER-PI atuais sem cadastro. Solicitar dado atual via LAI (STRANS/DER-PI). Modulo diagnostico: teresina_pi.",
+      "cobertura_estadual_confirmada": false,
+      "modulo_diagnostico": "teresina_pi"
     },
     {
       "uf": "RJ",
@@ -249,8 +252,8 @@
       "url_pagina": "https://sgitp.der.rj.gov.br/radares-portateis",
       "classificacao_evidencia": "lista_localizacao",
       "tipo_esperado": "trecho_elegivel",
-      "estado_integracao": "pendente",
-      "nosso_modulo": null,
+      "estado_integracao": "implementado",
+      "nosso_modulo": "der_rj",
       "observacao": "Rodovia/km/velocidade/sentido e janela 06-22; NAO significa equipamento presente o dia todo. Fonte adicional: DER_RJ_FIXOS.",
       "cobertura_estadual_confirmada": false
     },
@@ -263,8 +266,9 @@
       "tipo_esperado": "institucional_sem_lista",
       "estado_integracao": "sem_publicacao",
       "nosso_modulo": null,
-      "observacao": "Nao foi identificada listagem estruturada atual; solicitar relacao de radares e documentos a STTU/DER-RN.",
-      "cobertura_estadual_confirmada": false
+      "observacao": "DER-RN (https://www.der.rn.gov.br/) respondeu HTTP 503 em 10/10/2026; sem cadastro ESTADUAL. A STTU Natal tem subpagina municipal 'Equipamentos de Fiscalizacao Eletronica' (/sttu/equipamentos) com PDFs por equipamento (nao maquina-legivel, so a capital). Solicitar relacao via LAI (STTU/DER-RN). Modulo diagnostico: natal_rn.",
+      "cobertura_estadual_confirmada": false,
+      "modulo_diagnostico": "natal_rn"
     },
     {
       "uf": "RS",
@@ -273,8 +277,8 @@
       "url_pagina": "https://www.daer.rs.gov.br/radares-moveis",
       "classificacao_evidencia": "lista_trechos",
       "tipo_esperado": "trecho_elegivel",
-      "estado_integracao": "pendente",
-      "nosso_modulo": null,
+      "estado_integracao": "implementado",
+      "nosso_modulo": "daer_rs",
       "observacao": "Atualizacao declarada semanal; pontos elegiveis NAO equivalem a operacoes pontuais confirmadas. Fonte adicional: DAER_RS_PORTATEIS.",
       "cobertura_estadual_confirmada": false
     },
@@ -285,8 +289,8 @@
       "url_pagina": "https://semtran.portovelho.ro.gov.br/pagina/fiscalizacao-eletronica-radares-fixos",
       "classificacao_evidencia": "lista_documentos",
       "tipo_esperado": "cadastro_equipamento",
-      "estado_integracao": "pendente",
-      "nosso_modulo": null,
+      "estado_integracao": "implementado",
+      "nosso_modulo": "semtran_ro",
       "observacao": "PDF detalhado e serie/validades atualizados em 2026.1.",
       "cobertura_estadual_confirmada": false
     },
@@ -309,8 +313,8 @@
       "url_pagina": "https://www.joinville.sc.gov.br/publicacoes/estudos-tecnicos-equipamentos-de-fiscalizacao-eletronica-radares-e-lombadas/",
       "classificacao_evidencia": "lista_documentos",
       "tipo_esperado": "estudo_tecnico",
-      "estado_integracao": "pendente",
-      "nosso_modulo": null,
+      "estado_integracao": "parcial",
+      "nosso_modulo": "joinville_sc",
       "observacao": "Atualizacao agosto/2026 e PDFs por equipamento; NAO representa todos os municipios de SC.",
       "cobertura_estadual_confirmada": false
     },
@@ -333,8 +337,8 @@
       "url_pagina": "https://der.se.gov.br/localizacao-de-radares-fixos/",
       "classificacao_evidencia": "lista_documentos",
       "tipo_esperado": "cadastro_equipamento",
-      "estado_integracao": "pendente",
-      "nosso_modulo": null,
+      "estado_integracao": "implementado",
+      "nosso_modulo": "der_se",
       "observacao": "Pagina DER-SE com relatorio de radares e lombadas fixas; distinguir projeto/estudo de equipamento instalado e checar data. Complemento municipal: SMTT_ARACAJU.",
       "cobertura_estadual_confirmada": false
     },
@@ -345,8 +349,8 @@
       "url_pagina": "https://www.araguaina.to.gov.br/servicos/medidores-de-velocidade-lista-de-enderecos",
       "classificacao_evidencia": "lista_localizacao",
       "tipo_esperado": "cadastro_equipamento",
-      "estado_integracao": "pendente",
-      "nosso_modulo": null,
+      "estado_integracao": "implementado",
+      "nosso_modulo": "araguaiana_to",
       "observacao": "Pagina atualizada jan/2026 com download de enderecos; NAO cobre todas as rodovias estaduais.",
       "cobertura_estadual_confirmada": false
     }

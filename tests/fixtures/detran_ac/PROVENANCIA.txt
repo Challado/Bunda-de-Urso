@@ -1,0 +1,27 @@
+Fixture: Detran-AC / DERACRE - portal institucional (sem cadastro)
+=================================================================
+
+Arquivo: pagina_fixture.html
+Recorte verbatim (com tags minimas) do conteudo publicado na pagina oficial:
+
+  URL pagina : https://www.detran.ac.gov.br/
+  URL final  : (mesma; HTTP 200, text/html; charset=UTF-8, 232212 bytes)
+  Coletado em: 10/10/2026 (curl -sSL -A "RadarBrasil/1.0")
+  sha256 da pagina original:
+    9345c18b345c0320ae256a843ef5a62a687d0d8401168dfa2114d4d21434bf89
+
+Conteudo estruturado: NAO EXISTE.
+  - O portal do Detran-AC publica apenas SERVICOS institucionais e de consulta.
+  - Itens ligados a fiscalizacao: "Consulta de Imagens de autos de radar"
+    (consulta de autos ja lavrados, nao cadastro) e "Convenios de Fiscalizacao
+    de Transito" (https://www.detran.ac.gov.br/infracoes-multas/convenios-de-
+    fiscalizacao-de-transito/ , HTTP 200, 213663 bytes).
+  - Sem CSV/JSON/GeoJSON/KML/XLS => tem_dataset_estruturado = False.
+  - Unico registro publico de equipamentos e HISTORICO: materia de 2013 em
+    https://agencia.ac.gov.br/detran-anuncia-retorno-da-fiscalizacao-
+    eletronica/ (em 10/10/2026 responde HTTP 503 "Portal temporariamente fora
+    do ar").
+
+Uso: teste offline do conector coletor/fontes/detran_ac.py (nenhum acesso a
+rede). O recorte preserva as frases/link citados; e um recorte reduzido, sem
+alterar o sentido.

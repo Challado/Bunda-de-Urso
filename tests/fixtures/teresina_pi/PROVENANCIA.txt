@@ -1,0 +1,30 @@
+Fixture: STRANS Teresina - noticia de radares (2019, historica)
+===============================================================
+
+Arquivo: pagina_fixture.html
+Recorte verbatim (com tags minimas) do conteudo publicado na pagina oficial:
+
+  URL pagina : https://antigo.pmt.pi.gov.br/2019/04/10/localizacao-dos-radares-
+               sera-divulgada-mensalmente-no-site-da-prefeitura/
+  URL final  : (mesma; HTTP 200, text/html; charset=UTF-8, 73238 bytes)
+  Coletado em: 10/10/2026 (curl -sSL -A "RadarBrasil/1.0")
+  sha256 da pagina original:
+    b2b7fab711787f32ea40a1e0920846c57427786614b3071097a84ba46c0a926e
+
+Conteudo estruturado: NAO EXISTE.
+  - E uma NOTICIA de 10/04/2019 ("Localizacao dos radares sera divulgada
+    mensalmente no site da Prefeitura").
+  - Descreve que Teresina tem dois tipos de radares (fixos e estaticos), cita o
+    diretor da Strans (Jose Falcao) e AFIRMA que "a lista com a localizacao dos
+    radares sera divulgada mensalmente", acessivel na aba "Localizacao de
+    Radares". A noticia NAO traz a lista.
+  - Fontes atuais em 10/10/2026: STRANS (https://strans.teresina.pi.gov.br/)
+    NAO respondeu (falha de conexao); Prefeitura atual
+    (https://www.teresina.pi.gov.br/, HTTP 200) e DER-PI
+    (https://www.der.pi.gov.br/, HTTP 200) NAO publicam relacao de
+    equipamentos.
+  - Sem CSV/JSON/GeoJSON/KML/XLS => tem_dataset_estruturado = False.
+
+Uso: teste offline do conector coletor/fontes/teresina_pi.py (nenhum acesso a
+rede). O recorte preserva as frases/data citadas; e um recorte reduzido, sem
+alterar o sentido.
