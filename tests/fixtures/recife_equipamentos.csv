@@ -1,0 +1,4 @@
+id,endereco,bairro,latitude,longitude,tipo,situacao,velocidade,sentido
+REC-1,Av. Boa Viagem,Boa Viagem,-8.1200,-34.9000,Fixo,Ativo,60,Crescente
+REC-2,Av. Caxanga,Caxanga,-8.0500,-34.9300,Fixo,Ativo,60,Decrescente
+REC-3,Rua Sem Coordenada,Centro,,,Fixo,Ativo,40,
