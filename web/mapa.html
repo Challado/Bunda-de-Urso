@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radar Brasil — consulta por localização</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root{--azul:#12508f;--vermelho:#c0392b;--cinza:#f4f4f6;--borda:#d7d7de;}
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1d1d22}
+  header{background:var(--azul);color:#fff;padding:10px 16px}
+  header h1{margin:0;font-size:17px;font-weight:600}
+  header .sub{opacity:.85;font-size:12.5px}
+  #controles{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;padding:10px 16px;background:var(--cinza);border-bottom:1px solid var(--borda)}
+  #controles label{display:flex;flex-direction:column;font-size:12px;color:#4a4a55;gap:2px}
+  #controles input[type=number],#controles input[type=text]{padding:6px 8px;border:1px solid var(--borda);border-radius:6px;width:150px;font:inherit}
+  #controles input#raio{width:100px}
+  button{padding:7px 12px;border:0;border-radius:6px;background:var(--azul);color:#fff;font:inherit;cursor:pointer}
+  button.sec{background:#5b6472}
+  button:disabled{opacity:.55;cursor:default}
+  .chk{flex-direction:row!important;align-items:center;gap:5px!important;font-size:12.5px}
+  #mapa{height:64vh;min-height:360px;width:100%}
+  #barra{padding:8px 16px;font-size:13px;color:#4a4a55}
+  #barra b{color:#1d1d22}
+  #resultado{padding:0 16px 24px}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{border-bottom:1px solid var(--borda);padding:6px 8px;text-align:left;vertical-align:top}
+  th{background:var(--cinza);position:sticky;top:0}
+  .pill{display:inline-block;background:#e8eef6;color:var(--azul);border-radius:10px;padding:1px 8px;font-size:12px}
+  .aviso{background:#fff4e5;border:1px solid #ffd08a;border-radius:6px;padding:8px 10px;font-size:13px}
+  .err{background:#fdecea;border:1px solid #f5b7b1;border-radius:6px;padding:8px 10px;font-size:13px}
+  .vel{font-weight:600;color:var(--vermelho)}
+  a{color:var(--azul)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Radar Brasil — consulta por localização</h1>
+  <div class="sub">Dados oficiais (INMETRO/PSIE, DNIT, PRT/PRF, DERs e prefeituras). Mapa de fundo: OpenStreetMap (apenas visualização).</div>
+</header>
+
+<div id="controles">
+  <label>Latitude<input id="lat" type="text" inputmode="decimal" placeholder="-17.625377"></label>
+  <label>Longitude<input id="lon" type="text" inputmode="decimal" placeholder="-51.060863"></label>
+  <label>Raio (m)<input id="raio" type="number" min="50" max="50000" step="50" value="2000"></label>
+  <button id="btConsultar">Consultar</button>
+  <button id="btLocal" class="sec">Usar minha localização</button>
+  <label class="chk"><input type="checkbox" id="autoLocal"> buscar minha localização ao abrir</label>
+</div>
+
+<div id="mapa"></div>
+<div id="barra">Informe as coordenadas ou use a localização do navegador.</div>
+<div id="resultado"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+  "use strict";
+  var API = "api.pse";
+  var map = L.map("mapa").setView([-15.78, -47.93], 4);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: "&copy; OpenStreetMap"
+  }).addTo(map);
+
+  var camadaPts = L.layerGroup().addTo(map);
+  var marcaEu = null;
+
+  var elLat = document.getElementById("lat");
+  var elLon = document.getElementById("lon");
+  var elRaio = document.getElementById("raio");
+  var elBarra = document.getElementById("barra");
+  var elRes = document.getElementById("resultado");
+
+  function escapeHtml(s){
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];
+    });
+  }
+
+  function velDoPonto(p){
+    var v = p.velocidades_resolvidas || [];
+    for (var i=0;i<v.length;i++){
+      if (v[i] && v[i].velocidade_kmh != null && (v[i].categoria === "geral" || v.length === 1))
+        return v[i].velocidade_kmh;
+    }
+    if (v.length && v[0].velocidade_kmh != null) return v[0].velocidade_kmh;
+    var l = p.limites_velocidade || [];
+    if (l.length && l[0].velocidade_kmh != null) return l[0].velocidade_kmh;
+    return null;
+  }
+
+  function sentidoDoPonto(p){
+    var f = p.faixas || [];
+    if (f.length && f[0].sentido) return f[0].sentido;
+    return null;
+  }
+
+  function popupHtml(p){
+    var loc = p.localizacao || {};
+    var via = loc.via || {};
+    var viaTxt = [via.codigo, via.nome].filter(Boolean).join(" · ") || "(via não informada)";
+    var km = (loc.km != null) ? ("km " + loc.km) : "";
+    var vel = velDoPonto(p);
+    var s = sentidoDoPonto(p);
+    var h = "<b>" + escapeHtml(p.id) + "</b><br>";
+    h += escapeHtml(viaTxt) + (km ? " — " + escapeHtml(km) : "") + "<br>";
+    if (vel != null) h += "Velocidade: <span class='vel'>" + escapeHtml(vel) + " km/h</span><br>";
+    if (s) h += "Sentido: " + escapeHtml(s) + "<br>";
+    if (loc.distancia_metros != null) h += "Distância: " + Math.round(loc.distancia_metros) + " m<br>";
+    if (loc.qualidade) h += "Qualidade da posição: " + escapeHtml(loc.qualidade) + "<br>";
+    return h;
+  }
+
+  function render(meta, pontos){
+    camadaPts.clearLayers();
+    var linhas = [];
+    pontos.forEach(function(p){
+      var loc = p.localizacao || {};
+      var lat = loc.latitude, lon = loc.longitude;
+      var cor = "#c0392b";
+      if (lat != null && lon != null){
+        var m = L.circleMarker([lat, lon], {radius:7, color:cor, weight:2, fillColor:"#ffe08a", fillOpacity:0.95});
+        m.bindPopup(popupHtml(p));
+        m.addTo(camadaPts);
+      }
+      var via = (loc.via || {});
+      var vel = velDoPonto(p);
+      linhas.push("<tr><td>" + escapeHtml(p.id) + "</td><td>" +
+        escapeHtml([via.codigo, via.nome].filter(Boolean).join(" · ") || "—") + "</td><td>" +
+        (loc.km != null ? escapeHtml(loc.km) : "—") + "</td><td>" +
+        (vel != null ? "<span class='vel'>" + escapeHtml(vel) + "</span>" : "—") + "</td><td>" +
+        escapeHtml(sentidoDoPonto(p) || "—") + "</td><td>" +
+        (loc.distancia_metros != null ? Math.round(loc.distancia_metros) + " m" : "—") + "</td><td>" +
+        escapeHtml(loc.qualidade || "—") + "</td></tr>");
+    });
+    var tabela = "";
+    if (pontos.length){
+      tabela = "<table><thead><tr><th>ID</th><th>Via</th><th>km</th><th>Velocidade</th><th>Sentido</th><th>Distância</th><th>Posição</th></tr></thead><tbody>" +
+        linhas.join("") + "</tbody></table>";
+    }
+    var st = (meta && meta.status) || "?";
+    var resumo = "<span class='pill'>" + escapeHtml(st) + "</span> " +
+      "<b>" + (meta ? meta.total_pontos : 0) + "</b> ponto(s) de fiscalização no raio";
+    if (meta && meta.total_equipamentos != null) resumo += " · " + meta.total_equipamentos + " equipamento(s)";
+    elRes.innerHTML = resumo + tabela;
+  }
+
+  function consultar(lat, lon, raio){
+    if (lat == null || lon == null || isNaN(lat) || isNaN(lon)){
+      elRes.innerHTML = "<div class='err'>Informe latitude e longitude numéricas.</div>";
+      return;
+    }
+    elBarra.innerHTML = "Consultando " + lat + ", " + lon + " (raio " + raio + " m)…";
+    camadaPts.clearLayers();
+    if (marcaEu) map.removeLayer(marcaEu);
+    marcaEu = L.circleMarker([lat, lon], {radius:8, color:"#12508f", weight:3, fillColor:"#9ecbff", fillOpacity:1})
+      .addTo(map).bindPopup("Sua consulta");
+    map.setView([lat, lon], raio <= 1000 ? 15 : (raio <= 5000 ? 13 : 11));
+    var url = API + "?rota=" + encodeURIComponent("/api/v1/radares") +
+      "&lat=" + encodeURIComponent(lat) + "&lon=" + encodeURIComponent(lon) +
+      "&raio=" + encodeURIComponent(raio) + "&formato=json";
+    fetch(url).then(function(r){ return r.json(); }).then(function(d){
+      if (!d || d.sucesso === false){
+        var msg = (d && d.erro && d.erro.mensagem) || "falha na consulta";
+        elRes.innerHTML = "<div class='err'>" + escapeHtml(msg) + "</div>";
+        elBarra.textContent = "";
+        return;
+      }
+      var res = d.resultado || {};
+      var pontos = res.pontos || [];
+      render(res, pontos);
+      elBarra.innerHTML = "Snapshot " + escapeHtml(d.consultado_em || "") +
+        (pontos.length === 0 ? " — <span class='aviso' style='display:inline-block'>nada no raio informado (isso não afirma que não exista radar: verifique cobertura da região).</span>" : "");
+    }).catch(function(e){
+      elRes.innerHTML = "<div class='err'>Erro de rede: " + escapeHtml(e.message) + "</div>";
+      elBarra.textContent = "";
+    });
+  }
+
+  function usarLocalizacao(){
+    if (!navigator.geolocation){ elRes.innerHTML = "<div class='err'>Navegador sem geolocalização.</div>"; return; }
+    elBarra.textContent = "Obtendo localização do navegador…";
+    navigator.geolocation.getCurrentPosition(function(pos){
+      var lat = +pos.coords.latitude.toFixed(6), lon = +pos.coords.longitude.toFixed(6);
+      elLat.value = lat; elLon.value = lon;
+      var r = +elRaio.value || 2000;
+      consultar(lat, lon, r);
+    }, function(err){
+      elRes.innerHTML = "<div class='err'>Não foi possível obter a localização: " + escapeHtml(err.message) + "</div>";
+      elBarra.textContent = "";
+    }, {enableHighAccuracy:true, timeout:15000, maximumAge:30000});
+  }
+
+  document.getElementById("btConsultar").addEventListener("click", function(){
+    consultar(parseFloat(elLat.value), parseFloat(elLon.value), parseInt(elRaio.value, 10));
+  });
+  document.getElementById("btLocal").addEventListener("click", usarLocalizacao);
+  document.getElementById("autoLocal").addEventListener("change", function(e){
+    if (e.target.checked) usarLocalizacao();
+  });
+  // Enter nos campos dispara a consulta
+  [elLat, elLon, elRaio].forEach(function(el){
+    el.addEventListener("keydown", function(e){
+      if (e.key === "Enter") consultar(parseFloat(elLat.value), parseFloat(elLon.value), parseInt(elRaio.value, 10));
+    });
+  });
+  // Link direto: ?lat=..&lon=..&raio=..  (consulta sozinho)
+  //            ?local=1             (usa a localização do navegador)
+  var qp = new URLSearchParams(location.search);
+  if (qp.has("lat") && qp.has("lon")){
+    elLat.value = qp.get("lat"); elLon.value = qp.get("lon");
+    if (qp.has("raio")) elRaio.value = qp.get("raio");
+    consultar(parseFloat(elLat.value), parseFloat(elLon.value), parseInt(elRaio.value, 10));
+  } else if (qp.has("local")){
+    usarLocalizacao();
+  } else {
+    // exemplo de GO, só para abrir já com algo preenchido
+    elLat.value = "-17.625377"; elLon.value = "-51.060863";
+  }
+})();
+</script>
+</body>
+</html>
