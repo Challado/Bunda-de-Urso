@@ -796,7 +796,7 @@ def emit(dialect):
     for t in topo_order(TABLES):
         is_comp = bool(t.pk)
         lines = ["-- T%02d %s" % (t.num, t.name)]
-        lines.append("CREATE TABLE %s (" % t.name)
+        lines.append("CREATE TABLE IF NOT EXISTS %s (" % t.name)
         body = []
         for c in t.cols:
             body.append("    " + col_sql(c, dialect, t.name,
