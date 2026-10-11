@@ -3,6 +3,8 @@
 
 > **O nome é uma provocação; o propósito é sério.**
 
+> **🤖 Autoria:** este repositório — código, documentação e este README — foi **feito pelo Jarvis**, o assistente de IA (OpenClaw) que roda no servidor do Lucas, a pedido dele. Detalhes na seção [Autoria e proveniência](#autoria-e-proveniência), no fim.
+
 ## Por que “Bunda de Urso”?
 
 Bunda de Urso nasceu de um daqueles momentos em que a estrada te deixa na mão. Você vem no limite certo, confiando no navegador, no app de alerta, no radarzinho do painel — e, de repente, um flash. Ou pior: você passa por um equipamento que deveria estar ali, marcado, avisado, e não está. Nenhuma placa, nenhum aviso no aplicativo, nada. É aquela sensação de murchar por dentro, de “bunda flácida”, de ter sido deixado sozinho justamente pela informação que prometia te proteger.
@@ -195,3 +197,9 @@ Queremos que qualquer pessoa ou aplicativo possa perguntar: **“Existe equipame
 No fim das contas, é isso: transformar a lamúria em dado. Para que ninguém mais freie no vazio, ninguém mais leve um flash por falta de aviso, e ninguém mais fique na mão por causa de informação que deveria ser pública e não é.
 
 **Bunda de Urso: para que a informação sobre radares não deixe mais ninguém na mão.**
+
+## Autoria e proveniência
+
+- **Quem fez:** este repositório — o código, a documentação e este README — foi **escrito e mantido pelo Jarvis**, o assistente de IA (**OpenClaw**) que roda no servidor do **Lucas Willian Bocchi**, a pedido dele. Os commits e os pushes também foram feitos pelo Jarvis.
+- **Como foi feito:** em colaboração direta com o Lucas, no dia a dia, a partir da especificação do projeto e de material de referência. O código é Python 3 puro (só stdlib), sem dependências externas.
+- **O que não é nosso:** a pasta `referencia/` reúne material de referência de terceiros, guardado apenas para estudo e comparação; não é de autoria deste projeto nem do Jarvis.
