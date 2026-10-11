@@ -36,8 +36,6 @@ Uso:
 """
 import argparse
 import csv
-import gzip
-import json
 import os
 import sqlite3
 import sys
@@ -46,6 +44,23 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from coletor import http                        # noqa: E402
 from core import config                          # noqa: E402
+from core import geo_municipio as geo            # noqa: E402
+
+# A geometria e o resolvedor vivem em ``core.geo_municipio`` (reutilizavel
+# pelo importador).  Mantemos os nomes no namespace deste modulo para
+# compatibilidade com os testes existentes.
+ponto_em_anel = geo.ponto_em_anel
+ponto_na_borda = geo.ponto_na_borda
+parte_contem = geo.parte_contem
+ponto_em_poligono = geo.ponto_em_poligono
+extrair_partes = geo.extrair_partes
+_bbox_partes = geo._bbox_partes
+MunicipioMalha = geo.MunicipioMalha
+Malha = geo.Malha
+_cache_arquivo = geo._cache_arquivo
+_corpo_texto = geo._corpo_texto
+carregar_uf = geo.carregar_uf
+carregar_malhas = geo.carregar_malhas
 
 DB_PADRAO = os.environ.get("RADAR_DB", "/var/lib/radar-brasil/radar.sqlite3")
 CSV_PADRAO = os.path.join(config.ROOT, "dados", "calibracao",
@@ -68,226 +83,8 @@ CASOS_UF_DIVERGENTE = (
 
 
 # ---------------------------------------------------------------------------
-# Ponto-em-poligono (ray casting + borda), puro stdlib
-# ---------------------------------------------------------------------------
-def ponto_em_anel(anel, x, y):
-    """Ray casting classico: ponto (x,y) dentro do anel fechado (sem borda)."""
-    dentro = False
-    n = len(anel)
-    j = n - 1
-    for i in range(n):
-        xi, yi = anel[i]
-        xj, yj = anel[j]
-        if (yi > y) != (yj > y):
-            xint = (xj - xi) * (y - yi) / (yj - yi) + xi
-            if x < xint:
-                dentro = not dentro
-        j = i
-    return dentro
-
-
-def ponto_na_borda(anel, x, y, eps=1e-12):
-    """True se (x,y) esta sobre um segmento do anel (colinear e no retangulo)."""
-    n = len(anel)
-    j = n - 1
-    for i in range(n):
-        xi, yi = anel[i]
-        xj, yj = anel[j]
-        dx = xj - xi
-        dy = yj - yi
-        cross = (x - xi) * dy - (y - yi) * dx
-        comp = abs(dx) + abs(dy)
-        if comp and abs(cross) <= eps * comp:
-            if (min(xi, xj) - eps <= x <= max(xi, xj) + eps
-                    and min(yi, yj) - eps <= y <= max(yi, yj) + eps):
-                return True
-        j = i
-    return False
-
-
-def parte_contem(parte, x, y):
-    """parte = [anel_exterior, buraco1, ...]; buracos subtraem area.
-
-    Borda de QUALQUER anel (exterior ou buraco) conta como DENTRO do
-    municipio (regra deterministica de borda).
-    """
-    for anel in parte:
-        if ponto_na_borda(anel, x, y):
-            return True
-    if not ponto_em_anel(parte[0], x, y):
-        return False
-    for buraco in parte[1:]:
-        if ponto_em_anel(buraco, x, y):
-            return False
-    return True
-
-
-def ponto_em_poligono(partes, x, y):
-    """True se o ponto cai em QUALQUER parte (MultiPolygon) do municipio."""
-    return any(parte_contem(p, x, y) for p in partes)
-
-
-# ---------------------------------------------------------------------------
-# Geometria da malha
-# ---------------------------------------------------------------------------
-def extrair_partes(geometry):
-    """GeoJSON geometry -> [[anel_exterior, buraco...], ...] (partes validas).
-
-    Poligonos com menos de 3 vertices sao descartados. Nao reprojeta: a API do
-    IBGE entrega lon/lat WGS84. Se um CRS nao-WGS84 aparecesse, seria recusado.
-    """
-    tipo = (geometry or {}).get("type")
-    coords = (geometry or {}).get("coordinates")
-    if tipo == "Polygon":
-        poligonos = [coords]
-    elif tipo == "MultiPolygon":
-        poligonos = list(coords or [])
-    else:
-        return []
-    partes = []
-    for poligono in poligonos or []:
-        aneis = []
-        for anel in poligono or []:
-            pts = [(float(p[0]), float(p[1])) for p in anel]
-            if len(pts) >= 3:
-                aneis.append(pts)
-        if aneis:
-            partes.append(aneis)
-    return partes
-
-
-def _bbox_partes(partes):
-    xs0 = ys0 = float("inf")
-    xs1 = ys1 = float("-inf")
-    for parte in partes:
-        for anel in parte:
-            for x, y in anel:
-                if x < xs0:
-                    xs0 = x
-                if x > xs1:
-                    xs1 = x
-                if y < ys0:
-                    ys0 = y
-                if y > ys1:
-                    ys1 = y
-    return (xs0, ys0, xs1, ys1)
-
-
-class MunicipioMalha(object):
-    __slots__ = ("codarea", "uf", "partes", "bboxes", "bbox")
-
-    def __init__(self, codarea, uf, partes):
-        self.codarea = codarea
-        self.uf = uf
-        self.partes = partes
-        self.bboxes = [_bbox_partes([p]) for p in partes]
-        self.bbox = _bbox_partes(partes)
-
-    def contem(self, x, y):
-        b = self.bbox
-        if x < b[0] or x > b[2] or y < b[1] or y > b[3]:
-            return False
-        for i, parte in enumerate(self.partes):
-            bb = self.bboxes[i]
-            if x < bb[0] or x > bb[2] or y < bb[1] or y > bb[3]:
-                continue
-            if parte_contem(parte, x, y):
-                return True
-        return False
-
-
-class Malha(object):
-    """Malha municipal carregada (todas as UFs). Busca por bbox + ray casting."""
-
-    def __init__(self):
-        self._lista = []
-        self.por_cod = {}
-
-    def adicionar_feature(self, feature, uf=None):
-        props = (feature or {}).get("properties") or {}
-        cod = props.get("codarea")
-        if cod is None:
-            return False
-        cod = str(cod).strip()
-        partes = extrair_partes((feature or {}).get("geometry") or {})
-        if not partes or not cod:
-            return False
-        mun = MunicipioMalha(cod, uf, partes)
-        self._lista.append(mun)
-        self.por_cod[cod] = mun
-        return True
-
-    def adicionar_featurecollection(self, fc, uf=None):
-        n = 0
-        for feat in (fc or {}).get("features", []) or []:
-            if self.adicionar_feature(feat, uf=uf):
-                n += 1
-        return n
-
-    def __len__(self):
-        return len(self._lista)
-
-    def localizar(self, x, y):
-        """Codigo IBGE do municipio que contem (x=lon, y=lat), ou None."""
-        for mun in self._lista:
-            b = mun.bbox
-            if x < b[0] or x > b[2] or y < b[1] or y > b[3]:
-                continue
-            if mun.contem(x, y):
-                return mun.codarea
-        return None
-
-
-# ---------------------------------------------------------------------------
-# Download / cache das malhas
-# ---------------------------------------------------------------------------
-def _cache_arquivo(cache_dir, uf):
-    return os.path.join(cache_dir, "ibge_malha_municipios_%s.geojson" % uf)
-
-
-def _corpo_texto(corpo):
-    """Decodifica corpo HTTP do IBGE (aceita gzip defensivamente)."""
-    if corpo[:2] == b"\x1f\x8b":
-        corpo = gzip.decompress(corpo)
-    return corpo.decode("utf-8")
-
-
-def carregar_uf(uf, cache_dir, url_template, forcar=False, timeout=None):
-    """Devolve a FeatureCollection da malha da UF (do cache ou baixando)."""
-    caminho = _cache_arquivo(cache_dir, uf)
-    if os.path.exists(caminho) and not forcar and os.path.getsize(caminho) > 0:
-        with open(caminho, "r", encoding="utf-8") as f:
-            return json.load(f), "cache"
-    url = url_template.format(uf=uf)
-    corpo, _headers, url_final = http.baixar(url, timeout=timeout)
-    texto = _corpo_texto(corpo)
-    fc = json.loads(texto)
-    os.makedirs(cache_dir, exist_ok=True)
-    with open(caminho, "w", encoding="utf-8") as f:
-        f.write(texto)
-    return fc, url_final
-
-
-def carregar_malhas(ufs, cache_dir, url_template, forcar=False, timeout=None):
-    """Carrega todas as UFs; devolve (Malha, {uf: origem|None}, [erros])."""
-    malha = Malha()
-    origem = {}
-    erros = []
-    for uf in ufs:
-        try:
-            fc, de = carregar_uf(uf, cache_dir, url_template, forcar=forcar,
-                                 timeout=timeout)
-        except (http.ErroFonte, ValueError, OSError) as exc:
-            origem[uf] = None
-            erros.append((uf, str(exc)))
-            continue
-        n = malha.adicionar_featurecollection(fc, uf=uf)
-        origem[uf] = de
-        if n == 0:
-            erros.append((uf, "nenhuma feicao municipal extraida"))
-    return malha, origem, erros
-
-
+# A geometria (ponto-em-poligono) e o carregador das malhas agora vivem em
+# ``core.geo_municipio`` e sao reexportados no topo deste modulo.
 # ---------------------------------------------------------------------------
 # Banco (somente leitura)
 # ---------------------------------------------------------------------------
