@@ -16,6 +16,7 @@
   #controles label{display:flex;flex-direction:column;font-size:12px;color:#4a4a55;gap:2px}
   #controles input[type=number],#controles input[type=text]{padding:6px 8px;border:1px solid var(--borda);border-radius:6px;width:150px;font:inherit}
   #controles input[type=range]{width:220px;padding:0;margin-top:6px;accent-color:var(--azul)}
+  #controles .munBox input{width:230px}
   #controles .raioVal{font-weight:600;color:var(--azul)}
   button{padding:7px 12px;border:0;border-radius:6px;background:var(--azul);color:#fff;font:inherit;cursor:pointer}
   button.sec{background:#5b6472}
@@ -76,10 +77,12 @@
 <body>
 <header>
   <h1>Radar Brasil — consulta por localização</h1>
-  <div class="sub">Dados oficiais (INMETRO/PSIE, DNIT, PRT/PRF, DERs e prefeituras). Mapa de fundo: OpenStreetMap (apenas visualização).</div>
+  <div class="sub">Dados oficiais (INMETRO/PSIE, DNIT, PRT/PRF, DERs e prefeituras). Mapa de fundo: OpenStreetMap; lista de municípios: kelvins/municipios-brasileiros (dados IBGE).</div>
 </header>
 
 <div id="controles">
+  <label class="munBox">Município<input id="mun" list="listaMun" type="text" placeholder="digite o município…" autocomplete="off"></label>
+  <datalist id="listaMun"></datalist>
   <label>Latitude<input id="lat" type="text" inputmode="decimal" placeholder="-17.625377"></label>
   <label>Longitude<input id="lon" type="text" inputmode="decimal" placeholder="-51.060863"></label>
   <label class="raioBox">Raio: <span class="raioVal" id="raioVal">2,0 km</span>
@@ -319,6 +322,44 @@
     el.addEventListener("keydown", function(e){
       if (e.key === "Enter") consultar(parseFloat(elLat.value), parseFloat(elLon.value), parseInt(elRaio.value, 10));
     });
+  });
+
+  // ---- combo de municipio: digite o nome e va para o municipio ----
+  var elMun = document.getElementById("mun");
+  var elListaMun = document.getElementById("listaMun");
+  var MUNICIPIOS = [];
+  fetch("municipios.json").then(function(r){ return r.json(); }).then(function(lista){
+    MUNICIPIOS = lista || [];
+    var frag = document.createDocumentFragment();
+    for (var i=0;i<MUNICIPIOS.length;i++){
+      var o = document.createElement("option");
+      o.value = MUNICIPIOS[i].n + " / " + MUNICIPIOS[i].u;
+      frag.appendChild(o);
+    }
+    elListaMun.appendChild(frag);
+  }).catch(function(){ /* sem a lista o combo fica inerte; a pagina segue normal */ });
+
+  function irParaMunicipio(){
+    var txt = (elMun.value || "").trim();
+    if (!txt || !MUNICIPIOS.length) return;
+    var partes = txt.split("/");
+    var nome = partes[0].trim().toLowerCase();
+    var uf = (partes[1] || "").trim().toUpperCase();
+    var achou = null, cands = [];
+    for (var i=0;i<MUNICIPIOS.length;i++){
+      var m = MUNICIPIOS[i];
+      if (m.n.toLowerCase() === nome && (!uf || m.u === uf)){ achou = m; break; }
+      if (m.n.toLowerCase().indexOf(nome) === 0) cands.push(m);
+    }
+    if (!achou && cands.length === 1) achou = cands[0];
+    if (!achou) return;
+    elLat.value = achou.a; elLon.value = achou.o;
+    elBarra.textContent = "Município " + achou.n + "/" + achou.u + " …";
+    consultar(achou.a, achou.o, parseInt(elRaio.value, 10) || 2000);
+  }
+  elMun.addEventListener("change", irParaMunicipio);
+  elMun.addEventListener("keydown", function(e){
+    if (e.key === "Enter"){ e.preventDefault(); irParaMunicipio(); }
   });
   // Slider do raio: arrasta e o mapa/circulo acompanham; solta e consulta de novo
   elRaioVal.textContent = fmtRaio(parseInt(elRaio.value, 10));
