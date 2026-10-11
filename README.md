@@ -61,9 +61,9 @@ O projeto separa duas responsabilidades:
 1. **Coletor e normalizador:** processo independente que descobre recursos oficiais, baixa documentos, interpreta formatos, valida campos, registra alterações e alimenta o banco relacional.
 2. **Aplicação web/API:** interface de consulta que lê o banco local, sem consultar portais governamentais a cada requisição.
 
-A implementação de referência está em Python. A aplicação web é servida por **Nginx + fcgiwrap**, por meio de um executável Python com extensão **`.pse`**, preservando a convenção histórica do servidor. Não utiliza `import cgi`.
+A implementação é em **Python 3, só stdlib** (`urllib`, `sqlite3`, `csv`, `json`, `xml.etree`) — sem pip, sem dependência externa. A aplicação web é servida por **Nginx + fcgiwrap**, por meio de um executável Python com extensão **`.pse`**, preservando a convenção histórica do servidor. Não utiliza `import cgi`.
 
-O esquema de referência v1.4 inicializa 83 tabelas SQLAlchemy, incluindo equipamentos, pontos, instalações, faixas, órgãos, fontes, documentos, verificações, operações, evidências e candidatos geográficos. O banco padrão é SQLite, sem PostGIS. A compatibilidade efetiva com outros SGBDs requer homologação específica.
+O esquema é **SQL canônico, sem ORM** — nada de SQLAlchemy por aqui. São **77 tabelas** (T01..T77) definidas uma única vez em `tools/build_schema.py`, que gera as duas DDLs gêmeas (`sql/schema.sqlite.sql` e `sql/schema.postgres.sql`), com chaves primárias/estrangeiras, `CHECK`, `UNIQUE` e índices, incluindo equipamentos, pontos, instalações, faixas, órgãos, fontes, documentos, verificações, operações, evidências e candidatos geográficos. O banco padrão é SQLite, sem PostGIS. A compatibilidade efetiva com outros SGBDs requer homologação específica.
 
 ## Como a coleta funciona
 
@@ -120,23 +120,23 @@ O tipo de equipamento (fixo, portátil), a função (controlador, redutor), o se
 
 ## API e formatos
 
-A API web `.pse` oferece consultas por latitude, longitude e raio; identificação do equipamento; UF, rodovia e quilômetro; além de fontes, atualizações, cobertura, situação do serviço, operações e geolocalizações.
+A API web `.pse` oferece consultas por latitude, longitude e raio; identificação do equipamento; UF, rodovia e quilômetro; além de fontes, atualizações, situação do serviço, operações, trechos e tráfego.
 
-Entre os endpoints previstos/implementados na referência estão:
+Os endpoints da API são:
 
 - `/api/v1/radares`
 - `/api/v1/radares/{id}`
 - `/api/v1/radares/busca`
-- `/api/v1/equipamentos/{id}`
-- `/api/v1/geolocalizacoes`
-- `/api/v1/fontes`
+- `/api/v1/equipamentos` e `/api/v1/equipamentos/{id}`
+- `/api/v1/fontes` e `/api/v1/fontes/{id}`
 - `/api/v1/atualizacoes`
 - `/api/v1/operacoes`
 - `/api/v1/trechos`
 - `/api/v1/trafego`
 - `/api/v1/status`
 - `/api/v1/ajuda`
-- `/health/live` e `/health/ready`
+- `/api/v1/admin/sincronizar` e `/api/v1/admin/rollback`
+- `/health/live` e `/health/ready` (também em `/api/v1/health/live|ready`)
 
 Os retornos incluem **TXT delimitado em linha única por registro** (delimitador configurável por GET/POST), JSON, NDJSON, XML, DIF (Data Interchange Format) e EDI/EDIFACT no perfil bilateral do projeto. O perfil EDIFACT precisa de homologação com cada consumidor; não se declara interoperabilidade universal.
 
@@ -154,22 +154,27 @@ Os dados devem permitir rastrear cada resposta da API até a publicação origin
 
 ## Instalação e operação
 
-A referência técnica está no pacote Radar Brasil v1.4, em especial `README.md`, `docs/LOCALIZADOR_GEOGRAFICO_V1_4.md`, `docs/CRUZAMENTO_DE_CAMPOS.md` e `docs/REQUISITOS_VIGENTES_2026-10-10.md`.
+A especificação funcional é o `ESPECIFICACAO_v1.1.txt`; a referência técnica do código está em `docs/README_TECNICO.md`, `docs/LOCALIZADOR_GEOGRAFICO_V1_4.md`, `docs/CRUZAMENTO_DE_CAMPOS.md` e `docs/REQUISITOS_VIGENTES_2026-10-10.md`.
 
-Exemplo de inicialização e resolução, após configurar dependências, banco e ambiente:
+Sem pip, sem instalação: basta ter Python 3. Gera as DDLs, sincroniza uma fonte e serve a API:
 
 ```bash
-python -m radarbrasil.collector init
-python -m radarbrasil.georesolver preparar-antigos
-python -m radarbrasil.georesolver resolver-tudo
-python -m radarbrasil.georesolver relatorio --formato csv --arquivo /tmp/radares_geolocalizacao.csv
+python3 tools/build_schema.py
+python3 -m coletor.sync --fonte antt
+python3 -m coletor.sync --fonte recife --arquivo tests/fixtures/recife_equipamentos.csv
+```
+
+Variáveis: `RADAR_DATA_DIR` (padrão `dados/`), `RADAR_DB` (padrão `dados/radar.sqlite3`), `RADAR_BRASIL_HOME`. O entry point web é `web/api.pse`; os testes rodam com:
+
+```bash
+python3 -m unittest discover -s tests
 ```
 
 O ambiente web requer Nginx, fcgiwrap, Python e permissão controlada de acesso ao banco local. Antes de colocar em produção, testar autenticação administrativa, configurações, permissões, atualização, formatos e recuperação de falhas.
 
 ## Situação real do desenvolvimento
 
-A versão técnica de referência é **Radar Brasil v1.4 (10/10/2026)**, com coletor, API `.pse`, esquema relacional, módulo de resolução geográfica, documentação e testes automatizados locais. Os testes locais não equivalem à homologação das coletas reais em todo o Brasil.
+O projeto implementa a **ESPECIFICACAO_v1.1.txt (10/10/2026)**: coletor/sincronizador, API `.pse`, esquema relacional de **77 tabelas**, resolvedor geográfico, serializadores em seis formatos, documentação e testes automatizados locais (stdlib `unittest`). Os testes locais não equivalem à homologação das coletas reais em todo o Brasil.
 
 **Ainda precisam de trabalho e validação:** integração e importação real de todas as fontes federais, estaduais e municipais; resolução das coordenadas ausentes; homologação de cada formato e SGBD utilizado; verificação de qualidade e atualização de cada órgão; aferição da cobertura nacional; avaliação de licenças para redistribuição de cada conjunto de dados.
 
