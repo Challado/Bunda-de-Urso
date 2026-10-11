@@ -21,10 +21,16 @@ UM ponto por equipamento, preservando o numero de faixas e os sentidos
 declarados. O tipo na fonte (CEV/REV/CEM) e a velocidade regulamentada (REGUL.)
 sao preservados; nada e inventado -- campo ausente fica NULL.
 
-Coordenadas ilegiveis na fonte (ex.: "-7.158.138" / "-7199534") NAO viram GPS
-artificial: o ponto e preservado SEM posicao. O texto do PDF e lido com
-``pdftotext`` (poppler) quando disponivel e, na ausencia dele, com o leitor
-stdlib ``planilha.ler_pdf_texto``. Aceita arquivo LOCAL (fixture/testes).
+A fonte publica as coordenadas de tres formas: decimal normal
+("-7.191751"), com o ponto de milhar no lugar do decimal ("-7.158.138") e
+sem separador algum ("-7199534"). As duas ultimas sao MALFORMACOES de
+formatacao -- nao GPS artificial -- e sao interpretadas pelo formato da fonte
+(6 casas decimais): "-7.158.138" e "-7199534" -> -7.158138; "-48.192.593" e
+"-48192593" -> -48.192593.  O que nao casa esse formato (ou cai fora da faixa
+lat -90..90 / lon -180..180) e rejeitado: o ponto e preservado SEM posicao.
+O texto do PDF e lido com ``pdftotext`` (poppler) quando disponivel e, na
+ausencia dele, com o leitor stdlib ``planilha.ler_pdf_texto``. Aceita arquivo
+LOCAL (fixture/testes).
 """
 import os
 import re
@@ -50,6 +56,11 @@ PADRAO_LINHA = re.compile(
 
 PADRAO_ANCORA = re.compile(r'<a\b[^>]*href="([^"]+)"[^>]*>(.*?)</a>', re.I | re.S)
 
+# numero cru da fonte: digito, pontos de milhar e sinal opcional.
+PADRAO_COORD_NUM = re.compile(r"^[+-]?\d[\d.]*$")
+# casas decimais publicadas pela fonte (uniforme em toda a lista).
+CASAS_DECIMAIS_FONTE = 6
+
 
 def _texto_pdf(conteudo):
     """Texto do PDF via poppler (pdftotext -layout); fallback stdlib."""
@@ -64,17 +75,57 @@ def _texto_pdf(conteudo):
     return pl.ler_pdf_texto(conteudo)
 
 
+def _coord_por_digitos(digitos):
+    """Digitos sem separador -> coordenada no formato da fonte (6 casas).
+
+    Ex.: "7158138" -> 7.158138 ; "48192593" -> 48.192593.  Devolve None
+    quando a parte inteira nao tem 1 ou 2 digitos (fora do formato
+    publicado) -- nada e inventado.
+    """
+    if not digitos.isdigit() or len(digitos) < CASAS_DECIMAIS_FONTE + 1:
+        return None
+    inteiros = len(digitos) - CASAS_DECIMAIS_FONTE
+    if inteiros < 1 or inteiros > 2:
+        return None
+    return float("%s.%s" % (digitos[:inteiros], digitos[inteiros:]))
+
+
 def _coord(valor):
-    """Coordenada estrita: um unico ponto decimal e faixa valida."""
+    """Coordenada estrita no formato publicado pela fonte.
+
+    Aceita o decimal normal ("-7.191751") e as duas formas malformadas
+    publicadas: ponto de milhar no lugar do decimal ("-7.158.138" ->
+    -7.158138) e ausencia total do separador ("-7199534" -> -7.158138).
+    Devolve None para lixo/ambiguidade; a faixa (lat -90..90, lon
+    -180..180) e checada pelo chamador.
+    """
     if valor is None:
         return None
-    s = str(valor).strip().replace("°", "").replace("º", "").replace(",", ".")
-    if not s or s.count(".") != 1:
+    s = (str(valor).strip().replace("°", "").replace("º", "")
+         .replace(" ", "").replace(",", "."))
+    if not s or not PADRAO_COORD_NUM.match(s):
         return None
-    try:
-        return float(s)
-    except ValueError:
+    negativo = s[0] == "-"
+    digitos = s.lstrip("+-")
+    corpo = digitos.replace(".", "")
+    if not corpo:
         return None
+    if "." in digitos:
+        if digitos.count(".") == 1:
+            # decimal normal: um unico ponto
+            try:
+                v = float(digitos)
+            except ValueError:
+                return None
+        else:
+            # pontos de milhar usados onde deveria haver o decimal
+            v = _coord_por_digitos(corpo)
+    else:
+        # separador ausente por completo
+        v = _coord_por_digitos(corpo)
+    if v is None:
+        return None
+    return -v if negativo else v
 
 
 class ColetorASTTAraguaina(ColetorBase):

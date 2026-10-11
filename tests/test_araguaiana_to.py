@@ -3,8 +3,9 @@
 
 Sem rede: usam a fixture PDF real (lista de enderecos) e dubles para a
 descoberta de URL. Verificam o parse linha-a-linha (uma linha por faixa), o
-agrupamento por equipamento (processo + serie), a recusa de coordenada
-ilegivel (sem GPS artificial) e a normalizacao.
+agrupamento por equipamento (processo + serie), a interpretacao da
+coordenada malformada pelo formato da fonte (sem GPS artificial) e a
+normalizacao.
 """
 import os
 import unittest
@@ -72,16 +73,18 @@ class TestASTTAraguainaNormalizar(unittest.TestCase):
         self.assertAlmostEqual(d["longitude"], -48.229020, places=6)
         self.assertIn("Faixas: 1, 2", d["observacoes"])
 
-    def test_coordenada_ilegivel_nao_vira_gps(self):
+    def test_coordenada_malformada_e_interpretada_pelo_formato_da_fonte(self):
         c = ColetorASTTAraguaina()
         _, _, _, regs = c.carregar(PDF)
-        # R10341 traz coordenada malformada ("-7.158.138" / "-7158138")
+        # R10341 publica "-7.158.138" / "-48.192.593": ponto de milhar no
+        # lugar do decimal. E malformacao de FORMATO, nao GPS artificial --
+        # a fonte usa 6 casas decimais e a coordenada e recuperada.
         alvo = [r for r in regs if r["serie"] == "R10341"]
         self.assertEqual(len(alvo), 1)
         d = c.normalizar(0, alvo[0])
-        self.assertIsNone(d["latitude"])
-        self.assertIsNone(d["longitude"])
-        self.assertIn("Coordenada ilegivel", d["observacoes"])
+        self.assertAlmostEqual(d["latitude"], -7.158138, places=6)
+        self.assertAlmostEqual(d["longitude"], -48.192593, places=6)
+        self.assertNotIn("Coordenada ilegivel", d["observacoes"])
 
 
 class TestASTTAraguainaDescobrir(unittest.TestCase):
@@ -115,11 +118,19 @@ class TestASTTAraguainaDescobrir(unittest.TestCase):
 class TestASTTAraguainaUtil(unittest.TestCase):
 
     def test_coord(self):
+        # decimal normal
         self.assertEqual(_coord("-7.191751"), -7.191751)
-        self.assertIsNone(_coord("-7.158.138"))    # dois pontos
-        self.assertIsNone(_coord("-7158138"))      # sem ponto
+        # formas MALFORMADAS publicadas pela fonte (6 casas decimais):
+        # ponto de milhar no lugar do decimal, e separador ausente
+        self.assertEqual(_coord("-7.158.138"), -7.158138)
+        self.assertEqual(_coord("-7158138"), -7.158138)
+        self.assertEqual(_coord("-48.192.593"), -48.192593)
+        self.assertEqual(_coord("-48192593"), -48.192593)
+        # lixo / fora do formato publicado
         self.assertIsNone(_coord(""))
         self.assertIsNone(_coord(None))
+        self.assertIsNone(_coord("abc"))
+        self.assertIsNone(_coord("123456789012"))  # > 2 digitos inteiros
 
 
 class TestASTTAraguainaSync(unittest.TestCase):
@@ -135,10 +146,11 @@ class TestASTTAraguainaSync(unittest.TestCase):
             self.assertEqual(
                 dbmod.scalar(c.conn, "SELECT COUNT(*) FROM PONTO_FISCALIZACAO"),
                 53)
-            # 49 com coordenada valida; 4 preservados sem posicao
+            # todas as 53 com coordenada valida (o formato da fonte e
+            # interpretado: ponto de milhar no lugar do decimal)
             self.assertEqual(
                 dbmod.scalar(c.conn, "SELECT COUNT(*) FROM POSICAO_GEOGRAFICA"),
-                49)
+                53)
         finally:
             c.conn.close()
 
