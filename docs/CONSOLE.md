@@ -1,102 +1,71 @@
-# Console (Linux) — comandos prontos da API
+# Console — o `api.pse` no terminal do servidor
 
-Cliente de terminal: **`radar-api`** (instalado em `/home/openclaw/bin/radar-api`).
-Ele fala com a API pública do site (`api.pse`) por HTTPS e guarda a sessão num
-cookie jar local — **não** acessa o banco (tudo passa pela API, como manda a regra).
-
-- Código-fonte: `tools/radar_api.py` (só biblioteca padrão do Python 3)
-- Sessão: `~/.config/radar-api/cookies.txt` (modo 600)
-- Token de API: `~/.config/radar-api/token.txt`
-- Base: variável `RADAR_API_URL` (default: produção)
+O **mesmo** `api.pse` serve a web e o terminal. Rodando sob o nginx ele é CGI;
+rodando na linha de comando (sem `GATEWAY_INTERFACE`/`REQUEST_METHOD`) ele
+**percebe que está no console do servidor** e abre as opções de console.
 
 ```bash
-radar-api ajuda            # lista tudo
+cd /var/www/html/openclaw/radar
+./api.pse                 # menu interativo
+./api.pse ajuda           # lista os comandos
 ```
 
-## Sessão
+A lógica de console mora no app (`web/terminal.py`, em `/home/openclaw/bin/radar`),
+não no webroot — o webroot só tem a porta de entrada. Usa a mesma camada do app
+(`core.governanca`), então não é um caminho paralelo para o banco.
+
+## Comandos
 
 ```bash
-radar-api login admin            # pede a senha (não aparece na tela)
-radar-api login admin --senha '...'   # (opcional; fica no histórico do shell, evite)
-radar-api eu                     # quem sou eu (login/papel/escopo)
-radar-api senha                  # troca a própria senha (pede atual e nova)
-radar-api logout                 # encerra a sessão
+./api.pse pendentes                 # cadastros nao verificados (a fila)
+./api.pse cadastro P-1130           # detalhes de um cadastro (aceita --json)
+./api.pse usuarios                  # usuarios do painel
+./api.pse senha admin               # define nova senha (pede e confirma, min. 8)
+./api.pse resetar-senha admin       # gera temporaria (aparece 1x; troca obrigatoria)
+./api.pse tokens                    # tokens de API (so prefixo)
+./api.pse bloqueios                 # bloqueios geograficos (--todos inclui inativos)
+./api.pse historico P-1130          # historico/auditoria do ponto (--publico)
 ```
 
-## Ver cadastros e consultar
+O menu (sem argumentos, num terminal) é um atalho para os mesmos itens.
+
+Exemplo:
+
+```
+Radar Brasil — modo console (servidor)
+  1) Cadastros pendentes (nao verificados)
+  2) Detalhes de um cadastro
+  3) Trocar senha de um usuario
+  4) Resetar senha (gera temporaria)
+  5) Listar usuarios
+  6) Tokens de API
+  7) Bloqueios geograficos
+  8) Historico de um ponto
+  0) Sair
+Opcao:
+```
+
+## Senha — as três portas
+
+1. **Painel web:** em `gestao.html`, botão **Trocar senha** (ou o link no aviso de
+   senha temporária). Exige a atual + uma nova de **mínimo 8 caracteres**.
+2. **Console (este):** `./api.pse senha <login>` — define a nova senha (não exige a
+   atual, pois quem está no servidor já tem acesso ao banco; use com cuidado).
+3. **Emergência / não sei a atual:** `radar-admin reset-senha <login>` — gera uma
+   temporária e obriga a troca. O `radar-admin` é o CLI fora do painel e também da
+   API (usa `core.governanca` direto), para o caso de a única senha admin se perder.
+
+Regras: login web é genérico (`401`, sem revelar se o login existe); nova senha com
+menos de 8 caracteres → `senha_fraca`.
+
+## Web continua igual
+
+Nada mudou para quem chama pela web:
 
 ```bash
-radar-api pendentes                          # fila de colaborativos NÃO verificados
-radar-api radar P-1130                       # um ponto por id
-radar-api radares --lat -23.55 --lon -46.63 --raio 1000 --limite 50
-radar-api radares --uf SP --rodovia BR-116
-radar-api historico P-1130                   # histórico/auditoria público
+curl -s 'https://servidor3.lucas.inf.br/openclaw/radar/api.pse?rota=/api/v1/ajuda'
+curl -s 'https://servidor3.lucas.inf.br/openclaw/radar/api.pse?rota=/api/v1/radares&lat=-23.55&lon=-46.63&raio=1000&formato=json'
 ```
 
-## Moderar (moderador+)
-
-```bash
-radar-api verificar P-1234 --motivo vistoria
-radar-api editar P-1234 --km 12.5 --observacoes 'confirmado no local'
-radar-api desabilitar P-1234 --motivo 'em manutenção'      # motivo OBRIGATÓRIO
-radar-api remover P-1234 --motivo 'radar inexistente'      # tombstone, nunca apaga a linha
-radar-api vinculo 5 --status oficial_vence --motivo 'o ponto oficial é o correto'
-```
-
-## Admin — usuários, tokens, bloqueios
-
-```bash
-radar-api usuarios
-radar-api criar-usuario mod1 --papel moderador            # sem --senha -> temporária (1x)
-radar-api editar-usuario 2 --papel admin --ativo 1
-radar-api resetar-senha 2                                  # gera temporária (troca obrigatória)
-
-radar-api tokens
-radar-api criar-token github:fulano --escopo moderador      # o VALOR aparece 1x
-radar-api revogar-token 3
-
-radar-api bloqueios
-radar-api bloquear --tipo zona_sombra --lat -23.55 --lon -46.63 --raio 1000 --motivo sabotagem
-radar-api desbloquear 7
-```
-
-## Autenticar com token de API (em vez do cookie)
-
-```bash
-radar-api usar-token rb_xxxxxxxx     # a partir daqui usa o cabeçalho X-Api-Token
-radar-api limpar-token               # volta a usar só a sessão
-```
-
-## Sem o cliente (curl cru)
-
-```bash
-B='https://servidor3.lucas.inf.br/openclaw/radar/api.pse?rota='
-J=jar.txt
-
-curl -s -c $J -X POST "$B/api/v1/login" -H 'Content-Type: application/json' \
-  -d '{"login":"admin","senha":"..."}'
-
-curl -s -b $J -X POST "$B/api/v1/minha-senha" -H 'Content-Type: application/json' \
-  -d '{"senha_atual":"...","senha_nova":"aNovaSenha123"}'
-
-curl -s -b $J "$B/api/v1/gestao/pendentes"
-```
-
----
-
-## Perdi/errei a senha — como destravar
-
-1. **Pelo painel:** em `gestao.html`, botão **Trocar senha** (ou o link no aviso de senha
-   temporária). Exige a senha atual + uma nova de **mínimo 8 caracteres**.
-2. **Pelo terminal:** `radar-api senha` (pede a atual e a nova).
-3. **Emergência (sem saber a senha atual), no host:**
-
-   ```bash
-   radar-admin reset-senha admin     # imprime uma senha temporária UMA vez (troca obrigatória)
-   ```
-
-   Diferente do `radar-api` (que fala pela API), o `radar-admin` roda fora do painel e
-   usa o próprio banco — é a saída se a única senha admin se perder.
-
-Regras: login é genérico (`401`, sem revelar se o login existe); token de API **não**
-troca senha (só a sessão do painel); nova senha com menos de 8 caracteres → `senha_fraca`.
+A detecção é só o ambiente: com `GATEWAY_INTERFACE`/`REQUEST_METHOD` presentes →
+CGI; sem eles → console.
