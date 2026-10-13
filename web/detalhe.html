@@ -77,7 +77,7 @@
     id:"ID", tipo_registro:"Tipo de registro", situacao_operacional:"Situação operacional",
     situacao_original:"Situação (texto original da fonte)",
     localizacao:"Localização", latitude:"Latitude", longitude:"Longitude",
-    distancia_metros:"Distância do ponto de consulta (m)", precisao_metros:"Precisão informada (m)",
+    distancia_metros:"Distância do ponto de consulta", precisao_metros:"Precisão informada",
     qualidade:"Qualidade da posição", metodo_obtencao:"Método de obtenção",
     uf:"UF", municipio:"Município", codigo_ibge:"Código IBGE do município", endereco:"Endereço",
     via:"Via", codigo:"Código da via", tipo:"Tipo de via", nome:"Nome",
@@ -157,6 +157,13 @@
     return esc(s);
   }
   function ehObjeto(v){ return v && typeof v === "object"; }
+  // Distancias legiveis: abaixo de 1 km em metros; de 1 km pra cima em km.
+  function fmtDist(m){
+    m = Number(m);
+    if (!isFinite(m)) return String(m);
+    if (m < 1000) return Math.round(m) + " m";
+    return ((m / 1000).toFixed(2).replace(/\.?0+$/, "")).replace(".", ",") + " km";
+  }
   function todosEscalares(arr){
     for (var i=0;i<arr.length;i++) if (ehObjeto(arr[i])) return false;
     return true;
@@ -187,7 +194,13 @@
     var h = "<dl class='campos'>";
     for (var i=0;i<chaves.length;i++){
       var k = chaves[i], val = d[k];
-      h += "<dt>" + esc(rotulo(k)) + "</dt><dd>" + renderValor(val) + "</dd>";
+      var dd;
+      if ((k === "distancia_metros" || k === "precisao_metros") && typeof val === "number"){
+        dd = "<div>" + fmtDist(val) + " <span class='ni'>(" + esc(val) + " m)</span></div>";
+      } else {
+        dd = renderValor(val);
+      }
+      h += "<dt>" + esc(rotulo(k)) + "</dt><dd>" + dd + "</dd>";
     }
     return h + "</dl>";
   }
