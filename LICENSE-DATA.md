@@ -1,6 +1,7 @@
 # Licença dos dados — CC BY 4.0
 
-O **código e a documentação** deste repositório são licenciados sob **MIT** (ver `LICENSE`).
+O **código e a documentação** deste repositório são licenciados sob a licença de uso do Bunda de Urso
+(**código-fonte disponível**, não software livre — ver `LICENSE`).
 
 Os **dados** do cadastro (radares e fiscalização eletrônica) são compilados a partir de
 **fontes oficiais públicas** (órgãos federais, estaduais e municipais, Inmetro/PSIE,

@@ -1,21 +1,65 @@
-MIT License
+LICENÇA DE USO DO BUNDA DE URSO (BUNDITA DE URSO)
+Código-fonte disponível: uso e alteração permitidos; projetos derivados proibidos.
 
-Copyright (c) 2026 Lucas Willian Bocchi
+Copyright (c) 2026 Lucas Bocchi (github.com/Challado). Todos os direitos reservados, exceto os concedidos abaixo.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Este software (o código, os scripts, a estrutura do banco, o esquema, as telas e a documentação deste repositório) é protegido pela Lei 9.609/98 (Lei do Software) e pela Lei 9.610/98 (Lei de Direitos Autorais). Ele NÃO é software livre nem de código aberto: o código está à vista, mas o uso segue as regras abaixo.
+Usar, instalar ou alterar o software significa aceitar esta licença.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+1. O QUE VOCÊ PODE FAZER
+
+   a) Baixar, instalar e usar o software para você mesmo, para a sua família ou dentro da sua empresa ou organização,
+      para consultar e manter o seu próprio cadastro de radares e fiscalização eletrônica.
+   b) Alterar o software para adaptá-lo à sua própria instalação (novos campos, telas, fórmulas, correções, integrações).
+   c) Propor as suas alterações ao autor pelo repositório original (github.com/Challado/Bunda-de-Urso), por pull request.
+      Para isso, você pode fazer um fork no GitHub; o fork serve só para preparar essas propostas.
+   d) Fazer cópias de segurança da sua instalação.
+   e) Consultar e usar os dados publicados pelo serviço (mapa e API), conforme a licença dos dados em LICENSE-DATA.md.
+
+
+2. O QUE VOCÊ NÃO PODE FAZER
+
+   Sem autorização por escrito do autor, você não pode:
+
+   a) Criar ou publicar um projeto novo baseado neste software, no todo ou em parte: outro sistema, aplicativo,
+      biblioteca ou produto que use, copie, adapte, traduza ou reescreva o código dele, inclusive em outra linguagem
+      de programação.
+   b) Distribuir o software ou uma versão alterada dele: publicar, compartilhar, vender, alugar ou entregar cópias a
+      terceiros, em qualquer lugar ou formato, fora do repositório original.
+   c) Oferecer o software, alterado ou não, como serviço para terceiros (hospedagem, SaaS, instalação para clientes).
+   d) Manter um fork com vida própria: um fork que receba alterações que não são propostas ao repositório original,
+      ou que seja apresentado como um projeto separado.
+   e) Sublicenciar, ou conceder a outros qualquer direito sobre o software.
+   f) Remover ou alterar os avisos de autoria e esta licença.
+
+
+3. OS DADOS
+
+   Os dados do cadastro compilados por este projeto têm licença própria, descrita em LICENSE-DATA.md. Esta licença
+   trata do software; aquela trata dos dados.
+
+
+4. AS SUAS CONTRIBUIÇÕES
+
+   Ao enviar uma alteração ao repositório original (pull request, patch, issue com código), você declara que ela é
+   sua e concede ao autor, de graça, para sempre e de forma irrevogável, o direito de usá-la, alterá-la, incluí-la no
+   software e distribuí-la sob esta licença ou qualquer outra que o autor escolher.
+
+
+5. SEM GARANTIA
+
+   O software é fornecido "como está", sem garantia de nenhum tipo. O autor não responde por perdas, danos ou
+   prejuízos que o uso do software cause, inclusive a perda de dados, informação incorreta de radar ou um radar
+   deixado de fora do cadastro.
+
+
+6. FIM DA LICENÇA
+
+   Se você descumprir esta licença, os direitos dela acabam na hora, sem aviso, e você deve apagar as cópias alteradas
+   que fez. O autor pode mudar esta licença nas versões futuras; a versão que você baixou continua valendo para ela.
+
+
+7. LEI E FORO
+
+   Esta licença segue as leis do Brasil. As dúvidas e disputas sobre ela serão resolvidas no foro do domicílio do autor.
