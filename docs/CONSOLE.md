@@ -1,125 +1,102 @@
-# Console — comandos prontos da API
+# Console (Linux) — comandos prontos da API
 
-Duas formas de falar com a API sem abrir o painel: **console do navegador** (helper `rb`)
-e **curl no shell**. A sessão usa o cookie do painel (`credenciais:'same-origin'`); a
-senha **nunca** fica em arquivo. A rota vai no parâmetro `rota` do `api.pse`.
+Cliente de terminal: **`radar-api`** (instalado em `/home/openclaw/bin/radar-api`).
+Ele fala com a API pública do site (`api.pse`) por HTTPS e guarda a sessão num
+cookie jar local — **não** acessa o banco (tudo passa pela API, como manda a regra).
 
----
+- Código-fonte: `tools/radar_api.py` (só biblioteca padrão do Python 3)
+- Sessão: `~/.config/radar-api/cookies.txt` (modo 600)
+- Token de API: `~/.config/radar-api/token.txt`
+- Base: variável `RADAR_API_URL` (default: produção)
 
-## 1. Console do navegador (helper `rb`)
-
-Abra qualquer página do radar, ex.: `https://servidor3.lucas.inf.br/openclaw/radar/gestao.html`,
-abra o console (F12 → Console) e carregue o helper:
-
-```js
-await import('/openclaw/radar/console.js')
+```bash
+radar-api ajuda            # lista tudo
 ```
 
-Pronto. Agora `rb.*` funciona. (Alternativa: `fetch('console.js').then(r=>r.text()).then(eval)`.)
+## Sessão
 
-### Sessão
-
-```js
-rb.login('admin', 'sua-senha')        // entra (define o cookie de sessão)
-rb.eu()                               // {autenticado, escopo, rotulo} — quem sou eu
-rb.senha('atual', 'aNovaSenha123')    // TROCA a própria senha (mín. 8 caracteres)
-rb.logout()                           // sai
+```bash
+radar-api login admin            # pede a senha (não aparece na tela)
+radar-api login admin --senha '...'   # (opcional; fica no histórico do shell, evite)
+radar-api eu                     # quem sou eu (login/papel/escopo)
+radar-api senha                  # troca a própria senha (pede atual e nova)
+radar-api logout                 # encerra a sessão
 ```
 
-### Ver cadastros / consulta
+## Ver cadastros e consultar
 
-```js
-rb.pendentes()                        // fila de colaborativos NÃO verificados (o que você pediu "ver cadastros")
-rb.gestaoRadar('P-54922')             // um radar por id, visão de gestão
-rb.radares({lat:-23.55, lon:-46.63, raio:1000, limite:50})   // consulta por raio (pública)
-rb.radar('P-1130')                    // um ponto por id (público)
-rb.historico('P-54922')               // histórico/auditoria público
-rb.busca({uf:'SP', rodovia:'BR-116'}) // busca cadastral (sem coordenada)
-rb.fontes(); rb.status()              // fontes e estado da base
+```bash
+radar-api pendentes                          # fila de colaborativos NÃO verificados
+radar-api radar P-1130                       # um ponto por id
+radar-api radares --lat -23.55 --lon -46.63 --raio 1000 --limite 50
+radar-api radares --uf SP --rodovia BR-116
+radar-api historico P-1130                   # histórico/auditoria público
 ```
 
-### Moderar (moderador+)
+## Moderar (moderador+)
 
-```js
-rb.verificar('P-54922', 'vistoria')
-rb.editar('P-54922', {observacoes:'confirmado no local', km:12.5})
-rb.desabilitar('P-54922', 'em manutenção')   // motivo obrigatório
-rb.remover('P-54922', 'radar inexistente')   // tombstone, motivo obrigatório (nunca apaga a linha)
-rb.vinculo(5, 'oficial_vence', 'o ponto oficial é o correto')  // ou 'colaborativo_vence'
+```bash
+radar-api verificar P-1234 --motivo vistoria
+radar-api editar P-1234 --km 12.5 --observacoes 'confirmado no local'
+radar-api desabilitar P-1234 --motivo 'em manutenção'      # motivo OBRIGATÓRIO
+radar-api remover P-1234 --motivo 'radar inexistente'      # tombstone, nunca apaga a linha
+radar-api vinculo 5 --status oficial_vence --motivo 'o ponto oficial é o correto'
 ```
 
-### Admin — bloqueios, tokens, usuários
+## Admin — usuários, tokens, bloqueios
 
-```js
-rb.bloqueios()
-rb.bloquear({tipo:'zona_sombra', latitude:-23.55, longitude:-46.63, raio_metros:1000, motivo:'sabotagem'})
-rb.desbloquear(7)
+```bash
+radar-api usuarios
+radar-api criar-usuario mod1 --papel moderador            # sem --senha -> temporária (1x)
+radar-api editar-usuario 2 --papel admin --ativo 1
+radar-api resetar-senha 2                                  # gera temporária (troca obrigatória)
 
-rb.tokens()
-rb.criarToken('github:fulano', 'moderador')   // o VALOR do token aparece UMA vez
-rb.revogarToken(3)
+radar-api tokens
+radar-api criar-token github:fulano --escopo moderador      # o VALOR aparece 1x
+radar-api revogar-token 3
 
-rb.usuarios()
-rb.criarUsuario({login:'mod1', papel:'moderador'})          // sem senha -> temporária devolvida uma vez
-rb.editarUsuario(2, {papel:'admin', ativo:true})
-rb.resetarSenha(2)                                          // gera temporária (deve_trocar_senha=1)
+radar-api bloqueios
+radar-api bloquear --tipo zona_sombra --lat -23.55 --lon -46.63 --raio 1000 --motivo sabotagem
+radar-api desbloquear 7
 ```
 
-### Token de API em vez de cookie
+## Autenticar com token de API (em vez do cookie)
 
-```js
-rb.usarToken('rb_xxxxxxxx')   // a partir daqui os pedidos usam X-Api-Token
+```bash
+radar-api usar-token rb_xxxxxxxx     # a partir daqui usa o cabeçalho X-Api-Token
+radar-api limpar-token               # volta a usar só a sessão
 ```
 
-### Depurar
-
-```js
-rb._url('/api/v1/gestao/pendentes')   // a URL crua que seria chamada
-rb._log()                             // últimos pedidos (rota + status)
-```
-
----
-
-## 2. Shell (curl)
+## Sem o cliente (curl cru)
 
 ```bash
 B='https://servidor3.lucas.inf.br/openclaw/radar/api.pse?rota='
 J=jar.txt
 
-# login (guarda o cookie)
 curl -s -c $J -X POST "$B/api/v1/login" -H 'Content-Type: application/json' \
   -d '{"login":"admin","senha":"..."}'
 
-# trocar a própria senha
 curl -s -b $J -X POST "$B/api/v1/minha-senha" -H 'Content-Type: application/json' \
   -d '{"senha_atual":"...","senha_nova":"aNovaSenha123"}'
 
-# fila de cadastros não verificados
 curl -s -b $J "$B/api/v1/gestao/pendentes"
-
-# verificar / remover um radar
-curl -s -b $J -X POST "$B/api/v1/gestao/radar/P-54922/verificar" \
-  -H 'Content-Type: application/json' -d '{"motivo":"vistoria"}'
-curl -s -b $J -X POST "$B/api/v1/gestao/radar/P-54922/remover" \
-  -H 'Content-Type: application/json' -d '{"motivo":"radar inexistente"}'
 ```
-
-Com token de API troque `-b $J` por `-H "X-Api-Token: rb_..."`.
 
 ---
 
-## 3. Perdi/errei a senha — como destravar
+## Perdi/errei a senha — como destravar
 
-1. **Pelo painel:** em `gestao.html`, botão **Trocar senha** (ou o link no aviso de senha temporária).
-   Exige a senha atual + uma nova de **mínimo 8 caracteres**.
-2. **Pelo console:** `rb.senha('senha-atual', 'novaSenha123')`.
+1. **Pelo painel:** em `gestao.html`, botão **Trocar senha** (ou o link no aviso de senha
+   temporária). Exige a senha atual + uma nova de **mínimo 8 caracteres**.
+2. **Pelo terminal:** `radar-api senha` (pede a atual e a nova).
 3. **Emergência (sem saber a senha atual), no host:**
 
    ```bash
    radar-admin reset-senha admin     # imprime uma senha temporária UMA vez (troca obrigatória)
    ```
 
-   O `radar-admin` roda fora do painel de propósito: é a saída se a única senha admin se perder.
+   Diferente do `radar-api` (que fala pela API), o `radar-admin` roda fora do painel e
+   usa o próprio banco — é a saída se a única senha admin se perder.
 
-Regras: login é genérico (`401`, sem revelar se o login existe); token de API **não** troca
-senha (só sessão do painel); nova senha com menos de 8 caracteres → `senha_fraca`.
+Regras: login é genérico (`401`, sem revelar se o login existe); token de API **não**
+troca senha (só a sessão do painel); nova senha com menos de 8 caracteres → `senha_fraca`.
