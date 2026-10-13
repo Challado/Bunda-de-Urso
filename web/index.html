@@ -12,6 +12,9 @@
   header{background:var(--azul);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px}
   header .logo{height:54px;width:auto;border-radius:8px;background:#fff;padding:3px;box-shadow:0 1px 4px rgba(0,0,0,.3);flex:0 0 auto}
   header .cabTxt{min-width:0}
+  header .nav{margin-top:6px;display:flex;gap:14px;flex-wrap:wrap}
+  header .nav a{color:#fff;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.45);font-size:13.5px;font-weight:600;padding-bottom:1px}
+  header .nav a:hover{border-bottom-color:#fff}
   header h1{margin:0;font-size:17px;font-weight:600}
   header .sub{opacity:.85;font-size:12.5px}
   /* position+z-index: a barra de controles precisa ficar ACIMA do mapa. O Leaflet usa
@@ -111,7 +114,10 @@
   <img class="logo" src="bunda-de-urso.png" alt="Bundita de Urso — a base do Bunda de urso">
   <div class="cabTxt">
     <h1>Radar Brasil — consulta por localização</h1>
-    <div class="sub">Dados oficiais (INMETRO/PSIE, DNIT, PRT/PRF, DERs e prefeituras). Mapa de fundo: OpenStreetMap; lista de municípios: kelvins/municipios-brasileiros (dados IBGE).</div>
+    <nav class="nav">
+      <a href="cadastro.html">Cadastrar radar</a>
+      <a href="gestao.html">Administração</a>
+    </nav>
   </div>
 </header>
 

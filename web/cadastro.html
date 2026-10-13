@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cadastrar radar — Bundita de Urso</title>
+<style>
+  :root{--azul:#12508f;--verde:#178a3d;--borda:#d7d7de}
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1d1d22;background:#f7f7f9}
+  header{background:var(--azul);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px}
+  header .logo{height:54px;width:auto;border-radius:8px;background:#fff;padding:3px;box-shadow:0 1px 4px rgba(0,0,0,.3);flex:0 0 auto}
+  header .cabTxt{min-width:0}
+  header h1{margin:0;font-size:19px}
+  header .nav{margin-top:6px;display:flex;gap:14px;flex-wrap:wrap}
+  header .nav a{color:#fff;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.45);font-size:13.5px;font-weight:600;padding-bottom:1px}
+  header .nav a:hover{border-bottom-color:#fff}
+  main{max-width:780px;margin:0 auto;padding:16px}
+  h2{font-size:15px;margin:16px 0 8px;color:#4a4a55;text-transform:uppercase;letter-spacing:.4px}
+  .aviso{background:#fff4e5;border:1px solid #ffd08a;border-radius:8px;padding:10px 12px;font-size:13.5px}
+  .aviso.ok{background:#e6f6ea;border-color:#a8dfb6;color:#14622e}
+  .aviso.err{background:#fdecea;border-color:#f5b7b1;color:#7a1f1f}
+  form{background:#fff;border:1px solid var(--borda);border-radius:10px;padding:14px}
+  .grade{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  label{display:flex;flex-direction:column;font-size:12.5px;color:#4a4a55;gap:3px}
+  label.wide{grid-column:1/-1}
+  input,select,textarea{font:inherit;padding:8px 10px;border:1px solid var(--borda);border-radius:7px;background:#fff;color:#1d1d22;width:100%}
+  textarea{min-height:64px;resize:vertical}
+  button{margin-top:12px;padding:10px 16px;border:0;border-radius:7px;background:var(--azul);color:#fff;font:600 15px/1 inherit;cursor:pointer}
+  button:disabled{opacity:.6;cursor:default}
+  .dica{color:#6b7280;font-size:12.5px;margin-top:8px}
+  @media (max-width:560px){.grade{grid-template-columns:1fr}header .logo{height:40px}}
+</style>
+</head>
+<body>
+<header>
+  <img class="logo" src="bunda-de-urso.png" alt="Bundita de Urso — a base do Bunda de urso">
+  <div class="cabTxt">
+    <h1>Cadastrar radar</h1>
+    <nav class="nav">
+      <a href="index.html">Consulta</a>
+      <a href="gestao.html">Administração</a>
+    </nav>
+  </div>
+</header>
+<main>
+  <p class="aviso" id="aviso">Cadastro <b>colaborativo e aberto</b>. O radar entra <b>na hora</b>, marcado como “não verificado”, e pode ser verificado depois. Informe as coordenadas <b>ou</b>, no mínimo, município + via.</p>
+
+  <form id="form" novalidate>
+    <h2>Identificação</h2>
+    <div class="grade">
+      <label>Código/identificador do órgão (opcional)<input name="identificador" placeholder="ex.: R-1234" autocomplete="off"></label>
+      <label>Tipo<select name="tipo_radar"><option value="">—</option><option>fixo</option><option>portatil</option><option>movel</option></select></label>
+      <label class="wide">Fabricante / modelo (opcional)<input name="modelo" placeholder="ex.: Trafipax / …" autocomplete="off"></label>
+    </div>
+
+    <h2>Localização</h2>
+    <div class="grade">
+      <label>Latitude<input name="latitude" inputmode="decimal" placeholder="-23.288997" autocomplete="off"></label>
+      <label>Longitude<input name="longitude" inputmode="decimal" placeholder="-46.587841" autocomplete="off"></label>
+      <label>UF<input name="uf" maxlength="2" placeholder="SP" autocomplete="off"></label>
+      <label>Município<input name="municipio" placeholder="Mairiporã" autocomplete="off"></label>
+      <label>Via / rodovia<input name="via" placeholder="BR-381" autocomplete="off"></label>
+      <label>km<input name="km" inputmode="decimal" placeholder="27.3" autocomplete="off"></label>
+    </div>
+
+    <h2>Fiscalização</h2>
+    <div class="grade">
+      <label>Velocidade (km/h)<input name="velocidade_geral" inputmode="numeric" placeholder="80" autocomplete="off"></label>
+      <label>Sentido<select name="sentido"><option value="">—</option><option>crescente</option><option>decrescente</option><option>ambos</option><option>desconhecido</option></select></label>
+      <label class="wide">Observações<textarea name="observacoes" placeholder="Referências do ponto exato, placa, situação…"></textarea></label>
+      <label class="wide">Seu contato (opcional, para conferência)<input name="contato" placeholder="nome / e-mail" autocomplete="off"></label>
+    </div>
+
+    <button type="submit" id="bt">Enviar cadastro</button>
+    <div class="dica">Só a localização mínima é obrigatória. Campo em branco fica como “não informado” — nada é inventado.</div>
+  </form>
+  <div id="res" style="margin-top:14px"></div>
+</main>
+<script>
+var API = "api.pse?rota=/api/v1/radares&formato=json";
+var CAMPOS = ["identificador","tipo_radar","modelo","latitude","longitude","uf","municipio","via","km","velocidade_geral","sentido","observacoes","contato"];
+var form = document.getElementById("form");
+function val(n){ var el = form.elements[n]; return el ? el.value.trim() : ""; }
+function diz(html, cls){ document.getElementById("res").innerHTML = "<div class='aviso " + (cls||"") + "'>" + html + "</div>"; }
+form.addEventListener("submit", function(ev){
+  ev.preventDefault();
+  var body = {};
+  CAMPOS.forEach(function(k){ var v = val(k); if (v) body[k] = v; });
+  if (!body.latitude && !body.longitude && !(body.municipio && body.via)){
+    diz("Informe as coordenadas ou, no mínimo, município + via.", "err"); return;
+  }
+  var bt = document.getElementById("bt");
+  bt.disabled = true; bt.textContent = "Enviando…";
+  document.getElementById("res").innerHTML = "";
+  fetch(API, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)})
+    .then(function(r){ return r.json().catch(function(){return {};}).then(function(j){ return {status:r.status, body:j}; }); })
+    .then(function(o){
+      var j = o.body || {};
+      if (o.status === 200 && ((j.criados||0) + (j.atualizados||0)) > 0){
+        diz("Recebido! Criados: <b>" + (j.criados||0) + "</b>, atualizados: <b>" + (j.atualizados||0) + "</b>. Obrigado — ele já aparece no mapa.", "ok");
+      } else if (o.status === 404 || o.status === 501 || o.status === 401){
+        diz("O cadastro pela página ainda está <b>em ativação</b>. Tente novamente mais tarde.");
+      } else {
+        var erros = (j.erros||[]).map(function(e){ return (e.campo ? e.campo + ": " : "") + e.mensagem; }).join("<br>");
+        diz("<b>Não foi possível cadastrar</b> (HTTP " + o.status + ")." + (erros ? "<br>" + erros : ""), "err");
+      }
+    })
+    .catch(function(){ diz("O cadastro pela página ainda está <b>em ativação</b>. Tente novamente mais tarde."); })
+    .then(function(){ bt.disabled = false; bt.textContent = "Enviar cadastro"; });
+});
+</script>
+</body>
+</html>
