@@ -4,6 +4,7 @@
 Tudo e resolvido a partir da raiz do repositorio; nada depende de rede em
 tempo de requisicao da API.
 """
+import json
 import os
 
 # Raiz do repositorio = diretorio pai de core/
@@ -63,6 +64,57 @@ def token_ingestao():
 
 # Ingestao via API: tamanho maximo do corpo aceito (protege o CGI).
 API_MAX_BODY = int(os.environ.get("RADAR_API_MAX_BODY", 8 * 1024 * 1024))
+
+# ---------------------------------------------------------------------------
+# Governanca da ingestao (camada colaborativa). Valores versionados em
+# config/governanca.json; sobrescritos por variaveis RADAR_GOV_*. A senha
+# padrao inicial NAO mora aqui nem no repo: entra pelo CLI no deploy.
+# ---------------------------------------------------------------------------
+GOVERNANCA_CONFIG_PATH = os.path.join(ROOT, "config", "governanca.json")
+
+_GOV_PADRAO = {
+    "RAIO_CORRESPONDENCIA_M": 150,     # raio p/ casar colaborativo x oficial
+    "RAIO_ZONA_SOMBRA_M": 1000,        # raio sugerido p/ zona sombra (anti-sabotagem)
+    "SUBMISSAO_LIMITE": 20,            # submissoes publicas por IP na janela
+    "SUBMISSAO_JANELA_SEGUNDOS": 3600,  # janela do rate limit (1 h)
+    "SESSAO_TTL_SEGUNDOS": 28800,      # validade da sessao do painel (8 h)
+    "GOV_ITERACOES": 200000,           # PBKDF2-HMAC-SHA256 (minimo da spec)
+}
+
+
+def _carregar_governanca():
+    """Le config/governanca.json (ou o padrao) e aplica override por ambiente."""
+    valores = dict(_GOV_PADRAO)
+    try:
+        with open(GOVERNANCA_CONFIG_PATH, "r", encoding="utf-8") as f:
+            dados = json.load(f)
+        if isinstance(dados, dict):
+            for chave in valores:
+                valor = dados.get(chave)
+                if isinstance(valor, bool):
+                    continue
+                if isinstance(valor, (int, float)):
+                    valores[chave] = int(valor)
+    except (OSError, ValueError):
+        pass
+    for chave in list(valores):
+        env = os.environ.get("RADAR_GOV_" + chave)
+        if env is None or env == "":
+            continue
+        try:
+            valores[chave] = int(env)
+        except ValueError:
+            continue
+    return valores
+
+
+_GOV = _carregar_governanca()
+RAIO_CORRESPONDENCIA_M = _GOV["RAIO_CORRESPONDENCIA_M"]
+RAIO_ZONA_SOMBRA_M = _GOV["RAIO_ZONA_SOMBRA_M"]
+SUBMISSAO_LIMITE = _GOV["SUBMISSAO_LIMITE"]
+SUBMISSAO_JANELA_SEGUNDOS = _GOV["SUBMISSAO_JANELA_SEGUNDOS"]
+SESSAO_TTL_SEGUNDOS = _GOV["SESSAO_TTL_SEGUNDOS"]
+GOV_ITERACOES = max(200000, _GOV["GOV_ITERACOES"])
 
 # Geodesia
 EARTH_RADIUS_M = 6371008.8   # raio medio WGS84 (spec 9.2)

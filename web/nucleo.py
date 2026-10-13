@@ -9,6 +9,7 @@ import datetime
 import hmac
 import json
 import os
+import re
 import sys
 import urllib.parse
 
@@ -18,15 +19,18 @@ from core import config
 from core import db as dbmod
 from core import consultas
 from core import geo
+from core import governanca
 from core.serializers import serialize, is_valido, FORMATOS
 from core.serializers import campos, txt_ser, json_ser, xml_ser, edifact_ser, dif_ser
 
 _cls_txt = txt_ser
 
 STATUS_REASON = {
-    200: "OK", 400: "Bad Request", 404: "Not Found",
-    405: "Method Not Allowed", 422: "Unprocessable Entity",
-    503: "Service Unavailable", 500: "Internal Server Error",
+    200: "OK", 201: "Created", 400: "Bad Request", 401: "Unauthorized",
+    403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed",
+    409: "Conflict", 413: "Payload Too Large", 422: "Unprocessable Entity",
+    429: "Too Many Requests", 503: "Service Unavailable",
+    500: "Internal Server Error",
 }
 
 
@@ -65,8 +69,10 @@ PARAMS = [
 
 ENDPOINTS_AJUDA = {
     "/api/v1/radares": ["GET", "POST"],
+    "/api/v1/radares/submeter": ["POST"],
     "/api/v1/radares/busca": ["GET", "POST"],
     "/api/v1/radares/{id}": ["GET"],
+    "/api/v1/radares/{id}/historico": ["GET"],
     "/api/v1/trafego": ["GET", "POST"],
     "/api/v1/trechos": ["GET", "POST"],
     "/api/v1/operacoes": ["GET", "POST"],
@@ -74,6 +80,9 @@ ENDPOINTS_AJUDA = {
     "/api/v1/fontes": ["GET"],
     "/api/v1/fontes/{id}": ["GET"],
     "/api/v1/atualizacoes": ["GET"],
+    "/api/v1/login": ["POST"],
+    "/api/v1/logout": ["POST"],
+    "/api/v1/minha-senha": ["POST"],
     "/api/v1/ajuda": ["GET", "POST"],
     "/api/v1/status": ["GET", "POST"],
     "/health/live": ["GET"],
@@ -83,10 +92,31 @@ ENDPOINTS_AJUDA = {
 ENDPOINTS_ADMINISTRATIVOS = {
     "/api/v1/admin/sincronizar": ["POST"],
     "/api/v1/admin/rollback": ["POST"],
+    "/api/v1/gestao/pendentes": ["GET"],
+    "/api/v1/gestao/radar/{id}": ["GET", "PATCH"],
+    "/api/v1/gestao/radar/{id}/verificar": ["POST"],
+    "/api/v1/gestao/radar/{id}/desabilitar": ["POST"],
+    "/api/v1/gestao/radar/{id}/remover": ["POST"],
+    "/api/v1/gestao/radar/{id}/historico": ["GET"],
+    "/api/v1/gestao/bloqueios": ["GET", "POST"],
+    "/api/v1/gestao/bloqueios/{id}": ["DELETE"],
+    "/api/v1/gestao/tokens": ["GET", "POST"],
+    "/api/v1/gestao/tokens/{id}/revogar": ["POST"],
+    "/api/v1/gestao/usuarios": ["GET", "POST"],
+    "/api/v1/gestao/usuarios/{id}": ["PATCH"],
+    "/api/v1/gestao/usuarios/{id}/senha": ["POST"],
 }
 
 ENDPOINTS_DESC = {
     "/api/v1/radares": "Pontos de fiscalizacao (radar instalado) num raio.",
+    "/api/v1/radares/submeter": ("Submissao PUBLICA de radar (sem token): "
+                                  "entra como colaborativo/nao verificado e "
+                                  "publica na hora (rate limit + procedencia)."),
+    "/api/v1/radares/{id}/historico": ("Historico/auditoria PUBLICO de um "
+                                        "ponto: quem, quando, tipo, motivo."),
+    "/api/v1/login": "Login do painel -> sessao (cookie httpOnly).",
+    "/api/v1/logout": "Encerra a sessao do painel.",
+    "/api/v1/minha-senha": "Troca a propria senha (exige a senha atual).",
     "/api/v1/radares/busca": ("Busca cadastral por UF/rodovia/municipio, "
                               "sem coordenada; cobertura parcial."),
     "/api/v1/radares/{id}": "Um ponto de fiscalizacao por id (P-<n>).",
@@ -288,6 +318,23 @@ def ajuda_texto():
     for ep, metodos in ENDPOINTS_ADMINISTRATIVOS.items():
         linhas.append("  %-28s %s" % (ep, "/".join(metodos)))
     linhas.append("")
+    linhas.append("GOVERNANCA DA INGESTAO (colaborativo x oficial):")
+    linhas.extend([
+        "  - Leitura aberta; criacao aberta por POST /api/v1/radares/submeter",
+        "    (sem token): entra como colaborativo NAO verificado e publica na",
+        "    hora, com rate limit por IP e procedencia (IP/user-agent/quando).",
+        "  - Se houver ponto OFICIAL no raio de correspondencia (config",
+        "    RAIO_CORRESPONDENCIA_M), o colaborativo e corroborado",
+        "    automaticamente e ganha vinculo em CORRESPONDENCIA_PONTO.",
+        "  - Geofencing: coordenada dentro de BLOQUEIO_GEOGRAFICO ativo",
+        "    (marcacao_falsa / zona_sombra) e recusada com 409 e motivo.",
+        "  - Gestao exige sessao (login) ou cabecalho X-Api-Token; escopos:",
+        "    contribuidor (le) < moderador (verifica/edita/remove) < admin",
+        "    (usuarios, tokens, bloqueios). Remocao e TOMBSTONE: nada e apagado.",
+        "  - Consulta publica PREFERE o colaborativo e esconde removidos e",
+        "    desabilitados; GET /api/v1/radares/{id}/historico e publico.",
+    ])
+    linhas.append("")
     linhas.append("PARAMETROS (nome tipo obrig aceitos descricao):")
     for (n, t, o, a, d) in PARAMS:
         linhas.append("  %-18s %-9s %-3s aceitos=%-22s %s" % (
@@ -486,29 +533,10 @@ def _token_escrita(environ):
 def _validar_item_radar(item):
     """Valida o minimo de cada radar enviado. Devolve (campo, msg) ou None.
 
-    Exigencia: coordenada plausivel (latitude+longitude) OU municipio+via.
+    Delega para ``core.governanca.validar_minimo`` para que a ingestao
+    autenticada e a submissao publica usem EXATAMENTE a mesma regra.
     """
-    if not isinstance(item, dict):
-        return None, "cada item deve ser um objeto JSON"
-    from coletor.fontes import normalizacao as nz
-    lat = nz.to_float(nz.pick(item, "latitude", "lat"))
-    lon = nz.to_float(nz.pick(item, "longitude", "lon", "lng"))
-    if lat is not None or lon is not None:
-        if lat is None or lon is None:
-            return "latitude", "informe latitude E longitude juntas"
-        if not (-90 <= lat <= 90):
-            return "latitude", "latitude fora de -90..90"
-        if not (-180 <= lon <= 180):
-            return "longitude", "longitude fora de -180..180"
-        return None
-    municipio = nz.pick(item, "municipio", "municipio_nome", "cidade",
-                        "municipio_ibge", "codigo_ibge", "ibge")
-    via = nz.pick(item, "via", "via_codigo", "rodovia", "br")
-    if not municipio:
-        return "municipio", "informe latitude/longitude ou municipio+via"
-    if not via:
-        return "via", "informe latitude/longitude ou municipio+via"
-    return None
+    return governanca.validar_minimo(item)
 
 
 def _eh_ingestao(caminho, metodo, environ, stdin_bytes):
@@ -610,6 +638,339 @@ def _ingestao_radares(environ, stdin_bytes):
     return status, {"Content-Type": "application/json; charset=utf-8"}, corpo
 
 
+# ---------------------------------------------------------------------------
+# GOVERNANCA (rotas novas): submissao publica, login/sessao e gestao.
+# Toda escrita passa por core.governanca (a API e o unico caminho de escrita).
+# ---------------------------------------------------------------------------
+def _resp(obj, status=200, extra_headers=None):
+    headers = {"Content-Type": "application/json; charset=utf-8"}
+    if extra_headers:
+        headers.update(extra_headers)
+    return status, headers, obj
+
+
+def _gov_erro(exc):
+    status, headers, body = _erro(exc.status, exc.codigo, exc.mensagem,
+                                  campo=exc.campo)
+    if exc.detalhes:
+        body["erro"]["detalhes"] = exc.detalhes
+    return status, headers, body
+
+
+def _corpo_json(stdin_bytes):
+    if not stdin_bytes:
+        return {}
+    if len(stdin_bytes) > config.API_MAX_BODY:
+        raise governanca.GovernancaError(
+            413, "corpo_muito_grande",
+            "corpo excede %d bytes" % config.API_MAX_BODY)
+    try:
+        return json.loads(stdin_bytes.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError) as exc:
+        raise governanca.GovernancaError(
+            400, "json_invalido", "corpo JSON invalido: %s" % str(exc)[:200])
+
+
+def _pid(parte):
+    try:
+        return int(str(parte).upper().replace("P-", ""))
+    except (TypeError, ValueError):
+        raise governanca.GovernancaError(404, "ponto_nao_encontrado",
+                                         "id de ponto invalido: %s" % parte)
+
+
+def _ip_requisicao(environ):
+    return (environ.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
+            or environ.get("REMOTE_ADDR"))
+
+
+def _consulta_params(environ):
+    return dict(urllib.parse.parse_qsl(environ.get("QUERY_STRING", ""),
+                                       keep_blank_values=True))
+
+
+def _dispatch_governanca(conn, caminho, metodo, environ, stdin_bytes):
+    """Trata as rotas de governanca; devolve resposta ou None (nao e nossa)."""
+    p = caminho.rstrip("/") or "/"
+    if p == "/api/v1/radares/submeter":
+        if metodo != "POST":
+            return _erro(405, "metodo_nao_permitido", "metodo %s nao permitido" % metodo)
+        return _submeter(conn, environ, stdin_bytes)
+    if p == "/api/v1/login":
+        if metodo != "POST":
+            return _erro(405, "metodo_nao_permitido", "metodo %s nao permitido" % metodo)
+        return _login(conn, environ, stdin_bytes)
+    if p == "/api/v1/logout":
+        if metodo != "POST":
+            return _erro(405, "metodo_nao_permitido", "metodo %s nao permitido" % metodo)
+        return _logout(conn, environ)
+    if p == "/api/v1/minha-senha":
+        if metodo != "POST":
+            return _erro(405, "metodo_nao_permitido", "metodo %s nao permitido" % metodo)
+        return _minha_senha(conn, environ, stdin_bytes)
+    if p == "/api/v1/gestao" or p.startswith("/api/v1/gestao/"):
+        return _gestao(conn, p, metodo, environ, stdin_bytes)
+    m = re.match(r"^/api/v1/radares/([^/]+)/historico$", p)
+    if m:
+        if metodo != "GET":
+            return _erro(405, "metodo_nao_permitido", "metodo %s nao permitido" % metodo)
+        return _historico_publico(conn, m.group(1))
+    return None
+
+
+def _submeter(conn, environ, stdin_bytes):
+    try:
+        dados = _corpo_json(stdin_bytes)
+        contato = None
+        if isinstance(dados, dict):
+            contato = dados.get("contato")
+        elif isinstance(dados, list) and dados and isinstance(dados[0], dict):
+            contato = dados[0].get("contato")
+        procedencia = {"ip": _ip_requisicao(environ),
+                       "user_agent": environ.get("HTTP_USER_AGENT"),
+                       "quando": _agora(), "contato": contato}
+        res = governanca.submeter(conn, dados, procedencia)
+    except governanca.GovernancaError as exc:
+        return _gov_erro(exc)
+    return _resp({"sucesso": True, "versao_api": config.API_VERSION,
+                  "versao_esquema": config.SCHEMA_VERSION,
+                  "resultado": res}, 201)
+
+
+def _login(conn, environ, stdin_bytes):
+    try:
+        dados = _corpo_json(stdin_bytes) or {}
+        usuario = governanca.autenticar_senha(conn, dados.get("login"),
+                                              dados.get("senha"))
+    except governanca.GovernancaError as exc:
+        return _gov_erro(exc)
+    if usuario is None:
+        return _erro(401, "credenciais_invalidas",
+                     "login ou senha invalidos")
+    valor, ttl = governanca.criar_sessao(
+        conn, usuario["id"], ip=_ip_requisicao(environ),
+        user_agent=environ.get("HTTP_USER_AGENT"))
+    conn.execute("UPDATE USUARIO SET ultimo_login=? WHERE id=?",
+                 (_agora(), usuario["id"]))
+    conn.commit()
+    cookie = ("%s=%s; HttpOnly; Path=/; SameSite=Lax; Max-Age=%d"
+              % (governanca.COOKIE_SESSAO, valor, ttl))
+    corpo = {"sucesso": True, "token": valor, "expira_em_segundos": ttl,
+             "usuario": {"id": usuario["id"], "login": usuario["login"],
+                         "papel": usuario["papel"],
+                         "deve_trocar_senha": bool(
+                             usuario["deve_trocar_senha"])}}
+    return _resp(corpo, 200, {"Set-Cookie": cookie})
+
+
+def _logout(conn, environ):
+    valor = (governanca._cookie(environ, governanca.COOKIE_SESSAO)
+             or environ.get("HTTP_X_SESSAO"))
+    governanca.encerrar_sessao(conn, valor)
+    cookie = "%s=; HttpOnly; Path=/; Max-Age=0" % governanca.COOKIE_SESSAO
+    return _resp({"sucesso": True}, 200, {"Set-Cookie": cookie})
+
+
+def _minha_senha(conn, environ, stdin_bytes):
+    try:
+        ctx = governanca.contexto_autenticacao(conn, environ)
+        governanca.exigir(ctx, "contribuidor")
+        if ctx.get("tipo") != "usuario":
+            raise governanca.GovernancaError(
+                403, "permissao_negada",
+                "troca de senha exige sessao do painel (nao token de API)")
+        dados = _corpo_json(stdin_bytes) or {}
+        governanca.trocar_propria_senha(conn, ctx["usuario_id"],
+                                        dados.get("senha_atual"),
+                                        dados.get("senha_nova"))
+    except governanca.GovernancaError as exc:
+        return _gov_erro(exc)
+    return _resp({"sucesso": True})
+
+
+def _historico_publico(conn, parte):
+    try:
+        pid = _pid(parte)
+        governanca.garantir_esquema(conn)
+        hist = governanca.historico(conn, pid, publico=True)
+    except governanca.GovernancaError as exc:
+        return _gov_erro(exc)
+    return _resp({"sucesso": True, "ponto_id": "P-%d" % pid,
+                  "historico": hist})
+
+
+def _gestao(conn, p, metodo, environ, stdin_bytes):
+    try:
+        ctx = governanca.contexto_autenticacao(conn, environ)
+    except governanca.GovernancaError as exc:
+        return _gov_erro(exc)
+    resto = p[len("/api/v1/gestao"):].strip("/")
+    partes = resto.split("/") if resto else []
+    try:
+        # -- fila de pendentes --------------------------------------------
+        if partes[:1] == ["pendentes"]:
+            if metodo != "GET":
+                return _erro(405, "metodo_nao_permitido", "metodo %s nao permitido" % metodo)
+            governanca.exigir(ctx, "contribuidor")
+            params = _consulta_params(environ)
+            try:
+                limite = int(params.get("limite", config.DEFAULT_LIMITE))
+            except (TypeError, ValueError):
+                return _erro(422, "limite_invalido", "limite inteiro 1..1000")
+            pontos, meta = governanca.listar_pendentes(
+                conn, limite, params.get("cursor"), params.get("status"))
+            return _resp({"sucesso": True, "pendentes": pontos,
+                          "resultado": meta})
+
+        # -- radar/{id} e acoes -------------------------------------------
+        if partes[:1] == ["radar"] and len(partes) >= 2:
+            pid = _pid(partes[1])
+            acao = partes[2] if len(partes) > 2 else None
+            if acao is None:
+                if metodo == "GET":
+                    governanca.exigir(ctx, "contribuidor")
+                    return _resp({"sucesso": True,
+                                  "radar": governanca.obter_radar(conn, pid)})
+                if metodo == "PATCH":
+                    governanca.exigir(ctx, "moderador")
+                    dados = _corpo_json(stdin_bytes) or {}
+                    depois = governanca.editar_radar(
+                        conn, pid, dados, ctx, ip=_ip_requisicao(environ))
+                    return _resp({"sucesso": True, "editado": depois})
+                return _erro(405, "metodo_nao_permitido", "metodo %s nao permitido" % metodo)
+            if acao == "historico" and metodo == "GET":
+                governanca.exigir(ctx, "contribuidor")
+                hist = governanca.historico(conn, pid, publico=False)
+                return _resp({"sucesso": True, "ponto_id": "P-%d" % pid,
+                              "historico": hist})
+            if metodo != "POST":
+                return _erro(405, "metodo_nao_permitido", "metodo %s nao permitido" % metodo)
+            governanca.exigir(ctx, "moderador")
+            dados = _corpo_json(stdin_bytes) or {}
+            ip = _ip_requisicao(environ)
+            if acao == "verificar":
+                governanca.verificar_radar(conn, pid, ctx,
+                                           motivo=dados.get("motivo"), ip=ip)
+                return _resp({"sucesso": True})
+            if acao == "desabilitar":
+                governanca.desabilitar_radar(conn, pid, ctx,
+                                             dados.get("motivo"), ip=ip)
+                return _resp({"sucesso": True})
+            if acao == "remover":
+                governanca.remover_radar(conn, pid, ctx, dados.get("motivo"),
+                                         ip=ip)
+                return _resp({"sucesso": True, "removido": "P-%d" % pid})
+            return _erro(404, "rota_desconhecida",
+                         "acao desconhecida: %s" % acao)
+
+        # -- bloqueios geograficos ---------------------------------------
+        if partes[:1] == ["bloqueios"]:
+            if len(partes) == 1:
+                if metodo == "GET":
+                    governanca.exigir(ctx, "moderador")
+                    params = _consulta_params(environ)
+                    incluir = str(params.get("incluir_inativos", "")).lower() in ("1", "true", "sim")
+                    return _resp({"sucesso": True,
+                                  "bloqueios": governanca.listar_bloqueios(conn, incluir)})
+                if metodo == "POST":
+                    governanca.exigir(ctx, "admin")
+                    dados = _corpo_json(stdin_bytes) or {}
+                    raio = dados.get("raio_metros")
+                    if not raio and dados.get("tipo") == "zona_sombra":
+                        raio = config.RAIO_ZONA_SOMBRA_M
+                    bid = governanca.criar_bloqueio(
+                        conn, dados.get("tipo"), dados.get("latitude"),
+                        dados.get("longitude"), raio, dados.get("motivo"),
+                        ctx, origem_ponto_id=dados.get("origem_ponto_id"))
+                    return _resp({"sucesso": True, "bloqueio_id": bid}, 201)
+                return _erro(405, "metodo_nao_permitido", "metodo %s nao permitido" % metodo)
+            if len(partes) == 2:
+                governanca.exigir(ctx, "admin")
+                if metodo != "DELETE":
+                    return _erro(405, "metodo_nao_permitido", "metodo %s nao permitido" % metodo)
+                try:
+                    bid = int(partes[1])
+                except (TypeError, ValueError):
+                    return _erro(422, "parametro_invalido", "id de bloqueio invalido")
+                governanca.desativar_bloqueio(conn, bid, ctx)
+                return _resp({"sucesso": True})
+            return _erro(404, "rota_desconhecida", "rota de bloqueio desconhecida")
+
+        # -- tokens -------------------------------------------------------
+        if partes[:1] == ["tokens"]:
+            governanca.exigir(ctx, "admin")
+            if len(partes) == 1:
+                if metodo == "GET":
+                    return _resp({"sucesso": True,
+                                  "tokens": governanca.listar_tokens(conn)})
+                if metodo == "POST":
+                    dados = _corpo_json(stdin_bytes) or {}
+                    tid, valor = governanca.emitir_token(
+                        conn, dados.get("nome"),
+                        dados.get("escopo") or "contribuidor",
+                        dono=dados.get("dono"),
+                        expira_em=dados.get("expira_em"),
+                        observacoes=dados.get("observacoes"),
+                        criado_por=(ctx or {}).get("rotulo"))
+                    return _resp({"sucesso": True, "token_id": tid,
+                                  "token": valor,
+                                  "prefixo": governanca.prefixo_token(valor),
+                                  "aviso": "guarde o valor agora: ele NAO "
+                                            "sera exibido de novo"}, 201)
+                return _erro(405, "metodo_nao_permitido", "metodo %s nao permitido" % metodo)
+            if len(partes) == 3 and partes[2] == "revogar" and metodo == "POST":
+                try:
+                    tid = int(partes[1])
+                except (TypeError, ValueError):
+                    return _erro(422, "parametro_invalido", "id de token invalido")
+                governanca.revogar_token(conn, tid)
+                return _resp({"sucesso": True})
+            return _erro(404, "rota_desconhecida", "rota de token desconhecida")
+
+        # -- usuarios -----------------------------------------------------
+        if partes[:1] == ["usuarios"]:
+            governanca.exigir(ctx, "admin")
+            if len(partes) == 1:
+                if metodo == "GET":
+                    return _resp({"sucesso": True,
+                                  "usuarios": governanca.listar_usuarios(conn)})
+                if metodo == "POST":
+                    dados = _corpo_json(stdin_bytes) or {}
+                    res = governanca.criar_usuario_api(conn, dados, ctx)
+                    return _resp({"sucesso": True, "usuario": res}, 201)
+                return _erro(405, "metodo_nao_permitido", "metodo %s nao permitido" % metodo)
+            if len(partes) == 2:
+                try:
+                    uid = int(partes[1])
+                except (TypeError, ValueError):
+                    return _erro(422, "parametro_invalido", "id de usuario invalido")
+                if metodo == "PATCH":
+                    dados = _corpo_json(stdin_bytes) or {}
+                    governanca.definir_papel_ativo(
+                        conn, uid, papel=dados.get("papel"),
+                        ativo=(None if "ativo" not in dados
+                               else bool(dados.get("ativo"))))
+                    return _resp({"sucesso": True})
+                return _erro(405, "metodo_nao_permitido", "metodo %s nao permitido" % metodo)
+            if len(partes) == 3 and partes[2] == "senha" and metodo == "POST":
+                try:
+                    uid = int(partes[1])
+                except (TypeError, ValueError):
+                    return _erro(422, "parametro_invalido", "id de usuario invalido")
+                usuario = governanca.obter_usuario(conn, uid)
+                if usuario is None:
+                    return _erro(404, "usuario_nao_encontrado",
+                                 "usuario %s nao encontrado" % uid)
+                _row, senha = governanca.resetar_senha(conn, usuario["login"])
+                return _resp({"sucesso": True, "login": usuario["login"],
+                              "senha_temporaria": senha,
+                              "deve_trocar_senha": True})
+            return _erro(404, "rota_desconhecida", "rota de usuario desconhecida")
+    except governanca.GovernancaError as exc:
+        return _gov_erro(exc)
+    return _erro(404, "rota_desconhecida", "rota de gestao nao encontrada")
+
+
 def handle_request(environ, stdin_bytes=b""):
     metodo = environ.get("REQUEST_METHOD", "GET").upper()
     caminho = _rota(environ)
@@ -658,6 +1019,10 @@ def handle_request(environ, stdin_bytes=b""):
                      "banco local ausente ou nao inicializado")
 
     try:
+        gov = _dispatch_governanca(conn, caminho, metodo, environ, stdin_bytes)
+        if gov is not None:
+            return gov
+
         if caminho in ("/api/v1/status", "/api/v1/status/"):
             st = consultas.status_base(conn)
             try:
