@@ -265,18 +265,18 @@ class TestDecisaoReversao(BaseDedup):
         self.assertEqual(len(dedup.gerar_candidatos(self.con)["criados"]), 1)
         cid = self.candidato_unico()["id"]
 
-        decisao_id = dedup.decidir(self.con, cid, "unificar", "lucas",
+        decisao_id = dedup.decidir(self.con, cid, "unificar", "revisor",
                                    "mesma serie e mesmo km")
         self.assertEqual(self.candidato_unico()["estado"], "decidido_unificar")
         self.assertEqual(self.contar("DECISAO_DUPLICIDADE"), 1)
 
-        res = dedup.aplicar(self.con, cid, usuario="lucas")
+        res = dedup.aplicar(self.con, cid, usuario="revisor")
         self.assertTrue(res[0]["aplicado"])
         self.assertEqual(self.candidato_unico()["estado"], "consolidado")
         n_antes = self.vinculos_com_decisao(decisao_id)
         self.assertGreaterEqual(n_antes, 1)
 
-        rev = dedup.reverter_decisao(self.con, decisao_id, "lucas", "engano")
+        rev = dedup.reverter_decisao(self.con, decisao_id, "revisor", "engano")
         self.assertTrue(rev["revertida"])
         self.assertEqual(self.vinculos_com_decisao(decisao_id), 0)
         # auditoria intacta: a decisao continua, com revertida_em marcado
@@ -342,8 +342,8 @@ class TestRegras17p4(BaseDedup):
 
         dedup.gerar_candidatos(self.con)
         cid = self.candidato_unico()["id"]
-        dedup.decidir(self.con, cid, "unificar", "lucas", "mesmo instrumento")
-        res = dedup.aplicar(self.con, cid, usuario="lucas")
+        dedup.decidir(self.con, cid, "unificar", "revisor", "mesmo instrumento")
+        res = dedup.aplicar(self.con, cid, usuario="revisor")
         self.assertTrue(res[0]["aplicado"])
 
         # a posicao OFICIAL segue intacta (nada de sobrescrever divergencia)
@@ -382,8 +382,8 @@ class TestRegras17p4(BaseDedup):
 
         self.assertEqual(len(dedup.gerar_candidatos(self.con)["criados"]), 1)
         cid = self.candidato_unico()["id"]
-        dedup.decidir(self.con, cid, "unificar", "lucas", "mesma serie")
-        res = dedup.aplicar(self.con, cid, usuario="lucas")
+        dedup.decidir(self.con, cid, "unificar", "revisor", "mesma serie")
+        res = dedup.aplicar(self.con, cid, usuario="revisor")
         canonico = res[0]["equipamento_canonico"]
         self.assertIsNotNone(canonico)
 

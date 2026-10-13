@@ -5,7 +5,9 @@
 
 > **O nome é uma provocação; o propósito é sério.**
 
-> **🤖 Autoria:** este repositório — código, documentação e este README — foi **feito pelo Jarvis**, o assistente de IA (OpenClaw) que roda no servidor do Lucas, a pedido dele. Detalhes na seção [Autoria e proveniência](#autoria-e-proveniência), no fim.
+> **🤖 Autoria:** este repositório — código, documentação e este README — foi **feito pelo Jarvis**, o assistente de IA (OpenClaw). Detalhes na seção [Autoria e proveniência](#autoria-e-proveniência), no fim.
+>
+> **🌐 No ar:** a consulta pública roda em <https://servidor3.lucas.inf.br/openclaw/radar/> (mapa e raio por localização); a API responde em <https://servidor3.lucas.inf.br/openclaw/radar/api.pse>.
 
 ## Por que “Bunda de Urso”?
 
@@ -156,6 +158,15 @@ Registrar logs de download, parsing, validação, importação, deduplicação, 
 
 Os dados devem permitir rastrear cada resposta da API até a publicação original. Isso é indispensável para correção de erros e transparência pública.
 
+## No ar (consulta pública)
+
+O serviço publicado responde em:
+
+- **Página de consulta (mapa + raio por localização):** <https://servidor3.lucas.inf.br/openclaw/radar/>
+- **API:** <https://servidor3.lucas.inf.br/openclaw/radar/api.pse> (rotas em `/api/v1/*`)
+
+**Palavras-chave:** radar de velocidade, radares, fiscalização eletrônica, trânsito, dados abertos, Brasil, API, mapa, segurança viária.
+
 ## Instalação e operação
 
 A especificação funcional é o `ESPECIFICACAO_v1.1.txt`; a referência técnica do código está em `docs/README_TECNICO.md`, `docs/LOCALIZADOR_GEOGRAFICO_V1_4.md`, `docs/CRUZAMENTO_DE_CAMPOS.md` e `docs/REQUISITOS_VIGENTES_2026-10-10.md`.
@@ -208,6 +219,7 @@ No fim das contas, é isso: transformar a lamúria em dado. Para que ninguém ma
 
 ## Autoria e proveniência
 
-- **Quem fez:** este repositório — o código, a documentação e este README — foi **escrito e mantido pelo Jarvis**, o assistente de IA (**OpenClaw**) que roda no servidor do **Lucas Willian Bocchi**, a pedido dele. Os commits e os pushes também foram feitos pelo Jarvis.
-- **Como foi feito:** em colaboração direta com o Lucas, no dia a dia, a partir da especificação do projeto e de material de referência. O código é Python 3 puro (só stdlib), sem dependências externas.
+- **Quem fez:** este repositório — o código, a documentação e este README — foi **escrito e mantido pelo Jarvis**, o assistente de IA (**OpenClaw**), a pedido do mantenedor do projeto. Os commits e os pushes também foram feitos pelo Jarvis.
+- **Como foi feito:** em colaboração direta com o mantenedor, no dia a dia, a partir da especificação do projeto e de material de referência. O código é Python 3 puro (só stdlib), sem dependências externas.
+- **Onde está no ar:** a consulta pública roda em <https://servidor3.lucas.inf.br/openclaw/radar/> e a API em <https://servidor3.lucas.inf.br/openclaw/radar/api.pse> (rotas em `/api/v1/*`).
 - **O que não é nosso:** a pasta `referencia/` reúne material de referência de terceiros, guardado apenas para estudo e comparação; não é de autoria deste projeto nem do Jarvis.
