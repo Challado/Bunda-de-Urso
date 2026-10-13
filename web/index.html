@@ -9,7 +9,7 @@
   :root{--azul:#12508f;--vermelho:#c0392b;--cinza:#f4f4f6;--borda:#d7d7de;}
   *{box-sizing:border-box}
   body{margin:0;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1d1d22}
-  header{background:var(--azul);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px}
+  header{background:var(--azul);color:#fff;padding:10px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:12px}
   header .logo{height:54px;width:auto;border-radius:8px;background:#fff;padding:3px;box-shadow:0 1px 4px rgba(0,0,0,.3);flex:0 0 auto}
   header .cabTxt{min-width:0}
   header .nav{margin-top:6px;display:flex;gap:14px;flex-wrap:wrap}
@@ -40,6 +40,8 @@
   #barra b{color:#1d1d22}
   #resultado{padding:0 16px 24px}
   table{border-collapse:collapse;width:100%;font-size:13px}
+  /* container que rola na horizontal em vez de estourar a largura da pagina */
+  .tabWrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
   th,td{border-bottom:1px solid var(--borda);padding:6px 8px;text-align:left;vertical-align:top}
   th{background:var(--cinza);position:sticky;top:0}
   .pill{display:inline-block;background:#e8eef6;color:var(--azul);border-radius:10px;padding:1px 8px;font-size:12px}
@@ -106,6 +108,10 @@
     #festa .msg .feito{font-size:30px;letter-spacing:4px}
     .balao{font-size:34px}
     header .logo{height:40px}
+  }
+  @media (max-width: 420px){
+    header h1{font-size:14.5px}
+    #mapa{height:48vh;min-height:260px}
   }
 </style>
 <link rel="icon" href="favicon.ico" sizes="any">
@@ -411,8 +417,8 @@
     });
     var tabela = "";
     if (pontos.length){
-      tabela = "<table><thead><tr><th>ID</th><th>Via</th><th>km</th><th>Velocidade</th><th>Sentido</th><th>Distância</th><th>Posição</th></tr></thead><tbody>" +
-        linhas.join("") + "</tbody></table>";
+      tabela = "<div class='tabWrap'><table><thead><tr><th>ID</th><th>Via</th><th>km</th><th>Velocidade</th><th>Sentido</th><th>Distância</th><th>Posição</th></tr></thead><tbody>" +
+        linhas.join("") + "</tbody></table></div>";
     }
     var st = (meta && meta.status) || "?";
     var resumo = "<span class='pill'>" + escapeHtml(st) + "</span> " +
