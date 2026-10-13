@@ -12,7 +12,10 @@
   header{background:var(--azul);color:#fff;padding:10px 16px}
   header h1{margin:0;font-size:17px;font-weight:600}
   header .sub{opacity:.85;font-size:12.5px}
-  #controles{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;padding:10px 16px;background:var(--cinza);border-bottom:1px solid var(--borda)}
+  /* position+z-index: a barra de controles precisa ficar ACIMA do mapa. O Leaflet usa
+     z-index ate 1000 (controles/paneis); sem isso o autocomplete de municipio e encoberto
+     pelo mapa no PC (a lista "nao aparece"). */
+  #controles{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;padding:10px 16px;background:var(--cinza);border-bottom:1px solid var(--borda);position:relative;z-index:1100}
   #controles label{display:flex;flex-direction:column;font-size:12px;color:#4a4a55;gap:2px}
   #controles input[type=number],#controles input[type=text]{padding:6px 8px;border:1px solid var(--borda);border-radius:6px;width:150px;font:inherit}
   #controles input[type=range]{width:220px;padding:0;margin-top:6px;accent-color:var(--azul)}
@@ -20,9 +23,14 @@
   #controles .raioVal{font-weight:600;color:var(--azul)}
   button{padding:7px 12px;border:0;border-radius:6px;background:var(--azul);color:#fff;font:inherit;cursor:pointer}
   button.sec{background:#5b6472}
+  .ctrlAqui button{background:#fff;color:var(--azul);border:2px solid rgba(0,0,0,.25);border-radius:6px;padding:7px 10px;font:600 13px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;cursor:pointer;box-shadow:0 1px 5px rgba(0,0,0,.4);white-space:nowrap}
+  .ctrlAqui button:hover{background:#eef3f9}
+  #dicaAqui{display:none;position:absolute;left:50%;transform:translateX(-50%);bottom:12px;z-index:1100;background:rgba(18,80,143,.94);color:#fff;border:0;border-radius:20px;padding:8px 14px;font:600 13px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+  #dicaAqui.on{display:block}
   button:disabled{opacity:.55;cursor:default}
   .chk{flex-direction:row!important;align-items:center;gap:5px!important;font-size:12.5px}
   #mapa{height:64vh;min-height:360px;width:100%}
+  #mapaBox{position:relative}
   #barra{padding:8px 16px;font-size:13px;color:#4a4a55}
   #barra b{color:#1d1d22}
   #resultado{padding:0 16px 24px}
@@ -48,8 +56,10 @@
   a{color:var(--azul)}
   /* ---- autocomplete do municipio (lista propria, aparece ao digitar) ---- */
   #controles .munBox{display:flex;flex-direction:column;font-size:12px;color:#4a4a55;gap:2px;position:relative}
-  .sug{position:absolute;top:100%;left:0;right:0;z-index:60;margin-top:2px;max-height:290px;overflow:auto;background:#fff;color:#1d1d22;border:1px solid var(--borda);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.16);font-size:13.5px}
-  .sug .item{padding:7px 10px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sug{position:absolute;top:100%;left:0;right:0;z-index:1200;margin-top:2px;max-height:290px;overflow:auto;-webkit-overflow-scrolling:touch;background:#fff;color:#1d1d22;border:1px solid var(--borda);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.16);font-size:13.5px}
+  .sug .item{padding:9px 10px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sug .item[aria-selected="true"],.sug .item.sel{background:#e8eef6}
+  .detalhe{display:inline-block;margin-top:6px;font-weight:600}
   .sug .item .uf{color:#6b7280}
   .sug .item:hover,.sug .item.sel{background:#e8eef6}
   .sug .item b{color:var(--azul)}
@@ -108,10 +118,14 @@
   </label>
   <button id="btConsultar">Consultar</button>
   <button id="btLocal" class="sec">Usar minha localização</button>
+  <button id="btAqui" class="sec" title="Consulta o centro atual do mapa">Mostrar radares aqui</button>
   <label class="chk"><input type="checkbox" id="autoLocal"> buscar minha localização ao abrir</label>
 </div>
 
-<div id="mapa"></div>
+<div id="mapaBox">
+  <div id="mapa"></div>
+  <button id="dicaAqui" type="button">Mostrar radares aqui ▾</button>
+</div>
 <div id="barra">Informe as coordenadas ou use a localização do navegador.</div>
 <div id="resultado"></div>
 
@@ -145,6 +159,31 @@
 
   var camadaPts = L.layerGroup().addTo(map);
   var marcaEu = null;
+
+  // ---- "Mostrar radares aqui": consulta o CENTRO atual do mapa ----
+  function consultarCentroMapa(){
+    var c = map.getCenter();
+    var lat = +c.lat.toFixed(6), lon = +c.lng.toFixed(6);
+    var elLat2 = document.getElementById("lat"), elLon2 = document.getElementById("lon");
+    elLat2.value = lat; elLon2.value = lon;
+    consultar(lat, lon, parseInt(elRaio.value, 10) || 2000);
+    var dica = document.getElementById("dicaAqui");
+    if (dica) dica.classList.remove("on");
+  }
+  // controle dentro do mapa (canto superior direito)
+  var CtrlAqui = L.Control.extend({
+    options: {position: "topright"},
+    onAdd: function(){
+      var d = L.DomUtil.create("div", "ctrlAqui");
+      var b = L.DomUtil.create("button", "", d);
+      b.type = "button";
+      b.textContent = "Mostrar radares aqui";
+      L.DomEvent.disableClickPropagation(d);
+      L.DomEvent.on(b, "click", consultarCentroMapa);
+      return d;
+    }
+  });
+  map.addControl(new CtrlAqui());
 
   // ---- festa: sem equipamento no raio = motivo de comemorar ----
   var FESTA_EMOJIS = ["🎈","🎈","🎈","🎈","🎉","🎊","🥳","🎈","🎈"];
@@ -268,6 +307,7 @@
     if (s) h += "Sentido: " + escapeHtml(s) + "<br>";
     if (loc.distancia_metros != null) h += "Distância: " + Math.round(loc.distancia_metros) + " m<br>";
     if (loc.qualidade) h += "Qualidade da posição: " + escapeHtml(loc.qualidade) + "<br>";
+    h += "<a class='detalhe' href='detalhe.html?id=" + encodeURIComponent(p.id) + "'>Ver todos os detalhes &raquo;</a>";
     return h;
   }
 
@@ -286,7 +326,7 @@
       var via = (loc.via || {});
       var vel = velDoPonto(p);
       linhas.push("<tr>" +
-        "<td data-label='ID'>" + escapeHtml(p.id) + "</td>" +
+        "<td data-label='ID'><a class='detalhe' href='detalhe.html?id=" + encodeURIComponent(p.id) + "'><b>" + escapeHtml(p.id) + "</b></a></td>" +
         "<td data-label='Via'>" + escapeHtml([via.codigo, via.nome].filter(Boolean).join(" · ") || "—") + "</td>" +
         "<td data-label='km'>" + (loc.km != null ? escapeHtml(loc.km) : "—") + "</td>" +
         "<td data-label='Velocidade'>" + (vel != null ? "<span class='vel'>" + escapeHtml(vel) + "</span>" : "—") + "</td>" +
@@ -361,6 +401,10 @@
     consultar(parseFloat(elLat.value), parseFloat(elLon.value), parseInt(elRaio.value, 10));
   });
   document.getElementById("btLocal").addEventListener("click", usarLocalizacao);
+  document.getElementById("btAqui").addEventListener("click", consultarCentroMapa);
+  document.getElementById("dicaAqui").addEventListener("click", consultarCentroMapa);
+  // ao navegar (arrastar/zoom) o mapa, mostra a dica "mostrar radares aqui"
+  map.on("movestart", function(){ var d=document.getElementById("dicaAqui"); if (d) d.classList.add("on"); });
   document.getElementById("autoLocal").addEventListener("change", function(e){
     if (e.target.checked) usarLocalizacao();
   });
