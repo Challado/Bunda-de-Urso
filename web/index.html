@@ -38,6 +38,10 @@
   th,td{border-bottom:1px solid var(--borda);padding:6px 8px;text-align:left;vertical-align:top}
   th{background:var(--cinza);position:sticky;top:0}
   .pill{display:inline-block;background:#e8eef6;color:var(--azul);border-radius:10px;padding:1px 8px;font-size:12px}
+  #legenda{padding:6px 16px 0;font-size:12.5px;color:#4a4a55;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  #legenda .lg{display:inline-flex;align-items:center;gap:6px}
+  #legenda i{width:14px;height:14px;border-radius:50%;border:2px solid #000;display:inline-block}
+  .selo-nosso{display:inline-block;background:#ede9fe;color:#5b21b6;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:600}
   .aviso{background:#fff4e5;border:1px solid #ffd08a;border-radius:6px;padding:8px 10px;font-size:13px}
   /* ---- festa: quando nao ha nenhum equipamento no raio ---- */
   #festa{position:fixed;inset:0;z-index:10000;display:none;overflow:hidden;background:rgba(255,255,255,.82);cursor:pointer}
@@ -122,6 +126,11 @@
   <label class="chk"><input type="checkbox" id="autoLocal"> buscar minha localização ao abrir</label>
 </div>
 
+<div id="legenda" aria-label="legenda das cores">
+  <span class="lg"><i style="background:#ffe08a;border-color:#c0392b"></i> fonte oficial</span>
+  <span class="lg"><i style="background:#c4b5fd;border-color:#6d28d9"></i> nossa base (Bundita de Urso)</span>
+</div>
+
 <div id="mapaBox">
   <div id="mapa"></div>
   <button id="dicaAqui" type="button">Mostrar radares aqui ▾</button>
@@ -192,6 +201,18 @@
   // ---- festa: sem equipamento no raio = motivo de comemorar ----
   var FESTA_EMOJIS = ["🎈","🎈","🎈","🎈","🎉","🎊","🥳","🎈","🎈"];
   var FESTA_CORES  = ["#ff6b6b","#feca57","#48dbfb","#1dd1a1","#f368e0","#54a0ff","#ff9ff3"];
+
+  // ---- a NOSSA base (Bundita de Urso) tem cor propria ----
+  var NOSSA_FONTE = "Bundita de Urso - A base do Bunda de urso";
+  function ehNosso(p){
+    var fs = (p && p.fontes) || [];
+    for (var i=0;i<fs.length;i++){
+      var n = fs[i] && fs[i].nome;
+      if (n === NOSSA_FONTE) return true;
+      if (n && n.indexOf("Bundita de Urso") === 0) return true;
+    }
+    return false;
+  }
   function festa(raio, cobertura){
     var el = document.getElementById("festa");
     if (!el) return;
@@ -334,7 +355,9 @@
     var km = (loc.km != null) ? ("km " + loc.km) : "";
     var vel = velDoPonto(p);
     var s = sentidoDoPonto(p);
-    var h = "<b>" + escapeHtml(p.id) + "</b><br>";
+    var h = "<b>" + escapeHtml(p.id) + "</b>";
+    if (ehNosso(p)) h += " <span class='selo-nosso'>Bundita de Urso</span>";
+    h += "<br>";
     h += escapeHtml(viaTxt) + (km ? " — " + escapeHtml(km) : "") + "<br>";
     if (vel != null) h += "Velocidade: <span class='vel'>" + escapeHtml(vel) + " km/h</span><br>";
     if (s) h += "Sentido: " + escapeHtml(s) + "<br>";
@@ -350,9 +373,11 @@
     pontos.forEach(function(p){
       var loc = p.localizacao || {};
       var lat = loc.latitude, lon = loc.longitude;
-      var cor = "#c0392b";
+      var nosso = ehNosso(p);
+      var cor = nosso ? "#6d28d9" : "#c0392b";
+      var miolo = nosso ? "#c4b5fd" : "#ffe08a";
       if (lat != null && lon != null){
-        var m = L.circleMarker([lat, lon], {radius:7, color:cor, weight:2, fillColor:"#ffe08a", fillOpacity:0.95});
+        var m = L.circleMarker([lat, lon], {radius: nosso ? 9 : 7, color:cor, weight:2, fillColor:miolo, fillOpacity:0.95});
         m.bindPopup(popupHtml(p));
         m.addTo(camadaPts);
       }
