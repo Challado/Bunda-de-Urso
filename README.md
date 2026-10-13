@@ -162,7 +162,8 @@ Os endpoints da API são:
 - `/api/v1/radares/{id}/historico` (auditoria pública do ponto)
 - `/api/v1/login` e `/api/v1/logout` (sessão do painel)
 - `/api/v1/minha-senha` (troca da própria senha)
-- `/api/v1/gestao/*` (pendentes, radar, bloqueios, tokens, usuários — exige sessão ou `X-Api-Token`)
+- `/api/v1/gestao/*` (pendentes, radar, correspondências, bloqueios, tokens, usuários — exige sessão ou `X-Api-Token`)
+- `/api/v1/gestao/eu` (contexto da sessão: login/papel — o painel usa para decidir o que exibir)
 - `/api/v1/admin/sincronizar` e `/api/v1/admin/rollback`
 - `/health/live` e `/health/ready` (também em `/api/v1/health/live|ready`)
 
@@ -197,6 +198,13 @@ app. As camadas de confiança são:
 
 A configuração versionada mora em `config/governanca.json`; o esquema aditivo da
 camada em `sql/migracoes/`. Detalhes e exemplos `curl` em `docs/GOVERNANCA.md`.
+
+O **painel HTML** mora em `web/gestao.html` (login, fila de pendentes, detalhe/verificar/
+editar/desabilitar/remover, histórico, correspondências, bloqueios, tokens e troca de
+senha) e `web/usuarios.html` (usuários e tokens). É HTML/CSS/JS vanilla, sem CDN, e fala
+só pela API (`api.pse?rota=...`) com o cookie de sessão — nunca lê o banco direto. O que a
+tela mostra acompanha o escopo do login (contribuidor = leitura; moderador = moderação;
+admin = bloqueios/tokens/usuários).
 
 ## Atualizações, observabilidade e auditoria
 

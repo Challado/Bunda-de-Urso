@@ -547,6 +547,88 @@ class TestUsuariosSenha(BaseGov):
 
 
 # ---------------------------------------------------------------------------
+class TestPainelAPI(BaseGov):
+    """Rotas de apoio ao painel HTML: contexto da sessao e resolucao do
+    vinculo de correspondencia."""
+
+    def _colab(self, lat=-23.55, lon=-46.63, ip="203.0.113.9"):
+        self._req("POST", "/api/v1/radares/submeter",
+                  {"latitude": lat, "longitude": lon},
+                  headers={"HTTP_X_FORWARDED_FOR": ip})
+        return self._novo_id()
+
+    def test_eu_sem_credencial_401(self):
+        status, _h, corpo = self._req("GET", "/api/v1/gestao/eu")
+        self.assertEqual(status, 401, corpo)
+
+    def test_eu_com_sessao_devolve_escopo(self):
+        self._admin()
+        cookie = self._sessao()
+        status, _h, corpo = self._req("GET", "/api/v1/gestao/eu",
+                                      headers={"HTTP_COOKIE": cookie})
+        self.assertEqual(status, 200, corpo)
+        doc = self._doc((status, _h, corpo))
+        self.assertTrue(doc["autenticado"])
+        self.assertEqual(doc["escopo"], "admin")
+        self.assertEqual(doc["rotulo"], "admin")
+        self.assertEqual(doc["tipo"], "usuario")
+
+    def test_eu_com_token_devolve_escopo_do_token(self):
+        token = self._token_cookie("moderador")
+        status, _h, corpo = self._req("GET", "/api/v1/gestao/eu",
+                                      headers={"HTTP_X_API_TOKEN": token})
+        self.assertEqual(status, 200, corpo)
+        doc = self._doc((status, _h, corpo))
+        self.assertEqual(doc["escopo"], "moderador")
+        self.assertEqual(doc["tipo"], "token")
+
+    def test_correspondencia_colaborativo_vence(self):
+        self._admin()
+        cookie = self._sessao()
+        self._oficial(-23.5500, -46.6300, "OFICIAL-1")
+        pid = self._colab(-23.5501, -46.6301)   # corrobora automatico
+        con = dbmod.connect(config.DB_PATH)
+        try:
+            cid = dbmod.scalar(con, "SELECT id FROM CORRESPONDENCIA_PONTO")
+        finally:
+            con.close()
+        status, _h, corpo = self._req(
+            "POST", "/api/v1/gestao/correspondencias/%d" % cid,
+            {"status": "colaborativo_vence", "motivo": "o ponto correto"},
+            headers={"HTTP_COOKIE": cookie})
+        self.assertEqual(status, 200, corpo)
+        con = dbmod.connect(config.DB_PATH)
+        try:
+            self.assertEqual(dbmod.scalar(
+                con, "SELECT status FROM CORRESPONDENCIA_PONTO WHERE id=?",
+                (cid,)), "colaborativo_vence")
+        finally:
+            con.close()
+        # o colaborativo continua vivo
+        status, _h, corpo = self._req(
+            "GET", "/api/v1/gestao/radar/%d" % pid,
+            headers={"HTTP_COOKIE": cookie})
+        self.assertEqual(status, 200, corpo)
+
+    def test_correspondencia_status_invalido_422(self):
+        self._admin()
+        cookie = self._sessao()
+        status, _h, corpo = self._req(
+            "POST", "/api/v1/gestao/correspondencias/999",
+            {"status": "qualquer"}, headers={"HTTP_COOKIE": cookie})
+        self.assertEqual(status, 422, corpo)
+
+    def test_correspondencia_exige_moderador(self):
+        self._admin()
+        token = self._token_cookie("contribuidor")
+        status, _h, corpo = self._req(
+            "POST", "/api/v1/gestao/correspondencias/1",
+            {"status": "oficial_vence"},
+            headers={"HTTP_X_API_TOKEN": token})
+        self.assertEqual(status, 403, corpo)
+
+
+# ---------------------------------------------------------------------------
 class TestAjuda(BaseGov):
 
     def test_ajuda_lista_rotas_de_governanca(self):
@@ -557,6 +639,10 @@ class TestAjuda(BaseGov):
         self.assertIn("/api/v1/radares/submeter", doc["endpoints"])
         self.assertIn("/api/v1/login", doc["endpoints"])
         self.assertIn("/api/v1/gestao/pendentes",
+                      doc["endpoints_administrativos"])
+        self.assertIn("/api/v1/gestao/eu",
+                      doc["endpoints_administrativos"])
+        self.assertIn("/api/v1/gestao/correspondencias/{id}",
                       doc["endpoints_administrativos"])
 
     def test_ajuda_texto_mostra_governanca(self):

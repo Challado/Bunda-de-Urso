@@ -126,6 +126,20 @@ curl -s -X PATCH -H "X-Api-Token: $TOKEN" -H 'Content-Type: application/json' \
 curl -s -X POST -H "X-Api-Token: $TOKEN" "${B}/api/v1/gestao/usuarios/2/senha"
 ```
 
+### Contexto da sessão e vínculo de correspondência (apoio ao painel)
+
+```bash
+# quem sou eu (login/papel) — o painel usa para decidir o que exibir
+curl -s -b jar.txt "${B}/api/v1/gestao/eu"
+# -> 200 {"autenticado":true,"escopo":"admin","rotulo":"admin","tipo":"usuario"}
+
+# resolver o vínculo com o ponto oficial (moderador)
+curl -s -X POST -H "X-Api-Token: ***" -H 'Content-Type: application/json' \
+  "${B}/api/v1/gestao/correspondencias/5" \
+  -d '{"status":"colaborativo_vence","motivo":"o ponto correto e o colaborativo"}'
+# status: oficial_vence (remove o colaborativo) | colaborativo_vence
+```
+
 ## 4. Histórico público (transparência)
 
 ```bash
@@ -177,3 +191,24 @@ python3 tools/radar_admin.py listar-usuarios
 python3 tools/radar_admin.py criar-token --nome github:fulano --escopo moderador
 python3 tools/radar_admin.py revogar-token 3
 ```
+
+## 8. Painel HTML de administração
+
+Fica em `web/gestao.html` (painel) e `web/usuarios.html` (usuários + tokens). HTML/CSS/JS
+vanilla, sem CDN, **falando sempre pela API** (`api.pse?rota=...`) com
+`credentials:'same-origin'` (cookie de sessão) — nunca lê o banco direto.
+
+- `gestao.html` — login quando não há sessão; fila de pendentes (com filtro de status);
+detalhe do radar (km, observações, velocidade, tipo de pista); verificar; desabilitar e
+remover (motivo obrigatório, tombstone); histórico/auditoria; vínculos de correspondência;
+bloqueios geográficos; emitir/revogar tokens; trocar a própria senha; link para usuários.
+As ações aparecem conforme o escopo do login (contribuidor = leitura; moderador = moderação;
+admin = bloqueios/tokens/usuários).
+- `usuarios.html` — criar usuário (papel admin/moderador; senha em branco gera temporária
+exibida uma única vez), mudar papel, ativar/desativar, resetar senha, e emitir/revogar
+tokens. Exige escopo admin; sem sessão, aponta para o painel.
+
+O valor de um token/senha temporária aparece **uma única vez** na emissão; depois só o
+prefixo. As duas rotas de apoio (`/api/v1/gestao/eu` e
+`/api/v1/gestao/correspondencias/{id}`) vivem em `web/nucleo.py`, junto das demais de
+governança.
