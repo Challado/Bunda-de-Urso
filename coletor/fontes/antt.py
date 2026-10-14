@@ -100,8 +100,8 @@ class ColetorANTT(ColetorBase):
     def _parse_json(conteudo):
         dados = json.loads(conteudo.decode("utf-8-sig"))
         if isinstance(dados, dict):
-            for chave in ("features", "dados", "data", "records", "radares",
-                          "items"):
+            for chave in ("features", "dados", "data", "records", "radar",
+                          "radares", "items"):
                 if isinstance(dados.get(chave), list):
                     return dados[chave]
             # dict de dicts
