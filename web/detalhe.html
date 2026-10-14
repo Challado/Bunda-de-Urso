@@ -9,7 +9,9 @@
   :root{--azul:#12508f;--vermelho:#c0392b;--cinza:#f4f4f6;--borda:#d7d7de;--verde:#178a3d;}
   *{box-sizing:border-box}
   body{margin:0;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1d1d22}
-  header{background:var(--azul);color:#fff;padding:10px 16px}
+  header{background:var(--azul);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px}
+  header .logo{height:50px;width:auto;border-radius:8px;background:#fff;padding:3px;box-shadow:0 1px 4px rgba(0,0,0,.3);flex:0 0 auto}
+  header .cabTxt{min-width:0}
   header h1{margin:0;font-size:17px;font-weight:600}
   header .sub{opacity:.9;font-size:12.5px}
   header a{color:#fff}
@@ -49,6 +51,7 @@
   }
   @media (max-width: 620px){
     header{padding:9px 12px}
+    header .logo{height:38px}
     main{padding:10px 12px 40px}
     dl.campos{grid-template-columns:1fr;gap:0}
     dl.campos > dt{padding-top:6px}
@@ -59,8 +62,11 @@
 </head>
 <body>
 <header>
-  <h1 id="titulo">Radar — detalhes</h1>
-  <div class="sub">Todos os campos publicados pela API oficial. Campo sem fonte aparece como “não informado” (não é zero). &nbsp;·&nbsp; <a href="index.html">&larr; voltar à consulta por localização</a></div>
+  <img class="logo" src="bunda-de-urso.png" alt="Bundita de Urso — a base do Bunda de urso">
+  <div class="cabTxt">
+    <h1 id="titulo">Radar — detalhes</h1>
+    <div class="sub">Todos os campos publicados pela API oficial. Campo sem fonte aparece como “não informado” (não é zero). &nbsp;·&nbsp; <a href="index.html">&larr; voltar à consulta por localização</a></div>
+  </div>
 </header>
 
 <main id="principal">
