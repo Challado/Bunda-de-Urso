@@ -188,9 +188,15 @@
   document.getElementById("festa").addEventListener("click", function(){ this.classList.remove("on"); });
 
   // ---- aviso: apareceu radar no raio (irmao bem menos alegre da festa) ----
+  // Mostra no MAXIMO 1 vez por visita/aba (flag em sessionStorage), para nao
+  // subir a cada consulta com radar.
   function problemaCowboy(n, raio){
     var el = document.getElementById("problema");
     if (!el) return;
+    var jaMostrou = false;
+    try { jaMostrou = sessionStorage.getItem("radarCowboy") === "1"; } catch (e) {}
+    if (jaMostrou) return;
+    try { sessionStorage.setItem("radarCowboy", "1"); } catch (e) {}
     el.querySelector(".msg p").innerHTML =
       "Tem <b>" + n + "</b> equipamento(s) de fiscalização num raio de <b>" +
       fmtRaio(raio) + "</b>.<br>Segura a velocidade — radar na área!";
