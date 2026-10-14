@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# dados baixados / banco local
+dados/
+*.db
+*.sqlite
+*.sqlite3
+
+# temporários
+*.tmp
+*.log
+.DS_Store
