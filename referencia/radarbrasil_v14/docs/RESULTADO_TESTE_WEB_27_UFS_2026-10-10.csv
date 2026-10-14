@@ -1,0 +1,28 @@
+uf;url_testada;resultado_da_ferramenta;http_real_conhecido;registros_lidos;observacao
+AC;https://servicos.rbmlq.gov.br/dados-abertos/AC/medidores.json;JSON_LIDO;;2;Dois objetos nao provam cobertura completa
+AL;https://servicos.rbmlq.gov.br/dados-abertos/AL/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+AP;https://servicos.rbmlq.gov.br/dados-abertos/AP/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+AM;https://servicos.rbmlq.gov.br/dados-abertos/AM/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+BA;https://servicos.rbmlq.gov.br/dados-abertos/BA/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+CE;https://servicos.rbmlq.gov.br/dados-abertos/CE/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+DF;https://servicos.rbmlq.gov.br/dados-abertos/DF/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+ES;https://servicos.rbmlq.gov.br/dados-abertos/ES/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+GO;https://servicos.rbmlq.gov.br/dados-abertos/GO/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+MA;https://servicos.rbmlq.gov.br/dados-abertos/MA/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+MT;https://servicos.rbmlq.gov.br/dados-abertos/MT/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+MS;https://servicos.rbmlq.gov.br/dados-abertos/MS/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+MG;https://servicos.rbmlq.gov.br/dados-abertos/MG/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+PA;https://servicos.rbmlq.gov.br/dados-abertos/PA/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+PB;https://servicos.rbmlq.gov.br/dados-abertos/PB/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+PR;https://servicos.rbmlq.gov.br/dados-abertos/PR/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+PE;https://servicos.rbmlq.gov.br/dados-abertos/PE/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+PI;https://servicos.rbmlq.gov.br/dados-abertos/PI/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+RJ;https://servicos.rbmlq.gov.br/dados-abertos/RJ/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+RN;https://servicos.rbmlq.gov.br/dados-abertos/RN/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+RS;https://servicos.rbmlq.gov.br/dados-abertos/RS/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+RO;https://servicos.rbmlq.gov.br/dados-abertos/RO/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+RR;https://servicos.rbmlq.gov.br/dados-abertos/RR/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+SC;https://servicos.rbmlq.gov.br/dados-abertos/SC/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+SP;https://servicos.rbmlq.gov.br/dados-abertos/SP/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+SE;https://servicos.rbmlq.gov.br/dados-abertos/SE/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta
+TO;https://servicos.rbmlq.gov.br/dados-abertos/TO/medidores.json;INACESSIVEL_NESTA_FERRAMENTA;;;Impossivel concluir status HTTP a partir da ferramenta

@@ -1,0 +1,17 @@
+[Unit]
+Description=RadarBrasil - resolver referencias geograficas locais
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=www-data
+WorkingDirectory=/opt/radarbrasil
+EnvironmentFile=/etc/radarbrasil.env
+ExecStart=/opt/radarbrasil/.venv/bin/python -m radarbrasil.georesolver resolver-tudo
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/radarbrasil /var/cache/radarbrasil
