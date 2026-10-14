@@ -1,0 +1,156 @@
+{
+  "AMC Fortaleza - Equipamentos de fiscalizacao eletronica": {
+    "municipio": 190,
+    "pct_municipio": 100.0,
+    "pct_posicao": 100.0,
+    "pontos": 190,
+    "posicao": 190
+  },
+  "ANTT - Dados dos radares em rodovias concedidas": {
+    "municipio": 1256,
+    "pct_municipio": 100.0,
+    "pct_posicao": 100.0,
+    "pontos": 1256,
+    "posicao": 1256
+  },
+  "ASTT Araguaina - Medidores de velocidade (lista de enderecos)": {
+    "municipio": 53,
+    "pct_municipio": 100.0,
+    "pct_posicao": 92.45,
+    "pontos": 53,
+    "posicao": 49
+  },
+  "Agetran Campo Grande - Radares de fiscalizacao eletronica": {
+    "municipio": 8,
+    "pct_municipio": 100.0,
+    "pct_posicao": 0.0,
+    "pontos": 8,
+    "posicao": 0
+  },
+  "Belo Horizonte - Fiscalizacao eletronica": {
+    "municipio": 447,
+    "pct_municipio": 100.0,
+    "pct_posicao": 100.0,
+    "pontos": 447,
+    "posicao": 447
+  },
+  "Cariacica - Mapa de radares de fiscalizacao eletronica": {
+    "municipio": 13,
+    "pct_municipio": 100.0,
+    "pct_posicao": 100.0,
+    "pontos": 13,
+    "posicao": 13
+  },
+  "DER-MG - Localizacao de radares fixos e portateis": {
+    "municipio": 710,
+    "pct_municipio": 100.0,
+    "pct_posicao": 0.0,
+    "pontos": 710,
+    "posicao": 0
+  },
+  "DER-PR - Fiscalizacao de velocidade (fixa e portatil)": {
+    "municipio": 12,
+    "pct_municipio": 100.0,
+    "pct_posicao": 0.0,
+    "pontos": 12,
+    "posicao": 0
+  },
+  "DER-SE - Localizacao de radares e lombadas fixas": {
+    "municipio": 129,
+    "pct_municipio": 100.0,
+    "pct_posicao": 65.89,
+    "pontos": 129,
+    "posicao": 85
+  },
+  "DER-SP - Radares estaduais": {
+    "municipio": 1176,
+    "pct_municipio": 100.0,
+    "pct_posicao": 100.0,
+    "pontos": 1176,
+    "posicao": 1176
+  },
+  "DNIT - Controle de velocidade (PNCV)": {
+    "municipio": 1774,
+    "pct_municipio": 100.0,
+    "pct_posicao": 100.0,
+    "pontos": 1774,
+    "posicao": 1774
+  },
+  "Detran-DF - Relacao de medidores de velocidade": {
+    "municipio": 407,
+    "pct_municipio": 100.0,
+    "pct_posicao": 0.0,
+    "pontos": 407,
+    "posicao": 0
+  },
+  "Detran-MA - Fiscalizacao eletronica de velocidade": {
+    "municipio": 54,
+    "pct_municipio": 100.0,
+    "pct_posicao": 100.0,
+    "pontos": 54,
+    "posicao": 54
+  },
+  "GOINFRA - Equipamentos de monitoramento (GO)": {
+    "municipio": 1047,
+    "pct_municipio": 100.0,
+    "pct_posicao": 100.0,
+    "pontos": 1047,
+    "posicao": 1047
+  },
+  "IMMU Manaus - Fiscalizacao eletronica (locais)": {
+    "municipio": 34,
+    "pct_municipio": 100.0,
+    "pct_posicao": 0.0,
+    "pontos": 34,
+    "posicao": 0
+  },
+  "INMETRO / PSIE - Instrumentos verificados (medidores de velocidade)": {
+    "municipio": 40248,
+    "pct_municipio": 100.0,
+    "pct_posicao": 0.0,
+    "pontos": 40248,
+    "posicao": 0
+  },
+  "PRF - Lista de radares portateis": {
+    "municipio": 0,
+    "pct_municipio": 0.0,
+    "pct_posicao": 0.0,
+    "pontos": 270,
+    "posicao": 0
+  },
+  "PRF - Radares fixos": {
+    "municipio": 1574,
+    "pct_municipio": 100.0,
+    "pct_posicao": 76.62,
+    "pontos": 1574,
+    "posicao": 1206
+  },
+  "Recife - Equipamentos de fiscalizacao de transito": {
+    "municipio": 87,
+    "pct_municipio": 100.0,
+    "pct_posicao": 100.0,
+    "pontos": 87,
+    "posicao": 87
+  },
+  "SEINFRA-BA - Radares fixos e estaticos": {
+    "municipio": 79,
+    "pct_municipio": 100.0,
+    "pct_posicao": 100.0,
+    "pontos": 79,
+    "posicao": 79
+  },
+  "SEMTRAN Porto Velho - Fiscalizacao eletronica (radares fixos)": {
+    "municipio": 85,
+    "pct_municipio": 100.0,
+    "pct_posicao": 0.0,
+    "pontos": 85,
+    "posicao": 0
+  },
+  "Semob Joao Pessoa - Medidores de velocidade (locais)": {
+    "municipio": 6,
+    "pct_municipio": 100.0,
+    "pct_posicao": 0.0,
+    "pontos": 6,
+    "posicao": 0
+  }
+}
