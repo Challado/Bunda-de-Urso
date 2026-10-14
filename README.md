@@ -5,11 +5,30 @@
 
 ## Por que “Bunda de Urso”?
 
-Bunda de Urso nasceu da sensação de frustração de passar por um radar que deveria estar corretamente identificado nos sistemas de navegação e alerta, mas não está. É aquela sensação de ficar desanimado, murcho, de “bunda flácida”, como se a informação tivesse deixado o motorista na mão.
+Bunda de Urso nasceu de um daqueles momentos em que a estrada te deixa na mão. Você vem no limite certo, confiando no navegador, no app de alerta, no radarzinho do painel — e, de repente, um flash. Ou pior: você passa por um equipamento que deveria estar ali, marcado, avisado, e não está. Nenhuma placa, nenhum aviso no aplicativo, nada. É aquela sensação de murchar por dentro, de “bunda flácida”, de ter sido deixado sozinho justamente pela informação que prometia te proteger.
 
-A proposta é transformar essa frustração em infraestrutura pública de informação: descobrir onde estão os equipamentos de fiscalização, identificar sua situação e permitir que aplicativos, navegadores, pesquisadores e cidadãos consultem uma base consolidada, verificável e atualizada.
+E tem o outro lado, que dói igual: o radar que já morreu há anos, desligado, sucateado, arrancado do chão — e continua firme no mapa, como se estivesse lá. Aí você freia no vazio, por nada, todo dia no mesmo lugar, feito bobo.
 
-Não se trata de incentivar excesso de velocidade ou escapar da fiscalização. A ideia é aumentar a transparência, facilitar o respeito aos limites de velocidade, reduzir informações incorretas e permitir auditoria pública de dados já divulgados por órgãos competentes.
+A proposta é transformar essa frustração em infraestrutura pública de informação: descobrir onde estão os equipamentos de fiscalização, identificar sua situação real e permitir que aplicativos, navegadores, pesquisadores e cidadãos consultem uma base consolidada, verificável e atualizada — em vez de depender de achismo, de rumor e de cadastro comunitário para saber onde tem radar.
+
+Não se trata de incentivar excesso de velocidade nem de escapar da fiscalização. Quem quer correr, que responda por isso. A ideia é aumentar a transparência, facilitar o respeito aos limites, reduzir informação incorreta e permitir auditoria pública de dados que, em tese, já são públicos.
+
+## As lamúrias (ou: por que a gente ainda está aqui)
+
+A lista é longa, e todo mundo que dirige tem a sua. A nossa está aqui embaixo:
+
+- **O radar que não existe no mapa.** Está lá, na beira da pista, e o navegador jura que não há nada. O app de alerta, idem. Você só descobre na hora do flash.
+- **O radar fantasma.** Desativado, removido, sucateado — e ainda marcado como ativo. Aí você freia por um poste vazio, todo dia, no mesmo lugar, feito palhaço.
+- **A velocidade errada.** A placa (quando existe) diz uma coisa, o app diz outra, o cadastro diz uma terceira. Quarenta onde é sessenta, sessenta onde é quarenta. Ninguém sabe ao certo — e o bolso paga a conta.
+- **O cadastro oficial sem coordenada.** O órgão publica, com orgulho, “KM 027+244M”. Ótimo. E onde fica isso, exatamente? A resposta, com sorte, é um trecho de 400 km de rodovia.
+- **O dado espalhado em 27 portais.** Cada estado no seu formato: um em CSV, outro em PDF escaneado, outro numa página que só abre em navegador antigo, outro sem endereço nenhum.
+- **A planilha sem cabeçalho e o PDF torto.** A fonte “oficial” chega sem coluna definida, com coordenada misturando grau decimal e grau/minuto/segundo — e, às vezes, com o sinal do oeste perdido no caminho.
+- **A base comunitária decidindo se o radar existe.** Quando o órgão não publica, sobra o mapa colaborativo — que é útil, mas erra, e não deveria ser a única testemunha da existência de um equipamento.
+- **O radar que aparece do nada.** Sem obra, sem aviso, atrás de uma placa, num trecho que ontem não tinha nada.
+- **O órgão que publica a relação... de vez em quando.** Às vezes atualiza, às vezes esquece, às vezes tira do ar. E a multa continua chegando na sua casa.
+- **O cidadão que só quer respeitar o limite.** Ele só quer saber qual é o limite, e o sistema inteiro parece fazer questão de esconder.
+
+Ninguém aqui quer passar a mão na cabeça de quem corre. Queremos é que a informação deixe de ser favor, rumor ou PDF ilegível — e vire dado de verdade, com procedência e rastro.
 
 ## Missão
 
@@ -59,9 +78,9 @@ O esquema de referência v1.4 inicializa 83 tabelas SQLAlchemy, incluindo equipa
 
 Uma falha no portal de origem não deve derrubar a API. O cache e a base local continuam disponíveis, mas o sistema informa a idade dos dados e eventuais problemas de atualização.
 
-## O desafio central: encontrar latitude e longitude
+## O desafio central: onde diabos fica o radar
 
-Nem todo cadastro governamental contém GPS. Por isso, Bunda de Urso possui um **resolvedor geográfico** que tenta localizar cada equipamento oficial:
+Nem todo cadastro governamental contém GPS. É o pecado original do setor: o órgão sabe que o radar existe, sabe a rodovia, sabe o quilômetro — e, mesmo assim, te deixa procurando um ponto no meio do nada. Por isso, Bunda de Urso possui um **resolvedor geográfico** que tenta localizar cada equipamento oficial:
 
 **1. Coordenada oficial direta:** utilizar a latitude/longitude publicada pelo órgão, preservando a precisão declarada e o documento.
 
@@ -123,7 +142,7 @@ Os retornos incluem **TXT delimitado em linha única por registro** (delimitador
 
 O endpoint de ajuda documenta parâmetros, tipos, formatos, exemplos, significado dos campos e códigos de erro. Campos ausentes não devem ser substituídos por zeros ou valores presumidos.
 
-**Sem resultado não é sinônimo de ausência de radar.** Se a região não possui fonte suficiente, o sistema informa `sem_cobertura` e `completude_confirmada=false`, em vez de garantir falsamente que a via está livre de fiscalização.
+**Sem resultado não é sinônimo de ausência de radar.** Se a região não possui fonte suficiente, o sistema informa `sem_cobertura` e `completude_confirmada=false`, em vez de garantir falsamente que a via está livre de fiscalização. (É o reverso da lamúria: melhor dizer “não sei” do que jurar que a pista está limpa e te entregar de bandeja.)
 
 ## Atualizações, observabilidade e auditoria
 
@@ -154,7 +173,7 @@ A versão técnica de referência é **Radar Brasil v1.4 (10/10/2026)**, com col
 
 **Ainda precisam de trabalho e validação:** integração e importação real de todas as fontes federais, estaduais e municipais; resolução das coordenadas ausentes; homologação de cada formato e SGBD utilizado; verificação de qualidade e atualização de cada órgão; aferição da cobertura nacional; avaliação de licenças para redistribuição de cada conjunto de dados.
 
-O projeto não deve divulgar percentuais de cobertura, contagens nacionais ou precisão de localização sem medi-los efetivamente. Equipamentos sem coordenada comprovada continuam no inventário para investigação.
+O projeto não deve divulgar percentuais de cobertura, contagens nacionais ou precisão de localização sem medi-los efetivamente. Equipamentos sem coordenada comprovada continuam no inventário para investigação — porque apagar o que não sabemos localizar seria a pior lamúria de todas: esconder o problema debaixo do tapete.
 
 ## Transparência e segurança viária
 
@@ -167,5 +186,7 @@ O projeto apoia informação pública, fiscalização transparente, respeito aos
 ## Visão de futuro
 
 Queremos que qualquer pessoa ou aplicativo possa perguntar: **“Existe equipamento de fiscalização perto desta latitude e longitude? Qual é, qual velocidade fiscaliza, em que sentido, desde quando, e qual documento comprova isso?”** — e receber uma resposta verificável, inclusive quando a resposta responsável for **“ainda não conseguimos confirmar”**.
+
+No fim das contas, é isso: transformar a lamúria em dado. Para que ninguém mais freie no vazio, ninguém mais leve um flash por falta de aviso, e ninguém mais fique na mão por causa de informação que deveria ser pública e não é.
 
 **Bunda de Urso: para que a informação sobre radares não deixe mais ninguém na mão.**
