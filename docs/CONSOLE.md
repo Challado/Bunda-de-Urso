@@ -22,6 +22,9 @@ não no webroot — o webroot só tem a porta de entrada. Usa a mesma camada do 
 ./api.pse usuarios                  # usuarios do painel
 ./api.pse senha admin               # define nova senha (pede e confirma, min. 8)
 ./api.pse resetar-senha admin       # gera temporaria (aparece 1x; troca obrigatoria)
+./api.pse desativar-usuario <login> # inativa (ativo=0)
+./api.pse ativar-usuario <login>    # reativa (ativo=1)
+./api.pse excluir-usuario <login>   # exclui em definitivo (pede confirmacao)
 ./api.pse tokens                    # tokens de API (so prefixo)
 ./api.pse bloqueios                 # bloqueios geograficos (--todos inclui inativos)
 ./api.pse historico P-1130          # historico/auditoria do ponto (--publico)
@@ -41,6 +44,9 @@ Radar Brasil — modo console (servidor)
   6) Tokens de API
   7) Bloqueios geograficos
   8) Historico de um ponto
+  9) Desativar usuario
+ 10) Reativar usuario
+ 11) Excluir usuario
   0) Sair
 Opcao:
 ```

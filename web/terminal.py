@@ -12,6 +12,9 @@ serve a web (CGI) e o terminal:
     ./api.pse usuarios           # usuarios do painel
     ./api.pse senha admin        # define nova senha (pede e confirma)
     ./api.pse resetar-senha admin# gera temporaria (aparece 1x, troca obrigatoria)
+    ./api.pse desativar-usuario <login>   # inativa (ativo=0)
+    ./api.pse ativar-usuario <login>      # reativa (ativo=1)
+    ./api.pse excluir-usuario <login>     # exclui em definitivo (pede confirmacao)
     ./api.pse tokens | bloqueios | historico P-1130
     ./api.pse ajuda
 
@@ -153,6 +156,42 @@ def resetar_senha(conn, argv):
     return 0
 
 
+def desativar_usuario(conn, argv):
+    if not argv:
+        print("uso: desativar-usuario <login>")
+        return 2
+    row = gov.desativar_usuario(conn, argv[0])
+    print("usuario %s desativado (ativo=0)." % row["login"])
+    return 0
+
+
+def ativar_usuario(conn, argv):
+    if not argv:
+        print("uso: ativar-usuario <login>")
+        return 2
+    row = gov.reativar_usuario(conn, argv[0])
+    print("usuario %s reativado (ativo=1)." % row["login"])
+    return 0
+
+
+def excluir_usuario(conn, argv):
+    if not argv:
+        print("uso: excluir-usuario <login>")
+        return 2
+    login = argv[0]
+    try:
+        resp = input("Excluir %s DEFINITIVAMENTE? (digite o login para confirmar): " % login)
+    except EOFError:
+        print("cancelado (sem confirmacao).")
+        return 1
+    if resp.strip() != login:
+        print("cancelado.")
+        return 1
+    row = gov.excluir_usuario(conn, login)
+    print("usuario %s excluido." % row["login"])
+    return 0
+
+
 def tokens(conn, argv):
     _json(gov.listar_tokens(conn))
     return 0
@@ -183,6 +222,9 @@ COMANDOS = {
     "usuarios": usuarios,
     "senha": senha,
     "resetar-senha": resetar_senha,
+    "desativar-usuario": desativar_usuario,
+    "ativar-usuario": ativar_usuario,
+    "excluir-usuario": excluir_usuario,
     "tokens": tokens,
     "bloqueios": bloqueios,
     "historico": historico,
@@ -205,6 +247,9 @@ Radar Brasil — modo console (servidor)
   6) Tokens de API
   7) Bloqueios geograficos
   8) Historico de um ponto
+  9) Desativar usuario
+ 10) Reativar usuario
+ 11) Excluir usuario
   0) Sair""")
         try:
             op = input("Opcao: ").strip()
@@ -228,6 +273,12 @@ Radar Brasil — modo console (servidor)
                 bloqueios(conn, [])
             elif op == "8":
                 historico(conn, [input("id (ex.: P-1130): ").strip()])
+            elif op == "9":
+                desativar_usuario(conn, [input("login: ").strip()])
+            elif op == "10":
+                ativar_usuario(conn, [input("login: ").strip()])
+            elif op == "11":
+                excluir_usuario(conn, [input("login: ").strip()])
             elif op in ("0", "sair", "q"):
                 return 0
             elif op == "":
@@ -255,6 +306,12 @@ def main(argv=None):
     conn = _conn()
     try:
         return fn(conn, argv[1:])
+    except (ValueError, gov.GovernancaError) as e:
+        print("erro: %s" % getattr(e, "mensagem", e))
+        return 1
+    except KeyboardInterrupt:
+        print()
+        return 130
     finally:
         try:
             conn.close()
