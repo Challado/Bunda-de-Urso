@@ -1,0 +1,65 @@
+name: Testes
+
+# Valida o repositório a cada push no main e em todo pull request:
+#   1. a suíte completa (stdlib unittest): schema, geo, TXT, paridade, CGI, governança;
+#   2. sanidade: sintaxe, JSONs de configuração e varredura de segredos.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    name: Suíte de testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.13"]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Versão do Python
+        run: python -V
+      - name: Sintaxe (compileall)
+        run: python -m compileall -q core coletor tools web tests
+      - name: Suíte de testes
+        run: python -m unittest discover -s tests
+
+  sanidade:
+    name: Sanidade (config e segredos)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: JSONs de configuração
+        run: |
+          falhou=0
+          for f in config/*.json web/*.json; do
+            python3 -c "import json,sys;json.load(open(sys.argv[1]))" "$f" \
+              || { echo "::error file=$f::JSON inválido"; falhou=1; }
+          done
+          exit $falhou
+      - name: Varredura de segredos
+        run: |
+          if saida=$(git grep -InE 'ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----' -- .); then
+            echo "$saida"
+            echo "::error::Possível segredo versionado (veja a lista acima)."
+            exit 1
+          fi
+          echo "Nenhum segredo de alto sinal nos arquivos versionados."
