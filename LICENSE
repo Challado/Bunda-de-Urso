@@ -1,7 +1,6 @@
 MIT License
 
 Copyright (c) 2026 Lucas Willian Bocchi
-Autor: Jarvis (assistente de IA / OpenClaw), a pedido do titular.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -20,10 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-Dados: o cadastro é compilado a partir de fontes oficiais públicas. A compilação
-e a estrutura são oferecidas sob Creative Commons Atribuição 4.0 (CC BY 4.0),
-respeitando os termos de cada fonte original. A pasta `referencia/` contém
-material de terceiros e mantém a licença de origem.
