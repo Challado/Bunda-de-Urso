@@ -78,7 +78,7 @@
   <div id="res" style="margin-top:14px"></div>
 </main>
 <script>
-var API = "api.pse?rota=/api/v1/radares&formato=json";
+var API = "api.pse?rota=/api/v1/radares/submeter&formato=json";
 var CAMPOS = ["identificador","tipo_radar","modelo","latitude","longitude","uf","municipio","via","km","velocidade_geral","sentido","observacoes","contato"];
 var form = document.getElementById("form");
 function val(n){ var el = form.elements[n]; return el ? el.value.trim() : ""; }
