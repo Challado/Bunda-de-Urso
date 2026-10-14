@@ -1,0 +1,8 @@
+{
+  "svn_url": "file:///mnt/export/subversion/Bunda-de-Urso/trunk",
+  "revision": 1,
+  "uuid": "59037ff7-0e20-439f-a78e-b1e7f00106a7",
+  "log_xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<log>\n<logentry\n   revision=\"1\">\n<author>root</author>\n<date>2026-10-14T14:49:52.997844Z</date>\n<paths>\n<path\n   text-mods=\"false\"\n   kind=\"dir\"\n   action=\"A\"\n   prop-mods=\"false\">/branches</path>\n<path\n   text-mods=\"false\"\n   kind=\"dir\"\n   action=\"A\"\n   prop-mods=\"false\">/tags</path>\n<path\n   text-mods=\"false\"\n   kind=\"dir\"\n   action=\"A\"\n   prop-mods=\"false\">/trunk</path>\n</paths>\n<msg>Prepara estrutura SVN para importar o GitHub</msg>\n</logentry>\n</log>",
+  "properties_xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<properties>\n</properties>",
+  "directories_and_files_xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<lists>\n<list\n   path=\"file:///mnt/export/subversion/Bunda-de-Urso/trunk\">\n</list>\n</lists>"
+}
