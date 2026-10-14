@@ -10,26 +10,22 @@ Isto roda SO no coletor (nunca em tempo de requisicao da API).
 """
 import json
 import re
-import ssl
-import urllib.request
 
 from core import config
-
-# Portais do governo usam certificados validos; mantemos a verificacao, mas
-# deixamos um caminho tolerante para portais com cadeia incompleta.
-_CTX_TOLERANTE = ssl.create_default_context()
-_CTX_TOLERANTE.check_hostname = False
-_CTX_TOLERANTE.verify_mode = ssl.CERT_NONE
+from coletor import http
 
 
 def package_show(base_url, dataset_id, timeout=None, tolerante=False):
-    """Retorna a lista de recursos (dicts) do dataset."""
+    """Retorna a lista de recursos (dicts) do dataset.
+
+    Baixa via ``coletor.http.baixar`` (HTTPS verificado, redirects salto-a-salto
+    e retry).  ``tolerante=True`` mantem o comportamento historico de aceitar
+    cadeia de certificado incompleta (``verificar_ssl=False``).
+    """
     url = "%s/api/3/action/package_show?id=%s" % (base_url.rstrip("/"), dataset_id)
-    req = urllib.request.Request(url, headers={"User-Agent": config.USER_AGENT})
-    ctx = _CTX_TOLERANTE if tolerante else None
-    with urllib.request.urlopen(req, timeout=timeout or config.DEFAULT_TIMEOUT,
-                               context=ctx) as resp:
-        dados = json.loads(resp.read().decode("utf-8", "replace"))
+    corpo, _headers, _url_final = http.baixar(
+        url, timeout=timeout, verificar_ssl=not tolerante)
+    dados = json.loads(corpo.decode("utf-8", "replace"))
     if not dados.get("success"):
         raise RuntimeError("package_show falhou para %s" % dataset_id)
     return dados["result"].get("resources", [])

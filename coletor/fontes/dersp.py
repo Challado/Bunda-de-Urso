@@ -8,9 +8,9 @@ sistema de pesquisa (PesquisaRadar.aspx), que NAO e arquivo baixavel.
 Aceita arquivo LOCAL (fixtures/testes) ou URL.
 """
 import os
-import urllib.request
 
 from core import config
+from coletor import http
 from coletor.base import ColetorBase
 from coletor.fontes import normalizacao as nz
 from coletor.fontes import planilha as pl
@@ -61,9 +61,8 @@ class ColetorDERSP(ColetorBase):
         return cls.URL_FALLBACK
 
     def _baixar(self, url):
-        req = urllib.request.Request(url, headers={"User-Agent": config.USER_AGENT})
-        with urllib.request.urlopen(req, timeout=config.DEFAULT_TIMEOUT) as resp:
-            return resp.read()
+        corpo, _headers, _url_final = http.baixar(url)
+        return corpo
 
     def carregar(self, origem):
         if origem and os.path.exists(origem):
