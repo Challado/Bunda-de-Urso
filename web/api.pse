@@ -1,0 +1,26 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Entry point CGI fino (padrao da casa: fcgiwrap executa este .pse).
+
+Toda a logica mora FORA do webroot (pacote web.nucleo + core). Em producao,
+copie este arquivo para o webroot; ele resolve a raiz do projeto por
+RADAR_BRASIL_HOME ou por caminhos conhecidos.
+"""
+import os
+import sys
+
+_raiz = os.environ.get("RADAR_BRASIL_HOME")
+if not _raiz:
+    _aqui = os.path.dirname(os.path.abspath(__file__))
+    for _cand in (os.path.dirname(_aqui), _aqui,
+                  "/home/openclaw/openclaw/workspace/radar-brasil"):
+        if os.path.isdir(os.path.join(_cand, "core")):
+            _raiz = _cand
+            break
+if _raiz and _raiz not in sys.path:
+    sys.path.insert(0, _raiz)
+
+from web.nucleo import main   # noqa: E402
+
+if __name__ == "__main__":
+    main()
