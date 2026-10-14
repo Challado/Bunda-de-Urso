@@ -8,7 +8,7 @@
   :root{--azul:#12508f;--vermelho:#c0392b;--verde:#178a3d;--cinza:#f4f4f6;--borda:#d7d7de}
   *{box-sizing:border-box}
   body{margin:0;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1d1d22;background:#f7f7f9}
-  header{background:var(--azul);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px}
+  header{background:var(--azul);color:#fff;padding:10px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:12px}
   header .logo{height:54px;width:auto;border-radius:8px;background:#fff;padding:3px;box-shadow:0 1px 4px rgba(0,0,0,.3);flex:0 0 auto}
   header .cabTxt{min-width:0}
   header h1{margin:0;font-size:19px}
@@ -19,7 +19,8 @@
   h2{font-size:14px;margin:18px 0 8px;color:#4a4a55;text-transform:uppercase;letter-spacing:.4px}
   .cartao{background:#fff;border:1px solid var(--borda);border-radius:10px;padding:16px;max-width:440px}
   label{display:flex;flex-direction:column;font-size:12.5px;color:#4a4a55;gap:3px;margin-bottom:10px}
-  input,select,textarea{font:inherit;padding:8px 10px;border:1px solid var(--borda);border-radius:7px;background:#fff;color:#1d1d22;width:100%}
+  /* font-size:16px evita o zoom automatico dos campos no iOS */
+  input,select,textarea{font:inherit;font-size:16px;padding:8px 10px;border:1px solid var(--borda);border-radius:7px;background:#fff;color:#1d1d22;width:100%}
   textarea{min-height:60px;resize:vertical}
   button{padding:9px 14px;border:0;border-radius:7px;background:var(--azul);color:#fff;font:600 14px/1 inherit;cursor:pointer}
   button.sec{background:#5b6472}
@@ -36,6 +37,8 @@
   .pill.ruim{background:#fdecea;color:var(--vermelho)}
   .pill.neutro{background:#eceef2;color:#4a4a55}
   table{border-collapse:collapse;width:100%;font-size:13.5px;background:#fff;border:1px solid var(--borda);border-radius:10px;overflow:hidden}
+  /* cada tabela rola na horizontal dentro deste container, sem estourar a pagina */
+  .tabWrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
   th,td{border-bottom:1px solid var(--borda);padding:7px 9px;text-align:left;vertical-align:top}
   th{background:var(--cinza)}
   tr:last-child td{border-bottom:0}
@@ -61,6 +64,12 @@
     header .logo{height:40px}
     dl.campos{grid-template-columns:1fr;gap:0}
     dl.campos > dt{padding-top:6px}
+    /* alvo de toque confortavel e campos em largura cheia no celular */
+    button{min-height:44px}
+    button.mini{min-height:38px}
+    .linha > label{width:100%}
+    .topo{flex-direction:column;align-items:stretch}
+    .topo .linha{width:100%}
   }
 </style>
 <link rel="icon" href="favicon.ico" sizes="any">
@@ -380,7 +389,7 @@
       if (!pts.length){
         html = "<div class='vazio'>Nenhum cadastro colaborativo nessa condição.</div>";
       } else {
-        html += "<table><thead><tr><th>ID</th><th>Município/UF</th><th>Via</th><th>km</th><th>Status</th><th></th></tr></thead><tbody>";
+        html += "<div class='tabWrap'><table><thead><tr><th>ID</th><th>Município/UF</th><th>Via</th><th>km</th><th>Status</th><th></th></tr></thead><tbody>";
         pts.forEach(function(p){
           html += "<tr>" +
             "<td><b>" + esc(p.id) + "</b></td>" +
@@ -391,7 +400,7 @@
             "<td><button class='mini' data-abrir='" + esc(p.id) + "'>Abrir</button></td>" +
             "</tr>";
         });
-        html += "</tbody></table>";
+        html += "</tbody></table></div>";
         html += "<p class='vazio'>Mostrando " + pts.length + " de " + (meta.total||pts.length) + ".</p>";
         if (meta.proximo_cursor){
           html += "<button id='btMaisPend' class='sec' data-cursor='" + esc(meta.proximo_cursor) + "'>Carregar mais</button>";
@@ -495,7 +504,7 @@
     var corrs = p.correspondencias || [];
     if (corrs.length){
       h += "<div class='bloco'><h3>Vínculos de correspondência com ponto oficial</h3>";
-      h += "<table><thead><tr><th>#</th><th>Oficial</th><th>Colaborativo</th><th>Distância</th><th>Status</th><th></th></tr></thead><tbody>";
+      h += "<div class='tabWrap'><table><thead><tr><th>#</th><th>Oficial</th><th>Colaborativo</th><th>Distância</th><th>Status</th><th></th></tr></thead><tbody>";
       corrs.forEach(function(c){
         h += "<tr><td>" + esc(c.id) + "</td><td>" + esc(c.ponto_oficial_id) + "</td><td>" + esc(c.ponto_colaborativo_id) + "</td>" +
           "<td>" + esc(c.distancia_metros != null ? Math.round(c.distancia_metros) + " m" : "—") + "</td>" +
@@ -506,7 +515,7 @@
         }
         h += "</td></tr>";
       });
-      h += "</tbody></table><p class='vazio'><b>oficial vence</b> remove o colaborativo (tombstone); <b>colaborativo vence</b> mantém o colaborativo e esconde o oficial.</p></div>";
+      h += "</tbody></table></div><p class='vazio'><b>oficial vence</b> remove o colaborativo (tombstone); <b>colaborativo vence</b> mantém o colaborativo e esconde o oficial.</p></div>";
     }
 
     // historico
@@ -599,11 +608,11 @@
       if (o.status !== 200){ el.innerHTML = "<div class='vazio'>—</div>"; return; }
       var hist = o.body.historico || [];
       if (!hist.length){ el.innerHTML = "<div class='vazio'>Sem registros.</div>"; return; }
-      var h = "<table><thead><tr><th>Quando</th><th>Tipo</th><th>Quem</th><th>Motivo</th></tr></thead><tbody>";
+      var h = "<div class='tabWrap'><table><thead><tr><th>Quando</th><th>Tipo</th><th>Quem</th><th>Motivo</th></tr></thead><tbody>";
       hist.forEach(function(x){
         h += "<tr><td class='mono'>" + esc(x.quando || "") + "</td><td>" + esc(x.tipo || "") + "</td><td>" + esc(x.quem || "") + "</td><td>" + esc(x.motivo || "") + "</td></tr>";
       });
-      h += "</tbody></table>";
+      h += "</tbody></table></div>";
       el.innerHTML = h;
     });
   }
@@ -619,7 +628,7 @@
       if (o.status !== 200){ el.innerHTML = "<div class='aviso err'>" + esc(erroMsg(o)) + "</div>"; return; }
       var bs = o.body.bloqueios || [];
       if (!bs.length){ el.innerHTML = "<div class='vazio'>Nenhum bloqueio.</div>"; return; }
-      var h = "<table><thead><tr><th>#</th><th>Tipo</th><th>Lat</th><th>Lon</th><th>Raio (m)</th><th>Motivo</th><th>Ativo</th><th>Criado</th><th></th></tr></thead><tbody>";
+      var h = "<div class='tabWrap'><table><thead><tr><th>#</th><th>Tipo</th><th>Lat</th><th>Lon</th><th>Raio (m)</th><th>Motivo</th><th>Ativo</th><th>Criado</th><th></th></tr></thead><tbody>";
       bs.forEach(function(b){
         h += "<tr><td>" + esc(b.id) + "</td><td>" + esc(b.tipo) + "</td><td>" + esc(b.latitude) + "</td><td>" + esc(b.longitude) + "</td>" +
           "<td>" + esc(b.raio_metros != null ? b.raio_metros : "—") + "</td><td>" + esc(b.motivo || "") + "</td>" +
@@ -627,7 +636,7 @@
           "<td class='mono'>" + esc(b.criado_em || "") + "</td><td>" +
           (b.ativo ? "<button class='mini perigo' data-desblq='" + esc(b.id) + "'>desativar</button>" : "") + "</td></tr>";
       });
-      h += "</tbody></table>";
+      h += "</tbody></table></div>";
       el.innerHTML = h;
       el.querySelectorAll("[data-desblq]").forEach(function(bt){
         bt.addEventListener("click", function(){
@@ -677,7 +686,7 @@
       if (o.status !== 200){ el.innerHTML = "<div class='aviso err'>" + esc(erroMsg(o)) + "</div>"; return; }
       var ts = o.body.tokens || [];
       if (!ts.length){ el.innerHTML = "<div class='vazio'>Nenhum token emitido.</div>"; return; }
-      var h = "<table><thead><tr><th>#</th><th>Nome</th><th>Escopo</th><th>Prefixo</th><th>Criado</th><th>Último uso</th><th>Revogado</th><th></th></tr></thead><tbody>";
+      var h = "<div class='tabWrap'><table><thead><tr><th>#</th><th>Nome</th><th>Escopo</th><th>Prefixo</th><th>Criado</th><th>Último uso</th><th>Revogado</th><th></th></tr></thead><tbody>";
       ts.forEach(function(t){
         h += "<tr><td>" + esc(t.id) + "</td><td>" + esc(t.nome) + "</td><td>" + esc(t.escopo) + "</td>" +
           "<td class='mono'>" + esc(t.prefixo || "—") + "…</td><td class='mono'>" + esc(t.criado_em||"") + "</td>" +
@@ -685,7 +694,7 @@
           "<td>" + (t.revogado_em ? "<span class='pill ruim'>revogado</span>" : "<span class='pill ok'>ativo</span>") + "</td><td>" +
           (!t.revogado_em ? "<button class='mini perigo' data-revtk='" + esc(t.id) + "'>revogar</button>" : "") + "</td></tr>";
       });
-      h += "</tbody></table>";
+      h += "</tbody></table></div>";
       el.innerHTML = h;
       el.querySelectorAll("[data-revtk]").forEach(function(bt){
         bt.addEventListener("click", function(){
