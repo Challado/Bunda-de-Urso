@@ -1,0 +1,39 @@
+PROVENIENCIA DA AMOSTRA — SEMTRAN / PORTO VELHO / RO
+====================================================
+
+Fonte oficial (pagina de entrada)
+  URL pagina .......: https://semtran.portovelho.ro.gov.br/pagina/fiscalizacao-eletronica-radares-fixos
+  Coletada em ......: 2026-10-10 (America/Sao_Paulo)
+  HTTP .............: 200 (curl -sSL -A "RadarBrasil/1.0")
+
+Arquivo publicado (PDF — recurso principal)
+  URL ..............: https://semtran.portovelho.ro.gov.br/uploads/arquivos/Dados%20dos%20Radares%20fixos%20atualizados%202026.1.pdf
+  Bytes ............: 188451
+  Paginas ..........: 2 (A4 paisagem, 842 x 595 pts)
+  Gerador ..........: Google Sheets -> PDF
+  sha256 ...........: c56e85d260d18407db4bcf8bba57b538bd215c37bfa3211b5165b7a55c8ce853
+  Linhas de dados ..: 85 (radares fixos; colunas TIPO, NUMERO_SERIE,
+                      COD_FAIXA_CLIENTE, NUM_FAIXA, NOME_PISTA, DATA_AFERICAO,
+                      DATA_VALIDADE, POSICAO_LAT, POSICAO_LON, SIGLA)
+
+  COORDENADAS: a coluna POSICAO_LAT/POSICAO_LON esta publicada em formato
+  corrompido (ex.: "-876.651.999.999.999.000", "-6.387.977.999.999.990.000"),
+  fora de qualquer faixa de coordenada valida. Por isso o conector NAO cria
+  POSICAO_GEOGRAFICA a partir desses valores: guarda o texto bruto em
+  observacoes e deixa latitude/longitude NULOS (nada e inferido).
+
+  O PDF usa fontes Type0/Identity-H com subset (ToUnicode CMap): a extracao
+  "best-effort" da biblioteca padrao (`planilha.ler_pdf_texto`) NAO le este
+  arquivo (devolve codigos de glifo). O conector inclui um extrator
+  ToUnicode-aware (somente stdlib) que reconstroi o texto.
+
+Amostra recortada (este diretorio)
+  Arquivo ..........: radares_fixos_porto_velho_2026_1.pdf
+  sha256 ...........: c56e85d260d18407db4bcf8bba57b538bd215c37bfa3211b5165b7a55c8ce853
+  Conteudo .........: COPIA INTEGRAL do PDF publicado acima (188451 bytes).
+
+Pagina HTML (fixture de descoberta)
+  Arquivo ..........: pagina_fixture.html
+  Conteudo .........: recorte VERBATIM (ancoras <a href="...">) das URLs de
+                      arquivo publicadas na pagina oficial em 2026-10-10, para
+                      testar a escolha do PDF de dados sem rede.

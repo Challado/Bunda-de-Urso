@@ -1,0 +1,28 @@
+PROVENIENCIA DA AMOSTRA — SEGBEL / BELEM / PA
+============================================
+
+Fonte oficial (pagina de entrada)
+  URL pagina .......: https://seguranca.belem.pa.gov.br/portarias-de-ativacao-e-desativacao-de-radares/
+  Coletada em ......: 2026-10-10 (America/Sao_Paulo)
+  HTTP .............: 200 (curl -sSL -A "RadarBrasil/1.0")
+
+Recurso publicado: LISTA DE DOCUMENTOS (portarias), NAO um cadastro consolidado
+  A pagina publica oito (8) portarias de ativacao/desativacao de radares
+  (2022, SEMOB/SEGBEL Belem) + um "Mapa de Radares" (PDF de 2020). Cada
+  portaria e um PDF. Os PDFs de portaria CONTEM tabelas de equipamentos
+  (ex.: N. DE SERIE, COD. SEMOB, ENDERECO, velocidade), mas a pagina em si
+  NAO publica um cadastro estruturado unico de radares vigentes.
+
+  NAO ha entidade no schema canonico (v1.1) para "ato/portaria de
+  ativacao/desativacao". Por isso o conector DESCOBRE e CLASSIFICA os
+  documentos (ativacao / desativacao / instalacao), preserva a evidencia
+  bruta, e NUNCA converte isso em ponto/trecho/radar inventado
+  (`normalizar` devolve None). Equipamento listado dentro de uma portaria
+  NAO e transposto para cadastro: seria "cadastro inventado".
+
+Amostra recortada (este diretorio)
+  Arquivo ..........: portarias_fixture.html
+  Conteudo .........: recorte VERBATIM (ancoras <a href="..."> + texto) da
+                      secao "Portarias" e do "Mapa de Radares" publicados na
+                      pagina oficial em 2026-10-10, para testar a descoberta e
+                      a classificacao sem rede.
