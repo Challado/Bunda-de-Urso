@@ -390,6 +390,68 @@ def trocar_propria_senha(conn, usuario_id, senha_atual, senha_nova):
     conn.commit()
 
 
+def _ultimo_admin(conn, usuario_id):
+    """True se o usuario for o ultimo admin ATIVO (nao pode ser tirado)."""
+    row = obter_usuario(conn, usuario_id)
+    if row is None or row["papel"] != "admin" or not row["ativo"]:
+        return False
+    restantes = conn.execute(
+        "SELECT COUNT(*) FROM USUARIO WHERE papel='admin' AND ativo=1 "
+        "AND id<>?", (usuario_id,)).fetchone()[0]
+    return restantes == 0
+
+
+def desativar_usuario(conn, login):
+    """Desativa (ativo=0) um usuario. Recusa desativar o ultimo admin ativo."""
+    garantir_esquema(conn)
+    row = obter_usuario_por_login(conn, login)
+    if row is None:
+        raise GovernancaError(404, "usuario_nao_encontrado",
+                              "usuario %s nao encontrado" % login)
+    if _ultimo_admin(conn, row["id"]):
+        raise GovernancaError(409, "ultimo_admin",
+                              "nao posso desativar o ultimo admin ativo")
+    definir_papel_ativo(conn, row["id"], ativo=0)
+    return row
+
+
+def reativar_usuario(conn, login):
+    """Reativa (ativo=1) um usuario."""
+    garantir_esquema(conn)
+    row = obter_usuario_por_login(conn, login)
+    if row is None:
+        raise GovernancaError(404, "usuario_nao_encontrado",
+                              "usuario %s nao encontrado" % login)
+    definir_papel_ativo(conn, row["id"], ativo=1)
+    return row
+
+
+def excluir_usuario(conn, login):
+    """Exclui um usuario em definitivo.
+
+    Preserva a AUDITORIA: as referencias em RADAR_ALTERACAO e
+    BLOQUEIO_GEOGRAFICO viram NULL (resta o rotulo textual); as sessoes sao
+    apagadas. Guarda anti-lockout: recusa excluir o ultimo admin ativo.
+    """
+    garantir_esquema(conn)
+    row = obter_usuario_por_login(conn, login)
+    if row is None:
+        raise GovernancaError(404, "usuario_nao_encontrado",
+                              "usuario %s nao encontrado" % login)
+    if _ultimo_admin(conn, row["id"]):
+        raise GovernancaError(409, "ultimo_admin",
+                              "nao posso excluir o ultimo admin ativo")
+    uid = row["id"]
+    conn.execute("DELETE FROM SESSAO WHERE usuario_id=?", (uid,))
+    conn.execute("UPDATE RADAR_ALTERACAO SET quem_usuario_id=NULL "
+                 "WHERE quem_usuario_id=?", (uid,))
+    conn.execute("UPDATE BLOQUEIO_GEOGRAFICO SET criado_por_usuario_id=NULL "
+                 "WHERE criado_por_usuario_id=?", (uid,))
+    conn.execute("DELETE FROM USUARIO WHERE id=?", (uid,))
+    conn.commit()
+    return row
+
+
 # ---------------------------------------------------------------------------
 # Sessao do painel
 # ---------------------------------------------------------------------------
