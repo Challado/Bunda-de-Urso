@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radar — detalhes</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root{--azul:#12508f;--vermelho:#c0392b;--cinza:#f4f4f6;--borda:#d7d7de;--verde:#178a3d;}
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1d1d22}
+  header{background:var(--azul);color:#fff;padding:10px 16px}
+  header h1{margin:0;font-size:17px;font-weight:600}
+  header .sub{opacity:.9;font-size:12.5px}
+  header a{color:#fff}
+  main{padding:12px 16px 40px;max-width:1080px;margin:0 auto}
+  .resumo{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0 10px}
+  .pill{display:inline-block;background:#e8eef6;color:var(--azul);border-radius:10px;padding:2px 10px;font-size:12.5px;font-weight:600}
+  .pill.ok{background:#e6f6ea;color:var(--verde)}
+  .pill.ruim{background:#fdecea;color:var(--vermelho)}
+  #mapa{height:320px;width:100%;border-radius:10px;border:1px solid var(--borda);margin:6px 0 14px}
+  .secao{margin:14px 0;border:1px solid var(--borda);border-radius:10px;background:var(--cinza);overflow:hidden}
+  .secao > h2{margin:0;padding:9px 12px;font-size:14px;background:rgba(18,80,143,.09);border-bottom:1px solid var(--borda)}
+  .secao .corpo{padding:10px 12px}
+  dl.campos{margin:0;display:grid;grid-template-columns:minmax(150px,240px) 1fr;gap:2px 12px}
+  dl.campos > dt{color:#6b7280;font-size:12.5px;font-weight:600;padding:3px 0;overflow-wrap:anywhere}
+  dl.campos > dd{margin:0;padding:3px 0;overflow-wrap:anywhere}
+  dl.campos dl.campos{grid-template-columns:minmax(120px,220px) 1fr;margin:2px 0}
+  .vazio{color:#8a8a95;font-style:italic;font-size:13px}
+  .ni{color:#a0a0aa;font-style:italic}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{background:#e8eef6;border-radius:8px;padding:2px 8px;font-size:13px}
+  .cartao{border:1px solid var(--borda);border-radius:8px;padding:8px 10px;margin:6px 0;background:#fff}
+  .cartao-num{font-size:12px;font-weight:700;color:var(--azul);margin-bottom:4px}
+  .carregando{padding:20px;text-align:center;color:#6b7280}
+  .err{background:#fdecea;border:1px solid #f5b7b1;border-radius:8px;padding:12px;font-size:14px;color:#7a1f1f}
+  details.dobrado{border:1px solid var(--borda);border-radius:8px;margin:6px 0;background:#fff}
+  details.dobrado > summary{cursor:pointer;padding:8px 10px;font-weight:600;font-size:13.5px}
+  details.dobrado > .dentro{padding:0 10px 10px}
+  details.secao > summary{cursor:pointer;padding:9px 12px;font-size:14px;font-weight:600;background:rgba(18,80,143,.09);border-bottom:1px solid var(--borda)}
+  .rodape{margin-top:18px;font-size:12.5px;color:#6b7280}
+  .rodape code{background:rgba(127,127,127,.15);padding:1px 5px;border-radius:4px}
+  @media (prefers-color-scheme: dark){
+    body{background:#17181c;color:#eceef2}
+    :root{--cinza:#212228;--borda:#34363e;--azul:#7fb2e8}
+    .cartao,details.dobrado{background:#24252b}
+    .chip{background:#2a2c34}
+  }
+  @media (max-width: 620px){
+    header{padding:9px 12px}
+    main{padding:10px 12px 40px}
+    dl.campos{grid-template-columns:1fr;gap:0}
+    dl.campos > dt{padding-top:6px}
+    dl.campos > dd{padding-top:0;padding-bottom:4px}
+    #mapa{height:260px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="titulo">Radar — detalhes</h1>
+  <div class="sub">Todos os campos publicados pela API oficial. Campo sem fonte aparece como “não informado” (não é zero). &nbsp;·&nbsp; <a href="index.html">&larr; voltar à consulta por localização</a></div>
+</header>
+
+<main id="principal">
+  <div class="carregando">Carregando os detalhes…</div>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+  "use strict";
+  var API = "api.pse";
+
+  // ---- rotulos amigaveis para as chaves da API (fallback = chave bonitinha) ----
+  var LABELS = {
+    id:"ID", tipo_registro:"Tipo de registro", situacao_operacional:"Situação operacional",
+    situacao_original:"Situação (texto original da fonte)",
+    localizacao:"Localização", latitude:"Latitude", longitude:"Longitude",
+    distancia_metros:"Distância do ponto de consulta (m)", precisao_metros:"Precisão informada (m)",
+    qualidade:"Qualidade da posição", metodo_obtencao:"Método de obtenção",
+    uf:"UF", municipio:"Município", codigo_ibge:"Código IBGE do município", endereco:"Endereço",
+    via:"Via", codigo:"Código da via", tipo:"Tipo de via", nome:"Nome",
+    km:"Quilômetro", tipo_pista:"Tipo de pista",
+    data_inicio_operacao:"Início da operação", data_inativacao:"Data de inativação",
+    motivo_inativacao:"Motivo da inativação",
+    faixas:"Faixas", numero:"Número da faixa", sentido:"Sentido", sentido_original:"Sentido (original)",
+    limites_velocidade:"Limites de velocidade", faixa_id:"Faixa", categoria_veiculo:"Categoria de veículo",
+    velocidade_kmh:"Velocidade (km/h)", vigencia_inicio:"Vigência — início", vigencia_fim:"Vigência — fim",
+    fonte_registro_id:"ID do registro na fonte",
+    velocidades_resolvidas:"Velocidades resolvidas", categoria:"Categoria", estado:"Estado da resolução",
+    valores_publicados_kmh:"Valores publicados (km/h)",
+    velocidade_leves_kmh:"Velocidade — leves (km/h)", velocidade_pesados_kmh:"Velocidade — pesados (km/h)",
+    velocidade_geral_kmh:"Velocidade geral (km/h)",
+    conflitos:"Conflitos de velocidade", quantidade_faixas_declarada:"Quantidade de faixas declarada",
+    regimes:"Regimes de fiscalização", modalidade_fiscalizacao:"Modalidade de fiscalização",
+    tipo_medicao:"Tipo de medição", inicio_em:"Início", fim_em:"Fim",
+    fiscalizacao_pontual:"Fiscalização pontual",
+    equipamentos:"Equipamentos", tipo_radar:"Tipo de radar", tipo_radar_original:"Tipo de radar (original)",
+    funcao_equipamento:"Função do equipamento", sigla_equipamento_original:"Sigla (original)",
+    fabricante:"Fabricante", modelo:"Modelo", tecnologia_medicao:"Tecnologia de medição",
+    numero_serie:"Número de série", ano_fabricacao:"Ano de fabricação",
+    registro_aprovacao_modelo:"Registro de aprovação do modelo",
+    portaria_aprovacao_modelo:"Portaria de aprovação do modelo",
+    identificadores_oficiais:"Identificadores oficiais",
+    instalacoes:"Instalações", ponto_id:"Ponto", situacao:"Situação", faixas_ids:"Faixas",
+    data_inicio_educativo:"Início (modo educativo)", data_inicio_autuacao:"Início (autuação)",
+    verificacoes_metrologicas:"Verificações metrológicas", proprietario:"Proprietário",
+    mantenedor:"Mantenedor", ultima_manutencao:"Última manutenção", observacoes:"Observações",
+    tipos_radar_presentes:"Tipos de radar presentes", organizacoes:"Organizações",
+    documentos:"Documentos", fontes:"Fontes", esfera:"Esfera", organizacao:"Órgão responsável",
+    url:"URL", recurso_url:"URL do recurso", id_registro_original:"ID na fonte",
+    publicado_em:"Publicado em", coletado_em:"Coletado em", validado_em:"Validado em",
+    ultima_verificacao_acesso:"Última verificação de acesso", hash_artefato:"Hash do artefato",
+    status_integracao:"Status da integração", idade_dados_segundos:"Idade dos dados (s)",
+    operacoes:"Operações", primeira_observacao:"Primeira observação",
+    ultima_confirmacao:"Última confirmação", ultima_coleta:"Última coleta",
+    confianca:"Confiança", proveniencia_campos:"Proveniência dos campos",
+    cobertura:"Cobertura da base", fontes_ativas:"Fontes ativas", fontes_indisponiveis:"Fontes indisponíveis",
+    territorios_verificados:"Territórios verificados", limitacoes:"Limitações",
+    completude_confirmada:"Completude confirmada",
+    base:"Base de dados", snapshot_id:"Snapshot", idade_snapshot_segundos:"Idade do snapshot (s)",
+    ultima_sincronizacao_valida:"Última sincronização válida",
+    idade_publicacao_origem_segundos:"Idade da publicação de origem (s)",
+    status_cache:"Status do cache", alertas:"Alertas",
+    consultado_em:"Consultado em", consulta:"Chave da consulta", resultado:"Resultado",
+    total_pontos:"Total de pontos", total_equipamentos:"Total de equipamentos",
+    retornados:"Retornados", proximo_cursor:"Próximo cursor", status:"Status",
+    total_operacoes:"Total de operações", pontos:"Pontos",
+    certificado:"Certificado", data:"Data", validade:"Validade", orgao_executor:"Órgão executor",
+    classificacao:"Classificação", numero_certificado:"Número do certificado",
+    erro:"Erro", mensagem:"Mensagem", codigo_erro:"Código"
+  };
+  function rotulo(k){
+    if (LABELS[k]) return LABELS[k];
+    return String(k).replace(/_/g, " ").replace(/^\w/, function(c){ return c.toUpperCase(); });
+  }
+  function esc(s){
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];
+    });
+  }
+  function fmtData(iso){
+    try{
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return iso;
+      return d.toLocaleString("pt-BR", {dateStyle:"short", timeStyle:"short"});
+    }catch(e){ return iso; }
+  }
+  function fmtEscalar(v){
+    if (v === null || v === undefined || v === "") return "<span class='ni'>não informado</span>";
+    if (v === true) return "sim";
+    if (v === false) return "não";
+    if (typeof v === "number") return esc(v);
+    var s = String(v);
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return esc(fmtData(s)) + " <span class='ni'>(" + esc(s) + ")</span>";
+    return esc(s);
+  }
+  function ehObjeto(v){ return v && typeof v === "object"; }
+  function todosEscalares(arr){
+    for (var i=0;i<arr.length;i++) if (ehObjeto(arr[i])) return false;
+    return true;
+  }
+  // Renderiza QUALQUER valor (escalar, lista, dicionario) — nada e omitido.
+  function renderValor(v){
+    if (Array.isArray(v)){
+      if (!v.length) return "<div class='vazio'>nenhum registro</div>";
+      if (todosEscalares(v)){
+        return "<div class='chips'>" + v.map(function(x){ return "<span class='chip'>" + fmtEscalar(x) + "</span>"; }).join("") + "</div>";
+      }
+      var itens = v.map(function(x, i){
+        var cab = v.length > 1 ? "<div class='cartao-num'>#" + (i+1) + "</div>" : "";
+        return "<div class='cartao'>" + cab + renderDict(x) + "</div>";
+      }).join("");
+      if (v.length > 8){
+        return "<details class='dobrado'><summary>" + v.length + " registros — clique para ver</summary><div class='dentro'>" + itens + "</div></details>";
+      }
+      return itens;
+    }
+    if (ehObjeto(v)) return renderDict(v);
+    return "<div>" + fmtEscalar(v) + "</div>";
+  }
+  function renderDict(d){
+    if (!ehObjeto(d)) return "";
+    var chaves = Object.keys(d);
+    if (!chaves.length) return "<div class='vazio'>sem campos</div>";
+    var h = "<dl class='campos'>";
+    for (var i=0;i<chaves.length;i++){
+      var k = chaves[i], val = d[k];
+      h += "<dt>" + esc(rotulo(k)) + "</dt><dd>" + renderValor(val) + "</dd>";
+    }
+    return h + "</dl>";
+  }
+  function secao(titulo, obj){
+    if (!ehObjeto(obj) || !Object.keys(obj).length) return "";
+    return "<section class='secao'><h2>" + esc(titulo) + "</h2><div class='corpo'>" + renderDict(obj) + "</div></section>";
+  }
+  function secaoDobrada(titulo, obj, aberto){
+    if (!ehObjeto(obj) || !Object.keys(obj).length) return "";
+    return "<details class='secao' " + (aberto ? "open" : "") + "><summary>" + esc(titulo) + "</summary>" +
+      "<div class='corpo'>" + renderDict(obj) + "</div></details>";
+  }
+
+  var principal = document.getElementById("principal");
+
+  function semId(msg){
+    principal.innerHTML = "<div class='err'>" + msg + "<br><br><a href='index.html'>&larr; voltar à consulta por localização</a></div>";
+  }
+
+  var qp = new URLSearchParams(location.search);
+  var id = (qp.get("id") || "").trim();
+  if (!id){ semId("Nenhum identificador informado. Use <code>detalhe.html?id=P-1130</code>."); return; }
+
+  document.getElementById("titulo").textContent = "Radar " + id + " — detalhes";
+  document.title = "Radar " + id + " — detalhes";
+
+  var url = API + "?rota=" + encodeURIComponent("/api/v1/radares/" + id) + "&formato=json";
+  fetch(url).then(function(r){ return r.json(); }).then(function(d){
+    if (!d || d.sucesso === false){
+      var m = (d && d.erro && d.erro.mensagem) || "não foi possível obter os detalhes";
+      semId("Falha ao consultar <code>" + esc(id) + "</code>: " + esc(m));
+      return;
+    }
+    var res = d.resultado || {};
+    var pontos = res.pontos || [];
+    if (!pontos.length){ semId("Nenhum registro encontrado para <code>" + esc(id) + "</code>."); return; }
+    desenhar(pontos[0], d, res);
+  }).catch(function(e){
+    semId("Erro de rede: " + esc(e.message));
+  });
+
+  function desenhar(p, d, res){
+    var loc = p.localizacao || {};
+    var via = loc.via || {};
+    var lat = loc.latitude, lon = loc.longitude;
+    var vel = null, vrs = p.velocidades_resolvidas || [];
+    for (var i=0;i<vrs.length;i++){ if (vrs[i] && vrs[i].velocidade_kmh != null){ vel = vrs[i].velocidade_kmh; break; } }
+    if (vel == null){ var lv = p.limites_velocidade || []; if (lv.length) vel = lv[0].velocidade_kmh; }
+    var viaTxt = [via.codigo, via.nome].filter(Boolean).join(" · ");
+
+    var h = "";
+    h += "<div class='resumo'>";
+    h += "<span class='pill'>" + esc(p.id) + "</span>";
+    if (p.situacao_operacional) h += "<span class='pill " + (p.situacao_operacional === "ativo" ? "ok" : "ruim") + "'>" + esc(p.situacao_operacional) + "</span>";
+    var lugar = [loc.municipio, loc.uf].filter(Boolean).join("/");
+    if (lugar) h += "<span class='pill'>" + esc(lugar) + "</span>";
+    if (viaTxt) h += "<span class='pill'>" + esc(viaTxt) + (loc.km != null ? " · km " + esc(loc.km) : "") + "</span>";
+    if (vel != null) h += "<span class='pill ruim'>" + esc(vel) + " km/h</span>";
+    h += "</div>";
+    h += "<div id='mapa'></div>";
+
+    h += secao("Localização", {localizacao: p.localizacao});
+    h += secao("Identificação e situação", {id:p.id, tipo_registro:p.tipo_registro, situacao_operacional:p.situacao_operacional, situacao_original:p.situacao_original, data_inicio_operacao:p.data_inicio_operacao, data_inativacao:p.data_inativacao, motivo_inativacao:p.motivo_inativacao});
+    h += secao("Velocidade e faixas", {velocidade_leves_kmh:p.velocidade_leves_kmh, velocidade_pesados_kmh:p.velocidade_pesados_kmh, velocidade_geral_kmh:p.velocidade_geral_kmh, velocidades_resolvidas:p.velocidades_resolvidas, limites_velocidade:p.limites_velocidade, faixas:p.faixas, quantidade_faixas_declarada:p.quantidade_faixas_declarada, conflitos:p.conflitos});
+    h += secao("Regimes de fiscalização", {regimes:p.regimes});
+    h += secao("Equipamentos e instalações", {equipamentos:p.equipamentos});
+    h += secao("Organizações", {organizacoes:p.organizacoes});
+    h += secao("Documentos", {documentos:p.documentos});
+    h += secao("Operações", {operacoes:p.operacoes});
+    h += secao("Rastreabilidade e datas", {primeira_observacao:p.primeira_observacao, ultima_confirmacao:p.ultima_confirmacao, ultima_coleta:p.ultima_coleta, confianca:p.confianca, observacoes:p.observacoes, proveniencia_campos:p.proveniencia_campos});
+
+    // tudo o que sobrou (garante que NENHUM campo fique de fora)
+    var usados = {localizacao:1,tipo_registro:1,situacao_operacional:1,situacao_original:1,data_inicio_operacao:1,data_inativacao:1,motivo_inativacao:1,velocidade_leves_kmh:1,velocidade_pesados_kmh:1,velocidade_geral_kmh:1,velocidades_resolvidas:1,limites_velocidade:1,faixas:1,quantidade_faixas_declarada:1,conflitos:1,regimes:1,equipamentos:1,organizacoes:1,documentos:1,operacoes:1,primeira_observacao:1,ultima_confirmacao:1,ultima_coleta:1,confianca:1,observacoes:1,proveniencia_campos:1,fontes:1,id:1,tipos_radar_presentes:1,total_pontos:1,total_equipamentos:1,retornados:1,proximo_cursor:1,status:1,total_operacoes:1};
+    var resto = {};
+    Object.keys(p).forEach(function(k){ if (!usados[k]) resto[k] = p[k]; });
+    h += secao("Outros campos", resto);
+
+    if (p.fontes && p.fontes.length){
+      h += "<details class='secao'><summary>Fontes do registro (" + p.fontes.length + ")</summary><div class='corpo'>" + renderValor(p.fontes) + "</div></details>";
+    }
+
+    h += secaoDobrada("Procedência da resposta (API)", {consultado_em:d.consultado_em, versao_api:d.versao_api, versao_esquema:d.versao_esquema, consulta:d.consulta, total_pontos:res.total_pontos, total_equipamentos:res.total_equipamentos, total_operacoes:res.total_operacoes, status:res.status}, true);
+    h += secaoDobrada("Cobertura da base", d.cobertura, true);
+    h += secaoDobrada("Estado da base (snapshot)", d.base, true);
+
+    h += "<div class='rodape'>Fonte: API Radar Brasil <code>/api/v1/radares/" + esc(id) + "</code>. Campo sem fonte oficial aparece como <i>não informado</i>. Coordenada marcada como <i>inferida</i> foi derivada por km, não é GPS oficial.</div>";
+
+    principal.innerHTML = h;
+
+    try{
+      if (lat != null && lon != null && window.L){
+        var map = L.map("mapa").setView([lat, lon], 15);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 19, attribution: "&copy; OpenStreetMap"}).addTo(map);
+        L.circleMarker([lat, lon], {radius:9, color:"#c0392b", weight:3, fillColor:"#ffe08a", fillOpacity:.95}).addTo(map)
+          .bindPopup("<b>" + esc(p.id) + "</b>" + (viaTxt ? "<br>" + esc(viaTxt) : "")).openPopup();
+        setTimeout(function(){ map.invalidateSize(); }, 200);
+      } else {
+        var m = document.getElementById("mapa");
+        if (m) m.outerHTML = "<div class='aviso' style='padding:10px;border:1px solid var(--borda);border-radius:8px'>Este registro não tem coordenada geográfica publicada (posição não informada pela fonte).</div>";
+      }
+    }catch(e){}
+  }
+})();
+</script>
+</body>
+</html>
