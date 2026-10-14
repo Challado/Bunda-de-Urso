@@ -1,0 +1,10 @@
+[Unit]
+Description=RadarBrasil - resolver localizacoes diariamente
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+Persistent=true
+Unit=radarbrasil-georesolver.service
+
+[Install]
+WantedBy=timers.target

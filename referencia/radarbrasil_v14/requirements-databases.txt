@@ -1,0 +1,5 @@
+# Instalar apenas o driver do banco desejado
+psycopg[binary]>=3.1
+pymysql>=1.1
+sqlalchemy-firebird>=2.1
+firebird-driver>=1.10
