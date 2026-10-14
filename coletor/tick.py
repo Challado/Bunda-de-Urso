@@ -121,10 +121,21 @@ def executar(db_path=None, agora=None, forcar=None, arquivos=None,
                     "faltam_s": diag.get("faltam_s")})
                 continue
             origem = arquivos.get(chave) or item.get("url_direta")
-            if origem is None and not os.environ.get("RADAR_TICK_LIVE"):
+            if origem is None:
+                resolver = getattr(item["conector"], "resolver_url", None)
+                if callable(resolver):
+                    try:
+                        origem = resolver()
+                    except Exception as exc:            # noqa: BLE001
+                        resultados.append({
+                            "fonte": chave, "acao": "erro",
+                            "tipo": type(exc).__name__,
+                            "detalhe": "resolver_url: " + str(exc)[:160]})
+                        continue
+            if origem is None:
                 resultados.append({
                     "fonte": chave, "acao": "pulado",
-                    "motivo": "sem_url_direta"})
+                    "motivo": "sem_origem"})
                 continue
             if dry_run:
                 resultados.append({

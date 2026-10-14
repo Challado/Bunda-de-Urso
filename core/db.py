@@ -20,6 +20,13 @@ def connect(path=None):
     con = sqlite3.connect(path)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA foreign_keys = ON")
+    # Leitor (web) e escritor (coletor) ao mesmo tempo: WAL deixa a leitura
+    # nao travar na escrita e o busy_timeout evita "database is locked".
+    try:
+        con.execute("PRAGMA journal_mode = WAL")
+        con.execute("PRAGMA busy_timeout = 5000")
+    except sqlite3.Error:                                  # pragma: no cover
+        pass
     return con
 
 
