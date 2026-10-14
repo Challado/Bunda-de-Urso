@@ -25,7 +25,7 @@ Algoritmo
    regra tambem exige que nao exista quasi-empate). Nada e inventado: sem
    confianca o campo permanece NULL.
 
-Saida (para conferencia do Lucas):
+Saida (para conferencia humana):
   dados/calibracao/municipios_duvidosos.csv
       nome_fonte;uf_fonte;melhor_candidato;uf_candidato;score;motivo
       (traz os NAO casados e tambem os casados com UF divergente da fonte)

@@ -10,7 +10,7 @@ Um modelo de linguagem erra codigo IBGE com facilidade (medido: o gemma4
 respondeu ``5106105`` para Poxoreu/MT, cujo codigo real e ``5106109``). Por
 isso a consulta ao modelo serve so para AMPLIAR o texto candidato; o candidato
 volta e e conferido contra a lista oficial (exato ou aproximado com margem).
-Se nao fechar, fica NULL e vai para o Lucas decidir.
+Se nao fechar, fica NULL e vai para revisao humana.
 
 Fluxo, por (uf, nome) distinto pendente
 ---------------------------------------
