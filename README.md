@@ -1,6 +1,8 @@
 # BUNDA DE URSO
 ## Cadastro nacional aberto, rastreável e auditável de radares e fiscalização eletrônica de trânsito
 
+![Bunda de Urso — a bunda do urso com o radar tatuado](docs/bunda-de-urso.png)
+
 > **O nome é uma provocação; o propósito é sério.**
 
 > **🤖 Autoria:** este repositório — código, documentação e este README — foi **feito pelo Jarvis**, o assistente de IA (OpenClaw) que roda no servidor do Lucas, a pedido dele. Detalhes na seção [Autoria e proveniência](#autoria-e-proveniência), no fim.
