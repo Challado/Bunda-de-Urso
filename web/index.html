@@ -46,6 +46,21 @@
   .err{background:#fdecea;border:1px solid #f5b7b1;border-radius:6px;padding:8px 10px;font-size:13px}
   .vel{font-weight:600;color:var(--vermelho)}
   a{color:var(--azul)}
+  /* ---- autocomplete do municipio (lista propria, aparece ao digitar) ---- */
+  #controles .munBox{display:flex;flex-direction:column;font-size:12px;color:#4a4a55;gap:2px;position:relative}
+  .sug{position:absolute;top:100%;left:0;right:0;z-index:60;margin-top:2px;max-height:290px;overflow:auto;background:#fff;color:#1d1d22;border:1px solid var(--borda);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.16);font-size:13.5px}
+  .sug .item{padding:7px 10px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sug .item .uf{color:#6b7280}
+  .sug .item:hover,.sug .item.sel{background:#e8eef6}
+  .sug .item b{color:var(--azul)}
+  /* ---- aviso: tem radar na area (irmao da festa) ---- */
+  #problema{position:fixed;inset:0;z-index:10001;display:none;background:rgba(20,0,0,.55);cursor:pointer}
+  #problema.on{display:flex;align-items:center;justify-content:center}
+  #problema .msg{max-width:92vw;text-align:center;padding:26px 34px;background:#2b2b33;color:#fff;border:4px solid var(--vermelho);border-radius:20px;box-shadow:0 12px 44px rgba(0,0,0,.4)}
+  #problema .msg .cow{font-size:46px;line-height:1}
+  #problema .msg h2{margin:6px 0 10px;font-size:28px;color:#ff8a80}
+  #problema .msg p{margin:4px 0;font-size:16px;color:#f2f2f5}
+  #problema .msg small{display:block;margin-top:10px;color:#b9b9c4}
   /* ---- responsivo: celular / tablet / desktop ---- */
   @media (max-width: 860px){
     table thead{display:none}
@@ -61,7 +76,7 @@
     header h1{font-size:15px}
     header .sub{font-size:11.5px}
     #controles{flex-direction:column;align-items:stretch;gap:10px;padding:10px 12px}
-    #controles label{width:100%}
+    #controles label,#controles .munBox{width:100%}
     #controles input[type=text],#controles input[type=number],#controles input[type=range]{width:100%}
     #controles button{width:100%}
     .chk{flex-direction:row!important}
@@ -81,8 +96,11 @@
 </header>
 
 <div id="controles">
-  <label class="munBox">Município<input id="mun" list="listaMun" type="text" placeholder="digite o município…" autocomplete="off"></label>
-  <datalist id="listaMun"></datalist>
+  <div class="munBox">
+    <label for="mun">Município</label>
+    <input id="mun" type="text" placeholder="digite o município…" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="sugMun">
+    <div id="sugMun" class="sug" role="listbox" hidden></div>
+  </div>
   <label>Latitude<input id="lat" type="text" inputmode="decimal" placeholder="-17.625377"></label>
   <label>Longitude<input id="lon" type="text" inputmode="decimal" placeholder="-51.060863"></label>
   <label class="raioBox">Raio: <span class="raioVal" id="raioVal">2,0 km</span>
@@ -102,6 +120,15 @@
     <h2>🎉 EBA! Nada por aqui!</h2>
     <p></p>
     <div class="feito">🎈 🎉 🥳 🎊 🎈</div>
+    <small>toque para fechar</small>
+  </div>
+</div>
+
+<div id="problema" role="alertdialog" aria-live="assertive">
+  <div class="msg">
+    <div class="cow">🤠</div>
+    <h2>Você está com problemas, cowboy!</h2>
+    <p></p>
     <small>toque para fechar</small>
   </div>
 </div>
@@ -159,6 +186,19 @@
     festa._t = setTimeout(function(){ el.classList.remove("on"); }, 7500);
   }
   document.getElementById("festa").addEventListener("click", function(){ this.classList.remove("on"); });
+
+  // ---- aviso: apareceu radar no raio (irmao bem menos alegre da festa) ----
+  function problemaCowboy(n, raio){
+    var el = document.getElementById("problema");
+    if (!el) return;
+    el.querySelector(".msg p").innerHTML =
+      "Tem <b>" + n + "</b> equipamento(s) de fiscalização num raio de <b>" +
+      fmtRaio(raio) + "</b>.<br>Segura a velocidade — radar na área!";
+    el.classList.add("on");
+    clearTimeout(problemaCowboy._t);
+    problemaCowboy._t = setTimeout(function(){ el.classList.remove("on"); }, 5200);
+  }
+  document.getElementById("problema").addEventListener("click", function(){ this.classList.remove("on"); });
 
   var elLat = document.getElementById("lat");
   var elLon = document.getElementById("lon");
@@ -288,6 +328,7 @@
       var pontos = res.pontos || [];
       render(res, pontos);
       if (pontos.length === 0) festa(raio, res.status);
+      else problemaCowboy(pontos.length, raio);
       elBarra.innerHTML = "Snapshot " + escapeHtml(d.consultado_em || "") +
         (pontos.length === 0 ? " — <span class='aviso' style='display:inline-block'>nada no raio informado (isso não afirma que não exista radar: verifique cobertura da região).</span>" : "");
     }).catch(function(e){
@@ -324,42 +365,118 @@
     });
   });
 
-  // ---- combo de municipio: digite o nome e va para o municipio ----
+  // ---- combo de municipio: digite o nome e escolha na lista ----
   var elMun = document.getElementById("mun");
-  var elListaMun = document.getElementById("listaMun");
+  var elSug = document.getElementById("sugMun");
   var MUNICIPIOS = [];
+  var selIdx = -1;
+
+  function semAcento(s){
+    return String(s == null ? "" : s).normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  }
+
   fetch("municipios.json").then(function(r){ return r.json(); }).then(function(lista){
     MUNICIPIOS = lista || [];
-    var frag = document.createDocumentFragment();
-    for (var i=0;i<MUNICIPIOS.length;i++){
-      var o = document.createElement("option");
-      o.value = MUNICIPIOS[i].n + " / " + MUNICIPIOS[i].u;
-      frag.appendChild(o);
+    for (var i=0;i<MUNICIPIOS.length;i++){          // chaves de busca prontas
+      MUNICIPIOS[i].n0 = semAcento(MUNICIPIOS[i].n);
+      MUNICIPIOS[i].k = MUNICIPIOS[i].n0 + " " + semAcento(MUNICIPIOS[i].u);
     }
-    elListaMun.appendChild(frag);
   }).catch(function(){ /* sem a lista o combo fica inerte; a pagina segue normal */ });
+
+  function fecharSug(){
+    elSug.hidden = true; elSug.innerHTML = ""; elSug._res = null; selIdx = -1;
+    elMun.setAttribute("aria-expanded", "false");
+  }
+  function marcarSug(itens){
+    for (var i=0;i<itens.length;i++) itens[i].classList.toggle("sel", i === selIdx);
+    if (selIdx >= 0 && itens[selIdx] && itens[selIdx].scrollIntoView)
+      itens[selIdx].scrollIntoView({block:"nearest"});
+  }
+
+  // Monta a lista com os nomes conforme digita (comeca-por antes de contem).
+  function abrirSug(){
+    var q = semAcento(elMun.value.trim());
+    if (!MUNICIPIOS.length){ elSug.hidden = true; return; }
+    var starts = [], contem = [];
+    if (q){
+      for (var i=0;i<MUNICIPIOS.length;i++){
+        var m = MUNICIPIOS[i];
+        if (m.n0.indexOf(q) === 0){
+          starts.push(m);
+          if (starts.length >= 12) break;
+        } else if (contem.length < 12 && m.k.indexOf(q) >= 0){
+          contem.push(m);
+        }
+      }
+    }
+    var res = starts.concat(contem).slice(0, 12);
+    if (!res.length){ fecharSug(); return; }
+    selIdx = -1;
+    var h = "";
+    for (var j=0;j<res.length;j++){
+      h += "<div class='item' data-i='" + j + "' role='option'>" +
+        escapeHtml(res[j].n) + " <span class='uf'>/ " + escapeHtml(res[j].u) + "</span></div>";
+    }
+    elSug.innerHTML = h;
+    elSug._res = res;
+    elSug.hidden = false;
+    elMun.setAttribute("aria-expanded", "true");
+  }
+
+  function escolherSug(m){
+    elMun.value = m.n + " / " + m.u;
+    fecharSug();
+    elLat.value = m.a; elLon.value = m.o;
+    elBarra.textContent = "Município " + m.n + "/" + m.u + " …";
+    consultar(m.a, m.o, parseInt(elRaio.value, 10) || 2000);
+  }
 
   function irParaMunicipio(){
     var txt = (elMun.value || "").trim();
     if (!txt || !MUNICIPIOS.length) return;
     var partes = txt.split("/");
-    var nome = partes[0].trim().toLowerCase();
+    var nome = semAcento(partes[0].trim());
     var uf = (partes[1] || "").trim().toUpperCase();
     var achou = null, cands = [];
     for (var i=0;i<MUNICIPIOS.length;i++){
       var m = MUNICIPIOS[i];
-      if (m.n.toLowerCase() === nome && (!uf || m.u === uf)){ achou = m; break; }
-      if (m.n.toLowerCase().indexOf(nome) === 0) cands.push(m);
+      if (m.n0 === nome && (!uf || m.u === uf)){ achou = m; break; }
+      if (m.n0.indexOf(nome) === 0) cands.push(m);
     }
     if (!achou && cands.length === 1) achou = cands[0];
     if (!achou) return;
-    elLat.value = achou.a; elLon.value = achou.o;
-    elBarra.textContent = "Município " + achou.n + "/" + achou.u + " …";
-    consultar(achou.a, achou.o, parseInt(elRaio.value, 10) || 2000);
+    escolherSug(achou);
   }
-  elMun.addEventListener("change", irParaMunicipio);
+
+  elMun.addEventListener("input", abrirSug);
+  elMun.addEventListener("focus", abrirSug);
   elMun.addEventListener("keydown", function(e){
-    if (e.key === "Enter"){ e.preventDefault(); irParaMunicipio(); }
+    var itens = elSug.hidden ? [] : elSug.querySelectorAll(".item");
+    if (!itens.length){
+      if (e.key === "Enter"){ e.preventDefault(); irParaMunicipio(); }
+      return;
+    }
+    if (e.key === "ArrowDown"){ e.preventDefault(); selIdx = (selIdx + 1) % itens.length; marcarSug(itens); }
+    else if (e.key === "ArrowUp"){ e.preventDefault(); selIdx = (selIdx - 1 + itens.length) % itens.length; marcarSug(itens); }
+    else if (e.key === "Enter"){
+      e.preventDefault();
+      if (selIdx >= 0 && elSug._res && elSug._res[selIdx]) escolherSug(elSug._res[selIdx]);
+      else irParaMunicipio();
+    }
+    else if (e.key === "Escape"){ fecharSug(); }
+  });
+  elSug.addEventListener("mousedown", function(e){
+    var it = e.target && e.target.closest ? e.target.closest(".item") : null;
+    if (!it) return;
+    e.preventDefault();                       // nao rouba o foco do input
+    var i = parseInt(it.getAttribute("data-i"), 10);
+    if (elSug._res && elSug._res[i]) escolherSug(elSug._res[i]);
+  });
+  document.addEventListener("click", function(e){
+    if (elSug.hidden) return;
+    if (e.target && e.target.closest && e.target.closest(".munBox")) return;
+    fecharSug();
   });
   // Slider do raio: arrasta e o mapa/circulo acompanham; solta e consulta de novo
   elRaioVal.textContent = fmtRaio(parseInt(elRaio.value, 10));
