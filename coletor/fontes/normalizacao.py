@@ -5,9 +5,13 @@ canonico, preservando proveniencia (REGISTRO_FONTE + VINCULO_*).
 Nada e inventado: campos ausentes viram NULL; o payload bruto permanece em
 REGISTRO_FONTE.payload_original (spec 3.7, 11).
 """
+import logging
 import re
+import unicodedata
 
 from core import db as dbmod
+
+log = logging.getLogger(__name__)
 
 
 def _txt(v):
@@ -125,8 +129,50 @@ def tipo_via_de_rodovia(codigo):
     return "outra"
 
 
+def normalizar_nome_texto(valor):
+    """Normaliza um nome para casamento: sem acento, maiusculo, espacos
+    colapsados (ex.: 'Água Branca ' -> 'AGUA BRANCA').
+
+    Usado para casar o nome de municipio publicado pela fonte com o nome
+    oficial em MUNICIPIO; nao altera o valor gravado.
+    """
+    if valor is None:
+        return ""
+    s = unicodedata.normalize("NFKD", str(valor).strip())
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return " ".join(s.upper().split())
+
+
+def buscar_municipio_por_nome(conn, uf_sigla, municipio_nome):
+    """Casa (uf_sigla, nome) contra MUNICIPIO com normalizacao de
+    maiusculas/acentos/espacos. Devolve o codigo_ibge ou None.
+
+    Nada e inventado: sem correspondencia na lista oficial, devolve None.
+    """
+    if not uf_sigla or not municipio_nome:
+        return None
+    alvo = normalizar_nome_texto(municipio_nome)
+    if not alvo:
+        return None
+    for row in dbmod.query_all(
+            conn, "SELECT codigo_ibge, nome FROM MUNICIPIO WHERE uf_sigla=?",
+            (uf_sigla,)):
+        if normalizar_nome_texto(row["nome"]) == alvo:
+            return row["codigo_ibge"]
+    return None
+
+
 def resolver_uf_municipio(conn, uf_sigla, municipio_nome, municipio_ibge):
-    """Resolve/cria municipio e retorna (uf_sigla, municipio_id)."""
+    """Resolve/cria municipio e retorna (uf_sigla, municipio_id).
+
+    Ordem de resolucao:
+      1. codigo IBGE publicado pela fonte (com cria se ainda nao existir);
+      2. (uf_sigla, nome) normalizado contra MUNICIPIO (carga oficial IBGE).
+
+    Fontes mandam quase sempre o *nome* e raramente o codigo; por isso o
+    passo 2 e o que evita perder o municipio. Nunca insere municipio com
+    codigo_ibge NULL: sem correspondencia oficial fica NULL (e fica no log).
+    """
     uf_sigla = (uf_sigla or "").strip().upper() or None
     if uf_sigla:
         row = dbmod.query_one(conn, "SELECT sigla FROM UF WHERE sigla=?",
@@ -149,6 +195,13 @@ def resolver_uf_municipio(conn, uf_sigla, municipio_nome, municipio_ibge):
                 "nome": municipio_nome,
             })
             municipio_id = municipio_ibge
+    # sem codigo IBGE (ou codigo desconhecido): casar pelo nome oficial
+    if municipio_id is None and municipio_nome:
+        municipio_id = buscar_municipio_por_nome(conn, uf_sigla,
+                                                 municipio_nome)
+        if municipio_id is None:
+            log.debug("municipio nao resolvido (uf=%r nome=%r): fica NULL",
+                      uf_sigla, municipio_nome)
     return uf_sigla, municipio_id
 
 
