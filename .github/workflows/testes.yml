@@ -33,6 +33,11 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Versão do Python
         run: python -V
+      - name: Dependências do sistema (poppler)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq poppler-utils
+          pdftotext -v 2>&1 | head -1
       - name: Sintaxe (compileall)
         run: python -m compileall -q core coletor tools web tests
       - name: Suíte de testes
