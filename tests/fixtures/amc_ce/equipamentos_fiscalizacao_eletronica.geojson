@@ -1,0 +1,107 @@
+{
+ "type": "FeatureCollection",
+ "crs": {
+  "type": "name",
+  "properties": {
+   "name": "urn:ogc:def:crs:EPSG::4326"
+  }
+ },
+ "features": [
+  {
+   "type": "Feature",
+   "id": "vw_dados_abertos_equip_fisc_eletronica_2026.fid--71d14e69_1a1277b01f0_-7414",
+   "geometry": {
+    "type": "MultiPoint",
+    "coordinates": [
+     [
+      -38.547493,
+      -3.73205
+     ]
+    ]
+   },
+   "geometry_name": "the_geom",
+   "properties": {
+    "id": 1,
+    "sitio": "06702001",
+    "status": "Ativo",
+    "finalidade": "Fiscalização",
+    "endereco": "Av. Bezerra de Menezes, 306 [L-O]",
+    "viasentido": "Av. Bezerra de Menezes [L-O]",
+    "bairro": "Farias Brito",
+    "regional": "SR 3",
+    "dataativacao": 20221116.0,
+    "datadesativacao": null,
+    "faixas_via": 4,
+    "faixas_fis": 4,
+    "temcontagem": "S",
+    "fonte": "Autarquia Municipal de Trânsito e Cidadania - AMC",
+    "ano": 2026,
+    "src_codif": "SIRGAS 2000 - UTM Zone 24S (EPSG: 31984); Codificação: UTF-8"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "vw_dados_abertos_equip_fisc_eletronica_2026.fid--71d14e69_1a1277b01f0_-7413",
+   "geometry": {
+    "type": "MultiPoint",
+    "coordinates": [
+     [
+      -38.548628,
+      -3.73249
+     ]
+    ]
+   },
+   "geometry_name": "the_geom",
+   "properties": {
+    "id": 2,
+    "sitio": "06702002",
+    "status": "Ativo",
+    "finalidade": "Fiscalização",
+    "endereco": "Av. Bezerra de Menezes, 435 [O-L]",
+    "viasentido": "Av. Bezerra de Menezes [O-L]",
+    "bairro": "Parque Araxá",
+    "regional": "SR 3",
+    "dataativacao": 20221206.0,
+    "datadesativacao": null,
+    "faixas_via": 4,
+    "faixas_fis": 4,
+    "temcontagem": "S",
+    "fonte": "Autarquia Municipal de Trânsito e Cidadania - AMC",
+    "ano": 2026,
+    "src_codif": "SIRGAS 2000 - UTM Zone 24S (EPSG: 31984); Codificação: UTF-8"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "vw_dados_abertos_equip_fisc_eletronica_2026.fid--71d14e69_1a1277b01f0_-7412",
+   "geometry": {
+    "type": "MultiPoint",
+    "coordinates": [
+     [
+      -38.551894,
+      -3.73294
+     ]
+    ]
+   },
+   "geometry_name": "the_geom",
+   "properties": {
+    "id": 3,
+    "sitio": "06702003",
+    "status": "Ativo",
+    "finalidade": "Fiscalização",
+    "endereco": "Av. Bezerra de Menezes x R. Padre Anchieta [L-O]",
+    "viasentido": "Av. Bezerra de Menezes [L-O]",
+    "bairro": "São Gerardo",
+    "regional": "SR 3",
+    "dataativacao": 20220926.0,
+    "datadesativacao": null,
+    "faixas_via": 4,
+    "faixas_fis": 4,
+    "temcontagem": "S",
+    "fonte": "Autarquia Municipal de Trânsito e Cidadania - AMC",
+    "ano": 2026,
+    "src_codif": "SIRGAS 2000 - UTM Zone 24S (EPSG: 31984); Codificação: UTF-8"
+   }
+  }
+ ]
+}

@@ -1,0 +1,1152 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document id="root_doc">
+<Schema name="radaresestaticos2024" id="radaresestaticos2024">
+	<SimpleField name="UOE" type="string"></SimpleField>
+	<SimpleField name="Radar" type="string"></SimpleField>
+	<SimpleField name="Rodovia" type="string"></SimpleField>
+	<SimpleField name="Km" type="float"></SimpleField>
+	<SimpleField name="LATITUDE" type="float"></SimpleField>
+	<SimpleField name="LONGITUDE" type="float"></SimpleField>
+	<SimpleField name="F7" type="string"></SimpleField>
+	<SimpleField name="F8" type="string"></SimpleField>
+</Schema>
+<Folder><name>radaresestaticos2024</name>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">4ªCIA</SimpleData>
+		<SimpleData name="Radar">TC010657</SimpleData>
+		<SimpleData name="Rodovia">BA210</SimpleData>
+		<SimpleData name="Km">381.000000</SimpleData>
+		<SimpleData name="LATITUDE">-9.403211</SimpleData>
+		<SimpleData name="LONGITUDE">-40.356365</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.356365,-9.403211</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">4ªCIA</SimpleData>
+		<SimpleData name="Radar">TC010657</SimpleData>
+		<SimpleData name="Rodovia">BA210</SimpleData>
+		<SimpleData name="Km">384.000000</SimpleData>
+		<SimpleData name="LATITUDE">-9.414060</SimpleData>
+		<SimpleData name="LONGITUDE">-40.384045</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.384045,-9.41406</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">4ªCIA</SimpleData>
+		<SimpleData name="Radar">TC010657</SimpleData>
+		<SimpleData name="Rodovia">BA210</SimpleData>
+		<SimpleData name="Km">390.000000</SimpleData>
+		<SimpleData name="LATITUDE">-9.424853</SimpleData>
+		<SimpleData name="LONGITUDE">-40.443461</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.443461,-9.424853</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">4ªCIA</SimpleData>
+		<SimpleData name="Radar">TC010657</SimpleData>
+		<SimpleData name="Rodovia">BA210</SimpleData>
+		<SimpleData name="Km">393.000000</SimpleData>
+		<SimpleData name="LATITUDE">-9.430465</SimpleData>
+		<SimpleData name="LONGITUDE">-40.470316</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.470316,-9.430465</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">4ªCIA</SimpleData>
+		<SimpleData name="Radar">TC010657</SimpleData>
+		<SimpleData name="Rodovia">BA210</SimpleData>
+		<SimpleData name="Km">394.000000</SimpleData>
+		<SimpleData name="LATITUDE">-9.435078</SimpleData>
+		<SimpleData name="LONGITUDE">-40.481024</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.481024,-9.435078</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">4ªCIA</SimpleData>
+		<SimpleData name="Radar">TC010657</SimpleData>
+		<SimpleData name="Rodovia">BA210</SimpleData>
+		<SimpleData name="Km">395.000000</SimpleData>
+		<SimpleData name="LATITUDE">-9.439660</SimpleData>
+		<SimpleData name="LONGITUDE">-40.484013</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.484013,-9.43966</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">4ªCIA</SimpleData>
+		<SimpleData name="Radar">TC010657</SimpleData>
+		<SimpleData name="Rodovia">BA210</SimpleData>
+		<SimpleData name="Km">401.000000</SimpleData>
+		<SimpleData name="LATITUDE">-9.450890</SimpleData>
+		<SimpleData name="LONGITUDE">-40.534018</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.534018,-9.45089</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">4ªCIA</SimpleData>
+		<SimpleData name="Radar">TC010657</SimpleData>
+		<SimpleData name="Rodovia">BA210</SimpleData>
+		<SimpleData name="Km">403.000000</SimpleData>
+		<SimpleData name="LATITUDE">-9.468801</SimpleData>
+		<SimpleData name="LONGITUDE">-40.543020</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.54302,-9.468801</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">4ªCIA</SimpleData>
+		<SimpleData name="Radar">TC010657</SimpleData>
+		<SimpleData name="Rodovia">BA210</SimpleData>
+		<SimpleData name="Km">410.000000</SimpleData>
+		<SimpleData name="LATITUDE">-9.522301</SimpleData>
+		<SimpleData name="LONGITUDE">-40.572476</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.572476,-9.522301</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">5ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011130</SimpleData>
+		<SimpleData name="Rodovia">BA046</SimpleData>
+		<SimpleData name="Km">25.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.977222</SimpleData>
+		<SimpleData name="LONGITUDE">-39.212500</SimpleData>
+		<SimpleData name="F7">12º58’38”</SimpleData>
+		<SimpleData name="F8">39º12’45”</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.2125,-12.9772222222222</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">5ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011130</SimpleData>
+		<SimpleData name="Rodovia">BA001</SimpleData>
+		<SimpleData name="Km">19.000000</SimpleData>
+		<SimpleData name="LATITUDE">-13.063333</SimpleData>
+		<SimpleData name="LONGITUDE">-38.721667</SimpleData>
+		<SimpleData name="F7">13º3’48”</SimpleData>
+		<SimpleData name="F8">38º43’18”</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-38.7216666666667,-13.0633333333333</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">1ªCIA</SimpleData>
+		<SimpleData name="Radar">TC010655</SimpleData>
+		<SimpleData name="Rodovia">BA099</SimpleData>
+		<SimpleData name="Km">21.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.478869</SimpleData>
+		<SimpleData name="LONGITUDE">-38.121014</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-38.12101448,-12.4788692</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">1ªCIA</SimpleData>
+		<SimpleData name="Radar">TC010655</SimpleData>
+		<SimpleData name="Rodovia">BA099</SimpleData>
+		<SimpleData name="Km">22.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.463073</SimpleData>
+		<SimpleData name="LONGITUDE">-38.114288</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-38.1142882,-12.46307272</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">1ªCIA</SimpleData>
+		<SimpleData name="Radar">TC010655</SimpleData>
+		<SimpleData name="Rodovia">BA099</SimpleData>
+		<SimpleData name="Km">28.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.449064</SimpleData>
+		<SimpleData name="LONGITUDE">-38.949514</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-38.9495144,-12.4490636</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">1ªCIA</SimpleData>
+		<SimpleData name="Radar">TC010655</SimpleData>
+		<SimpleData name="Rodovia">BA099</SimpleData>
+		<SimpleData name="Km">39.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.404879</SimpleData>
+		<SimpleData name="LONGITUDE">-38.545258</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-38.545258,-12.4048792</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">1ªCIA</SimpleData>
+		<SimpleData name="Radar">TC010655</SimpleData>
+		<SimpleData name="Rodovia">BA099</SimpleData>
+		<SimpleData name="Km">45.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.374023</SimpleData>
+		<SimpleData name="LONGITUDE">-38.347707</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-38.3477072,-12.37402348</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">1ªCIA</SimpleData>
+		<SimpleData name="Radar">TC010655</SimpleData>
+		<SimpleData name="Rodovia">BA099</SimpleData>
+		<SimpleData name="Km">42.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.385164</SimpleData>
+		<SimpleData name="LONGITUDE">-38.447586</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-38.447586,-12.38516408</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BR324</SimpleData>
+		<SimpleData name="Km">297.000000</SimpleData>
+		<SimpleData name="LATITUDE">-11.184535</SimpleData>
+		<SimpleData name="LONGITUDE">-40.510329</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.510329,-11.184535</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BR324</SimpleData>
+		<SimpleData name="Km">300.000000</SimpleData>
+		<SimpleData name="LATITUDE">-11.205472</SimpleData>
+		<SimpleData name="LONGITUDE">-40.814749</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.814749,-11.2054717</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BR324</SimpleData>
+		<SimpleData name="Km">301.000000</SimpleData>
+		<SimpleData name="LATITUDE">-11.208492</SimpleData>
+		<SimpleData name="LONGITUDE">-40.467873</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.467873,-11.2084921</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BR324</SimpleData>
+		<SimpleData name="Km">307.000000</SimpleData>
+		<SimpleData name="LATITUDE">-11.202352</SimpleData>
+		<SimpleData name="LONGITUDE">-40.408076</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.4080759,-11.2023518</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BR324</SimpleData>
+		<SimpleData name="Km">329.000000</SimpleData>
+		<SimpleData name="LATITUDE">-11.252334</SimpleData>
+		<SimpleData name="LONGITUDE">-40.318526</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.3185257,-11.2523336</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BR324</SimpleData>
+		<SimpleData name="Km">284.000000</SimpleData>
+		<SimpleData name="LATITUDE">-11.146159</SimpleData>
+		<SimpleData name="LONGITUDE">-40.501769</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.501769,-11.1461591</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BR324</SimpleData>
+		<SimpleData name="Km">281.000000</SimpleData>
+		<SimpleData name="LATITUDE">-11.125577</SimpleData>
+		<SimpleData name="LONGITUDE">-40.616673</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.616673,-11.125577</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BR324</SimpleData>
+		<SimpleData name="Km">270.000000</SimpleData>
+		<SimpleData name="LATITUDE">-11.083277</SimpleData>
+		<SimpleData name="LONGITUDE">-40.698251</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.698251,-11.083277</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BR324</SimpleData>
+		<SimpleData name="Km">263.000000</SimpleData>
+		<SimpleData name="LATITUDE">-11.048855</SimpleData>
+		<SimpleData name="LONGITUDE">-40.773264</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.773264,-11.048855</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BR324</SimpleData>
+		<SimpleData name="Km">248.000000</SimpleData>
+		<SimpleData name="LATITUDE">-11.055560</SimpleData>
+		<SimpleData name="LONGITUDE">-40.879661</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.879661,-11.05556</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BR324</SimpleData>
+		<SimpleData name="Km">246.000000</SimpleData>
+		<SimpleData name="LATITUDE">-10.984966</SimpleData>
+		<SimpleData name="LONGITUDE">-40.947318</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.947318,-10.984966</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BA144</SimpleData>
+		<SimpleData name="Km">251.000000</SimpleData>
+		<SimpleData name="LATITUDE">-11.664233</SimpleData>
+		<SimpleData name="LONGITUDE">-40.797922</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.797922,-11.664233</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BA144</SimpleData>
+		<SimpleData name="Km">273.000000</SimpleData>
+		<SimpleData name="LATITUDE">-11.211498</SimpleData>
+		<SimpleData name="LONGITUDE">-40.921898</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.9218979,-11.2114982</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BA120</SimpleData>
+		<SimpleData name="Km">253.000000</SimpleData>
+		<SimpleData name="LATITUDE">-10.355000</SimpleData>
+		<SimpleData name="LONGITUDE">-39.265500</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.2655,-10.355</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BA120</SimpleData>
+		<SimpleData name="Km">273.000000</SimpleData>
+		<SimpleData name="LATITUDE">-10.464300</SimpleData>
+		<SimpleData name="LONGITUDE">-39.334500</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.3345,-10.4643</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BA381</SimpleData>
+		<SimpleData name="Km">76.000000</SimpleData>
+		<SimpleData name="LATITUDE">-10.464300</SimpleData>
+		<SimpleData name="LONGITUDE">-39.334300</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.3343,-10.4643</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BA052</SimpleData>
+		<SimpleData name="Km">274.000000</SimpleData>
+		<SimpleData name="LATITUDE">-11.532739</SimpleData>
+		<SimpleData name="LONGITUDE">-41.195190</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-41.19519,-11.532739</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BA052</SimpleData>
+		<SimpleData name="Km">307.000000</SimpleData>
+		<SimpleData name="LATITUDE">-11.531925</SimpleData>
+		<SimpleData name="LONGITUDE">-41.197956</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-41.197956,-11.531925</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BA052</SimpleData>
+		<SimpleData name="Km">257.000000</SimpleData>
+		<SimpleData name="LATITUDE">-11.570743</SimpleData>
+		<SimpleData name="LONGITUDE">-41.126387</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-41.126387,-11.570743</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BA144</SimpleData>
+		<SimpleData name="Km">326.000000</SimpleData>
+		<SimpleData name="LATITUDE">-11.616831</SimpleData>
+		<SimpleData name="LONGITUDE">-41.160011</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-41.160011,-11.616831</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BA144</SimpleData>
+		<SimpleData name="Km">311.000000</SimpleData>
+		<SimpleData name="LATITUDE">-11.485214</SimpleData>
+		<SimpleData name="LONGITUDE">-41.094248</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-41.094248,-11.485214</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BA131</SimpleData>
+		<SimpleData name="Km">13.000000</SimpleData>
+		<SimpleData name="LATITUDE">-10.520991</SimpleData>
+		<SimpleData name="LONGITUDE">-40.232883</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.232883,-10.520991</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BA131</SimpleData>
+		<SimpleData name="Km">20.000000</SimpleData>
+		<SimpleData name="LATITUDE">-10.562145</SimpleData>
+		<SimpleData name="LONGITUDE">-40.268803</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.268803,-10.562145</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">2ªCIA</SimpleData>
+		<SimpleData name="Radar">TC011141</SimpleData>
+		<SimpleData name="Rodovia">BA220</SimpleData>
+		<SimpleData name="Km">319.000000</SimpleData>
+		<SimpleData name="LATITUDE">-10.557079</SimpleData>
+		<SimpleData name="LONGITUDE">-40.282339</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.282339,-10.557079</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Brumado</SimpleData>
+		<SimpleData name="Radar">TC010657</SimpleData>
+		<SimpleData name="Rodovia">BA262</SimpleData>
+		<SimpleData name="Km">442.000000</SimpleData>
+		<SimpleData name="LATITUDE">-14.227394</SimpleData>
+		<SimpleData name="LONGITUDE">-41.636205</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-41.636205,-14.227394</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Brumado</SimpleData>
+		<SimpleData name="Radar">TC010657</SimpleData>
+		<SimpleData name="Rodovia">BR407</SimpleData>
+		<SimpleData name="Km">640.000000</SimpleData>
+		<SimpleData name="LATITUDE">-14.101436</SimpleData>
+		<SimpleData name="LONGITUDE">-41.194671</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-41.194671,-14.101436</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Brumado</SimpleData>
+		<SimpleData name="Radar">TC010657</SimpleData>
+		<SimpleData name="Rodovia">BA263</SimpleData>
+		<SimpleData name="Km">85.000000</SimpleData>
+		<SimpleData name="LATITUDE">-14.969061</SimpleData>
+		<SimpleData name="LONGITUDE">-40.821473</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.821473,-14.969061</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Brumado</SimpleData>
+		<SimpleData name="Radar">TC010657</SimpleData>
+		<SimpleData name="Rodovia">BA262</SimpleData>
+		<SimpleData name="Km">321.000000</SimpleData>
+		<SimpleData name="LATITUDE">-14.835868</SimpleData>
+		<SimpleData name="LONGITUDE">-40.951693</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.951693,-14.835868</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011131</SimpleData>
+		<SimpleData name="Rodovia">BA001</SimpleData>
+		<SimpleData name="Km">239.000000</SimpleData>
+		<SimpleData name="LATITUDE">-14.392758</SimpleData>
+		<SimpleData name="LONGITUDE">-39.035669</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.035669,-14.392758</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011131</SimpleData>
+		<SimpleData name="Rodovia">BA001</SimpleData>
+		<SimpleData name="Km">278.000000</SimpleData>
+		<SimpleData name="LATITUDE">-14.656474</SimpleData>
+		<SimpleData name="LONGITUDE">-39.067762</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.067762,-14.656474</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011131</SimpleData>
+		<SimpleData name="Rodovia">BA001</SimpleData>
+		<SimpleData name="Km">296.000000</SimpleData>
+		<SimpleData name="LATITUDE">-14.839309</SimpleData>
+		<SimpleData name="LONGITUDE">-39.025885</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.025885,-14.839309</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011131</SimpleData>
+		<SimpleData name="Rodovia">BA001</SimpleData>
+		<SimpleData name="Km">402.000000</SimpleData>
+		<SimpleData name="LATITUDE">-15.668517</SimpleData>
+		<SimpleData name="LONGITUDE">-38.968382</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-38.968382,-15.668517</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011131</SimpleData>
+		<SimpleData name="Rodovia">BA262</SimpleData>
+		<SimpleData name="Km">2.000000</SimpleData>
+		<SimpleData name="LATITUDE">-14.672504</SimpleData>
+		<SimpleData name="LONGITUDE">-39.393236</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.393236,-14.672504</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011131</SimpleData>
+		<SimpleData name="Rodovia">BA262</SimpleData>
+		<SimpleData name="Km">34.000000</SimpleData>
+		<SimpleData name="LATITUDE">-14.355240</SimpleData>
+		<SimpleData name="LONGITUDE">-39.163220</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.16322,-14.35524</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011131</SimpleData>
+		<SimpleData name="Rodovia">BA654</SimpleData>
+		<SimpleData name="Km">5.000000</SimpleData>
+		<SimpleData name="LATITUDE">-14.308779</SimpleData>
+		<SimpleData name="LONGITUDE">-39.020668</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.020668,-14.308779</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011131</SimpleData>
+		<SimpleData name="Rodovia">BA649</SimpleData>
+		<SimpleData name="Km">17.000000</SimpleData>
+		<SimpleData name="LATITUDE">-14.791878</SimpleData>
+		<SimpleData name="LONGITUDE">-39.089085</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.089085,-14.791878</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011131</SimpleData>
+		<SimpleData name="Rodovia">BA963</SimpleData>
+		<SimpleData name="Km">3.000000</SimpleData>
+		<SimpleData name="LATITUDE">-14.788288</SimpleData>
+		<SimpleData name="LONGITUDE">-39.253489</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.253489,-14.788288</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011131</SimpleData>
+		<SimpleData name="Rodovia">BA963</SimpleData>
+		<SimpleData name="Km">4.000000</SimpleData>
+		<SimpleData name="LATITUDE">-14.788259</SimpleData>
+		<SimpleData name="LONGITUDE">-39.249426</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.249426,-14.788259</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011131</SimpleData>
+		<SimpleData name="Rodovia">BA963</SimpleData>
+		<SimpleData name="Km">5.000000</SimpleData>
+		<SimpleData name="LATITUDE">-14.786148</SimpleData>
+		<SimpleData name="LONGITUDE">-39.245656</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.245656,-14.786148</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011131</SimpleData>
+		<SimpleData name="Rodovia">BA964</SimpleData>
+		<SimpleData name="Km">1.000000</SimpleData>
+		<SimpleData name="LATITUDE">-14.786079</SimpleData>
+		<SimpleData name="LONGITUDE">-39.254987</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.254987,-14.786079</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011133</SimpleData>
+		<SimpleData name="Rodovia">BA026</SimpleData>
+		<SimpleData name="Km">234.000000</SimpleData>
+		<SimpleData name="LATITUDE">-13.415800</SimpleData>
+		<SimpleData name="LONGITUDE">-40.441621</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.441621,-13.4158</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011133</SimpleData>
+		<SimpleData name="Rodovia">BA026</SimpleData>
+		<SimpleData name="Km">257.000000</SimpleData>
+		<SimpleData name="LATITUDE">-13.525940</SimpleData>
+		<SimpleData name="LONGITUDE">-40.577785</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.577785,-13.52594</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011133</SimpleData>
+		<SimpleData name="Rodovia">BA026</SimpleData>
+		<SimpleData name="Km">266.000000</SimpleData>
+		<SimpleData name="LATITUDE">-13.536280</SimpleData>
+		<SimpleData name="LONGITUDE">-40.642845</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.642845,-13.53628</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011133</SimpleData>
+		<SimpleData name="Rodovia">BA120</SimpleData>
+		<SimpleData name="Km">815.000000</SimpleData>
+		<SimpleData name="LATITUDE">-14.027306</SimpleData>
+		<SimpleData name="LONGITUDE">-39.603350</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.60335,-14.027306</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011133</SimpleData>
+		<SimpleData name="Rodovia">BA130</SimpleData>
+		<SimpleData name="Km">28.000000</SimpleData>
+		<SimpleData name="LATITUDE">-15.162816</SimpleData>
+		<SimpleData name="LONGITUDE">-40.300445</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.300445,-15.162816</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011133</SimpleData>
+		<SimpleData name="Rodovia">BA130</SimpleData>
+		<SimpleData name="Km">613.000000</SimpleData>
+		<SimpleData name="LATITUDE">-15.053918</SimpleData>
+		<SimpleData name="LONGITUDE">-40.021685</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.021685,-15.053918</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011133</SimpleData>
+		<SimpleData name="Rodovia">BA250</SimpleData>
+		<SimpleData name="Km">210.000000</SimpleData>
+		<SimpleData name="LATITUDE">-13.527978</SimpleData>
+		<SimpleData name="LONGITUDE">-40.125199</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.125199,-13.527978</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011133</SimpleData>
+		<SimpleData name="Rodovia">BA250</SimpleData>
+		<SimpleData name="Km">227.000000</SimpleData>
+		<SimpleData name="LATITUDE">-13.477007</SimpleData>
+		<SimpleData name="LONGITUDE">-40.216206</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.216206,-13.477007</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011133</SimpleData>
+		<SimpleData name="Rodovia">BA250</SimpleData>
+		<SimpleData name="Km">239.000000</SimpleData>
+		<SimpleData name="LATITUDE">-13.460230</SimpleData>
+		<SimpleData name="LONGITUDE">-40.349456</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.349456,-13.46023</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011133</SimpleData>
+		<SimpleData name="Rodovia">BA263</SimpleData>
+		<SimpleData name="Km">17.000000</SimpleData>
+		<SimpleData name="LATITUDE">-15.154949</SimpleData>
+		<SimpleData name="LONGITUDE">40.245416</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>40.245416,-15.154949</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011133</SimpleData>
+		<SimpleData name="Rodovia">BA263</SimpleData>
+		<SimpleData name="Km">20.000000</SimpleData>
+		<SimpleData name="LATITUDE">-15.164862</SimpleData>
+		<SimpleData name="LONGITUDE">40.263087</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>40.263087,-15.164862</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011133</SimpleData>
+		<SimpleData name="Rodovia">BA650</SimpleData>
+		<SimpleData name="Km">47.000000</SimpleData>
+		<SimpleData name="LATITUDE">-14.156340</SimpleData>
+		<SimpleData name="LONGITUDE">-39.758546</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.758546,-14.15634</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011133</SimpleData>
+		<SimpleData name="Rodovia">BA650</SimpleData>
+		<SimpleData name="Km">39.000000</SimpleData>
+		<SimpleData name="LATITUDE">-14.116049</SimpleData>
+		<SimpleData name="LONGITUDE">-39.715827</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.715827,-14.116049</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011133</SimpleData>
+		<SimpleData name="Rodovia">BA330</SimpleData>
+		<SimpleData name="Km">774.000000</SimpleData>
+		<SimpleData name="LATITUDE">-13.866034</SimpleData>
+		<SimpleData name="LONGITUDE">-40.154084</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.154084,-13.866034</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011136</SimpleData>
+		<SimpleData name="Rodovia">BA290</SimpleData>
+		<SimpleData name="Km">30.000000</SimpleData>
+		<SimpleData name="LATITUDE">-17.301565</SimpleData>
+		<SimpleData name="LONGITUDE">-39.221597</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.221597,-17.301565</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011136</SimpleData>
+		<SimpleData name="Rodovia">BA290</SimpleData>
+		<SimpleData name="Km">6.000000</SimpleData>
+		<SimpleData name="LATITUDE">-17.520075</SimpleData>
+		<SimpleData name="LONGITUDE">-39.650937</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.650937,-17.520075</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011136</SimpleData>
+		<SimpleData name="Rodovia">BA290</SimpleData>
+		<SimpleData name="Km">75.000000</SimpleData>
+		<SimpleData name="LATITUDE">-17.465880</SimpleData>
+		<SimpleData name="LONGITUDE">-0.000040</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-0.000040094752,-17.46588</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011136</SimpleData>
+		<SimpleData name="Rodovia">BA290</SimpleData>
+		<SimpleData name="Km">120.000000</SimpleData>
+		<SimpleData name="LATITUDE">-17.425447</SimpleData>
+		<SimpleData name="LONGITUDE">-40.210715</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-40.210715,-17.425447</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011136</SimpleData>
+		<SimpleData name="Rodovia">BA001</SimpleData>
+		<SimpleData name="Km">552.000000</SimpleData>
+		<SimpleData name="LATITUDE">-16.423625</SimpleData>
+		<SimpleData name="LONGITUDE">-39.237667</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.237667,-16.423625</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011136</SimpleData>
+		<SimpleData name="Rodovia">BA001</SimpleData>
+		<SimpleData name="Km">566.000000</SimpleData>
+		<SimpleData name="LATITUDE">-16.489186</SimpleData>
+		<SimpleData name="LONGITUDE">-39.144603</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.144603,-16.489186</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011136</SimpleData>
+		<SimpleData name="Rodovia">BA987</SimpleData>
+		<SimpleData name="Km">3.000000</SimpleData>
+		<SimpleData name="LATITUDE">-16.604176</SimpleData>
+		<SimpleData name="LONGITUDE">-39.134973</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.134973,-16.604176</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Itabuna</SimpleData>
+		<SimpleData name="Radar">TC011136</SimpleData>
+		<SimpleData name="Rodovia">BA986</SimpleData>
+		<SimpleData name="Km">7.000000</SimpleData>
+		<SimpleData name="LATITUDE">-16.480624</SimpleData>
+		<SimpleData name="LONGITUDE">-39.107050</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.10705,-16.480624</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">3ªCIA</SimpleData>
+		<SimpleData name="Rodovia">BA502</SimpleData>
+		<SimpleData name="Km">7.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.334810</SimpleData>
+		<SimpleData name="LONGITUDE">38.956010</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>38.95601,-12.33481</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">3ªCIA</SimpleData>
+		<SimpleData name="Rodovia">BA502</SimpleData>
+		<SimpleData name="Km">13.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.400320</SimpleData>
+		<SimpleData name="LONGITUDE">38.955470</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>38.95547,-12.40032</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">3ªCIA</SimpleData>
+		<SimpleData name="Rodovia">BA502</SimpleData>
+		<SimpleData name="Km">21.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.449840</SimpleData>
+		<SimpleData name="LONGITUDE">38.987070</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>38.98707,-12.44984</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">3ªCIA</SimpleData>
+		<SimpleData name="Rodovia">BA513</SimpleData>
+		<SimpleData name="Km">1.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.532356</SimpleData>
+		<SimpleData name="LONGITUDE">-38.605341</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-38.6053408,-12.5323562</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">3ªCIA</SimpleData>
+		<SimpleData name="Rodovia">BA513</SimpleData>
+		<SimpleData name="Km">30.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.575540</SimpleData>
+		<SimpleData name="LONGITUDE">-38.794780</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-38.79478,-12.57554</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">3ªCIA</SimpleData>
+		<SimpleData name="Rodovia">BA513</SimpleData>
+		<SimpleData name="Km">33.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.558908</SimpleData>
+		<SimpleData name="LONGITUDE">-38.813876</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-38.8138765,-12.5589075</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">3ªCIA</SimpleData>
+		<SimpleData name="Rodovia">BA513</SimpleData>
+		<SimpleData name="Km">37.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.544293</SimpleData>
+		<SimpleData name="LONGITUDE">-38.844194</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-38.844194,-12.544293</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">3ªCIA</SimpleData>
+		<SimpleData name="Rodovia">BA878</SimpleData>
+		<SimpleData name="Km">5.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.625860</SimpleData>
+		<SimpleData name="LONGITUDE">38.754020</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>38.75402,-12.62586</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">3ªCIA</SimpleData>
+		<SimpleData name="Rodovia">BA233</SimpleData>
+		<SimpleData name="Km">189.000000</SimpleData>
+		<SimpleData name="LATITUDE">-11.638169</SimpleData>
+		<SimpleData name="LONGITUDE">-38.921474</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-38.921474,-11.638169</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">3ªCIA</SimpleData>
+		<SimpleData name="Rodovia">BA233</SimpleData>
+		<SimpleData name="Km">194.000000</SimpleData>
+		<SimpleData name="LATITUDE">-11.652107</SimpleData>
+		<SimpleData name="LONGITUDE">-38.967304</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-38.967304,-11.652107</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">3ªCIA</SimpleData>
+		<SimpleData name="Rodovia">BA120</SimpleData>
+		<SimpleData name="Km">394.000000</SimpleData>
+		<SimpleData name="LATITUDE">11.600190</SimpleData>
+		<SimpleData name="LONGITUDE">-39.324730</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.32473,11.60019</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">3ªCIA</SimpleData>
+		<SimpleData name="Rodovia">BA120</SimpleData>
+		<SimpleData name="Km">399.000000</SimpleData>
+		<SimpleData name="LATITUDE">11.633252</SimpleData>
+		<SimpleData name="LONGITUDE">-39.351871</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.351871,11.633252</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">3ªCIA</SimpleData>
+		<SimpleData name="Rodovia">BA409</SimpleData>
+		<SimpleData name="Km">18.000000</SimpleData>
+		<SimpleData name="LATITUDE">-11.616480</SimpleData>
+		<SimpleData name="LONGITUDE">-39.154133</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.154133,-11.61648</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">3ªCIA</SimpleData>
+		<SimpleData name="Rodovia">BA052</SimpleData>
+		<SimpleData name="Km">9.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.242679</SimpleData>
+		<SimpleData name="LONGITUDE">-39.089813</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.089813,-12.242679</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">3ªCIA</SimpleData>
+		<SimpleData name="Rodovia">BA052</SimpleData>
+		<SimpleData name="Km">45.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.182344</SimpleData>
+		<SimpleData name="LONGITUDE">-39.385801</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.385801,-12.182344</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">3ªCIA</SimpleData>
+		<SimpleData name="Rodovia">BA052</SimpleData>
+		<SimpleData name="Km">68.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.195705</SimpleData>
+		<SimpleData name="LONGITUDE">-39.532264</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.5322639,-12.1957049</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">3ªCIA</SimpleData>
+		<SimpleData name="Rodovia">BA052</SimpleData>
+		<SimpleData name="Km">88.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.152388</SimpleData>
+		<SimpleData name="LONGITUDE">-39.762582</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.762582,-12.152388</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">3ªCIA</SimpleData>
+		<SimpleData name="Rodovia">BA233</SimpleData>
+		<SimpleData name="Km">328.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.182698</SimpleData>
+		<SimpleData name="LONGITUDE">-39.761546</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-39.761546,-12.182698</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Barreiras</SimpleData>
+		<SimpleData name="Radar">TC011135</SimpleData>
+		<SimpleData name="Rodovia">BA447</SimpleData>
+		<SimpleData name="Km">4.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.087222</SimpleData>
+		<SimpleData name="LONGITUDE">-44.918611</SimpleData>
+		<SimpleData name="F7">12º5’14</SimpleData>
+		<SimpleData name="F8">44º55’7</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-44.9186111111111,-12.0872222222222</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Barreiras</SimpleData>
+		<SimpleData name="Radar">TC011135</SimpleData>
+		<SimpleData name="Rodovia">BA463</SimpleData>
+		<SimpleData name="Km">86.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.444900</SimpleData>
+		<SimpleData name="LONGITUDE">-45.120600</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-45.1206,-12.4449</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Barreiras</SimpleData>
+		<SimpleData name="Radar">TC011135</SimpleData>
+		<SimpleData name="Rodovia">BA583</SimpleData>
+		<SimpleData name="Km">68.000000</SimpleData>
+		<SimpleData name="LATITUDE">-13.378400</SimpleData>
+		<SimpleData name="LONGITUDE">-44.378800</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-44.3788,-13.3784</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Barreiras</SimpleData>
+		<SimpleData name="Radar">TC011135</SimpleData>
+		<SimpleData name="Rodovia">BA172</SimpleData>
+		<SimpleData name="Km">370.000000</SimpleData>
+		<SimpleData name="LATITUDE">-13.345800</SimpleData>
+		<SimpleData name="LONGITUDE">-44.155000</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-44.155,-13.3458</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Barreiras</SimpleData>
+		<SimpleData name="Radar">TC011135</SimpleData>
+		<SimpleData name="Rodovia">BA172</SimpleData>
+		<SimpleData name="Km">392.000000</SimpleData>
+		<SimpleData name="LATITUDE">-13.473400</SimpleData>
+		<SimpleData name="LONGITUDE">-44.236700</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-44.2367,-13.4734</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Barreiras</SimpleData>
+		<SimpleData name="Radar">TC011135</SimpleData>
+		<SimpleData name="Rodovia">BA459</SimpleData>
+		<SimpleData name="Km">154.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.022472</SimpleData>
+		<SimpleData name="LONGITUDE">-45.574500</SimpleData>
+		<SimpleData name="F7">12º01’20,9</SimpleData>
+		<SimpleData name="F8">45º34’28,2</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-45.5745,-12.0224722222222</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<ExtendedData><SchemaData schemaUrl="#radaresestaticos2024">
+		<SimpleData name="UOE">Barreiras</SimpleData>
+		<SimpleData name="Radar">TC011135</SimpleData>
+		<SimpleData name="Rodovia">BA460</SimpleData>
+		<SimpleData name="Km">49.000000</SimpleData>
+		<SimpleData name="LATITUDE">-12.070750</SimpleData>
+		<SimpleData name="LONGITUDE">-46.012556</SimpleData>
+		<SimpleData name="F7">12º04’14,7</SimpleData>
+		<SimpleData name="F8">46º00’45,2</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-46.0125555555556,-12.07075</coordinates></Point>
+  </Placemark>
+</Folder>
+</Document></kml>

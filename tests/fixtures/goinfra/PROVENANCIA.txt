@@ -1,0 +1,39 @@
+PROVENIENCIA DA AMOSTRA — GOINFRA / GO
+=====================================
+
+Fonte oficial (pagina)
+  URL pagina .......: https://goias.gov.br/goinfra/relatorio-de-equipamentos-de-monitoramento-da-goinfra/
+  Coletada em ......: 2026-10-10 (America/Sao_Paulo)
+  HTTP .............: 200 (curl -sSL -A "RadarBrasil/1.0")
+
+Arquivo publicado (PDF)
+  URL final ........: https://goias.gov.br/goinfra/wp-content/uploads/sites/77/2026/10/Lista_de_Equipamento_02_10_2026.xlsx-Equipamentos-Ativos.pdf
+  Data de emissao ..: 02/10/2026 (dentro do proprio PDF)
+  Bytes ............: 686104
+  Paginas ..........: 11 (A3, 1191 x 842 pts)
+  sha256 ...........: 59f337c619441cfe8e222b2309e3fd5f635c2895f0d731ed7e57408ca009b57e
+  Linhas de dados ..: 1047  (740 "LOMBADA ELET" + 307 "RADAR FIXO")
+
+Amostra recortada (este diretorio)
+  Arquivo ..........: goinfra_equipamentos_fixture.txt
+  sha256 ...........: 32d42a388965a802e75a4fa7ac5acc770f7ee15cae2da142106e1c7d0225f535
+  Conteudo .........: cabecalho real (linhas 0-7 do texto) + 20 linhas de dados
+                      recortadas VERBATIM do texto extraido do PDF acima.
+  Linhas incluídas .: 060L5R001 (linha do cabecalho),
+                      174L5R129 (as DUAS linhas: GO-050 e GO-174 = conflito),
+                      174L5R127, 174L5R125, 060L5R091, 060L5B058 (os 5 POIs),
+                      174L5R021/022/023 (GO-174 km 254+524 = coordenada divergente),
+                      010L3B185 (lat == lon), 070L4B031 / 070L4B041 (longitude
+                      positiva), 060L4B083 (complemento ausente),
+                      174L5R131 ("KM 255,530m" decimal), 524L2B011 ("0,001").
+
+Como o texto foi obtido
+  pdftotext -layout <pdf> -     (poppler-utils 25.03.0)
+  A extracao NAO altera o conteudo: as linhas recortadas sao copias exatas do
+  texto do relatorio oficial.
+
+Pagina HTML (fixture de descoberta)
+  Arquivo ..........: goinfra_pagina_fixture.html
+  Conteudo .........: recorte VERBATIM (ancoras <a href="...">) das URLs de
+                      arquivo publicadas na pagina oficial em 2026-10-10,
+                      para testar a escolha do relatorio mais recente sem rede.

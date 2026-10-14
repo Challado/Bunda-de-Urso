@@ -1,0 +1,90 @@
+{
+ "type": "FeatureCollection",
+ "name": "radar_15092026_2",
+ "crs": {
+  "type": "name",
+  "properties": {
+   "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+  }
+ },
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "F1": 1.0,
+    "ANO": 2026.0,
+    "TIPO": "RADAR",
+    "MARCA": "CONSILUX",
+    "MODELO": "CSC-II",
+    "COD__ORGAO": "FIGCT0005 / FIGCT0006",
+    "Nº_SERIE": "2100006",
+    "Nº_INMETR": 13854596.0,
+    "VELOCIDADE": "50km",
+    "MUNICIPIO": "SENHOR DO BONFIM",
+    "RODOVIA": "BA131",
+    "KM": "9+500m",
+    "LATITUDE": -10.5177,
+    "LONGITUDE": -40.2295
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -40.2295,
+     -10.5177
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "F1": 2.0,
+    "ANO": 2026.0,
+    "TIPO": "RADAR",
+    "MARCA": "CONSILUX",
+    "MODELO": "CSC-II",
+    "COD__ORGAO": "FIGCT0007 / FIGCT0008",
+    "Nº_SERIE": "2100008",
+    "Nº_INMETR": 13854597.0,
+    "VELOCIDADE": "60km",
+    "MUNICIPIO": "JACOBINA",
+    "RODOVIA": "BA144",
+    "KM": "248+250m",
+    "LATITUDE": -11.0527,
+    "LONGITUDE": -40.7861
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -40.7861,
+     -11.0527
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "F1": 3.0,
+    "ANO": 2026.0,
+    "TIPO": "RADAR",
+    "MARCA": "CONSILUX",
+    "MODELO": "CSC-II",
+    "COD__ORGAO": "FIGCT0009 / FIGCT0010",
+    "Nº_SERIE": "2100014",
+    "Nº_INMETR": 13854599.0,
+    "VELOCIDADE": "50km",
+    "MUNICIPIO": "ALCOBAÇA",
+    "RODOVIA": "BA290",
+    "KM": "13+500m",
+    "LATITUDE": -17.5285,
+    "LONGITUDE": -39.2871
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -39.2871,
+     -17.5285
+    ]
+   }
+  }
+ ]
+}
