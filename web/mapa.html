@@ -15,7 +15,8 @@
   #controles{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;padding:10px 16px;background:var(--cinza);border-bottom:1px solid var(--borda)}
   #controles label{display:flex;flex-direction:column;font-size:12px;color:#4a4a55;gap:2px}
   #controles input[type=number],#controles input[type=text]{padding:6px 8px;border:1px solid var(--borda);border-radius:6px;width:150px;font:inherit}
-  #controles input#raio{width:100px}
+  #controles input[type=range]{width:220px;padding:0;margin-top:6px;accent-color:var(--azul)}
+  #controles .raioVal{font-weight:600;color:var(--azul)}
   button{padding:7px 12px;border:0;border-radius:6px;background:var(--azul);color:#fff;font:inherit;cursor:pointer}
   button.sec{background:#5b6472}
   button:disabled{opacity:.55;cursor:default}
@@ -29,6 +30,18 @@
   th{background:var(--cinza);position:sticky;top:0}
   .pill{display:inline-block;background:#e8eef6;color:var(--azul);border-radius:10px;padding:1px 8px;font-size:12px}
   .aviso{background:#fff4e5;border:1px solid #ffd08a;border-radius:6px;padding:8px 10px;font-size:13px}
+  /* ---- festa: quando nao ha nenhum equipamento no raio ---- */
+  #festa{position:fixed;inset:0;z-index:10000;display:none;overflow:hidden;background:rgba(255,255,255,.82);cursor:pointer}
+  #festa.on{display:block}
+  #festa .msg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:2;text-align:center;padding:26px 34px;background:#fff;border:4px solid #ffcc00;border-radius:20px;box-shadow:0 12px 44px rgba(0,0,0,.22);max-width:92vw}
+  #festa .msg h2{margin:0 0 10px;font-size:32px;color:#178a3d}
+  #festa .msg p{margin:4px 0;font-size:16px;color:#2b2b33}
+  #festa .msg .feito{margin-top:14px;font-size:40px;letter-spacing:6px}
+  #festa .msg small{display:block;margin-top:10px;color:#888}
+  .balao{position:absolute;bottom:-90px;font-size:46px;animation:sobe linear forwards;will-change:transform}
+  @keyframes sobe{from{transform:translateY(0) rotate(-6deg)}to{transform:translateY(-125vh) rotate(14deg)}}
+  .confete{position:absolute;top:-24px;width:10px;height:16px;border-radius:2px;opacity:.92;animation:cai linear forwards;will-change:transform}
+  @keyframes cai{from{transform:translateY(0) rotate(0)}to{transform:translateY(115vh) rotate(760deg)}}
   .err{background:#fdecea;border:1px solid #f5b7b1;border-radius:6px;padding:8px 10px;font-size:13px}
   .vel{font-weight:600;color:var(--vermelho)}
   a{color:var(--azul)}
@@ -43,7 +56,9 @@
 <div id="controles">
   <label>Latitude<input id="lat" type="text" inputmode="decimal" placeholder="-17.625377"></label>
   <label>Longitude<input id="lon" type="text" inputmode="decimal" placeholder="-51.060863"></label>
-  <label>Raio (m)<input id="raio" type="number" min="50" max="50000" step="50" value="2000"></label>
+  <label class="raioBox">Raio: <span class="raioVal" id="raioVal">2,0 km</span>
+    <input id="raio" type="range" min="200" max="50000" step="100" value="2000" aria-label="raio em metros">
+  </label>
   <button id="btConsultar">Consultar</button>
   <button id="btLocal" class="sec">Usar minha localização</button>
   <label class="chk"><input type="checkbox" id="autoLocal"> buscar minha localização ao abrir</label>
@@ -52,6 +67,15 @@
 <div id="mapa"></div>
 <div id="barra">Informe as coordenadas ou use a localização do navegador.</div>
 <div id="resultado"></div>
+
+<div id="festa" role="dialog" aria-live="polite">
+  <div class="msg">
+    <h2>🎉 EBA! Nada por aqui!</h2>
+    <p></p>
+    <div class="feito">🎈 🎉 🥳 🎊 🎈</div>
+    <small>toque para fechar</small>
+  </div>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -66,11 +90,71 @@
   var camadaPts = L.layerGroup().addTo(map);
   var marcaEu = null;
 
+  // ---- festa: sem equipamento no raio = motivo de comemorar ----
+  var FESTA_EMOJIS = ["🎈","🎈","🎈","🎈","🎉","🎊","🥳","🎈","🎈"];
+  var FESTA_CORES  = ["#ff6b6b","#feca57","#48dbfb","#1dd1a1","#f368e0","#54a0ff","#ff9ff3"];
+  function festa(raio, cobertura){
+    var el = document.getElementById("festa");
+    if (!el) return;
+    var txt = "Nenhum equipamento de fiscalização num raio de <b>" + fmtRaio(raio) + "</b>.<br>";
+    if (cobertura === "sem_cobertura"){
+      el.querySelector(".msg h2").textContent = "🎈 Nada por aqui…";
+      txt += "Mas atenção: <b>esta região não tem fonte oficial cadastrada</b> — isso não garante que não exista radar.";
+    } else {
+      el.querySelector(".msg h2").textContent = "🎉 EBA! Nada por aqui!";
+      txt += "Olha que beleza — pode passar tranquilo!";
+    }
+    el.querySelector(".msg p").innerHTML = txt;
+    var antigos = el.querySelectorAll(".balao, .confete");
+    for (var k=0;k<antigos.length;k++) el.removeChild(antigos[k]);
+    for (var i=0;i<18;i++){
+      var b = document.createElement("div");
+      b.className = "balao";
+      b.textContent = FESTA_EMOJIS[i % FESTA_EMOJIS.length];
+      b.style.left = Math.round(Math.random()*95) + "%";
+      b.style.animationDuration = (4 + Math.random()*4).toFixed(1) + "s";
+      b.style.animationDelay = (Math.random()*1.8).toFixed(1) + "s";
+      el.appendChild(b);
+    }
+    for (var j=0;j<46;j++){
+      var c = document.createElement("div");
+      c.className = "confete";
+      c.style.left = Math.round(Math.random()*100) + "%";
+      c.style.background = FESTA_CORES[j % FESTA_CORES.length];
+      c.style.animationDuration = (2.6 + Math.random()*3).toFixed(1) + "s";
+      c.style.animationDelay = (Math.random()*2.4).toFixed(1) + "s";
+      el.appendChild(c);
+    }
+    el.classList.add("on");
+    clearTimeout(festa._t);
+    festa._t = setTimeout(function(){ el.classList.remove("on"); }, 7500);
+  }
+  document.getElementById("festa").addEventListener("click", function(){ this.classList.remove("on"); });
+
   var elLat = document.getElementById("lat");
   var elLon = document.getElementById("lon");
   var elRaio = document.getElementById("raio");
   var elBarra = document.getElementById("barra");
   var elRes = document.getElementById("resultado");
+  var elRaioVal = document.getElementById("raioVal");
+  var circleRaio = null;
+  var ultimo = null;      // ultima posicao consultada
+  var reTimer = null;
+
+  function fmtRaio(m){
+    return m >= 1000 ? (m/1000).toFixed(1).replace(".", ",") + " km" : m + " m";
+  }
+  function desenharCirculo(lat, lon, raio){
+    if (circleRaio){ map.removeLayer(circleRaio); circleRaio = null; }
+    if (lat == null || lon == null) return;
+    circleRaio = L.circle([lat, lon], {
+      radius: raio, color: "#12508f", weight: 1.5, dashArray: "5,5",
+      fillColor: "#9ecbff", fillOpacity: 0.10
+    }).addTo(map);
+  }
+  function enquadrar(lat, lon, raio){
+    map.fitBounds(L.latLng(lat, lon).toBounds(raio * 2), {padding: [24, 24]});
+  }
 
   function escapeHtml(s){
     return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
@@ -156,7 +240,9 @@
     if (marcaEu) map.removeLayer(marcaEu);
     marcaEu = L.circleMarker([lat, lon], {radius:8, color:"#12508f", weight:3, fillColor:"#9ecbff", fillOpacity:1})
       .addTo(map).bindPopup("Sua consulta");
-    map.setView([lat, lon], raio <= 1000 ? 15 : (raio <= 5000 ? 13 : 11));
+    ultimo = {lat: lat, lon: lon};
+    desenharCirculo(lat, lon, raio);
+    enquadrar(lat, lon, raio);
     var url = API + "?rota=" + encodeURIComponent("/api/v1/radares") +
       "&lat=" + encodeURIComponent(lat) + "&lon=" + encodeURIComponent(lon) +
       "&raio=" + encodeURIComponent(raio) + "&formato=json";
@@ -170,6 +256,7 @@
       var res = d.resultado || {};
       var pontos = res.pontos || [];
       render(res, pontos);
+      if (pontos.length === 0) festa(raio, res.status);
       elBarra.innerHTML = "Snapshot " + escapeHtml(d.consultado_em || "") +
         (pontos.length === 0 ? " — <span class='aviso' style='display:inline-block'>nada no raio informado (isso não afirma que não exista radar: verifique cobertura da região).</span>" : "");
     }).catch(function(e){
@@ -205,12 +292,25 @@
       if (e.key === "Enter") consultar(parseFloat(elLat.value), parseFloat(elLon.value), parseInt(elRaio.value, 10));
     });
   });
+  // Slider do raio: arrasta e o mapa/circulo acompanham; solta e consulta de novo
+  elRaioVal.textContent = fmtRaio(parseInt(elRaio.value, 10));
+  elRaio.addEventListener("input", function(){
+    var r = parseInt(elRaio.value, 10);
+    elRaioVal.textContent = fmtRaio(r);
+    if (ultimo){
+      desenharCirculo(ultimo.lat, ultimo.lon, r);
+      enquadrar(ultimo.lat, ultimo.lon, r);
+      clearTimeout(reTimer);
+      reTimer = setTimeout(function(){ consultar(ultimo.lat, ultimo.lon, r); }, 350);
+    }
+  });
   // Link direto: ?lat=..&lon=..&raio=..  (consulta sozinho)
   //            ?local=1             (usa a localização do navegador)
   var qp = new URLSearchParams(location.search);
   if (qp.has("lat") && qp.has("lon")){
     elLat.value = qp.get("lat"); elLon.value = qp.get("lon");
     if (qp.has("raio")) elRaio.value = qp.get("raio");
+    elRaioVal.textContent = fmtRaio(parseInt(elRaio.value, 10));
     consultar(parseFloat(elLat.value), parseFloat(elLon.value), parseInt(elRaio.value, 10));
   } else if (qp.has("local")){
     usarLocalizacao();
