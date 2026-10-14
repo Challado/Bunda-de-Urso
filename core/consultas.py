@@ -9,6 +9,7 @@ import json
 
 from . import db as dbmod
 from . import geo
+from . import georesolver
 
 _PONTO_SQL = """
 SELECT p.id AS ponto_id, p.km AS km, p.tipo_pista AS tipo_pista,
@@ -117,6 +118,64 @@ def _filtros_extra(filtros):
     return clauses, params
 
 
+def _pontos_inferidos_dentro(conn, lat, lon, raio, filtros):
+    """Pontos SEM posicao que ganham coordenada INFERIDA via (via, km).
+
+    Le os pontos sem POSICAO_GEOGRAFICA mas com via + km, resolve o km pelo
+    referenciamento linear (``core.georesolver``) e filtra por Haversine. So
+    entram os que resolvem de forma inequivoca (``status == 'ok'``);
+    ``ambiguo``/``fora_de_faixa``/``sem_calibracao`` NAO entram (nada e
+    inventado). A coordenada sai marcada ``qualidade='inferida'`` /
+    ``metodo_obtencao='linear_km'``.
+
+    Devolve lista de ``(distancia_m, row)`` no mesmo formato de ``_PONTO_SQL``.
+    """
+    candidatos = dbmod.query_all(
+        conn,
+        "SELECT p.id AS ponto_id, v.codigo AS via_codigo, p.km AS km "
+        "FROM PONTO_FISCALIZACAO p JOIN VIA v ON v.id = p.via_id "
+        "WHERE p.posicao_id IS NULL AND p.via_id IS NOT NULL "
+        "AND p.km IS NOT NULL", ())
+    if not candidatos:
+        return []
+    calibracao = georesolver.calibracao()
+    dentro = {}
+    for c in candidatos:
+        try:
+            res = georesolver.resolver(c["via_codigo"], c["km"],
+                                       calibracao=calibracao)
+        except (ValueError, TypeError):
+            continue
+        if res.get("status") != georesolver.STATUS_OK:
+            continue                      # nao resolvido: nao entra
+        rlat, rlon = res.get("lat"), res.get("lon")
+        if rlat is None or rlon is None:
+            continue
+        dist = geo.haversine_m(lat, lon, rlat, rlon)
+        if dist <= raio:
+            dentro[c["ponto_id"]] = (dist, rlat, rlon)
+    if not dentro:
+        return []
+    ids = sorted(dentro)
+    placeholders = ",".join("?" * len(ids))
+    extra, extra_params = _filtros_extra(filtros)
+    sql = _PONTO_SQL + " WHERE p.id IN (%s)" % placeholders
+    if extra:
+        sql += " AND " + " AND ".join(extra)
+    saida = []
+    for row in dbmod.query_all(conn, sql, ids + extra_params):
+        dist, rlat, rlon = dentro[row["ponto_id"]]
+        d = dict(row)
+        d["latitude"] = rlat
+        d["longitude"] = rlon
+        d["precisao_metros"] = None
+        d["qualidade"] = georesolver.QUALIDADE_INFERIDA
+        d["metodo_obtencao"] = georesolver.METODO
+        d["posicao_id"] = None
+        saida.append((dist, d))
+    return saida
+
+
 def buscar_pontos(conn, lat, lon, raio, filtros=None, limite=100, cursor=None):
     """Retorna (records, meta) com pontos dentro do raio, ordenados por
     distancia. `meta` traz total_pontos/total_equipamentos/proximo_cursor."""
@@ -140,6 +199,16 @@ def buscar_pontos(conn, lat, lon, raio, filtros=None, limite=100, cursor=None):
         dist = geo.haversine_m(lat, lon, r["latitude"], r["longitude"])
         if dist <= raio:
             dentro.append((dist, r))
+    dentro.sort(key=lambda t: (t[0], t[1]["ponto_id"]))
+
+    inferidos = _pontos_inferidos_dentro(conn, lat, lon, raio, filtros)
+    uf_inf = (filtros.get("uf") or "").upper() or None
+    n_inferidos = 0
+    for dist, r in inferidos:
+        if uf_inf and _uf_do_ponto(conn, r) != uf_inf:
+            continue
+        dentro.append((dist, r))
+        n_inferidos += 1
     dentro.sort(key=lambda t: (t[0], t[1]["ponto_id"]))
 
     total = len(dentro)
@@ -173,6 +242,7 @@ def buscar_pontos(conn, lat, lon, raio, filtros=None, limite=100, cursor=None):
         "total_equipamentos": total_equip,
         "retornados": len(records),
         "proximo_cursor": proximo,
+        "total_inferidos": n_inferidos,
     }
 
 

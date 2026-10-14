@@ -26,7 +26,9 @@ Sem dependencias externas (somente stdlib). NAO grava nada no banco.
 """
 import csv
 import os
+import threading
 
+from . import config
 from .geo import haversine_m
 
 # Caminho padrao do arquivo de ancoras LIMPO (gerado por tools/limpar_calibracao.py),
@@ -35,6 +37,24 @@ from .geo import haversine_m
 _RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CAMINHO_ANCORAS_PADRAO = os.path.join(
     _RAIZ, "dados", "calibracao", "ancoras_limpas.csv")
+def caminho_padrao():
+    """Caminho do CSV de ancoras limpas, resolvido em tempo de chamada.
+
+    Prefere ``config.DATA_DIR/calibracao/ancoras_limpas.csv`` (onde o dado de
+    producao vive; ``RADAR_DATA_DIR=`` e herdado pela API no webroot), com o
+    ``dados/`` do repositorio como alternativa para desenvolvimento/testes.
+    Resolver na chamada (e nao no import) evita congelar o caminho errado.
+    """
+    candidatos = [
+        os.path.join(config.DATA_DIR, "calibracao", "ancoras_limpas.csv"),
+        os.path.join(_RAIZ, "dados", "calibracao", "ancoras_limpas.csv"),
+    ]
+    for candidato in candidatos:
+        if os.path.exists(candidato):
+            return candidato
+    return candidatos[0]
+
+
 # Arquivo bruto (sem limpeza/segmentacao), mantido para comparacao/reproducao.
 CAMINHO_ANCORAS_BRUTO = os.path.join(
     _RAIZ, "dados", "calibracao", "ancoras.csv")
@@ -88,7 +108,7 @@ def carregar_ancoras(caminho=None):
     A coluna ``segmento`` e opcional: quando ausente (CSV bruto), vale 1. Linhas
     sem via, km, lat ou lon sao descartadas (campo ausente = ausente; nao inventa).
     """
-    caminho = caminho or CAMINHO_ANCORAS_PADRAO
+    caminho = caminho or caminho_padrao()
     por_via = {}
     with open(caminho, "r", encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f, delimiter=";")
@@ -115,6 +135,40 @@ def carregar_ancoras(caminho=None):
     for via in por_via:
         por_via[via].sort(key=_chave_ordem)
     return por_via
+
+
+_CAL_LOCK = threading.Lock()
+_CAL_CACHE = {"chave": None, "dados": None}
+
+
+def calibracao(caminho=None):
+    """Calibração de âncoras em cache de processo (lazy, invalidada por mtime).
+
+    Evita reler ``ancoras_limpas.csv`` a cada requisição da API. Devolve o
+    mesmo dict de :func:`carregar_ancoras`. Não grava nada.
+    """
+    caminho = caminho or caminho_padrao()
+    try:
+        chave = (caminho, os.path.getmtime(caminho))
+    except OSError:
+        chave = (caminho, None)
+    with _CAL_LOCK:
+        if _CAL_CACHE["dados"] is None or _CAL_CACHE["chave"] != chave:
+            try:
+                _CAL_CACHE["dados"] = carregar_ancoras(caminho)
+            except OSError:
+                # Calibracao ausente nao pode derrubar a API: sem ancoras nao
+                # ha como inferir posicao (o ponto simplesmente nao entra).
+                _CAL_CACHE["dados"] = {}
+            _CAL_CACHE["chave"] = chave
+        return _CAL_CACHE["dados"]
+
+
+def esquecer_calibracao():
+    """Descarta o cache de calibração (usado por testes)."""
+    with _CAL_LOCK:
+        _CAL_CACHE["dados"] = None
+        _CAL_CACHE["chave"] = None
 
 
 def _chave_ordem(a):
