@@ -158,6 +158,11 @@ Os endpoints da API são:
 - `/api/v1/trafego`
 - `/api/v1/status`
 - `/api/v1/ajuda`
+- `/api/v1/radares/submeter` (submissão pública, sem token)
+- `/api/v1/radares/{id}/historico` (auditoria pública do ponto)
+- `/api/v1/login` e `/api/v1/logout` (sessão do painel)
+- `/api/v1/minha-senha` (troca da própria senha)
+- `/api/v1/gestao/*` (pendentes, radar, bloqueios, tokens, usuários — exige sessão ou `X-Api-Token`)
 - `/api/v1/admin/sincronizar` e `/api/v1/admin/rollback`
 - `/health/live` e `/health/ready` (também em `/api/v1/health/live|ready`)
 
@@ -166,6 +171,32 @@ Os retornos incluem **TXT delimitado em linha única por registro** (delimitador
 O endpoint de ajuda documenta parâmetros, tipos, formatos, exemplos, significado dos campos e códigos de erro. Campos ausentes não devem ser substituídos por zeros ou valores presumidos.
 
 **Sem resultado não é sinônimo de ausência de radar.** Se a região não possui fonte suficiente, o sistema informa `sem_cobertura` e `completude_confirmada=false`, em vez de garantir falsamente que a via está livre de fiscalização. (É o reverso da lamúria: melhor dizer “não sei” do que jurar que a pista está limpa e te entregar de bandeja.)
+
+## Governança da ingestão (camadas de confiança)
+
+Toda escrita passa pela **API**; nenhuma tela nem ferramenta toca o banco por fora do
+app. As camadas de confiança são:
+
+- **Leitura aberta** (site + API), sem cadastro.
+- **Criação aberta** por `POST /api/v1/radares/submeter` (sem token): o cadastro entra
+  como `colaborativo` **não verificado** e **publica na hora**, com selo, procedência
+  (IP, user-agent, data/hora, contato) e *rate limit* por IP.
+- **Verificação / edição / remoção** exigem **sessão do painel** ou **`X-Api-Token`**.
+  Escopos: `contribuidor` (lê) < `moderador` (verifica/edita/remove) < `admin`
+  (usuários, tokens, bloqueios). A remoção é **tombstone** (soft delete com motivo
+  obrigatório): o radar sai do mapa/consulta, mas a linha e o histórico permanecem.
+- **Correspondência com o oficial:** ao ingerir um colaborativo, procura-se um ponto
+  OFICIAL no raio `RAIO_CORRESPONDENCIA_M` (default 150 m). Havendo, o colaborativo é
+  **corroborado automaticamente** (`verificado`) e cria-se o vínculo
+  `CORRESPONDENCIA_PONTO` (`distancia_m`, `status`).
+- **Anti-sabotagem:** coordenada dentro de um `BLOQUEIO_GEOGRAFICO` ativo
+  (`marcacao_falsa` | `zona_sombra`) é **recusada (409)** com o motivo.
+- **Consulta pública:** prefere o **colaborativo** sobre o oficial correspondente e
+  **esconde** pontos removidos/desabilitados. `GET /api/v1/radares/{id}/historico` é
+  público (transparência: “removido em X por Y, motivo Z”).
+
+A configuração versionada mora em `config/governanca.json`; o esquema aditivo da
+camada em `sql/migracoes/`. Detalhes e exemplos `curl` em `docs/GOVERNANCA.md`.
 
 ## Atualizações, observabilidade e auditoria
 

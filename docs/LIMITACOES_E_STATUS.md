@@ -94,15 +94,21 @@ que não pôde ser confirmado está marcado **a confirmar** (não inventado).
    fictício). Isso é regra, não falha.
 9. **Postgres:** a DDL é gerada (`sql/schema.postgres.sql`), mas **a
    confirmar** execução/carga reais em Postgres — só SQLite foi exercitado.
-10. **Migrations / volume:** não há gerenciador de migrations para esquema já
-   em produção; ingestão processa a lista em memória (não homologada para
-   datasets de milhões de observações).
+10. **Migrations / volume:** o esquema canônico (T01..T77) é criado por
+   `init_db`; a camada de **governança** (USUARIO, API_TOKEN, SESSAO,
+   RADAR_ALTERACAO, BLOQUEIO_GEOGRAFICO, CORRESPONDENCIA_PONTO,
+   SUBMISSAO_PUBLICA) entra por **migração aditiva versionada**
+   (`sql/migracoes/`, aplicada e registrada em `MIGRACAO_GOVERNANCA`).
+   Ingestão processa a lista em memória (não homologada para datasets de
+   milhões de observações).
 11. **EDIFACT/DIF:** perfis/esqueletos **funcionais**, mas **não
     homologados** com parser/leitor externo. O EDIFACT é perfil bilateral
     (ver `docs/EDIFACT_PERFIL.md`), **não** um MIG aceito por terceiros; e
     **não** implementa o esquema Base64/`FTX` da referência.
-12. **Notificações externas:** não há envio por e-mail/webhook nem painel
-    administrativo; há apenas o registro local (tabelas de execução/alerta).
+12. **Notificações externas:** não há envio por e-mail/webhook. O painel
+    administrativo é servido pela própria API de governança
+    (`/api/v1/gestao/*`); a única ferramenta fora do painel é a CLI
+    `tools/radar_admin.py` (anti-lockout).
 
 ## Regra de ouro
 
