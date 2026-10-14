@@ -25,6 +25,29 @@ from coletor.fontes.prf import (ColetorPRFFixos, ColetorPRFPortateis,
                                 ColetorPRFTrechos)
 from coletor.fontes.osm import ColetorOSM
 from coletor.fontes.inmetro import ColetorINMETRO
+from coletor.fontes.goinfra import ColetorGOINFRA
+from coletor.fontes.seinfra_ba import ColetorSEINFRABA
+from coletor.fontes.amc_ce import ColetorAMCCE
+from coletor.fontes.der_rj import ColetorDERRJ
+from coletor.fontes.daer_rs import ColetorDAERRS
+from coletor.fontes.cariacica_es import ColetorCariacica
+from coletor.fontes.joinville_sc import ColetorJoinville
+from coletor.fontes.immu_am import ColetorIMMUAM
+from coletor.fontes.agetran_ms import ColetorAgetranMS
+from coletor.fontes.semob_pb import ColetorSemobPB
+from coletor.fontes.ctmac_ap import ColetorCtmacAP
+from coletor.fontes.cuiaba_mt import ColetorCuiabaMT
+from coletor.fontes.semtran_ro import ColetorSEMTRANRO
+from coletor.fontes.segbell_pa import ColetorSEGBELPA
+from coletor.fontes.boavista_rr import ColetorBoaVistaRR
+from coletor.fontes.detran_df import ColetorDetranDF
+from coletor.fontes.detran_ma import ColetorDetranMA
+from coletor.fontes.der_se import ColetorDERSE
+from coletor.fontes.araguaiana_to import ColetorASTTAraguaina
+from coletor.fontes.detran_ac import ColetorDetranAC
+from coletor.fontes.der_al import ColetorDerAL
+from coletor.fontes.natal_rn import ColetorNatalRN
+from coletor.fontes.teresina_pi import ColetorTeresinaPI
 
 HORA = 3600
 DIA = 86400
@@ -110,6 +133,170 @@ AGENDA_PADRAO = {
         "conector": ColetorINMETRO,
         "intervalo_s": SEMANA,
         "url_direta": "TODAS",
+        "ativo": True,
+    },
+    # -- 27 UFs, ondas 1-3: conectores com cadastro real (dados) --------
+    "goinfra": {
+        "rotulo": "GOINFRA - GO, equipamentos de monitoramento",
+        "conector": ColetorGOINFRA,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "seinfra_ba": {
+        "rotulo": "SEINFRA-BA - radares fixos e estaticos",
+        "conector": ColetorSEINFRABA,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "amc_ce": {
+        "rotulo": "AMC Fortaleza/CE - fiscalizacao eletronica",
+        "conector": ColetorAMCCE,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "der_rj": {
+        "rotulo": "DER-RJ - radares portateis (trechos elegiveis)",
+        "conector": ColetorDERRJ,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "daer_rs": {
+        "rotulo": "DAER-RS/CRBM - radares moveis (trechos elegiveis)",
+        "conector": ColetorDAERRS,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "cariacica_es": {
+        "rotulo": "Cariacica/ES - mapa de radares",
+        "conector": ColetorCariacica,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "immu_am": {
+        "rotulo": "IMMU Manaus/AM - fiscalizacao eletronica",
+        "conector": ColetorIMMUAM,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "agetran_ms": {
+        "rotulo": "Agetran Campo Grande/MS - radares",
+        "conector": ColetorAgetranMS,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "semob_pb": {
+        "rotulo": "Semob Joao Pessoa/PB - medidores de velocidade",
+        "conector": ColetorSemobPB,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "semtran_ro": {
+        "rotulo": "SEMTRAN Porto Velho/RO - radares fixos",
+        "conector": ColetorSEMTRANRO,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "detran_df": {
+        "rotulo": "Detran-DF - medidores de velocidade",
+        "conector": ColetorDetranDF,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "detran_ma": {
+        "rotulo": "Detran-MA - fiscalizacao eletronica",
+        "conector": ColetorDetranMA,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "der_se": {
+        "rotulo": "DER-SE - radares e lombadas fixas",
+        "conector": ColetorDERSE,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "araguaiana_to": {
+        "rotulo": "ASTT Araguaina/TO - medidores de velocidade",
+        "conector": ColetorASTTAraguaina,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    # -- 27 UFs: diagnosticados (sem cadastro -> so evidencia) ----------
+    # Ativos de proposito: registram REGISTRO_FONTE e nao criam ponto.
+    "joinville_sc": {
+        "rotulo": "Joinville/SC - estudos tecnicos (sem cadastro)",
+        "conector": ColetorJoinville,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "segbell_pa": {
+        "rotulo": "SEGBEL Belem/PA - portarias (sem cadastro)",
+        "conector": ColetorSEGBELPA,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "ctmac_ap": {
+        "rotulo": "CTMac Macapa/AP - lista historica (sem cadastro)",
+        "conector": ColetorCtmacAP,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "cuiaba_mt": {
+        "rotulo": "Cuiaba/MT - noticia historica (sem cadastro)",
+        "conector": ColetorCuiabaMT,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "boavista_rr": {
+        "rotulo": "Boa Vista/RR - lista em imagem (sem cadastro)",
+        "conector": ColetorBoaVistaRR,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "detran_ac": {
+        "rotulo": "Detran-AC - sem publicacao (pendente LAI)",
+        "conector": ColetorDetranAC,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "der_al": {
+        "rotulo": "DER-AL - sem publicacao",
+        "conector": ColetorDerAL,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "natal_rn": {
+        "rotulo": "STTU Natal/RN - sem publicacao estadual",
+        "conector": ColetorNatalRN,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "teresina_pi": {
+        "rotulo": "Teresina/PI - sem publicacao (pendente LAI)",
+        "conector": ColetorTeresinaPI,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
         "ativo": True,
     },
     # -- complementar (nao oficial) — opt-in ----------------------------
