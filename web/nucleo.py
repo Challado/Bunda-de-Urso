@@ -98,6 +98,8 @@ ENDPOINTS_ADMINISTRATIVOS = {
     "/api/v1/gestao/radar/{id}/desabilitar": ["POST"],
     "/api/v1/gestao/radar/{id}/remover": ["POST"],
     "/api/v1/gestao/radar/{id}/historico": ["GET"],
+    "/api/v1/gestao/eu": ["GET"],
+    "/api/v1/gestao/correspondencias/{id}": ["POST"],
     "/api/v1/gestao/bloqueios": ["GET", "POST"],
     "/api/v1/gestao/bloqueios/{id}": ["DELETE"],
     "/api/v1/gestao/tokens": ["GET", "POST"],
@@ -117,6 +119,11 @@ ENDPOINTS_DESC = {
     "/api/v1/login": "Login do painel -> sessao (cookie httpOnly).",
     "/api/v1/logout": "Encerra a sessao do painel.",
     "/api/v1/minha-senha": "Troca a propria senha (exige a senha atual).",
+    "/api/v1/gestao/eu": ("Contexto da sessao/token atual (login, papel): "
+                          "usado pelo painel para decidir o que exibir."),
+    "/api/v1/gestao/correspondencias/{id}": ("Resolve o vinculo de "
+                                             "correspondencia "
+                                             "(oficial_vence|colaborativo_vence)."),
     "/api/v1/radares/busca": ("Busca cadastral por UF/rodovia/municipio, "
                               "sem coordenada; cobertura parcial."),
     "/api/v1/radares/{id}": "Um ponto de fiscalizacao por id (P-<n>).",
@@ -807,6 +814,34 @@ def _gestao(conn, p, metodo, environ, stdin_bytes):
     resto = p[len("/api/v1/gestao"):].strip("/")
     partes = resto.split("/") if resto else []
     try:
+        # -- quem sou eu (contexto da sessao/token) -----------------------
+        if partes[:1] == ["eu"]:
+            if metodo != "GET":
+                return _erro(405, "metodo_nao_permitido", "metodo %s nao permitido" % metodo)
+            governanca.exigir(ctx, "contribuidor")
+            return _resp({"sucesso": True, "autenticado": True,
+                          "tipo": ctx.get("tipo"),
+                          "escopo": ctx.get("escopo"),
+                          "rotulo": ctx.get("rotulo"),
+                          "usuario_id": ctx.get("usuario_id"),
+                          "token_id": ctx.get("token_id")})
+
+        # -- resolucao de vinculo de correspondencia ----------------------
+        if partes[:1] == ["correspondencias"] and len(partes) == 2:
+            if metodo != "POST":
+                return _erro(405, "metodo_nao_permitido", "metodo %s nao permitido" % metodo)
+            governanca.exigir(ctx, "moderador")
+            try:
+                cid = int(partes[1])
+            except (TypeError, ValueError):
+                return _erro(422, "parametro_invalido",
+                             "id de correspondencia invalido")
+            dados = _corpo_json(stdin_bytes) or {}
+            governanca.resolver_correspondencia(
+                conn, cid, dados.get("status"), ctx,
+                motivo=dados.get("motivo"))
+            return _resp({"sucesso": True})
+
         # -- fila de pendentes --------------------------------------------
         if partes[:1] == ["pendentes"]:
             if metodo != "GET":
