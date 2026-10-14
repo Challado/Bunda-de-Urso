@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Usuários e tokens — Bundita de Urso</title>
+<style>
+  :root{--azul:#12508f;--vermelho:#c0392b;--verde:#178a3d;--cinza:#f4f4f6;--borda:#d7d7de}
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1d1d22;background:#f7f7f9}
+  header{background:var(--azul);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px}
+  header .logo{height:54px;width:auto;border-radius:8px;background:#fff;padding:3px;box-shadow:0 1px 4px rgba(0,0,0,.3);flex:0 0 auto}
+  header .cabTxt{min-width:0}
+  header h1{margin:0;font-size:19px}
+  header .nav{margin-top:6px;display:flex;gap:14px;flex-wrap:wrap}
+  header .nav a{color:#fff;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.45);font-size:13.5px;font-weight:600;padding-bottom:1px}
+  header .nav a:hover{border-bottom-color:#fff}
+  main{max-width:1000px;margin:0 auto;padding:16px}
+  h2{font-size:14px;margin:18px 0 8px;color:#4a4a55;text-transform:uppercase;letter-spacing:.4px}
+  .cartao{background:#fff;border:1px solid var(--borda);border-radius:10px;padding:16px;max-width:440px}
+  label{display:flex;flex-direction:column;font-size:12.5px;color:#4a4a55;gap:3px;margin-bottom:10px}
+  input,select{font:inherit;padding:8px 10px;border:1px solid var(--borda);border-radius:7px;background:#fff;color:#1d1d22;width:100%}
+  button{padding:9px 14px;border:0;border-radius:7px;background:var(--azul);color:#fff;font:600 14px/1 inherit;cursor:pointer}
+  button.sec{background:#5b6472}
+  button.perigo{background:var(--vermelho)}
+  button.ok{background:var(--verde)}
+  button.mini{padding:5px 9px;font-size:12.5px}
+  button:disabled{opacity:.55;cursor:default}
+  .linha{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+  .aviso{background:#fff4e5;border:1px solid #ffd08a;border-radius:8px;padding:10px 12px;font-size:13.5px;margin-bottom:14px}
+  .aviso.ok{background:#e6f6ea;border-color:#a8dfb6;color:#14622e}
+  .aviso.err{background:#fdecea;border-color:#f5b7b1;color:#7a1f1f}
+  .pill{display:inline-block;background:#e8eef6;color:var(--azul);border-radius:10px;padding:1px 9px;font-size:12.5px;font-weight:600}
+  .pill.ok{background:#e6f6ea;color:var(--verde)}
+  .pill.ruim{background:#fdecea;color:var(--vermelho)}
+  .pill.neutro{background:#eceef2;color:#4a4a55}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;background:#fff;border:1px solid var(--borda);border-radius:10px;overflow:hidden}
+  th,td{border-bottom:1px solid var(--borda);padding:7px 9px;text-align:left;vertical-align:middle}
+  th{background:var(--cinza)}
+  tr:last-child td{border-bottom:0}
+  .bloco{border:1px solid var(--borda);border-radius:10px;background:#fff;padding:12px;margin:10px 0}
+  .bloco > h3{margin:0 0 8px;font-size:14px}
+  .vazio{color:#8a8a95;font-style:italic;font-size:13.5px;padding:8px 0}
+  .modal{position:fixed;inset:0;background:rgba(20,20,26,.55);display:flex;align-items:center;justify-content:center;z-index:5000;padding:16px}
+  .modal[hidden]{display:none}
+  .modal .cx{background:#fff;border-radius:12px;max-width:480px;width:100%;padding:18px;box-shadow:0 14px 44px rgba(0,0,0,.3)}
+  .modal h3{margin:0 0 10px;font-size:17px}
+  .tokenVal{display:block;background:#f4f4f6;border:1px dashed var(--azul);border-radius:8px;padding:10px;font:600 14px/1.4 ui-monospace,Menlo,Consolas,monospace;word-break:break-all;margin:8px 0}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+  td select{min-width:120px}
+  @media (max-width:640px){ header .logo{height:40px} }
+</style>
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="favicon-32.png" sizes="32x32">
+<link rel="icon" type="image/png" href="favicon-16.png" sizes="16x16">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+</head>
+<body>
+<header>
+  <img class="logo" src="bunda-de-urso.png" alt="Bundita de Urso — a base do Bunda de urso">
+  <div class="cabTxt">
+    <h1>Usuários e tokens</h1>
+    <nav class="nav">
+      <a href="index.html">Consulta</a>
+      <a href="cadastro.html">Cadastrar radar</a>
+      <a href="gestao.html">Administração</a>
+    </nav>
+  </div>
+</header>
+<main>
+  <div id="carregando" class="aviso">Verificando a sessão…</div>
+
+  <section id="negado" hidden>
+    <div class="cartao">
+      <p class="aviso" id="negadoTxt">Esta página exige escopo <b>admin</b>.</p>
+      <p><a href="gestao.html">Voltar ao painel de administração</a></p>
+    </div>
+  </section>
+
+  <div id="conteudo" hidden>
+    <div id="avisoGer" hidden></div>
+
+    <h2>Usuários</h2>
+    <div id="listaUsuarios"></div>
+
+    <div class="bloco">
+      <h3>Criar usuário</h3>
+      <div class="linha">
+        <label style="min-width:170px;margin:0">Login<input id="nuLogin" autocomplete="off" placeholder="mod1"></label>
+        <label style="min-width:170px;margin:0">Nome (opcional)<input id="nuNome" autocomplete="off"></label>
+        <label style="min-width:180px;margin:0">E-mail (opcional)<input id="nuEmail" autocomplete="off"></label>
+        <label style="min-width:150px;margin:0">Papel
+          <select id="nuPapel"><option value="moderador">moderador</option><option value="admin">admin</option></select>
+        </label>
+      </div>
+      <label>Senha (opcional — em branco gera uma temporária)<input id="nuSenha" type="password" autocomplete="new-password"></label>
+      <button id="btCriarUsuario">Criar usuário</button>
+    </div>
+
+    <h2>Tokens de API</h2>
+    <p class="aviso">O valor do token aparece <b>uma única vez</b>, na emissão. Depois só o prefixo fica visível.</p>
+    <div class="linha" style="margin-bottom:10px"><button id="btAtualizarTokens" class="sec">Atualizar tokens</button></div>
+    <div id="listaTokens"></div>
+    <div class="bloco">
+      <h3>Emitir token</h3>
+      <div class="linha">
+        <label style="min-width:200px;margin:0">Nome<input id="tkNome" placeholder="ex.: github:fulano"></label>
+        <label style="min-width:150px;margin:0">Escopo
+          <select id="tkEscopo"><option value="contribuidor">contribuidor</option><option value="moderador">moderador</option><option value="admin">admin</option></select>
+        </label>
+        <label style="min-width:170px;margin:0">Dono (opcional)<input id="tkDono"></label>
+      </div>
+      <label>Observações (opcional)<input id="tkObs"></label>
+      <button id="btEmitirToken">Emitir token</button>
+    </div>
+  </div>
+</main>
+
+<div id="modal" class="modal" hidden>
+  <div class="cx">
+    <h3 id="modalTitulo"></h3>
+    <div id="modalCorpo"></div>
+    <div class="linha" style="justify-content:flex-end;margin-top:12px">
+      <button id="modalCancelar" class="sec" type="button">Cancelar</button>
+      <button id="modalOk" type="button">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var API = "api.pse";
+  var esc = function(s){ return String(s==null?"":s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); };
+
+  function url(rota, query){
+    return API + "?rota=" + encodeURIComponent(rota) + (query ? "&" + query : "") + "&formato=json";
+  }
+  function req(rota, opts){
+    opts = opts || {};
+    var init = {method: opts.method || "GET", credentials: "same-origin", headers: {}};
+    if (opts.body !== undefined){
+      init.headers["Content-Type"] = "application/json";
+      init.body = JSON.stringify(opts.body);
+    }
+    return fetch(url(rota, opts.query), init).then(function(r){
+      return r.json().catch(function(){ return {}; }).then(function(j){ return {status:r.status, body:j}; });
+    });
+  }
+  function erroMsg(o){
+    var e = o.body && o.body.erro;
+    if (e){
+      var t = e.mensagem || e.codigo || "erro";
+      if (e.codigo) t += " (" + e.codigo + ")";
+      return t;
+    }
+    return "HTTP " + o.status;
+  }
+
+  var modal = document.getElementById("modal");
+  function fecharModal(){ modal.hidden = true; document.getElementById("modalCorpo").innerHTML = ""; }
+  function abrirModal(opts){
+    return new Promise(function(resolve){
+      document.getElementById("modalTitulo").innerHTML = opts.titulo || "";
+      document.getElementById("modalCorpo").innerHTML = opts.corpo || "";
+      var btOk = document.getElementById("modalOk");
+      btOk.textContent = opts.ok || "Confirmar";
+      btOk.className = opts.perigo ? "perigo" : (opts.classeOk || "");
+      var bcancel = document.getElementById("modalCancelar");
+      bcancel.hidden = !!opts.semCancelar;
+      modal.hidden = false;
+      if (opts.preparar) opts.preparar(modal);
+      btOk.onclick = function(){ var v = opts.ler ? opts.ler(modal) : {}; if (v === undefined) return; modal.hidden = true; resolve(v); };
+      bcancel.onclick = function(){ fecharModal(); resolve(null); };
+    });
+  }
+  function avisoGer(msg, cls){
+    var el = document.getElementById("avisoGer");
+    if (!msg){ el.hidden = true; el.innerHTML = ""; return; }
+    el.hidden = false;
+    el.innerHTML = "<div class='aviso " + (cls||"") + "'>" + msg + "</div>";
+  }
+  function mostrarUmavez(titulo, rotulo, valor){
+    return abrirModal({
+      titulo: titulo,
+      corpo: "<div class='aviso'>" + rotulo + " aparece <b>uma única vez</b>. Copie e guarde agora.</div>" +
+             "<span class='tokenVal' id='tvVal'>" + esc(valor) + "</span>" +
+             "<button class='mini sec' id='tvCopiar' type='button'>Copiar</button>",
+      ok:"Já guardei", semCancelar:true,
+      preparar:function(){
+        var c = document.getElementById("tvCopiar");
+        if (c) c.addEventListener("click", function(){
+          try { navigator.clipboard.writeText(valor); c.textContent = "Copiado!"; } catch(e){}
+        });
+      }
+    }).then(function(){ fecharModal(); });
+  }
+
+  var estado = {escopo:null};
+
+  function iniciar(){
+    req("/api/v1/gestao/eu").then(function(o){
+      document.getElementById("carregando").hidden = true;
+      if (o.status !== 200 || !o.body.autenticado){
+        document.getElementById("negado").hidden = false;
+        document.getElementById("negadoTxt").innerHTML = "Você não está autenticado. <a href='gestao.html'>Entre pelo painel de administração</a>.";
+        return;
+      }
+      estado.escopo = o.body.escopo;
+      if (estado.escopo !== "admin"){
+        document.getElementById("negado").hidden = false;
+        document.getElementById("negadoTxt").innerHTML = "Esta página exige escopo <b>admin</b> (o seu é <b>" + esc(estado.escopo) + "</b>).";
+        return;
+      }
+      document.getElementById("conteudo").hidden = false;
+      carregarUsuarios();
+      carregarTokens();
+    }).catch(function(){
+      document.getElementById("carregando").hidden = true;
+      document.getElementById("negado").hidden = false;
+      document.getElementById("negadoTxt").innerHTML = "Falha ao falar com a API.";
+    });
+  }
+
+  // ---------------- usuarios ----------------
+  function carregarUsuarios(){
+    var el = document.getElementById("listaUsuarios");
+    el.innerHTML = "<div class='vazio'>Carregando…</div>";
+    req("/api/v1/gestao/usuarios").then(function(o){
+      if (o.status === 401){ location.replace("gestao.html"); return; }
+      if (o.status !== 200){ el.innerHTML = "<div class='aviso err'>" + esc(erroMsg(o)) + "</div>"; return; }
+      var us = o.body.usuarios || [];
+      var h = "<table><thead><tr><th>#</th><th>Login</th><th>Nome</th><th>Papel</th><th>Ativo</th><th>Trocar senha</th><th>Último login</th><th>Ações</th></tr></thead><tbody>";
+      us.forEach(function(u){
+        h += "<tr>" +
+          "<td>" + esc(u.id) + "</td>" +
+          "<td><b>" + esc(u.login) + "</b></td>" +
+          "<td>" + esc(u.nome || "—") + "</td>" +
+          "<td><select data-papel='" + esc(u.id) + "'>" +
+            "<option value='moderador'" + (u.papel==="moderador"?" selected":"") + ">moderador</option>" +
+            "<option value='admin'" + (u.papel==="admin"?" selected":"") + ">admin</option>" +
+          "</select></td>" +
+          "<td>" + (u.ativo ? "<span class='pill ok'>ativo</span>" : "<span class='pill ruim'>inativo</span>") + "</td>" +
+          "<td>" + (u.deve_trocar_senha ? "<span class='pill neutro'>sim</span>" : "—") + "</td>" +
+          "<td class='mono'>" + esc(u.ultimo_login || "—") + "</td>" +
+          "<td style='white-space:nowrap'>" +
+            "<button class='mini sec' data-ativo='" + esc(u.id) + "' data-valor='" + (u.ativo?0:1) + "'>" + (u.ativo?"desativar":"ativar") + "</button> " +
+            "<button class='mini' data-senha='" + esc(u.id) + "' data-login='" + esc(u.login) + "'>resetar senha</button>" +
+          "</td></tr>";
+      });
+      h += "</tbody></table>";
+      el.innerHTML = h;
+
+      el.querySelectorAll("[data-papel]").forEach(function(sel){
+        sel.addEventListener("change", function(){
+          var id = sel.getAttribute("data-papel");
+          req("/api/v1/gestao/usuarios/" + encodeURIComponent(id), {method:"PATCH", body:{papel: sel.value}}).then(function(o){
+            if (o.status === 200) avisoGer("Papel do usuário #" + esc(id) + " atualizado.", "ok");
+            else { alert("Falha: " + erroMsg(o)); carregarUsuarios(); }
+          });
+        });
+      });
+      el.querySelectorAll("[data-ativo]").forEach(function(b){
+        b.addEventListener("click", function(){
+          var id = b.getAttribute("data-ativo");
+          var ativo = b.getAttribute("data-valor") === "1";
+          req("/api/v1/gestao/usuarios/" + encodeURIComponent(id), {method:"PATCH", body:{ativo: ativo}}).then(function(o){
+            if (o.status === 200){ avisoGer("Usuário #" + esc(id) + (ativo ? " ativado." : " desativado."), "ok"); carregarUsuarios(); }
+            else alert("Falha: " + erroMsg(o));
+          });
+        });
+      });
+      el.querySelectorAll("[data-senha]").forEach(function(b){
+        b.addEventListener("click", function(){
+          var id = b.getAttribute("data-senha");
+          abrirModal({titulo:"Resetar senha de " + esc(b.getAttribute("data-login")),
+            corpo:"<p>Uma senha <b>temporária</b> será gerada e o usuário deverá trocá-la no próximo acesso. As sessões abertas dele serão encerradas.</p>",
+            ok:"Resetar", perigo:true})
+          .then(function(r){ if(!r) return;
+            req("/api/v1/gestao/usuarios/" + encodeURIComponent(id) + "/senha", {method:"POST", body:{}}).then(function(o){
+              if (o.status === 200){
+                mostrarUmavez("Senha temporária — copie agora", "A senha temporária", o.body.senha_temporaria || "");
+                avisoGer("Senha de " + esc(o.body.login || "") + " resetada.", "ok");
+                carregarUsuarios();
+              } else alert("Falha: " + erroMsg(o));
+            });
+          });
+        });
+      });
+    });
+  }
+
+  document.getElementById("btCriarUsuario").addEventListener("click", function(){
+    var login = document.getElementById("nuLogin").value.trim();
+    if (!login){ alert("Informe o login."); return; }
+    var body = {login: login, papel: document.getElementById("nuPapel").value};
+    var nome = document.getElementById("nuNome").value.trim();
+    var email = document.getElementById("nuEmail").value.trim();
+    var senha = document.getElementById("nuSenha").value;
+    if (nome) body.nome = nome;
+    if (email) body.email = email;
+    if (senha) body.senha = senha;
+    req("/api/v1/gestao/usuarios", {method:"POST", body:body}).then(function(o){
+      if (o.status === 201){
+        var u = o.body.usuario || {};
+        if (u.senha_temporaria){
+          mostrarUmavez("Senha temporária — copie agora", "A senha temporária de " + esc(u.login||login) + " ", u.senha_temporaria);
+        } else {
+          avisoGer("Usuário <b>" + esc(u.login||login) + "</b> criado.", "ok");
+        }
+        ["nuLogin","nuNome","nuEmail","nuSenha"].forEach(function(i){ document.getElementById(i).value = ""; });
+        carregarUsuarios();
+      } else alert("Falha ao criar: " + erroMsg(o));
+    });
+  });
+
+  // ---------------- tokens ----------------
+  function carregarTokens(){
+    var el = document.getElementById("listaTokens");
+    el.innerHTML = "<div class='vazio'>Carregando…</div>";
+    req("/api/v1/gestao/tokens").then(function(o){
+      if (o.status === 401){ location.replace("gestao.html"); return; }
+      if (o.status !== 200){ el.innerHTML = "<div class='aviso err'>" + esc(erroMsg(o)) + "</div>"; return; }
+      var ts = o.body.tokens || [];
+      if (!ts.length){ el.innerHTML = "<div class='vazio'>Nenhum token emitido.</div>"; return; }
+      var h = "<table><thead><tr><th>#</th><th>Nome</th><th>Escopo</th><th>Prefixo</th><th>Criado</th><th>Último uso</th><th>Revogado</th><th></th></tr></thead><tbody>";
+      ts.forEach(function(t){
+        h += "<tr><td>" + esc(t.id) + "</td><td>" + esc(t.nome) + "</td><td>" + esc(t.escopo) + "</td>" +
+          "<td class='mono'>" + esc(t.prefixo || "—") + "…</td><td class='mono'>" + esc(t.criado_em||"") + "</td>" +
+          "<td class='mono'>" + esc(t.ultimo_uso||"—") + "</td>" +
+          "<td>" + (t.revogado_em ? "<span class='pill ruim'>revogado</span>" : "<span class='pill ok'>ativo</span>") + "</td><td>" +
+          (!t.revogado_em ? "<button class='mini perigo' data-revtk='" + esc(t.id) + "'>revogar</button>" : "") + "</td></tr>";
+      });
+      h += "</tbody></table>";
+      el.innerHTML = h;
+      el.querySelectorAll("[data-revtk]").forEach(function(b){
+        b.addEventListener("click", function(){
+          var id = b.getAttribute("data-revtk");
+          abrirModal({titulo:"Revogar token #" + id, corpo:"<p>Tem certeza? O token para de autenticar imediatamente.</p>", perigo:true, ok:"Revogar"})
+          .then(function(r){ if(!r) return;
+            req("/api/v1/gestao/tokens/" + encodeURIComponent(id) + "/revogar", {method:"POST", body:{}}).then(function(o){
+              if (o.status === 200){ avisoGer("Token revogado.", "ok"); carregarTokens(); }
+              else alert("Falha: " + erroMsg(o));
+            });
+          });
+        });
+      });
+    });
+  }
+  document.getElementById("btAtualizarTokens").addEventListener("click", carregarTokens);
+  document.getElementById("btEmitirToken").addEventListener("click", function(){
+    var nome = document.getElementById("tkNome").value.trim();
+    if (!nome){ alert("Informe o nome do token."); return; }
+    var body = {nome: nome, escopo: document.getElementById("tkEscopo").value};
+    var dono = document.getElementById("tkDono").value.trim();
+    var obs = document.getElementById("tkObs").value.trim();
+    if (dono) body.dono = dono;
+    if (obs) body.observacoes = obs;
+    req("/api/v1/gestao/tokens", {method:"POST", body:body}).then(function(o){
+      if (o.status === 201){
+        mostrarUmavez("Token emitido — copie agora", "O valor do token",
+                      o.body.token || "");
+        document.getElementById("tkNome").value = ""; document.getElementById("tkDono").value = ""; document.getElementById("tkObs").value = "";
+        carregarTokens();
+      } else alert("Falha ao emitir: " + erroMsg(o));
+    });
+  });
+
+  iniciar();
+})();
+</script>
+</body>
+</html>
