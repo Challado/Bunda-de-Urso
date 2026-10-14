@@ -30,6 +30,7 @@ from core.config import ROOT                      # noqa: E402
 
 DB_PADRAO = os.environ.get("RADAR_DB", "/var/lib/radar-brasil/radar.sqlite3")
 BASELINE_PADRAO = os.path.join(ROOT, "config", "cobertura_fontes.json")
+MINIMO_PADRAO = os.path.join(ROOT, "config", "cobertura_minima.json")
 
 SQL_PONTOS = """
 SELECT p.id AS ponto_id,
@@ -84,6 +85,19 @@ def comparar(atual, baseline, tolerancia):
     return alertas
 
 
+def minimos_de(atual):
+    """-> pisos de cobertura por fonte a partir de uma medicao.
+
+    Congela o estado atual como "minimo esperado": o teste por fonte
+    (``tests/test_cobertura_fontes.py``) quebra quando a cobertura de uma
+    fonte cai abaixo disso. Atualizar e um ato DELIBERADO
+    (``--atualizar-minimos``), nao um efeito colateral da coleta.
+    """
+    return {f: {"pct_municipio": d["pct_municipio"],
+                "pct_posicao": d["pct_posicao"]}
+            for f, d in atual.items()}
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Monitor pos-coleta da cobertura.")
     ap.add_argument("--db", default=DB_PADRAO)
@@ -92,6 +106,8 @@ def main(argv=None):
                     help="queda em p.p. que dispara alerta (padrao 1.0)")
     ap.add_argument("--atualizar-baseline", action="store_true",
                     help="grava o estado atual como novo baseline")
+    ap.add_argument("--atualizar-minimos", action="store_true",
+                    help="grava os pisos de cobertura (config/cobertura_minima.json)")
     args = ap.parse_args(argv)
 
     if not os.path.exists(args.db):
@@ -115,6 +131,13 @@ def main(argv=None):
         with open(args.baseline, "w", encoding="utf-8") as f:
             json.dump(atual, f, ensure_ascii=False, indent=2, sort_keys=True)
         print("baseline atualizado: %s" % args.baseline)
+
+    if args.atualizar_minimos:
+        os.makedirs(os.path.dirname(MINIMO_PADRAO), exist_ok=True)
+        with open(MINIMO_PADRAO, "w", encoding="utf-8") as f:
+            json.dump(minimos_de(atual), f, ensure_ascii=False, indent=2,
+                      sort_keys=True)
+        print("pisos de cobertura atualizados: %s" % MINIMO_PADRAO)
 
     alertas = comparar(atual, baseline, args.tolerancia)
 
