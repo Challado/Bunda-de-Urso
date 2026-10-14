@@ -1,0 +1,91 @@
+,,,,,,Subseção de Análise e Desenvolvimento de Sistemas - SSAS CRBM
+ESTADO DO RIO GRANDE DO SUL,,,,,,
+SECRETARIA DA SEGURANÇA PÚBLICA,,,,,,
+BRIGADA MILITAR,,,,,,
+CRBM - 1º BRBM,,,,,,
+,,,,,,
+LOCAIS COM FISCALIZAÇÃO DE VELOCIDADE POR RADAR PORTÁTIL NA ÁREA DO 1ºBRBM,,,,,,
+,,,,,,
+"O Comando Rodoviário da Brigada Militar (CRBM) torna pública a lista atualizada dos locais passíveis de fiscalização de velocidade, por meio de medidores de velocidade do tipo portátil, na área do 1º BRBM, nos termos da Resolução Contran nº 798/2020.",,,,,,
+,,,,,,
+Período: De 1º a 31 de outubro de 2026.,,,,,,
+,,,,,,
+Nº ord,Fração fiscalizadora,Rodovia,Km inicial,Km final,Perímetro,Velocidade regulamentada
+1,Pelotão Rodoviário de Passo Fundo,RSC 153,138,148,Rural,80 km/h
+2,Pelotão Rodoviário de Passo Fundo,RSC 153,151,159,Rural,80 km/h
+3,Grupo Rodoviário de Coxilha,ERS 135,8,18,Rural,80 km/h
+4,Pelotão Rodoviário de Casca,ERS 324,218,268,Rural,80 km/h
+5,Pelotão Rodoviário de Casca,ERS 324,268,218,Rural,80 km/h
+6,Pelotão Rodoviário de Casca,ERS 129,118,163,Rural,80 km/h
+7,Pelotão Rodoviário de Casca,ERS 129,163,118,Rural,80 km/h
+8,Pelotão Rodoviário de Erechim,ERS 135,67,77,Rural,80 km/h
+9,Pelotão Rodoviário de Erechim,ERS 135,60,70,Rural,80 km/h
+10,Pelotão Rodoviário de Erechim,ERS 135,52,63,Rural,80 km/h
+11,Pelotão Rodoviário de Erechim,ERS 211,56,63,Rural,80 km/h
+12,Pelotão Rodoviário de Erechim,ERS 211,53,63,Rural,80 km/h
+13,Pelotão Rodoviário de Erechim,ERS 211,47,57,Rural,80 km/h
+14,Pelotão Rodoviário de Erechim,ERS 331,0,10,Rural,80 km/h
+15,Pelotão Rodoviário de Cruz Alta,ERS 155,1,10,Rural,80 km/h
+16,Pelotão Rodoviário de Cruz Alta,ERS 342,140,153,Rural,80 km/h
+17,Pelotão Rodoviário de Cruz Alta,ERS 342,153,140,Rural,80 km/h
+18,Pelotão Rodoviário de Cruz Alta,ERS 342,126,139,Rural,80 km/h
+19,Grupo Rodoviário de Tapera,ERS 223,1,3,Rural,100 km/h
+20,Grupo Rodoviário de Tapera,ERS 223,26,24,Rural,100 km/h
+21,Grupo Rodoviário de Tapera,ERS 223,25,27,Rural,80 km/h
+22,Grupo Rodoviário de Tapera,ERS 223,29,31,Rural,100 km/h
+23,Grupo Rodoviário de Tapera,ERS 223,42,40,Rural,100 km/h
+24,Grupo Rodoviário de Tapera,ERS 223,32,34,Rural,80 km/h
+25,Grupo Rodoviário de Tapera,ERS 223,34,32,Rural,80 km/h
+26,Grupo Rodoviário de Tapera,ERS 223,36,34,Rural,80 km/h
+27,Grupo Rodoviário de Tapera,ERS 223,42,44,Rural,80 km/h
+28,Grupo Rodoviário de Tapera,ERS 223,54,56,Rural,80 km/h
+29,Grupo Rodoviário de Tapera,ERS 332,146,141,Rural,80 km/h
+30,Grupo Rodoviário de Tapera,ERS 332,142,146,Rural,80 km/h
+31,Grupo Rodoviário de Tapera,VRS 824,30,20,Rural,60 km/h
+32,Grupo Rodoviário de Tapera,VRS 824,20,30,Rural,60 km/h
+33,Pelotão Rodoviário de Nonoai,ERS 324,63,76,Rural,80 Km/h
+34,Pelotão Rodoviário de Nonoai,ERS 324,59,69,Rural,80 Km/h
+35,Pelotão Rodoviário de Nonoai,ERS 406,7,16,Rural,80 Km/h
+36,Pelotão Rodoviário de Nonoai,ERS 406,17,27,Rural,80 Km/h
+37,Pelotão Rodoviário de Nonoai,ERS 480,11,21,Rural,80 Km/h
+38,Pelotão Rodoviário de Palmeira das Missões,ERS 569,1,10,Rural,80 km/h
+39,Pelotão Rodoviário de Palmeira das Missões,ERS 569,10,20,Rural,80 km/h
+40,Pelotão Rodoviário de Palmeira das Missões,ERS 569,16,2,Rural,80 km/h
+41,Pelotão Rodoviário de Palmeira das Missões,ERS 569,35,25,Rural,80 km/h
+42,Pelotão Rodoviário de Palmeira das Missões,ERS 404,21,9,Rural,80 km/h
+43,Pelotão Rodoviário de Palmeira das Missões,ERS 404,6,16,Rural,80 km/h
+44,Pelotão Rodoviário de Santo Ângelo,ERS 344,80,91,Rural,80 km/h
+45,Pelotão Rodoviário de Santo Ângelo,ERS 344,91,80,Rural,80 km/h
+46,Pelotão Rodoviário de Santo Ângelo,ERS 168,86,108,Rural,80 km/h
+47,Pelotão Rodoviário de Santo Ângelo,ERS 168,108,86,Rural,80 km/h
+48,Pelotão Rodoviário de Santo Ângelo,ERS 168,112,116,Rural,80 km/h
+49,Pelotão Rodoviário de Santo Ângelo,ERS 218,11,29,Rural,80 km/h
+50,Pelotão Rodoviário de Santo Ângelo,ERS 218,29,11,Rural,80 km/h
+51,Pelotão Rodoviário de Santo Ângelo,ERS 342,112,94,Rural,80 km/h
+52,Pelotão Rodoviário de Santo Augusto,ERS 155,40,60,Rural,80 km/h
+53,Pelotão Rodoviário de Santo Augusto,ERS 155,67,80,Rural,80 km/h
+54,Pelotão Rodoviário de Santo Augusto,ERS 210,16,29,Rural,80 km/h
+55,Pelotão Rodoviário de Santo Augusto,ERS 210,1,15,Rural,80 km/h
+56,Pelotão Rodoviário de Santo Augusto,RSC 472,36,42,Rural,80 km/h
+57,Grupo Rodoviário de Santa Rosa,ERS 344,47,57,Rural,80 km/h
+58,Grupo Rodoviário de Santa Rosa,ERS 344,2,20,Rural,80 km/h
+59,Grupo Rodoviário de Santa Rosa,ERS 344,21,38,Rural,80 km/h
+60,Grupo Rodoviário de Santa Rosa,ERS 344,58,79,Rural,80 km/h
+61,Grupo Rodoviário de Santa Rosa,RSC 472,156,161,Rural,80 km/h
+62,Grupo Rodoviário de Santa Rosa,RSC 472,136,163,Rural,80 km/h
+63,Grupo Rodoviário de Santa Rosa,RSC 472,164,180,Rural,80 km/h
+64,Grupo Rodoviário de Santa Rosa,RSC 472,181,197,Rural,80 km/h
+65,Grupo Rodoviário de Santa Rosa,ERS 305,2,12,Rural,80 km/h
+66,Grupo Rodoviário de Santa Rosa,ERS 305,13,33,Rural,80 km/h
+67,Grupo Rodoviário de Santa Rosa,ERS 307,1,27,Rural,80 km/h
+68,Grupo Rodoviário de Santa Rosa,ERS 307,28,48,Rural,80 km/h
+69,Grupo Rodoviário de Santa Rosa,ERS 307,49,57,Rural,80 km/h
+70,Grupo Rodoviário de Santa Rosa,ERS 342,1,23,Rural,80 km/h
+71,Grupo Rodoviário de Santa Rosa,ERS 342,24,41,Rural,80 km/h
+72,Grupo Rodoviário de Santa Rosa,ERS 342,42,72,Rural,80 km/h
+73,Grupo Rodoviário de Santa Rosa,ERS 540,2,22,Rural,80 km/h
+74,Grupo Rodoviário de Santa Rosa,ERS 344,47,57,Rural,80 km/h
+75,Grupo Rodoviário de Santa Rosa,ERS 344,2,20,Rural,80 km/h
+76,Grupo Rodoviário de Santa Rosa,ERS 344,21,38,Rural,80 km/h
+77,Grupo Rodoviário de Santa Rosa,ERS 344,58,79,Rural,80 km/h
+78,Grupo Rodoviário de Santa Rosa,ERS 165,59,69,Rural,80 km/h
