@@ -1,0 +1,1775 @@
+RADAR BRASIL — ESPECIFICAÇÃO FUNCIONAL, RELACIONAL E DE INTEGRAÇÃO
+VERSÃO: 1.1 — 10/10/2026 — REVISÃO COM REFERÊNCIAS DO GITHUB
+DESTINATÁRIO: IA RESPONSÁVEL PELA IMPLEMENTAÇÃO
+ESTADO: ESPECIFICAÇÃO PARA INICIAR O DESENVOLVIMENTO
+
+======================================================================
+0. INSTRUÇÃO DE EXECUÇÃO E LIBERDADE TECNOLÓGICA
+======================================================================
+
+Implemente o sistema descrito neste documento, em duas partes independentes:
+(1) COLETOR/SINCRONIZADOR; (2) APLICAÇÃO WEB/API DE CONSULTA.
+
+A escolha de linguagem de programação, frameworks, bibliotecas, ferramentas,
+organização interna e infraestrutura de execução pertence integralmente à IA
+implementadora. NÃO existe linguagem obrigatória, nem preferência prescrita.
+
+O banco deverá adotar modelagem relacional NORMALIZADA, no mínimo até a
+TERCEIRA FORMA NORMAL (3FN), com PK, FK, UNIQUE, CHECK, NOT NULL,
+relacionamentos 1:N e tabelas associativas para N:N sempre que cabíveis.
+
+O esquema lógico e a API não podem depender de PostGIS, SpatiaLite, funções
+geográficas proprietárias ou extensão geográfica obrigatória. Manter suporte
+arquitetural para PostgreSQL, MySQL, MariaDB, Firebird e SQLite, documentando
+adaptações de DDL, transações e índices necessárias em cada SGBD. Escolher
+uma implementação primária para entregar o código, sem mudar o modelo lógico.
+
+Não entregar apenas pseudocódigo: entregar código executável, migrações,
+coletores de fontes efetivamente acessíveis, API, serializadores, documentação,
+configuração, logs, testes, inicialização, cronograma de execução e instruções.
+
+Não inventar dados, APIs, URLs, credenciais, certificados, horários de operações,
+coordenadas ou campos efetivamente publicados. Os modelos deste documento
+incluem CAMPOS PREVISTOS que só poderão ser preenchidos com evidência
+correspondente. Se uma fonte não permitir acesso automatizado legítimo,
+registrar a limitação e manter as demais em operação.
+
+======================================================================
+1. PROPÓSITO, UNIDADE DE INFORMAÇÃO E COBERTURA
+======================================================================
+
+1.1 O sistema reunirá informações de radares e outros medidores de velocidade
+    identificados em publicações oficiais das esferas federal, estadual e
+    municipal. Inclui instrumentos fixos, portáteis e móveis quando as
+    categorias constarem nas publicações. Conservar a classificação original.
+
+1.2 Distinguir conceitualmente:
+    - PONTO_FISCALIZACAO: local/cadastro geográfico lógico.
+    - EQUIPAMENTO: instrumento físico, eventualmente identificado por série.
+    - INSTALACAO: vínculo temporal entre equipamento e ponto.
+    - FAIXA_FISCALIZACAO: faixa/sentido no ponto.
+    - REGIME_FISCALIZACAO: modalidade/período de fiscalização no ponto.
+    - OPERACAO: ato/agenda efetivo ou previsto de fiscalização, com data/hora
+      apenas quando a publicação oferecer evidências.
+    - TRECHO_ELEGIVEL: segmento em que uma operação portátil PODE ocorrer,
+      sem significar presença atual ou operação confirmada.
+    - VERIFICACAO_METROLOGICA: evento histórico de verificação de instrumento.
+    - OBSERVACAO_TRAFEGO: estatística/evento agregado publicado em fonte
+      complementar; não confundir com cadastro de equipamentos.
+
+1.3 A unidade padrão do endpoint /radares é o PONTO consolidado, contendo
+    equipamentos e instalações distinguíveis. O mesmo ponto pode reunir
+    mais de uma faixa/sentido e mais de um instrumento físico; isso NÃO é
+    duplicidade automática. Oferecer detalhamento por equipamento/instalação
+    sem multiplicar o ponto indevidamente. A resposta distingue contagens
+    total_pontos e total_equipamentos, nunca os soma como 'radares'.
+
+1.4 A ausência de radares encontrados NÃO significa inexistência de radares.
+    A resposta indicará cobertura, atualidade e fontes consultadas. Radares
+    portáteis sem localização atual confirmada não devem ser posicionados
+    arbitrariamente. Trechos elegíveis são devolvidos em coleção própria.
+    Uma operação portátil COM posição e janela temporal oficialmente
+    confirmadas pode ser consultada por /operacoes e também incluída na
+    coleção separada resultado.operacoes de /radares se solicitada, mesmo
+    sem PONTO_FISCALIZACAO vinculado. Não contá-la como radar instalado.
+
+1.5 O objetivo é cobertura nacional progressiva, não uma alegação de que
+    existe catálogo central completo ou monitoramento em tempo real.
+
+======================================================================
+2. FONTES PÚBLICAS, ENDEREÇOS E ESCOPO
+======================================================================
+
+O coletor deve descobrir dinamicamente recursos e versões em portais oficiais.
+Não fixar a URL de um arquivo mensal se o portal fornecer um conjunto com
+novas publicações. Preservar URLs, metadados, licenças e datas observadas.
+
+[F01] INMETRO / PSIE — CONSULTA NACIONAL METROLÓGICA
+Portal: https://servicos.rbmlq.gov.br/
+Consulta: https://servicos.rbmlq.gov.br/Instrumento
+Orientação oficial: https://www.gov.br/inmetro/pt-br/acesso-a-informacao/perguntas-frequentes/metrologia-legal/medidor-de-velocidade-radar/como-obter-acesso-ao-certificado-de-verificacao-dos-medidores-de-velocidade
+Catálogo de dados: https://dados.gov.br/dados/conjuntos-dados/portal-de-servicos-do-inmetro-nos-estados-psie
+Finalidade: identificar instrumentos verificados e históricos/certificados,
+inclusive de órgãos estaduais e municipais quando existentes. ATENÇÃO:
+o catálogo nacional NÃO foi comprovado como base pública única, integral,
+georreferenciada e com API massiva acessível. Confirmar recursos JSON/XML,
+atualidade, formatos, limites de acesso e licenças antes de codificar downloads.
+Não contornar CAPTCHA, autenticação, controles ou restrições de uso.
+
+[F02] ANTT — DADOS DOS RADARES EM RODOVIAS CONCEDIDAS
+Conjunto: https://dados.antt.gov.br/dataset/79d287f4-f5ca-4385-a17c-f61f53831f17
+Exemplo de recurso publicado (JUN/2026, NÃO URL PERMANENTE):
+https://dados.antt.gov.br/dataset/79d287f4-f5ca-4385-a17c-f61f53831f17/resource/a9dd232a-b3ff-4d23-a93f-e871123413a9/download/dados-dos-radares5_2026.json
+Recurso CSV da mesma publicação:
+https://dados.antt.gov.br/dataset/79d287f4-f5ca-4385-a17c-f61f53831f17/resource/35ae4963-e396-4742-82b1-335f0ac26188/download/dados-dos-radares5_2026.csv
+Dicionário oficial (descobrir versão vigente pelo conjunto):
+https://dados.antt.gov.br/dataset/radar/resource/f115dbc4-fb41-44ec-981e-62f263273288
+Escopo: concessionárias, tipo/situação, via, km, latitude/longitude,
+sentido, pista, velocidades leves/pesados e demais atributos conforme
+layout real da edição coletada.
+
+[F03] ANTT — TRÁFEGO NOS RADARES (COMPLEMENTAR)
+https://dados.antt.gov.br/dataset/269aebaa-05e7-4d76-a105-408f12bf4094
+Escopo: observações agregadas e características de tráfego publicadas.
+Não transformar eventos/passagens em novos radares e não coletar dados
+pessoais de placas, motoristas ou passagens identificáveis.
+
+[F04] DNIT — CONTROLE DE VELOCIDADE / PNCV
+https://servicos.dnit.gov.br/dadosabertos/dataset/controle-de-velocidade
+Recursos confirmados na página: dicionário de dados e planilha XLSX de
+JULHO/2026, além de históricos. O cadastro inclui UF, rodovia, km,
+tipo/situação, quantidade de faixas, sentido, códigos técnicos e outros
+campos conforme planilha e dicionário. Não presumir coordenadas ou colunas
+que não constem da versão efetivamente baixada.
+
+[F05] PRF — RADARES FIXOS
+https://www.gov.br/prf/pt-br/assuntos/fiscalizacao-de-velocidade/radares-fixos
+Escopo: tabela/mapa de locais de radares fixos, referências técnicas,
+identificações e outras colunas da publicação vigente. Página alterada em
+23/09/2026 no momento de verificação da fonte.
+
+[F06] PRF — LISTA DE RADARES PORTÁTEIS
+https://www.gov.br/prf/pt-br/assuntos/fiscalizacao-de-velocidade/lista-de-radares
+Escopo: identificador administrativo de instrumento e número de série.
+NÃO contém necessariamente posição/hora atual do equipamento.
+
+[F07] PRF — TRECHOS CRÍTICOS PARA RADARES PORTÁTEIS
+https://www.gov.br/prf/pt-br/assuntos/fiscalizacao-de-velocidade/trechos-criticos
+Escopo: locais passíveis de fiscalização, NÃO operações confirmadas.
+Página atualizada em 02/10/2026 no momento de verificação.
+
+[F08] DER-SP — RADARES ESTADUAIS
+https://dadosabertos.sp.gov.br/dataset/radar
+Escopo: localização/informações e recurso XLSX ou links para sistemas
+oficiais. Confirmar a versão e dicionário obtidos no momento da coleta.
+
+[F09] DER-PR — FISCALIZAÇÃO FIXA E PORTÁTIL
+https://www.der.pr.gov.br/Pagina/Fiscalizacao-de-velocidade
+Escopo: áreas/documentos de fiscalização por equipamento fixo e portátil.
+Seguir recursos oficiais vinculados e suas atualizações.
+
+[F10] DER-MG — LOCALIZAÇÃO DE RADARES
+https://der.mg.gov.br/transportes/localizacao-de-radares-fixos-e-portateis
+Escopo: tabelas oficiais com rodovia, km, município, velocidade, números
+de equipamento, números de série, datas de início e entidades responsáveis.
+Página constatada atualizada em 09/10/2026. Um mesmo registro de ponto pode
+listar VÁRIOS números administrativos e uma ou mais séries; jamais assumir
+correspondência posicional 1:1 sem examinar o documento e suas evidências.
+
+[F11] CURITIBA — FISCALIZAÇÃO ELETRÔNICA MUNICIPAL
+https://transito.curitiba.pr.gov.br/fiscalizacaoeletronica
+Escopo: locais e características de fiscalização divulgados pelo município.
+
+[F12] RECIFE — EQUIPAMENTOS DE FISCALIZAÇÃO MUNICIPAL
+https://dados.recife.pe.gov.br/dataset/equipamentos-de-monitoramento-e-fiscalizacao-de-transito
+Escopo: recursos CSV, dicionários JSON, localização de equipamentos.
+Página indicava periodicidade anual e atualização de 02/03/2026.
+
+[F13] BELO HORIZONTE — FISCALIZAÇÃO ELETRÔNICA
+https://dados.pbh.gov.br/pt_BR/dataset/fiscalizacao-eletronica
+CANDIDATO A VALIDAR: disponibilidade técnica não confirmada nesta revisão.
+
+[F14] DEMAIS 26 UF, DISTRITO FEDERAL E MUNICÍPIOS
+Descobrir sistematicamente portais oficiais estaduais/municipais e inserir
+como fontes individualizadas com órgão titular, abrangência, recurso,
+periodicidade e estado de verificação. Ausência de conector não pode ser
+substituída por afirmação de que a região não possui radares.
+
+MANTER PARA CADA FONTE:
+  identificador, órgão, esfera, abrangência, URL institucional, URL de
+  dataset, URL de recurso, formato, licença, documentação/dicionário,
+  periodicidade declarada, última publicação conhecida, última verificação,
+  último download validado, situação de acesso e cobertura espacial.
+
+======================================================================
+3. MODELO RELACIONAL — REGRAS DE NORMALIZAÇÃO E PORTABILIDADE
+======================================================================
+
+3.1 Exigir 1FN/2FN/3FN em TODAS as tabelas canônicas. Evitar grupos
+    repetidos, listas separadas por vírgulas, colunas 'faixa1/faixa2',
+    atributos multivalorados e dependências transitivas. Arrays/objetos
+    existem na API de saída, gerados por JOIN/agrupamento, não em colunas
+    canônicas do banco.
+
+3.2 Nomear cada PK explicitamente. Cada FK deve apontar para PK/UNIQUE
+    existente. Definir ON DELETE RESTRICT para dados históricos referenciados;
+    não permitir cascata que apague dados de auditoria. Executar migrações
+    transacionais onde suportado. No SQLite, ativar PRAGMA foreign_keys=ON.
+
+3.3 IDs internos estáveis, opacos, preferencialmente inteiros de 64 bits no
+    esquema lógico. Gerar IDs conforme mecanismo do SGBD escolhido. NÃO
+    reutilizar chaves de origem como PK globais.
+
+3.4 Tipos lógicos portáveis: ID=inteiro de 64 bits; TEXTO=VARCHAR/TEXT;
+    DATA=date; INSTANTE=datetime/timestamp em UTC; DECIMAL(p,s) com precisão
+    explícita; BOOLEAN com CHECK quando o SGBD não tiver boolean nativo.
+    Decimais geográficos: DECIMAL(10,7), latitude -90..90, longitude -180..180.
+    KM: DECIMAL(10,3); velocidades DECIMAL(6,2), metros DECIMAL(12,3).
+
+3.5 Onde o SGBD não aplicar CHECK adequadamente, repetir o controle em
+    validação de aplicação e em testes de integridade; não aceitar gravação
+    inválida por qualquer caminho. Ao usar SQLite, exigir versão que aplique
+    CHECK e FOREIGN KEY corretamente. Usar motores transacionais no MySQL.
+
+3.6 Não duplicar UF dentro de município se ela é obtida por FK. Não gravar
+    distancia_metros no cadastro: distância é resultado calculado da consulta.
+    Não gravar fiscalizacao_pontual como campo redundante se derivável da
+    modalidade e da existência de operação; a API o calcula e pode retornar
+    null quando a modalidade é desconhecida.
+
+3.7 Dados de origem brutos podem ser guardados como texto JSON/CSV original
+    para auditoria, em tabelas de ingestão separadas. Isso NÃO substitui
+    entidades canônicas normalizadas, nem autoriza EAV genérico como esquema
+    principal. Cada atributo oficial não mapeado permanece preservado no
+    payload original e no catálogo de mapeamentos para evolução posterior.
+
+======================================================================
+4. DICIONÁRIO DE TABELAS CANÔNICAS (PK, FK, CHECK, UNIQUE)
+======================================================================
+
+CONVENÇÕES:
+PK = chave primária; FK = chave estrangeira; NN = NOT NULL;
+UQ = UNIQUE; CK = CHECK. Campos não assinalados NN aceitam NULL quando
+não confirmados. Cada tabela possui ID PK salvo associativas com PK composta.
+Colunas created_at/updated_at e controle de auditoria por entidade deverão
+ser implementadas coerentemente, sem substituir datas vindas da fonte.
+
+--- TERRITÓRIO E ORGANIZAÇÕES ---
+
+T01 UF
+  sigla CHAR(2) PK; nome TEXTO NN UQ.
+  CK sigla no conjunto oficial válido de UF, incluindo DF.
+
+T02 MUNICIPIO
+  codigo_ibge CHAR(7) PK; uf_sigla CHAR(2) NN FK->UF.sigla;
+  nome TEXTO NN; UQ(uf_sigla,nome) somente se normalização oficial de nomes
+  for garantida; preferir codigo_ibge como identidade estável.
+
+T03 TIPO_VIA
+  id PK; codigo TEXTO NN UQ; descricao TEXTO NN.
+  Ex.: federal, estadual, municipal, urbana, outra, desconhecida.
+
+T04 VIA
+  id PK; tipo_via_id NN FK->TIPO_VIA; codigo TEXTO NN;
+  nome TEXTO; observacao TEXTO; UQ(tipo_via_id,codigo) se escopo inequívoco.
+  Não colocar uma única UF obrigatória em BRs interestaduais.
+
+T05 VIA_UF (N:N)
+  via_id FK->VIA; uf_sigla FK->UF; PK(via_id,uf_sigla).
+
+T06 ORGANIZACAO
+  id PK; nome TEXTO NN; tipo_organizacao_id NN FK->TIPO_ORGANIZACAO;
+  municipio_id FK->MUNICIPIO.codigo_ibge; cnpj TEXTO;
+  site_oficial TEXTO; UQ(cnpj) quando não nulo e validado.
+
+T07 TIPO_ORGANIZACAO
+  id PK; codigo TEXTO NN UQ; descricao TEXTO NN.
+  Domínios: órgão público, concessionária, fabricante, laboratório,
+  operador privado, mantenedora, outro, desconhecido.
+
+T08 PAPEL_ORGANIZACAO
+  id PK; codigo TEXTO NN UQ; descricao TEXTO NN.
+  Ex.: fiscalizador, titular_via, concessionaria, operador, mantenedor,
+  fabricante, verificador, emissor_documento.
+
+--- CATÁLOGOS DE CLASSIFICAÇÃO ---
+
+T09 TIPO_RADAR
+  id PK; codigo TEXTO NN UQ; descricao TEXTO NN.
+  Valores iniciais: fixo, portatil, movel, desconhecido.
+  Não equiparar automaticamente portátil a móvel.
+
+T10 FUNCAO_EQUIPAMENTO
+  id PK; codigo TEXTO NN UQ; descricao TEXTO NN.
+  Ex.: controlador, redutor, misto, outro, desconhecido; preservar CEV,
+  CEM e REV no identificador/classificação original também.
+
+T11 TECNOLOGIA_MEDICAO
+  id PK; codigo TEXTO NN UQ; descricao TEXTO NN.
+
+T12 SITUACAO_OPERACIONAL
+  id PK; codigo TEXTO NN UQ; descricao TEXTO NN.
+  Ex.: ativo, inativo, manutencao, em_instalacao, suspenso, desconhecido.
+  Estado operacional, NÃO validade do certificado metrológico.
+
+T13 MODALIDADE_FISCALIZACAO
+  id PK; codigo TEXTO NN UQ; descricao TEXTO NN.
+  permanente, pontual, itinerante, por_trecho, desconhecida.
+
+T14 TIPO_MEDICAO
+  id PK; codigo TEXTO NN UQ; descricao TEXTO NN.
+  velocidade_instantanea, velocidade_media_trecho, outra, desconhecida.
+
+T15 SENTIDO
+  id PK; codigo TEXTO NN UQ; descricao TEXTO NN.
+  crescente, decrescente, ambos, sentido_geografico, desconhecido.
+  Guardar descrição literal do órgão separadamente quando necessário.
+
+T16 CATEGORIA_VEICULO
+  id PK; codigo TEXTO NN UQ; descricao TEXTO NN.
+  leves, pesados, geral, categoria_original, desconhecida.
+
+T17 SITUACAO_OPERACAO
+  id PK; codigo TEXTO NN UQ; descricao TEXTO NN.
+  planejada, confirmada, encerrada, cancelada, desconhecida.
+
+T18 RESULTADO_VERIFICACAO
+  id PK; codigo TEXTO NN UQ; descricao TEXTO NN.
+  conforme, nao_conforme, outro, desconhecido; usar categorias reais.
+
+T19 TIPO_VERIFICACAO
+  id PK; codigo TEXTO NN UQ; descricao TEXTO NN.
+  inicial, periodica, apos_reparo, outra, desconhecida.
+
+T20 TIPO_DOCUMENTO
+  id PK; codigo TEXTO NN UQ; descricao TEXTO NN.
+  estudo_tecnico, certificado, portaria, relatorio, edital, outro.
+
+T21 TIPO_IDENTIFICADOR
+  id PK; codigo TEXTO NN UQ; descricao TEXTO NN.
+  id_orgao, codigo_equipamento, serie, codigo_et, cadastro_local, outro.
+
+T22 QUALIDADE_POSICAO
+  id PK; codigo TEXTO NN UQ; descricao TEXTO NN.
+  oficial, oficial_imprecisa, inferida, estimada, conflitante, desconhecida.
+
+--- POSIÇÃO, PONTO, FAIXAS E TRECHOS ---
+
+T23 POSICAO_GEOGRAFICA
+  id PK; latitude DECIMAL(10,7) NN; longitude DECIMAL(10,7) NN;
+  precisao_metros DECIMAL(12,3); qualidade_posicao_id NN FK->T22;
+  metodo_obtencao TEXTO; registro_fonte_id FK->REGISTRO_FONTE.id;
+  CK(-90<=latitude<=90); CK(-180<=longitude<=180);
+  CK(precisao_metros IS NULL OR precisao_metros>=0).
+  Não usar coordenada ZERO/ZERO como substituição de NULL.
+
+T24 ENDERECO
+  id PK; logradouro TEXTO;
+  numero TEXTO; bairro TEXTO; complemento TEXTO; cep CHAR(8);
+  ponto_referencia TEXTO; CK CEP numérico com 8 dígitos quando preenchido.
+
+T25 PONTO_FISCALIZACAO
+  id PK; posicao_id FK->POSICAO_GEOGRAFICA;
+  endereco_id FK->ENDERECO; municipio_id FK->MUNICIPIO;
+  via_id FK->VIA; km DECIMAL(10,3); tipo_pista TEXTO;
+  situacao_operacional_id FK->SITUACAO_OPERACIONAL;
+  inicio_operacao INSTANTE; data_inativacao DATA; observacoes TEXTO;
+  CK(km IS NULL OR km>=0).
+  Não impor UNIQUE(latitude,longitude), pois há pontos distintos próximos.
+  municipio_id pode ser NULL se localização não confirmada.
+
+T26 PONTO_ORGANIZACAO (N:N COM PAPEL E HISTÓRICO)
+  id PK; ponto_id NN FK->PONTO_FISCALIZACAO;
+  organizacao_id NN FK->ORGANIZACAO;
+  papel_id NN FK->PAPEL_ORGANIZACAO;
+  inicio_em INSTANTE; fim_em INSTANTE;
+  CK(fim_em IS NULL OR inicio_em IS NULL OR fim_em>=inicio_em).
+
+T27 FAIXA_FISCALIZACAO
+  id PK; ponto_id NN FK->PONTO_FISCALIZACAO;
+  numero_faixa INTEIRO; sentido_id FK->SENTIDO;
+  sentido_original TEXTO; descricao TEXTO;
+  CK(numero_faixa IS NULL OR numero_faixa>=1).
+  A quantidade agregada publicada não autoriza criar números de faixa
+  fictícios; quando só houver a contagem, guardá-la em atributo específico
+  da observação de origem e expor no contrato sem inventar faixas numeradas.
+
+T28 LIMITE_VELOCIDADE
+  id PK; ponto_id FK->PONTO_FISCALIZACAO;
+  faixa_id FK->FAIXA_FISCALIZACAO;
+  categoria_veiculo_id NN FK->CATEGORIA_VEICULO;
+  velocidade_kmh DECIMAL(6,2) NN;
+  vigencia_inicio INSTANTE; vigencia_fim INSTANTE;
+  registro_fonte_id FK->REGISTRO_FONTE;
+  CK(exatamente um entre ponto_id/faixa_id não nulo);
+  CK(velocidade_kmh>0 AND velocidade_kmh<=350);
+  CK(vigencia_fim IS NULL OR vigencia_inicio IS NULL OR
+     vigencia_fim>=vigencia_inicio).
+  Não inventar velocidade geral ao existir apenas velocidade por classe.
+
+T29 REGIME_FISCALIZACAO
+  id PK; ponto_id NN FK->PONTO_FISCALIZACAO;
+  modalidade_id NN FK->MODALIDADE_FISCALIZACAO;
+  tipo_medicao_id FK->TIPO_MEDICAO;
+  situacao_operacional_id FK->SITUACAO_OPERACIONAL;
+  inicio_em INSTANTE; fim_em INSTANTE;
+  fonte_registro_id FK->REGISTRO_FONTE;
+  CK(fim_em IS NULL OR inicio_em IS NULL OR fim_em>=inicio_em).
+  fiscalizacao_pontual na API é DERIVADA: true se modalidade pontual
+  confirmada, false se modalidade expressamente não pontual, null se
+  desconhecida; não confundir histórico com operação atualmente ocorrendo.
+
+T30 TRECHO_ELEGIVEL
+  id PK; via_id NN FK->VIA; km_inicio DECIMAL(10,3);
+  km_fim DECIMAL(10,3); sentido_id FK->SENTIDO;
+  criterio_inclusao TEXTO; vigencia_inicio DATA; vigencia_fim DATA;
+  situacao TEXTO; registro_fonte_id FK->REGISTRO_FONTE;
+  CK(km_inicio IS NULL OR km_inicio>=0);
+  CK(km_fim IS NULL OR km_fim>=0);
+  CK(km_inicio IS NULL OR km_fim IS NULL OR km_fim>=km_inicio);
+  CK(vigencia_fim IS NULL OR vigencia_inicio IS NULL OR
+     vigencia_fim>=vigencia_inicio).
+
+T31 TRECHO_MUNICIPIO (N:N)
+  trecho_id FK->TRECHO_ELEGIVEL;
+  municipio_id FK->MUNICIPIO; PK(trecho_id,municipio_id).
+
+T32 TRECHO_VERTICE
+  trecho_id FK->TRECHO_ELEGIVEL;
+  ordem INTEIRO; posicao_id NN FK->POSICAO_GEOGRAFICA;
+  PK(trecho_id,ordem); CK(ordem>=0).
+  Vértices só existem se obtidos legitimamente; km inicial/final sem
+  traçado não autoriza afirmar distância geométrica precisa ao trecho.
+
+--- INSTRUMENTOS E INSTALAÇÕES ---
+
+T33 MODELO_EQUIPAMENTO
+  id PK; fabricante_id FK->ORGANIZACAO;
+  nome_modelo TEXTO NN; tecnologia_id FK->TECNOLOGIA_MEDICAO;
+  registro_aprovacao_inmetro TEXTO; portaria_aprovacao_modelo TEXTO;
+  UQ(fabricante_id,nome_modelo) onde factível e com nomes normalizados.
+
+T34 EQUIPAMENTO
+  id PK; modelo_id FK->MODELO_EQUIPAMENTO;
+  tipo_radar_id NN FK->TIPO_RADAR;
+  numero_serie TEXTO; ano_fabricacao INTEIRO;
+  observacoes TEXTO; CK(ano_fabricacao IS NULL OR
+  (ano_fabricacao>=1900 AND ano_fabricacao<=2100)).
+  Não criar UNIQUE(numero_serie) global. Números de série podem repetir
+  entre fabricantes, modelos e domínios; decidir identidade por evidência.
+
+T35 INSTALACAO
+  id PK; ponto_id NN FK->PONTO_FISCALIZACAO;
+  equipamento_id NN FK->EQUIPAMENTO;
+  funcao_equipamento_id FK->FUNCAO_EQUIPAMENTO;
+  situacao_operacional_id FK->SITUACAO_OPERACIONAL;
+  inicio_em INSTANTE; fim_em INSTANTE;
+  data_inicio_autuacao DATA; data_inicio_educativo DATA;
+  observacoes TEXTO;
+  CK(fim_em IS NULL OR inicio_em IS NULL OR fim_em>=inicio_em).
+  Uma mesma peça física pode passar por várias instalações em pontos
+  diferentes ao longo do tempo, mas intervalos incompatíveis de uso
+  simultâneo de mesma série devem gerar conflito e revisão.
+
+T36 INSTALACAO_FAIXA (N:N)
+  instalacao_id FK->INSTALACAO;
+  faixa_id FK->FAIXA_FISCALIZACAO;
+  PK(instalacao_id,faixa_id).
+  Validar via trigger/aplicação que a faixa pertence ao ponto da instalação.
+
+--- OPERAÇÕES E AGENDA DE FISCALIZAÇÃO ---
+
+T37 OPERACAO_FISCALIZACAO
+  id PK; modalidade_id NN FK->MODALIDADE_FISCALIZACAO;
+  situacao_operacao_id NN FK->SITUACAO_OPERACAO;
+  organizacao_id FK->ORGANIZACAO;
+  ponto_id FK->PONTO_FISCALIZACAO;
+  trecho_id FK->TRECHO_ELEGIVEL;
+  posicao_id FK->POSICAO_GEOGRAFICA;
+  via_id FK->VIA; municipio_id FK->MUNICIPIO;
+  km DECIMAL(10,3); descricao TEXTO;
+  inicio_em INSTANTE; fim_em INSTANTE; fuso_original TEXTO;
+  publicado_em INSTANTE; registro_fonte_id FK->REGISTRO_FONTE;
+  CK(fim_em IS NULL OR inicio_em IS NULL OR fim_em>=inicio_em);
+  CK(km IS NULL OR km>=0).
+  Uma operação pode estar associada a um trecho ou ponto, mas nunca
+  é criada automaticamente só pela existência de trecho elegível.
+  Horários ausentes permanecem NULL; não presumir operação de 24h.
+
+T38 OPERACAO_EQUIPAMENTO (N:N)
+  operacao_id FK->OPERACAO_FISCALIZACAO;
+  equipamento_id FK->EQUIPAMENTO;
+  PK(operacao_id,equipamento_id).
+
+T39 OPERACAO_FAIXA (N:N)
+  operacao_id FK->OPERACAO_FISCALIZACAO;
+  faixa_id FK->FAIXA_FISCALIZACAO;
+  PK(operacao_id,faixa_id).
+
+T40 OPERACAO_RECORRENCIA
+  id PK; operacao_id NN FK->OPERACAO_FISCALIZACAO;
+  regra_repeticao TEXTO NN; fuso_horario TEXTO;
+  data_inicio DATA; data_fim DATA;
+  CK(data_fim IS NULL OR data_inicio IS NULL OR data_fim>=data_inicio).
+  Regras devem ser baseadas em publicação oficial, jamais estimadas.
+
+T41 RECORRENCIA_DIA
+  recorrencia_id FK->OPERACAO_RECORRENCIA;
+  dia_semana INTEIRO; hora_inicio TIME; hora_fim TIME;
+  PK(recorrencia_id,dia_semana,hora_inicio); hora_inicio NN;
+  CK(dia_semana BETWEEN 1 AND 7);
+  horário cruzando meia-noite exige representação sem ambiguidade.
+
+--- IDENTIFICADORES EXTERNOS, DOCUMENTOS E VERIFICAÇÕES ---
+
+T42 IDENTIFICADOR_EXTERNO
+  id PK; fonte_id NN FK->FONTE;
+  tipo_identificador_id NN FK->TIPO_IDENTIFICADOR;
+  valor TEXTO NN; valor_normalizado TEXTO NN;
+  UQ(fonte_id,tipo_identificador_id,valor_normalizado).
+  Identificador administrativo não é número de série por definição.
+
+T43 IDENTIFICADOR_PONTO (N:N / HISTÓRICO)
+  id PK; identificador_id NN FK->IDENTIFICADOR_EXTERNO;
+  ponto_id NN FK->PONTO_FISCALIZACAO;
+  vigencia_inicio INSTANTE; vigencia_fim INSTANTE;
+  UQ(identificador_id,ponto_id,vigencia_inicio) na convenção adotada.
+
+T44 IDENTIFICADOR_EQUIPAMENTO (N:N / HISTÓRICO)
+  id PK; identificador_id NN FK->IDENTIFICADOR_EXTERNO;
+  equipamento_id NN FK->EQUIPAMENTO;
+  vigencia_inicio INSTANTE; vigencia_fim INSTANTE.
+
+T45 IDENTIFICADOR_OPERACAO (N:N / HISTÓRICO)
+  id PK; identificador_id NN FK->IDENTIFICADOR_EXTERNO;
+  operacao_id NN FK->OPERACAO_FISCALIZACAO;
+  vigencia_inicio INSTANTE; vigencia_fim INSTANTE.
+
+T46 VERIFICACAO_METROLOGICA
+  id PK; equipamento_id NN FK->EQUIPAMENTO;
+  tipo_verificacao_id NN FK->TIPO_VERIFICACAO;
+  resultado_id NN FK->RESULTADO_VERIFICACAO;
+  orgao_executor_id FK->ORGANIZACAO;
+  data_verificacao DATA; validade_ate DATA;
+  numero_certificado TEXTO; norma_aplicada TEXTO;
+  observacoes TEXTO; registro_fonte_id FK->REGISTRO_FONTE;
+  CK(validade_ate IS NULL OR data_verificacao IS NULL OR
+     validade_ate>=data_verificacao).
+  Várias verificações legítimas NÃO são duplicatas.
+
+T47 DOCUMENTO
+  id PK; tipo_documento_id NN FK->TIPO_DOCUMENTO;
+  codigo_documento TEXTO; titulo TEXTO; url TEXTO;
+  orgao_emissor_id FK->ORGANIZACAO;
+  data_emissao DATA; validade_ate DATA; hash_conteudo TEXTO;
+  descricao TEXTO; CK(validade_ate IS NULL OR data_emissao IS NULL
+  OR validade_ate>=data_emissao).
+
+T48 DOCUMENTO_PONTO (N:N)
+  documento_id FK->DOCUMENTO; ponto_id FK->PONTO_FISCALIZACAO;
+  PK(documento_id,ponto_id).
+
+T49 DOCUMENTO_EQUIPAMENTO (N:N)
+  documento_id FK->DOCUMENTO; equipamento_id FK->EQUIPAMENTO;
+  PK(documento_id,equipamento_id).
+
+T50 DOCUMENTO_VERIFICACAO (N:N)
+  documento_id FK->DOCUMENTO;
+  verificacao_id FK->VERIFICACAO_METROLOGICA;
+  PK(documento_id,verificacao_id).
+
+T51 DOCUMENTO_OPERACAO (N:N)
+  documento_id FK->DOCUMENTO; operacao_id FK->OPERACAO_FISCALIZACAO;
+  PK(documento_id,operacao_id).
+
+T52 DOCUMENTO_TRECHO (N:N)
+  documento_id FK->DOCUMENTO; trecho_id FK->TRECHO_ELEGIVEL;
+  PK(documento_id,trecho_id).
+
+--- TRÁFEGO AGREGADO ---
+
+T53 OBSERVACAO_TRAFEGO
+  id PK; registro_fonte_id NN FK->REGISTRO_FONTE;
+  equipamento_id FK->EQUIPAMENTO;
+  ponto_id FK->PONTO_FISCALIZACAO;
+  faixa_id FK->FAIXA_FISCALIZACAO;
+  categoria_veiculo_id FK->CATEGORIA_VEICULO;
+  sentido_id FK->SENTIDO;
+  instante_observacao INSTANTE; data_observacao DATA;
+  velocidade_publicada TEXTO;
+  velocidade_kmh DECIMAL(6,2); volume_total INTEIRO;
+  CK(volume_total IS NULL OR volume_total>=0);
+  CK(velocidade_kmh IS NULL OR velocidade_kmh>=0);
+  UQ(registro_fonte_id) apenas se 1 registro bruto gerar exatamente 1
+  observação; caso contrário, usar ordem_subregistro na chave.
+  NÃO armazenar CPF, placa, identificação de veículo ou motorista.
+
+======================================================================
+5. TABELAS DE COLETA, CACHE, PUBLICAÇÃO E PROVENIÊNCIA
+======================================================================
+
+O coletor grava primeiro conteúdo imutável e faz staging/validação.
+O banco publicado só muda após concluir uma atualização consistente.
+As tabelas a seguir também fazem parte do modelo relacional, com PK/FK.
+
+T54 FONTE
+  id PK; organizacao_id NN FK->ORGANIZACAO;
+  nome TEXTO NN; url_institucional TEXTO NN;
+  esfera TEXTO NN CK IN('federal','estadual','municipal','distrital',
+  'outra','desconhecida'); licenca TEXTO;
+  documentacao_url TEXTO; situacao TEXTO NN;
+  periodicidade_declarada TEXTO; observacoes TEXTO.
+
+T55 COBERTURA_FONTE
+  id PK; fonte_id NN FK->FONTE;
+  tipo_abrangencia TEXTO NN CK IN('nacional','estadual','municipal',
+  'rodoviaria','desconhecida');
+  uf_sigla FK->UF; municipio_id FK->MUNICIPIO; via_id FK->VIA;
+  vigencia_inicio DATA; vigencia_fim DATA; confirmada BOOLEAN NN;
+  CK(vigencia_fim IS NULL OR vigencia_inicio IS NULL
+  OR vigencia_fim>=vigencia_inicio);
+  CK: abrangência MUNICIPAL exige municipio_id; ESTADUAL exige uf_sigla;
+  RODOVIARIA exige via_id; NACIONAL não exige filtros administrativos.
+  Abrangência institucional não prova cobertura COMPLETA de radares.
+
+T56 RECURSO_FONTE
+  id PK; fonte_id NN FK->FONTE; nome TEXTO NN;
+  url_recurso TEXTO NN; formato_origem TEXTO NN;
+  dicionario_url TEXTO; periodicidade_segundos INTEIRO;
+  ativo BOOLEAN NN; tamanho_maximo_bytes BIGINT;
+  status_integracao TEXTO NN;
+  CK(periodicidade_segundos IS NULL OR periodicidade_segundos>0);
+  CK(tamanho_maximo_bytes IS NULL OR tamanho_maximo_bytes>0).
+
+T57 ARTEFATO_COLETA
+  id PK; recurso_id NN FK->RECURSO_FONTE;
+  hash_sha256 CHAR(64) NN; caminho_cache TEXTO NN;
+  bytes_arquivo BIGINT NN; tipo_mime TEXTO;
+  etag TEXTO; last_modified_http TEXTO;
+  data_publicacao_origem INSTANTE;
+  baixado_em INSTANTE NN; validado_em INSTANTE;
+  resultado_validacao TEXTO NN;
+  UQ(recurso_id,hash_sha256); CK(bytes_arquivo>=0).
+  Cópias imutáveis e versionadas, jamais sobrescritas no mesmo caminho.
+
+T58 EXECUCAO_COLETA
+  id PK; recurso_id NN FK->RECURSO_FONTE;
+  artefato_id FK->ARTEFATO_COLETA;
+  iniciada_em INSTANTE NN; terminada_em INSTANTE;
+  status TEXTO NN; http_status INTEIRO;
+  tentativas INTEIRO NN; linhas_recebidas INTEIRO;
+  linhas_validas INTEIRO; linhas_rejeitadas INTEIRO;
+  registros_criados INTEIRO; registros_alterados INTEIRO;
+  erro_codigo TEXTO; erro_detalhe TEXTO;
+  CK(terminada_em IS NULL OR terminada_em>=iniciada_em);
+  CK(tentativas>=0); CK(http_status IS NULL OR http_status BETWEEN 100 AND 599);
+  CK(contadores não negativos).
+  O mesmo artefato pode estar associado a múltiplas execuções (HTTP 304).
+
+T59 REGISTRO_FONTE
+  id PK; artefato_id NN FK->ARTEFATO_COLETA;
+  numero_ordem INTEIRO NN; identificador_na_fonte TEXTO;
+  payload_original TEXTO NN; hash_registro CHAR(64) NN;
+  status_validacao TEXTO NN;
+  UQ(artefato_id,numero_ordem); CK(numero_ordem>=0).
+  Preservar valores brutos mesmo se descartados da visão publicada.
+
+T60 ERRO_VALIDACAO
+  id PK; execucao_id FK->EXECUCAO_COLETA;
+  registro_id FK->REGISTRO_FONTE;
+  campo_origem TEXTO; codigo_erro TEXTO NN;
+  descricao TEXTO NN; severidade TEXTO NN;
+  registrado_em INSTANTE NN;
+  CK(execucao_id IS NOT NULL OR registro_id IS NOT NULL).
+
+T61 SNAPSHOT_PUBLICADO
+  id PK; anterior_id FK->SNAPSHOT_PUBLICADO;
+  publicado_em INSTANTE NN; status TEXTO NN;
+  resumo_validacao TEXTO; identificador_versao TEXTO NN UQ.
+  Não publicar snapshot parcial como se fosse completo.
+
+T62 SNAPSHOT_RECURSO (N:N)
+  snapshot_id FK->SNAPSHOT_PUBLICADO;
+  recurso_id FK->RECURSO_FONTE;
+  artefato_id FK->ARTEFATO_COLETA;
+  PK(snapshot_id,recurso_id).
+  Garantir que o artefato selecionado pertence ao recurso correspondente.
+
+T63 VINCULO_REGISTRO_PONTO
+  registro_id FK->REGISTRO_FONTE;
+  ponto_id FK->PONTO_FISCALIZACAO;
+  confianca DECIMAL(5,4);
+  decisao_id FK->DECISAO_DUPLICIDADE;
+  PK(registro_id,ponto_id); CK(confianca IS NULL OR confianca BETWEEN 0 AND 1).
+
+T64 VINCULO_REGISTRO_EQUIPAMENTO
+  registro_id FK->REGISTRO_FONTE;
+  equipamento_id FK->EQUIPAMENTO;
+  confianca DECIMAL(5,4); decisao_id FK->DECISAO_DUPLICIDADE;
+  PK(registro_id,equipamento_id);
+  CK(confianca IS NULL OR confianca BETWEEN 0 AND 1).
+
+T65 VINCULO_REGISTRO_OPERACAO
+  registro_id FK->REGISTRO_FONTE;
+  operacao_id FK->OPERACAO_FISCALIZACAO;
+  confianca DECIMAL(5,4); decisao_id FK->DECISAO_DUPLICIDADE;
+  PK(registro_id,operacao_id).
+
+T66 VINCULO_REGISTRO_TRECHO
+  registro_id FK->REGISTRO_FONTE;
+  trecho_id FK->TRECHO_ELEGIVEL;
+  confianca DECIMAL(5,4); decisao_id FK->DECISAO_DUPLICIDADE;
+  PK(registro_id,trecho_id).
+
+T67 VINCULO_REGISTRO_VERIFICACAO
+  registro_id FK->REGISTRO_FONTE;
+  verificacao_id FK->VERIFICACAO_METROLOGICA;
+  PK(registro_id,verificacao_id).
+
+T68 REGRA_DEDUPLICACAO
+  id PK; versao TEXTO NN UQ; descricao TEXTO NN;
+  configuracao_serializada TEXTO NN; inicio_validade INSTANTE NN.
+  Configuração é de regra, não cadastro de radares; versão imutável.
+
+T69 CANDIDATO_DUPLICIDADE
+  id PK; registro_a_id NN FK->REGISTRO_FONTE;
+  registro_b_id NN FK->REGISTRO_FONTE;
+  regra_id NN FK->REGRA_DEDUPLICACAO;
+  score DECIMAL(5,4); estado TEXTO NN;
+  evidencias_resumo TEXTO; gerado_em INSTANTE NN;
+  CK(registro_a_id < registro_b_id);
+  CK(score IS NULL OR score BETWEEN 0 AND 1);
+  UQ(registro_a_id,registro_b_id,regra_id).
+
+T70 DECISAO_DUPLICIDADE
+  id PK; candidato_id NN FK->CANDIDATO_DUPLICIDADE;
+  decisao TEXTO NN CK IN('unificar','manter_separados','revisar');
+  fundamentacao TEXTO NN; ator TEXTO NN;
+  decidida_em INSTANTE NN; revertida_em INSTANTE;
+  observacoes TEXTO.
+  Registrar regras, evidências e motivo; decisões reversíveis e auditáveis.
+
+T71 CATALOGO_CAMPO
+  id PK; entidade_logica TEXTO NN; nome_campo TEXTO NN;
+  tipo_dado TEXTO NN; descricao TEXTO NN;
+  UQ(entidade_logica,nome_campo).
+  SOMENTE dicionário de mapeamento/proveniência, nunca substitui colunas
+  relacionais nem converte banco em EAV.
+
+T72 VALOR_OBSERVADO
+  id PK; registro_id NN FK->REGISTRO_FONTE;
+  campo_id NN FK->CATALOGO_CAMPO;
+  valor_original TEXTO; valor_normalizado TEXTO;
+  linha_origem TEXTO; pontuacao_qualidade DECIMAL(5,4);
+  CK(pontuacao_qualidade IS NULL OR pontuacao_qualidade BETWEEN 0 AND 1).
+  Guarda como uma origem afirmou certo campo. Para valores canônicos,
+  continuam valendo as colunas próprias das entidades T23..T53.
+
+T73 DECISAO_VALOR_CANONICO
+  id PK; valor_observado_id NN FK->VALOR_OBSERVADO;
+  ponto_id FK->PONTO_FISCALIZACAO;
+  equipamento_id FK->EQUIPAMENTO;
+  instalacao_id FK->INSTALACAO;
+  operacao_id FK->OPERACAO_FISCALIZACAO;
+  trecho_id FK->TRECHO_ELEGIVEL;
+  verificacao_id FK->VERIFICACAO_METROLOGICA;
+  status_decisao TEXTO NN; justificativa TEXTO;
+  decidida_em INSTANTE NN;
+  CK(exatamente UMA das seis FKs de entidade não é NULL).
+  A FK tipada evita 'tipo_entidade + id_entidade' sem integridade referencial.
+
+T74 ALERTA_OPERACIONAL
+  id PK; recurso_id FK->RECURSO_FONTE;
+  execucao_id FK->EXECUCAO_COLETA;
+  snapshot_id FK->SNAPSHOT_PUBLICADO;
+  chave_incidente TEXTO NN; nivel TEXTO NN;
+  status TEXTO NN; mensagem TEXTO NN;
+  primeira_ocorrencia INSTANTE NN; ultima_ocorrencia INSTANTE NN;
+  resolvido_em INSTANTE; ocorrencias INTEIRO NN;
+  CK(ocorrencias>=1); CK(ultima_ocorrencia>=primeira_ocorrencia).
+
+NOTAS DE NORMALIZAÇÃO E INTEGRIDADE:
+- UQ com campos nullable tem comportamento diferente conforme o SGBD;
+  documentar e testar explicitamente. Não depender de UQ(nullable) para
+  deduplicação de entidades sem chave natural segura.
+- Se uma FK condicional depender de outra (faixa no mesmo ponto, recurso
+  igual ao do artefato), implementar chave composta e FK composta ou
+  trigger transacional, com testes. Não confiar apenas no frontend.
+- Datas originais de emissão, verificação, coleta e publicação não são
+  equivalentes. UTC no armazenamento, timezone de origem preservado.
+- Cadeias codificadas em tabelas de domínio são cadastros relacionais,
+  com FK real, e não ENUM fechado que exija alterar código a cada novidade.
+- O esquema final pode acrescentar tabelas de associação quando novos
+  relacionamentos N:N aparecerem, sem violar 3FN nem perder proveniência.
+
+======================================================================
+6. MODELO ENTIDADE-RELACIONAMENTO (MER) — CARDINALIDADES
+======================================================================
+
+  UF 1:N MUNICIPIO
+  VIA N:N UF via VIA_UF
+  TIPO_VIA 1:N VIA
+  TIPO_ORGANIZACAO 1:N ORGANIZACAO
+  ORGANIZACAO 1:N FONTE
+  FONTE 1:N RECURSO_FONTE
+  FONTE 1:N COBERTURA_FONTE
+  RECURSO_FONTE 1:N ARTEFATO_COLETA
+  RECURSO_FONTE 1:N EXECUCAO_COLETA
+  ARTEFATO_COLETA 1:N REGISTRO_FONTE
+  ARTEFATO_COLETA 1:N EXECUCAO_COLETA (artefato reaproveitado)
+  SNAPSHOT_PUBLICADO N:N RECURSO_FONTE via SNAPSHOT_RECURSO
+  REGISTRO_FONTE 1:N ERRO_VALIDACAO
+  POSICAO_GEOGRAFICA 1:N PONTO_FISCALIZACAO (uso opcional)
+  MUNICIPIO 1:N PONTO_FISCALIZACAO
+  VIA 1:N PONTO_FISCALIZACAO
+  ENDERECO 1:N PONTO_FISCALIZACAO
+  PONTO_FISCALIZACAO N:N ORGANIZACAO via PONTO_ORGANIZACAO
+  PONTO_FISCALIZACAO 1:N FAIXA_FISCALIZACAO
+  PONTO_FISCALIZACAO 1:N REGIME_FISCALIZACAO
+  PONTO_FISCALIZACAO 1:N INSTALACAO
+  EQUIPAMENTO 1:N INSTALACAO
+  INSTALACAO N:N FAIXA_FISCALIZACAO via INSTALACAO_FAIXA
+  MODELO_EQUIPAMENTO 1:N EQUIPAMENTO
+  FABRICANTE (=ORGANIZACAO) 1:N MODELO_EQUIPAMENTO
+  EQUIPAMENTO 1:N VERIFICACAO_METROLOGICA
+  OPERACAO_FISCALIZACAO N:N EQUIPAMENTO via OPERACAO_EQUIPAMENTO
+  OPERACAO_FISCALIZACAO N:N FAIXA via OPERACAO_FAIXA
+  OPERACAO_FISCALIZACAO 1:N OPERACAO_RECORRENCIA
+  OPERACAO_RECORRENCIA 1:N RECORRENCIA_DIA
+  TRECHO_ELEGIVEL N:N MUNICIPIO via TRECHO_MUNICIPIO
+  TRECHO_ELEGIVEL 1:N TRECHO_VERTICE
+  DOCUMENTO N:N PONTO via DOCUMENTO_PONTO
+  DOCUMENTO N:N EQUIPAMENTO via DOCUMENTO_EQUIPAMENTO
+  DOCUMENTO N:N VERIFICACAO via DOCUMENTO_VERIFICACAO
+  DOCUMENTO N:N OPERACAO via DOCUMENTO_OPERACAO
+  DOCUMENTO N:N TRECHO via DOCUMENTO_TRECHO
+  REGISTRO_FONTE N:N entidades canônicas via tabelas VINCULO_*
+  REGISTRO_FONTE 1:N VALOR_OBSERVADO
+  VALOR_OBSERVADO 1:N DECISAO_VALOR_CANONICO
+  CANDIDATO_DUPLICIDADE 1:N DECISAO_DUPLICIDADE
+
+Diagrama simplificado (Mermaid ER para copiar/renderizar):
+
+```mermaid
+erDiagram
+  UF ||--o{ MUNICIPIO : contem
+  TIPO_VIA ||--o{ VIA : classifica
+  VIA ||--o{ PONTO_FISCALIZACAO : localiza
+  MUNICIPIO ||--o{ PONTO_FISCALIZACAO : abriga
+  POSICAO_GEOGRAFICA ||--o{ PONTO_FISCALIZACAO : referencia
+  PONTO_FISCALIZACAO ||--o{ FAIXA_FISCALIZACAO : possui
+  PONTO_FISCALIZACAO ||--o{ REGIME_FISCALIZACAO : possui
+  PONTO_FISCALIZACAO ||--o{ INSTALACAO : recebe
+  MODELO_EQUIPAMENTO ||--o{ EQUIPAMENTO : identifica
+  EQUIPAMENTO ||--o{ INSTALACAO : instalado_em
+  EQUIPAMENTO ||--o{ VERIFICACAO_METROLOGICA : tem
+  INSTALACAO ||--o{ INSTALACAO_FAIXA : controla
+  FAIXA_FISCALIZACAO ||--o{ INSTALACAO_FAIXA : controlada_por
+  EQUIPAMENTO ||--o{ OPERACAO_EQUIPAMENTO : participa
+  OPERACAO_FISCALIZACAO ||--o{ OPERACAO_EQUIPAMENTO : utiliza
+  TRECHO_ELEGIVEL ||--o{ TRECHO_VERTICE : geometria
+  TRECHO_ELEGIVEL ||--o{ OPERACAO_FISCALIZACAO : pode_referenciar
+  ORGANIZACAO ||--o{ FONTE : publica
+  FONTE ||--o{ RECURSO_FONTE : disponibiliza
+  RECURSO_FONTE ||--o{ ARTEFATO_COLETA : gera
+  ARTEFATO_COLETA ||--o{ REGISTRO_FONTE : contem
+  RECURSO_FONTE ||--o{ EXECUCAO_COLETA : processa
+  SNAPSHOT_PUBLICADO ||--o{ SNAPSHOT_RECURSO : agrega
+  RECURSO_FONTE ||--o{ SNAPSHOT_RECURSO : incluido
+  REGISTRO_FONTE ||--o{ VALOR_OBSERVADO : sustenta
+  REGISTRO_FONTE ||--o{ VINCULO_REGISTRO_PONTO : associa
+  PONTO_FISCALIZACAO ||--o{ VINCULO_REGISTRO_PONTO : consolidado
+  REGISTRO_FONTE ||--o{ VINCULO_REGISTRO_EQUIPAMENTO : associa
+  EQUIPAMENTO ||--o{ VINCULO_REGISTRO_EQUIPAMENTO : consolidado
+```
+
+Diagrama simplificado não substitui o dicionário de T01..T74. Implementar
+todas as FKs e associações descritas, não apenas as exibidas acima.
+
+======================================================================
+7. DFD — DIAGRAMA DE FLUXO DE DADOS
+======================================================================
+
+[Fontes oficiais federais, estaduais e municipais]
+                  |
+                  v
+        +----------------------+
+        | COLETOR / CONECTORES |  <- relógio/timer, controle de cotas
+        +----------------------+
+                  |
+                  v
+      +---------------------------+
+      | CACHE IMUTÁVEL DE ARQUIVOS |  <- ETag, hash, data, metadados
+      +---------------------------+
+                  |
+                  v
+      +----------------------------+
+      | VALIDAÇÃO / QUARENTENA     |----> ERROS + ALERTAS + LOGS
+      +----------------------------+
+                  |
+                  v
+      +----------------------------+
+      | NORMALIZAÇÃO + DEDUPLICAÇÃO|----> REVISÃO DE CONFLITOS
+      +----------------------------+
+                  |
+                  v
+      +---------------------------+
+      | PUBLICAÇÃO ATÔMICA        |----> HISTÓRICO/SNAPSHOTS
+      +---------------------------+
+                  |
+                  v
+      +---------------------------+
+      | BANCO RELACIONAL LOCAL    |
+      +---------------------------+
+                  ^
+                  |
+      +---------------------------+
+      | APLICAÇÃO WEB / API       |
+      | Consulta, raio, formatos |
+      +---------------------------+
+                  ^
+                  |
+         [Usuário HTTP GET/POST]
+
+Duas aplicações independentes. A aplicação web consulta o banco LOCAL,
+NUNCA depende de rede externa durante requisições comuns. O coletor
+atualiza de hora em hora por padrão configurável; a periodicidade dos
+recursos individuais respeita sua publicação efetiva.
+
+======================================================================
+8. DEDUPLICAÇÃO — ALGORITMO OBRIGATÓRIO E VERIFICÁVEL
+======================================================================
+
+8.1 NÍVEIS DE IDENTIDADE:
+  A) MESMO REGISTRO BRUTO: mesmo recurso e mesma identidade/versão; descartar
+     repetição lógica na visão, mantendo artefatos históricos para auditoria.
+  B) MESMO EQUIPAMENTO FÍSICO: coincidência de série contextualizada por
+     fabricante/modelo, documentos e consistência temporal.
+  C) MESMO PONTO: coincidência de posição/rodovia/km/sentido/função,
+     independentemente de quantidade de equipamentos físicos.
+  D) MESMA OPERAÇÃO: período, fonte, ponto/trecho e código administrativo.
+  E) MESMA VERIFICAÇÃO: instrumento, número de certificado, data e executor.
+  F) MESMO DOCUMENTO: URL canônica ou hash de arquivo, emissor e versão.
+
+8.2 NORMALIZAR PARA COMPARAR, SEM ALTERAR O DADO ORIGINAL:
+  - caixa, espaços, acentos, pontuação e prefixos de série;
+  - aliases de órgãos, concessionárias, municípios e rodovias;
+  - BR-277, BR277 etc.; km com vírgula decimal e unidades;
+  - coord. WGS84, precisão/origem, números brasileiros com separadores;
+  - sentido crescente/decrescente e texto original;
+  - datas originais com fuso e granularidade (dia vs hora);
+  - natureza de identificadores: série != ID administrativo != código ET.
+
+8.3 GERAR CANDIDATOS (blocking/indexação):
+  (i) nº de série + fabricante/modelo compatíveis;
+  (ii) mesmo ID oficial DENTRO do escopo correto da fonte;
+  (iii) mesma via, km, município, sentido, função e proximidade;
+  (iv) proximidade espacial usando bounding box + Haversine;
+  (v) documentos/certificados vinculados ao mesmo instrumento.
+  Não comparar todos contra todos em O(n²); usar índices por chaves.
+
+8.4 CONFRONTAR E DECIDIR:
+  - Match determinístico: evidência forte sem conflito relevante -> unificar.
+  - Evidência moderada -> candidato para análise e revisão.
+  - Evidência contraditória -> manter separado até resolver.
+  - Mesmo ponto ≠ mesmo instrumento; mesmo instrumento ≠ mesma instalação;
+    mesma série isolada ≠ identidade global garantida.
+  - Duas faixas fiscalizadas por um aparelho ≠ dois aparelhos.
+  - Múltiplos IDs administrativos no mesmo local ≠ automaticamente N aparelhos.
+  - Um único número de série associado a IDs distintos pode indicar
+    duplicidade, renumeração ou identificação por faixa; investigar.
+  - Mesmo aparelho pode mudar de local em épocas diferentes sem se tornar
+    outro equipamento; preservar INSTALACAO temporal.
+  - Equipamento portátil cadastrado sem coordenada NÃO ganha posição
+    baseada em trecho elegível; só operação comprovada dá localização
+    temporal de operação.
+
+8.5 REGRAS DE ESCORE:
+  Definir e versionar pesos/limiares após inspecionar amostras reais.
+  Nunca estabelecer 'distância <=10m => mesmo radar' como regra absoluta.
+  Considerar conflito de número de série, fabricante/modelo, intervalos
+  incompatíveis, km, pistas paralelas e sentidos opostos como bloqueadores.
+  Casos sem evidência suficiente permanecem com status REVISAO.
+  Registrar score, evidências, regra, decisão, autor e reversão possível.
+
+8.6 CASOS REAIS PARA TESTES DE DEDUP:
+  A lista PRF de portáteis de 13/05/2026 contém:
+    REF181 -> TC005867; REF184 -> TC005867
+    REF182 -> TC005868; REF185 -> TC005868
+    RRJ004 -> S1539; RRJ005 -> S1539
+  URL: https://www.gov.br/prf/pt-br/assuntos/fiscalizacao-de-velocidade/lista-de-radares
+  TESTE: assinalar como candidatos à associação física, preservar TODOS
+  os IDs PRF; só consolidar como uma peça após verificar contexto.
+
+  O DER-MG mostra locais com múltiplos números de equipamento numa linha
+  e números de série não necessariamente em relação 1:1. Exemplo:
+  https://der.mg.gov.br/transportes/localizacao-de-radares-fixos-e-portateis
+  TESTE: não criar instrumentos fictícios nem presumir que cada código
+  na célula equivale a uma série diferente; reconhecer ambiguidade.
+
+8.7 RECONCILIAÇÃO E REVERSÃO:
+  Persistir fontes originais e vínculos. Ao unificar, manter um ID canônico
+  estável e registro de aliases. Se desunificar após correção, refazer
+  vínculos e histórico sem apagar arquivos. Toda alteração deve ser testável.
+
+======================================================================
+9. CONSULTA GEOGRÁFICA SEM POSTGIS E SEM FUNÇÕES PROPRIETÁRIAS
+======================================================================
+
+Parâmetros principais: latitude, longitude, raio_metros.
+
+9.1 Pré-filtragem: calcular bounding box geográfica com margem segura
+    que englobe o círculo geodésico; SQL convencional usando latitude
+    BETWEEN lat_min AND lat_max; longitude BETWEEN lon_min AND lon_max;
+    usar OR para caixa que cruza antimeridiano. Perto dos polos permitir
+    qualquer longitude. NÃO excluir pontos válidos por aproximação.
+
+9.2 Pós-filtragem: aplicar Haversine usando WGS84/raio médio da Terra
+    6.371.008,8 m e funções matemáticas da aplicação; distâncias em metros.
+    Para exigência submétrica ou discrepâncias em latitude extrema, usar
+    algoritmo elipsoidal implementado na aplicação e testado. Não exigir
+    função trigonométrica nativa do SGBD. Coordenadas DECIMAL(10,7).
+
+9.3 Índices comuns B-tree em POSICAO_GEOGRAFICA(latitude,longitude)
+    e (longitude,latitude), PONTO_FISCALIZACAO(posicao_id), VIA(codigo),
+    equipamentos por série, fonte/identificador e FKs de JOIN relevantes.
+
+9.4 NÃO aplicar LIMIT na bounding box antes de calcular distância;
+    poderia omitir pontos próximos. Ordenar e paginar SOMENTE após cálculo
+    e classificação geográfica. Implementar limite de raio e recursos.
+
+9.5 Precisão: retorno deve informar precisão/caráter estimado e não
+    apresentar localização inferida como equipamento confirmado em 10m.
+
+9.6 Para trechos, medir distância a segmento SOMENTE quando existir
+    geometria/traçado confiável; não substituir a polilinha por reta entre
+    marcos nem estimar distância ao longo da rodovia a partir dos kms.
+
+======================================================================
+10. CONTRATO HTTP — MÉTODOS, ENDPOINTS E PARÂMETROS
+======================================================================
+
+MÉTODOS: GET por query string; POST por JSON ou FORM URL-ENCODED.
+GET e POST com parâmetros equivalentes devolvem os mesmos resultados.
+POST nunca altera o cadastro quando chamado em endpoints de consulta.
+
+ENDPOINTS OBRIGATÓRIOS:
+  GET/POST /api/v1/radares
+  GET/POST /api/v1/trechos
+  GET/POST /api/v1/operacoes
+  GET/POST /api/v1/ajuda
+  GET/POST /api/v1/status
+  GET      /api/v1/radares/{id}
+  GET      /api/v1/equipamentos/{id}
+  GET      /api/v1/fontes
+  GET      /api/v1/fontes/{id}
+  GET      /api/v1/atualizacoes
+  GET      /health/live
+  GET      /health/ready
+  Endpoints administrativos (sincronização/rollback) autenticados.
+
+PARÂMETROS DA CONSULTA /radares:
+  lat             decimal   obrigatório; -90..90 (graus WGS84)
+  lon             decimal   obrigatório; -180..180 (graus WGS84)
+  raio            inteiro   opcional; 1..50000 metros; padrão 1000
+  formato         string    opcional; txt|json|ndjson|xml|edi|edifact|dif;
+                             padrão json; edi alias edifact
+  delimitador     string    opcional apenas txt; padrão '|'; 1 caractere,
+                             tab ou seu equivalente codificado; rejeitar
+                             CR, LF, NUL, aspas e delimitadores inseguros
+  detalhado       boolean   opcional; padrão true (todos campos disponíveis)
+  incluir_inativos boolean  opcional; padrão false
+  incluir_incertos boolean   opcional; padrão true com indicador de incerteza
+  incluir_trechos boolean   opcional; padrão false (coleção separada)
+  incluir_operacoes boolean opcional; padrão true, sem inventar dados
+  tipo_radar      string    opcional; código cadastrado
+  modalidade      string    opcional; código cadastrado
+  fiscalizacao_pontual boolean opcional; true|false; desconhecido fica fora
+  uf              string    opcional; sigla de UF
+  municipio_ibge  string    opcional; código IBGE de 7 dígitos
+  rodovia         string    opcional; código conhecido
+  sentido         string    opcional; código cadastrado
+  em              datetime  opcional; filtrar informação temporal no instante
+  limite          inteiro   opcional; 1..1000; padrão 100
+  cursor          string    opcional; cursor estável de paginação
+  versao_esquema  string    opcional; versão de contrato quando aplicável
+
+Aplicar filtros e requisitos de lat/lon conforme endpoint; /trechos e
+/operacoes aceitam os mesmos filtros relevantes e podem exigir outra
+combinação de localização/rodovia. Documentar obrigatoriedade por endpoint.
+
+ENDPOINT AJUDA:
+  /api/v1/ajuda?formato=json
+  /api/v1/ajuda?formato=txt
+  /api/v1/ajuda?formato=xml
+  /api/v1/ajuda?formato=ndjson
+  /api/v1/ajuda?formato=edifact
+  /api/v1/ajuda?formato=dif
+
+Retornar, PARA CADA ENDPOINT E PARÂMETRO: nome, descrição, tipo, aceitação
+GET/POST, obrigatoriedade, valores aceitos, limites, valor padrão,
+exemplo, erros possíveis, formato de retorno, versão, ordem das colunas
+TXT/DIF, nulabilidade, tipo e significado de CADA campo devolvido.
+Não escrever ajuda fixa divergente do esquema: gerar da mesma definição.
+
+======================================================================
+11. DICIONÁRIO COMPLETO DOS CAMPOS DA RESPOSTA
+======================================================================
+
+A API deve devolver TODOS os atributos conhecidos, sem descartar valor
+'irrelevante', com NULL explícito quando ausente. Evitar redundância
+semântica: por exemplo, não repetir 'UF' em seis locais; grupos aninhados
+podem apontar para objeto de localização correspondente. Valores de
+operacionalidade, metrologia e atualidade são conceitos separados.
+
+11.1 METADADOS DE CONSULTA
+  sucesso:boolean; versao_api:string; versao_esquema:string;
+  consultado_em:datetime_utc; consulta.lat:decimal; consulta.lon:decimal;
+  consulta.raio_metros:int; consulta.filtros:objeto;
+  resultado.encontrado:boolean|null; resultado.total_pontos:int;
+  resultado.total_equipamentos:int; resultado.retornados:int;
+  resultado.proximo_cursor:string|null;
+  resultado.operacoes:array (operações móveis/pontuais com posição válida,
+    coleção distinta de radares instalados quando solicitada);
+  resultado.total_operacoes:int;
+  resultado.status:string (completo|parcial|sem_cobertura|indisponivel);
+  cobertura.fontes_ativas:array; cobertura.fontes_indisponiveis:array;
+  cobertura.territorios_verificados:array;
+  cobertura.limitacoes:array; cobertura.completude_confirmada:boolean;
+  base.snapshot_id:string; base.publicado_em:datetime_utc;
+  base.idade_snapshot_segundos:int;
+  base.ultima_sincronizacao_valida:datetime_utc|null;
+  base.idade_publicacao_origem_segundos:int|null;
+  base.status_cache:string; base.alertas:array.
+
+11.2 PONTO_FISCALIZACAO (UM POR LOCAL LÓGICO)
+  id:string (PK canônica da API);
+  tipo_registro:string (=ponto_fiscalizacao);
+  situacao_operacional:string|null;
+  situacao_original:string|null;
+  localizacao.latitude:decimal|null;
+  localizacao.longitude:decimal|null;
+  localizacao.distancia_metros:decimal|null (calculada);
+  localizacao.precisao_metros:decimal|null;
+  localizacao.qualidade:string|null;
+  localizacao.metodo_obtencao:string|null;
+  localizacao.uf:string|null;
+  localizacao.municipio:string|null;
+  localizacao.codigo_ibge:string|null;
+  localizacao.endereco.logradouro:string|null;
+  localizacao.endereco.numero:string|null;
+  localizacao.endereco.bairro:string|null;
+  localizacao.endereco.complemento:string|null;
+  localizacao.endereco.cep:string|null;
+  localizacao.endereco.ponto_referencia:string|null;
+  localizacao.via.codigo:string|null;
+  localizacao.via.tipo:string|null;
+  localizacao.via.nome:string|null;
+  localizacao.km:decimal|null;
+  localizacao.tipo_pista:string|null;
+  data_inicio_operacao:datetime|null;
+  data_inativacao:date|null;
+  motivo_inativacao:string|null (se publicado em fonte);
+  organizacoes:array de {id,nome,papel,inicio_em,fim_em};
+  faixas:array de {id,numero,sentido,sentido_original};
+  quantidade_faixas_declarada:int|null;
+  limites_velocidade:array de {faixa_id|null,categoria_veiculo,
+    velocidade_kmh,vigencia_inicio,vigencia_fim,fonte_registro_id};
+  regimes:array de {id,modalidade_fiscalizacao,tipo_medicao,
+    situacao_operacional,inicio_em,fim_em};
+  fiscalizacao_pontual:boolean|null (valor derivado, triestado);
+  tipos_radar_presentes:array de strings (derivados dos equipamentos);
+  equipamentos:array (detalhes 11.3);
+  operacoes:array (detalhes 11.4, se publicadas);
+  documentos:array (detalhes 11.7);
+  fontes:array (detalhes 11.9);
+  conflitos:array (detalhes 11.10);
+  primeira_observacao:datetime|null;
+  ultima_confirmacao:datetime|null;
+  ultima_coleta:datetime|null;
+  confianca:alta|media|baixa|conflitante|nao_avaliada;
+  observacoes:string|null.
+
+11.3 EQUIPAMENTO FÍSICO
+  id:string; tipo_radar:string (fixo|portatil|movel|desconhecido);
+  tipo_radar_original:string|null;
+  funcao_equipamento:string|null;
+  sigla_equipamento_original:string|null (CEV, CEM, REV etc.);
+  fabricante:string|null; modelo:string|null;
+  tecnologia_medicao:string|null; numero_serie:string|null;
+  ano_fabricacao:int|null; registro_aprovacao_modelo:string|null;
+  portaria_aprovacao_modelo:string|null;
+  identificadores_oficiais:array de {fonte,tipo,valor,vigencia};
+  instalacoes:array de {id,ponto_id,inicio_em,fim_em,situacao,
+    faixas_ids,data_inicio_educativo,data_inicio_autuacao};
+  verificacoes_metrologicas:array (11.6);
+  proprietario:string|null (se informado); mantenedor:string|null
+    (se identificado via organização/associação);
+  ultima_manutencao:date|null (se publicado por fonte);
+  observacoes:string|null.
+
+11.4 OPERAÇÃO PONTUAL/ITINERANTE
+  id:string; modalidade:string; fiscalizacao_pontual:boolean|null;
+  situacao_operacao:string; tipo_operacao_original:string|null;
+  inicio_em:datetime|null; fim_em:datetime|null;
+  fuso_original:string|null; publicado_em:datetime|null;
+  recorrencias:array {regra,fuso,dias_semana,horarios};
+  ponto_id:string|null; trecho_id:string|null;
+  latitude:decimal|null; longitude:decimal|null;
+  via:string|null; km:decimal|null; municipio:string|null;
+  orgao_responsavel:string|null;
+  equipamentos_ids:array; faixas_ids:array;
+  documento_url:string|null; fontes:array;
+  evidencia_operacao:string (planejada|confirmada|desconhecida).
+  IMPORTANTE: informação de TRECHO ELEGÍVEL não gera operação fictícia.
+
+11.5 TRECHO ELEGÍVEL PARA RADAR PORTÁTIL
+  id:string; via:string; uf:string|null; municipios:array;
+  km_inicio:decimal|null; km_fim:decimal|null; sentido:string|null;
+  vertices:array de {latitude,longitude} (somente se fornecidos);
+  geometria_confirmada:boolean; criterio_inclusao:string|null;
+  vigencia_inicio:date|null; vigencia_fim:date|null;
+  documento_url:string|null; fontes:array;
+  indicador:'pode_haver_fiscalizacao';
+  radar_instalado_confirmado:boolean|null (NUNCA inferir true).
+
+11.6 VERIFICAÇÃO METROLÓGICA
+  id:string; tipo_verificacao:string; data_verificacao:date|null;
+  validade_ate:date|null; resultado:string|null;
+  numero_certificado:string|null; certificado_url:string|null;
+  orgao_executor:string|null; norma_aplicada:string|null;
+  situacao_metrologica_derivada:string (valida|vencida|desconhecida);
+  documentos:array; fonte:string; observacoes:string|null.
+  NÃO deduzir radar funcionando de certificado válido.
+
+11.7 DOCUMENTO OFICIAL
+  id:string; tipo_documento:string; codigo_documento:string|null;
+  titulo:string|null; url:string|null; data_emissao:date|null;
+  validade_ate:date|null; orgao_emissor:string|null;
+  hash_conteudo:string|null; descricao:string|null.
+
+11.8 OBSERVAÇÃO DE TRÁFEGO (ENDPOINT/SEÇÃO ESPECÍFICA)
+  id:string; equipamento_id:string|null; ponto_id:string|null;
+  fonte_registro_id:string; data_passagem:date|datetime|null;
+  faixa:string|null; sentido:string|null; categoria_veiculo:string|null;
+  velocidade_publicada:string|null; velocidade_kmh:decimal|null;
+  volume_total:int|null; granularidade:string.
+  Não incluir observações individuais sensíveis.
+
+11.9 ORIGEM, PUBLICAÇÃO E ATUALIDADE
+  fonte.id:string; fonte.nome:string; fonte.esfera:string;
+  fonte.organizacao:string; fonte.url:string; fonte.recurso_url:string;
+  fonte.id_registro_original:string|null;
+  fonte.publicado_em:datetime|null;
+  fonte.coletado_em:datetime|null;
+  fonte.validado_em:datetime|null;
+  fonte.ultima_verificacao_acesso:datetime|null;
+  fonte.hash_artefato:string|null;
+  fonte.status_integracao:string;
+  fonte.idade_dados_segundos:int|null.
+  Proveniência de cada campo pode ser solicitada em detalhamento expandido.
+
+11.10 CONFLITO DE FONTES
+  id:string; campo:string; tipo_entidade:string; descricao:string;
+  valores_concorrentes:array {valor,fonte,publicado_em};
+  valor_canonico:string|null; criterio_escolha:string|null;
+  score_confianca:decimal|null; decisao:string;
+  exige_revisao:boolean.
+
+11.11 ERROS DE CONSULTA
+  erro.codigo:string; erro.mensagem:string;
+  erro.detalhes:array; erro.campo:string|null;
+  erro.correlation_id:string; erro.timestamp:datetime_utc;
+  cobertura/status do snapshot quando for relevante.
+
+Tudo que existir nas fontes e NÃO se encaixar num campo canônico deve:
+  (a) permanecer nos registros imutáveis de origem;
+  (b) ser documentado como pendência no mapeamento;
+  (c) motivar ampliação NORMALIZADA do esquema se houver nova semântica;
+  (d) nunca ser descartado silenciosamente.
+
+======================================================================
+12. SERIALIZAÇÃO: TXT / JSON / NDJSON / XML / EDI-EDIFACT / DIF
+======================================================================
+
+A mesma consulta/semântica alimenta TODOS os serializadores. A conversão
+não pode inventar valores nem descartar dado disponível silenciosamente.
+
+12.1 JSON: aplicação/json; objetos aninhados e arrays tipados conforme
+     seção 11. Campos conhecidos porém sem valor = null; dados ausentes
+     não transformam falso em verdadeiro.
+
+12.2 NDJSON: application/x-ndjson; 1a linha é objeto meta, demais são
+     objetos radar completos, 1 por linha. Metadados de fechamento/página
+     quando necessário devem possuir tipo_registro identificável.
+
+12.3 XML: application/xml UTF-8; objetos e coleções com nomes estáveis;
+     nulos explicitados por xsi:nil; versionamento de esquema e escaping.
+
+12.4 TXT: text/plain; charset=utf-8.
+     EXACTAMENTE UMA LINHA por ponto retornado, SEM cabeçalho no corpo,
+     SEM blocos, SEM títulos. Delimitador padrão '|', trocável por GET ou
+     POST com parâmetro 'delimitador'. Ex.: '|', ';', ',', '#', TAB.
+     Ordem de colunas fixa e publicada em /ajuda. Para preservar todos os
+     campos, arrays e objetos serão serializados como JSON compacto UTF-8
+     DENTRO DE UMA ÚNICA CÉLULA TXT, com aspas CSV duplas e escape devido.
+     Uma coluna nunca é silenciosamente omitida; se NULL usar marcador
+     \N (sem aspas); a string literal \N terá tratamento para distinção.
+     CR/LF internos são escapados, sem quebrar o registro. Não usar
+     delimitadores que confundam separação/quoting.
+
+     ORDEM CANÔNICA TXT v1 (32 colunas, sem perda dos dados complexos):
+       01 id
+       02 tipo_registro
+       03 situacao_operacional
+       04 latitude
+       05 longitude
+       06 distancia_metros
+       07 precisao_metros
+       08 uf
+       09 municipio
+       10 codigo_ibge
+       11 via_codigo
+       12 km
+       13 tipo_pista
+       14 tipos_radar_presentes_json
+       15 fiscalizacao_pontual
+       16 regimes_json
+       17 faixas_json
+       18 limites_velocidade_json
+       19 equipamentos_json
+       20 operacoes_json
+       21 documentos_json
+       22 fontes_json
+       23 conflitos_json
+       24 confianca
+       25 atualizacao_json
+     Endereço completo, organizações, origem de coordenada e observações
+     deverão constar nos objetos de detalhe serializados em coluna JSON
+     própria OU em colunas adicionais versionadas; NÃO omitir.
+     Como a lista v1 acima não carrega esses objetos explicitamente,
+     acrescentar na implementação contratual as colunas fixas:
+       26 endereco_json
+       27 organizacoes_json
+       28 localizacao_metadados_json
+       29 observacoes
+       30 proveniencia_campos_json
+       31 estado_temporal_json
+       32 quantidade_faixas_declarada
+     A versão TXT v1 FINAL possui 32 colunas nesta ordem imutável.
+
+     Uma linha por ponto. Múltiplos equipamentos, verificações e operações
+     pertencem aos campos JSON encapsulados sem gerar linhas falsas.
+     Exemplo ILUSTRATIVO, ABREVIADO somente para mostrar delimitador:
+       P-EXEMPLO-1|ponto_fiscalizacao|desconhecido|-24.9555000|-53.4552000|0.0|\N|PR|Cascavel|\N|BR-277|\N|\N|"[""fixo""]"|\N|"[]"|"[]"|"[]"|"[]"|"[]"|"[]"|"[]"|"[]"|nao_avaliada|"{}"|"{}"|"[]"|"{}"|\N|"[]"
+     Exemplo completo de cada coluna é obrigação do serializador e /ajuda.
+     Sem resultados, TXT = corpo vazio APENAS se cobertura suficiente;
+     metadados em headers HTTP e /status; erro controlado se indisponível.
+
+12.5 EDI / EDIFACT: application/EDIFACT.
+     'edi' e 'edifact' são aliases da serialização UN/EDIFACT; NÃO assumir
+     que ANSI X12 é a mesma coisa. Produzir mensagem conforme diretório
+     e versão UN/EDIFACT realmente suportados, com envelope UNB/UNZ,
+     cabeçalho UNH, trailer UNT, contagens e escaping válidos, mapeamento
+     documentado para o contrato RADAR BRASIL. Verificar adequação de tipo
+     de mensagem oficial (como GENRAL, se apropriado). NÃO inventar segmento
+     como se fosse padronizado. Se um mapeamento estruturado completo não
+     couber no tipo escolhido, documentar guia de implementação de acordo
+     bilateral ou escolher mensagem legítima compatível; validar parser.
+     Sinais de erro/ausência não podem ser confundidos com radars reais.
+
+12.6 DIF: Data Interchange Format (.dif), formato tabular de intercâmbio
+     usado por planilhas; serializar TABLE, VECTORS, TUPLES, DATA, BOT,
+     EOD e respectivos códigos de tipo válidos. Uma linha DIF por ponto;
+     mesma ordem de 32 colunas do TXT, arrays/objetos em células string
+     JSON; preservar NULL com convenção documentada, sem perder semântica.
+     Validar em leitor DIF real.
+
+12.7 AJUDA: disponível em TODOS os seis formatos; documentar todos os
+     parâmetros, tipos, limites, posições TXT/DIF, escape, NULL, campos,
+     enumerações, exemplos GET/POST e códigos HTTP. No EDIFACT a ajuda
+     também segue mapeamento estrutural válido e documentado.
+
+EXEMPLOS HTTP:
+  GET /api/v1/radares?lat=-24.9555&lon=-53.4552&raio=1000&formato=txt&delimitador=%7C
+  GET /api/v1/radares?lat=-24.9555&lon=-53.4552&raio=5000&formato=json
+  GET /api/v1/radares?lat=-24.9555&lon=-53.4552&raio=100&formato=ndjson
+  GET /api/v1/radares?lat=-24.9555&lon=-53.4552&raio=100&formato=xml
+  GET /api/v1/radares?lat=-24.9555&lon=-53.4552&raio=100&formato=edifact
+  GET /api/v1/radares?lat=-24.9555&lon=-53.4552&raio=100&formato=dif
+  POST /api/v1/radares
+       Content-Type: application/json
+       {"lat":-24.9555,"lon":-53.4552,"raio":1000,"formato":"txt","delimitador":";"}
+  GET /api/v1/ajuda?formato=txt
+  GET /api/v1/status?formato=json
+
+======================================================================
+13. CACHE PERSISTENTE, FALHAS E VALIDADE
+======================================================================
+
+13.1 A API consulta SOMENTE banco/cache local já validado por padrão.
+     Não bloquear requisição esperando governo. Atualizações em processo
+     distinto, com agendamento configurável (verificação padrão a cada hora).
+
+13.2 Manter por recurso: última tentativa, último HTTP OK, último 304,
+     último download íntegro, última importação íntegra, publicação na
+     origem, último snapshot publicado, idade de cada marco, ETag,
+     Last-Modified, SHA-256, erros consecutivos e status.
+
+13.3 Ao falhar fonte externa: não apagar dados, conservar último artefato
+     validado, registrar motivo e ativar fallback local automaticamente.
+     HTTP 200 não significa sucesso se arquivo for HTML de erro/CSV vazio.
+     HTTP 304 não significa que a PUBLICAÇÃO original seja recente.
+
+13.4 Definir estados: fresco, aviso_desatualizado,
+     critico_desatualizado, sem_cache, indisponivel, parcial.
+     Indicativos iniciais de alerta: tentativa horária; 24h sem coleta
+     válida = aviso; 7 dias = crítico, A MENOS que periodicidade da fonte
+     seja mensal/anual. Calcular também idade da data de publicação;
+     esses limites são configuráveis POR RECURSO.
+
+13.5 Limites de rede: timeouts, tentativas, exponential backoff + jitter,
+     429/Retry-After, conditional GET, circuit breaker, controle de cotas,
+     User-Agent identificável, limite de download, locks e deduplicação de
+     arquivos por hash. Nunca burlar acesso protegido/CAPTCHA.
+
+13.6 Staging, consistência, publicação atômica, quarentena de fontes
+     anômalas, rollbacks/versionamento. Falha parcial NÃO publica base
+     como se fosse integralmente atualizada. Cada fonte pode evoluir
+     isoladamente, desde que o snapshot declare sua composição exata.
+
+13.7 Validações: esquema, colunas, encoding, nulos, faixa de coordenadas,
+     velocidade, tipo/situação, totais, diferença anormal de contagem,
+     mudanças geográficas abruptas, dados de 2015 rotulados como 2026,
+     certificados vencidos, origem x hora de coleta, possíveis séries
+     repetidas, tamanhos de arquivos e integridade por hash.
+
+13.8 Logs estruturados DEBUG/INFO/WARN/ERROR/CRITICAL: fonte, recurso,
+     URL, status HTTP, duração, bytes, ETag, tentativa, hash, qtd linhas,
+     aceitos/rejeitados/alterados, duplicidades, snapshot, fallback,
+     idade, stack trace, correlation_id. Rotação e retenção; alertas
+     deduplicados e alerta de recuperação; não registrar dados sensíveis.
+
+======================================================================
+14. COMPORTAMENTO DA API E ERROS
+======================================================================
+
+HTTP 200: consulta executada, inclusive quando zero pontos com cobertura
+suficiente; incluir metadados completos de cobertura e atualização.
+HTTP 200 PARCIAL: retorno do último snapshot válido, com alertas explícitos.
+HTTP 400/422: parâmetro ou formato inválido.
+HTTP 401/403: ação administrativa não autorizada.
+HTTP 404: ID individual não encontrado.
+HTTP 429: limite de requisições excedido.
+HTTP 503: banco ou snapshot não utilizável; NUNCA fingir resultado vazio.
+HTTP 500: erro interno inesperado, com correlation_id.
+
+Cabeçalhos em todos formatos quando pertinentes:
+  X-Radar-Snapshot-ID
+  X-Radar-Base-Updated-At
+  X-Radar-Cache-Age-Seconds
+  X-Radar-Coverage-Status
+  X-Radar-Total-Points
+  X-Radar-Total-Equipment
+  X-Radar-Response-Schema-Version
+
+Para TXT sem resultado: corpo vazio apenas se realmente pesquisado e
+cobertura suficiente; para cobertura insuficiente, aviso via header/status
+ou resposta controlada que NÃO pareça 'zero comprovado'. Nunca converter
+registro com localização ausente em radar a 0m do ponto do usuário.
+
+======================================================================
+15. SEGURANÇA, AUDITORIA, DESEMPENHO E TESTES
+======================================================================
+
+- GET/POST parâmetros validados; consultas SQL parametrizadas; limite de
+  raio, página e payload; autenticação de funções administrativas;
+  proteção contra SSRF ao configurar fontes; HTTPS e segredos fora do
+  código; contas com permissões mínimas.
+- Logs, decisões de dedup, arquivos brutos e snapshots auditáveis;
+  revisão e desfazimento de fusão errada sem perda histórica.
+- Índices B-tree e duas fases de cálculo de distância sem PostGIS.
+- Health/live independe de fontes externas; health/ready verifica banco e
+  snapshot utilizável. /status expõe estado e idade das fontes.
+- Registrar testes de integração de fontes com fixtures e sem depender
+  de disponibilidade externa; separar testes ao vivo opcionais.
+- Testar importação idempotente, 304, 403, 404, 429, 500, timeout,
+  documento inesperado, planilha truncada, CSV malformado, isolamento de
+  erro por fonte, concorrência, retomada e rollback.
+- Testar distâncias de 10m/100m/1km/5km, pontos limítrofes, polos,
+  antimeridiano, ordenação após Haversine, paginação estável e precisão.
+- Testar exatamente os três pares PRF de série repetida citados, dois
+  dispositivos verdadeiramente distintos no mesmo ponto, faixa múltipla
+  com um instrumento, múltiplas instalações temporais, fonte com número
+  de série desconhecido, conflito entre dois órgãos e operações pontuais.
+- Testar integridade referencial, CHECK/UNIQUE, tentativa de FK inválida,
+  exclusões referenciadas, intervalos inválidos, mesmo identificador em
+  fontes diferentes, NULL em campos opcionais e transações.
+- Testar os seis formatos, especialmente TXT 32 colunas com delimitador
+  personalizado e escaping, XML nil, NDJSON, EDIFACT por parser, DIF por
+  leitor DIF, e /ajuda em cada formato.
+
+======================================================================
+16. CRITÉRIOS DE ENTREGA, IMPLANTAÇÃO E RESULTADO
+======================================================================
+
+A implementação deve entregar:
+  1. Relatório de investigação de cada fonte com URLs verificadas,
+     formatos encontrados e status de integração; sem alegar cobertura
+     nacional completa sem confirmação.
+  2. Diagrama ER detalhado final e diagrama de fluxo de dados.
+  3. Migrações/DDL de todas tabelas T01..T77, PK, FK, CHECK, UQ e índices;
+     scripts de carga inicial de domínios e referências territoriais.
+  4. Conectores com download/cache/validação reais para fontes acessíveis.
+  5. Mecanismo de dedup documentado, auditável e reversível, com exemplos
+     reais dos pares PRF e situações ambíguas do DER-MG.
+  6. Banco local consolidado, histórico de origem e snapshots íntegros.
+  7. Web/API GET e POST, contrato de ajuda e seis formatos de retorno.
+  8. Atualização periódica, logs, alertas e processo independente da web.
+  9. Testes automatizados e evidências de execução real ou explicação
+     técnica precisa para limitações de acesso a cada fonte.
+ 10. Manual de instalação, operação, upgrade, backup e restauração.
+
+CRITÉRIOS DE ACEITAÇÃO:
+  - nenhuma dependência obrigatória de PostGIS/extensão geográfica;
+  - nenhuma linguagem imposta pela especificação;
+  - dois componentes executáveis independentes;
+  - campos de fonte preservados, normalizados e vinculados por FKs;
+  - sem duplicidade confirmada na visão consolidada e sem fusão indevida;
+  - operações pontuais com data/hora apenas quando oficialmente informadas;
+  - portátil cadastrado e trecho elegível não se tornam radares ativos;
+  - consultas acessam apenas dados locais, inclusive com fonte offline;
+  - metadados mostram idade da publicação, idade da coleta e do snapshot;
+  - TXT estritamente uma linha por ponto, delimitador configurável;
+  - JSON, NDJSON, XML, UN/EDIFACT e DIF consistentes;
+  - /ajuda nos formatos e parâmetros definidos;
+  - nenhum dado inexistente é apresentado como confirmado.
+
+======================================================================
+17. COMPLEMENTO DE PESQUISA GITHUB — VERIFICAÇÃO DE 10/10/2026
+======================================================================
+
+OBJETIVO: adicionar boas ideias de projetos públicos verificáveis SEM impor
+linguagem, framework, produto, banco ou arquitetura proprietária. A IA
+implementadora escolhe livremente sua tecnologia. Referências são insumos de
+pesquisa, NÃO evidência de que determinada base pública esteja disponível,
+nem autorização automática para copiar código ou redistribuir datasets.
+
+17.1 PROJETOS ENCONTRADOS E O QUE APROVEITAR
+
+[G01] Consulta Instrumentos INMETRO — GabrielHiro
+  https://github.com/GabrielHiro/consulta-instrumentos-INMETRO
+  https://github.com/GabrielHiro/consulta-instrumentos-INMETRO/blob/main/exemplo-AC.json
+  Identificado: consulta/análise de medidores, filtros por estado/município,
+  tipo, faixa de velocidade, aprovação, histórico de verificações; cache local
+  em IndexedDB e modo com dados estáticos. Contém registros demonstrativos.
+  IDEIA: adotar como REFERÊNCIA DE CAMPOS e construção de testes, NÃO como
+  evidência de que a API oficial do Inmetro funcione ou que dados de exemplo
+  representem inventário nacional verdadeiro. O exemplo-AC.json possui um
+  registro com Faixas[1] e Faixas[2] repetindo o mesmo NumeroSerie e NumeroInmetro;
+  isso ilustra que DOIS REGISTROS DE FAIXA não equivalem a dois instrumentos.
+  O script-publicado experimenta endpoint no formato
+  https://servicos.rbmlq.gov.br/dados-abertos/{UF}/medidores.json por proxy CORS.
+  ESSA URL NÃO FOI VALIDADA COMO API OFICIAL FUNCIONAL: descobrir os recursos
+  efetivos no portal do Inmetro; verificar status, forma legal de uso, payload,
+  cobertura, atualidade e autenticação; não implementar URL presumida como certa.
+
+[G02] Velox — zyadhpl
+  https://github.com/zyadhpl/velox
+  Coleta radares mapeados no OpenStreetMap via Overpass, divide por região/país,
+  salva JSON e oferece API simples de arquivos previamente importados.
+  IDEIA: coleta em lotes territoriais com cache local, sem acessar Overpass a
+  cada consulta. NÃO é um cadastro oficial brasileiro. Não reutilizar sua API
+  simples como substituto da API integral do Radar Brasil.
+
+[G03] Uzbekistan Speed Camera Database — muminoff
+  https://github.com/muminoff/uzbspeedcameradb
+  Demonstra extração de nós OSM de fiscalização, exportação CSV/JSON,
+  direção de câmera e distinção entre speed_camera, traffic_camera, ALPR.
+  IDEIA: importador OSM com atributos e IDs de origem completos. NÃO confundir
+  câmeras de placas, tráfego genérico e fiscalização de velocidade.
+
+[G04] NavBridge — DangLamTung
+  https://github.com/DangLamTung/navbridge
+  https://github.com/DangLamTung/navbridge/blob/main/tool/fetch_overpass_cameras.py
+  Combina dados de câmeras de fontes públicas regionais com OSM e conserva
+  bases offline. Há script de importação Overpass de câmeras.
+  IDEIA: normalização por fonte, indicação de procedência e validação cruzada.
+  NÃO importar datasets do Vietnã como base para o Brasil; cuidado com direitos
+  sobre material de terceiros mencionados no repositório.
+
+[G05] Peugeot/Citroën RT6 MapaRadar Updater — tomsnunes
+  https://github.com/tomsnunes/peugeot_citroen_rt6_maparadar_updater
+  Converte CSVs locais do MapaRadar para dados de navegação. Aplica direções e
+  pode comparar direção de via com OSM. Declara explicitamente não disponibilizar
+  a base MapaRadar no repositório nem baixá-la automaticamente.
+  IDEIA: preservar sentido/orientação e rotular origem de coordenada/direção.
+  Uso de dados do MapaRadar exige conferir licença e acesso permitido; não
+  presumir autorização para baixar/redistribuir nem tratar crowdsourcing como
+  confirmação oficial.
+
+[G06] ALPR2OsmAnd — datascry
+  https://github.com/datascry/alpr2osmand
+  É sobre câmeras ALPR (leitura de placas), NÃO sobre equipamentos de velocidade.
+  Traz padrões de snapshot periódico, divisão em tiles geográficos de 2 graus,
+  índice de tiles não vazios, cache de resposta, deduplicação de requisições e
+  teste golden para igualdade das saídas. As câmeras ALPR deste projeto NÃO
+  serão importadas como radares de velocidade.
+  IDEIA: cache particionado para conjuntos extensos e teste de paridade exata
+  entre serializadores; adotar particionamento somente se volume justificar.
+
+[G07] GarageStack — joszz
+  https://github.com/joszz/GarageStack
+  Agrega radares do OSM identificados com highway=speed_camera via Overpass,
+  pré-carrega dados em worker e os mantém em cache persistente.
+  IDEIA: separar coleta/atualização da leitura online e servir resposta local.
+  O comportamento de disponibilidade do OSM não substitui aferição oficial.
+
+[G08] Librescoot Speed Limit Proof of Concept
+  https://github.com/librescoot/speed-limit-poc
+  Projeto de limite de velocidade, NÃO inventário de radares; mostra consulta
+  offline de localização sobre SQLite, com fallback sem SpatiaLite.
+  IDEIA: evidência de que pode haver índice/cálculo local sem exigir extensão
+  geográfica. Nosso projeto CONTINUA PROIBINDO dependência obrigatória de
+  PostGIS, SpatiaLite ou funções geográficas proprietárias.
+
+17.2 NOVA FONTE COMPLEMENTAR (NÃO OFICIAL)
+
+[F15] OPENSTREETMAP / OVERPASS — APENAS COMPLEMENTAR
+  Portal OSM: https://www.openstreetmap.org/
+  Documentação de consulta: https://wiki.openstreetmap.org/wiki/Overpass_API
+  Tags candidatas, sujeitas a validação semântica: highway=speed_camera;
+  relations type=enforcement e enforcement=maxspeed/average_speed; certos
+  objetos relacionados a fiscalização. Buscar nodes, ways e relations conforme
+  a estrutura correta e não só nós simples. É necessário inspecionar as
+  relações para recuperar sentido/trecho fiscalizado com consistência.
+  Manter o ID OSM junto ao TIPO de elemento (node/way/relation) e versão/data
+  de atualização, se fornecidos, para evitar colisões de IDs entre tipos.
+  Não inferir confirmação governamental, posição legal, situação operacional,
+  horário de fiscalização, certificado ou velocidade regulamentada sem evidência.
+  OSM pode conter informação incompleta, voluntária ou desatualizada.
+  Importar só registros adequados à fiscalização de velocidade e manter outros
+  tipos de câmeras separados, sem classificá-los automaticamente como radar.
+  A prioridade é dado OFICIAL; OSM poderá sugerir pontos candidatos,
+  complementar posição com qualidade indicada ou gerar divergência auditável.
+  Faltando identificação oficial, expor explicitamente "não confirmado".
+  Aplicar ODbL e atribuição de dados; verificar implicações sobre combinação
+  de bases e redistribuição antes de publicar uma base derivada.
+  Não realizar consultas Overpass no atendimento GET/POST ao cliente final:
+  só o coletor consulta a origem, obedecendo quotas e cache persistente.
+
+[F16] MAPARADAR / BASE COMUNITÁRIA — CANDIDATA CONDICIONAL
+  https://forum.maparadar.com/
+  Não existe comprovação nesta revisão de API pública livre e de direitos de
+  redistribuição automática desses arquivos. Se houver meio autorizado,
+  adicionar importador separado com arquivo bruto, licença, identificação da
+  revisão, data e proveniência. Não baixar nem redistribuir sem permissão.
+  As informações comunitárias nunca se tornam oficiais somente por estarem
+  repetidas em diversas bases derivadas da mesma origem.
+
+17.3 COMPLEMENTO AO MER: QUALIDADE DE ORIGEM E LICENCIAMENTO
+
+Adicionar três entidades ao dicionário existente. NÃO desnormalizar o banco.
+
+T75 NATUREZA_FONTE
+  id PK; codigo TEXTO NN UQ; nome TEXTO NN; descricao TEXTO;
+  CK codigo IN('oficial','comunitaria','academica','privada','outra',
+  'desconhecida'). T54 FONTE passa a ter natureza_id NN FK->T75.
+  O campo esfera de T54 permanece; esfera federativa != natureza da fonte.
+  Uma fonte estadual pode ser oficial ou não, dependendo do titular.
+
+T76 LICENCA_DADOS
+  id PK; codigo TEXTO NN UQ; nome TEXTO NN; url_licenca TEXTO;
+  versao TEXTO; requisitos_atribuicao TEXTO; observacoes TEXTO.
+  Licença é entidade; não duplicar o catálogo de licenças por fonte.
+
+T77 RECURSO_LICENCA (N:N temporal)
+  recurso_id NN FK->T56 RECURSO_FONTE;
+  licenca_id NN FK->T76 LICENCA_DADOS;
+  vigencia_inicio DATA; vigencia_fim DATA;
+  observacoes TEXTO;
+  PK ou UQ estável composta por recurso_id, licenca_id, vigencia_inicio
+  (observando nulabilidade dos componentes nos SGBDs suportados);
+  CK(vigencia_fim IS NULL OR vigencia_inicio IS NULL OR
+  vigencia_fim>=vigencia_inicio).
+  Cada recurso pode ter licença/condições próprias e mudanças históricas.
+  Se forem exigidos IDs autogerados universais, acrescentar id PK e UNIQUE
+  adequado aos campos de identidade natural; não usar UNIQUE que falhe em
+  garantir unicidade sob NULL em diferentes SGBDs.
+
+Quando T54.licenca TEXTO já existir, tratá-la somente como evidência bruta
+legada, migrar os valores normalizados para T76/T77 e evitar duas fontes de
+verdade. Os direitos efetivos dependem do recurso, não apenas da organização.
+
+Atributos oficiais externos, como OSM node/way/relation, deverão ser mapeados
+para T42 IDENTIFICADOR_EXTERNO e relações T43-T45 com namespace/composição
+adequados. NÃO criar colunas soltas osm_id em diversas tabelas canônicas.
+
+Não é necessário impor nenhuma linguagem ou alterar o algoritmo geográfico.
+Se houver expansão de dados de orientação em graus, adicionar ao ponto/faixa
+em que aquela orientação é verdadeira, com DECIMAL e CK(angulo>=0 AND
+angulo<360); não confundir azimute da câmera com sentido crescente/decrescente
+no marco quilométrico da rodovia.
+
+17.4 REGRAS NOVAS DE NORMALIZAÇÃO, DEDUPLICAÇÃO E QUALIDADE
+
+  1. Cada registro original mantém sua classificação: oficial, comunitário,
+     acadêmico, privado ou desconhecido por FK T54.natureza_id.
+  2. Na API, disponibilizar tipo/fonte de evidência e não apresentar um radar
+     comunitário como confirmado por órgão oficial.
+  3. Origem compartilhada não é confirmação independente. Dois repositórios
+     que copiam a mesma base OSM constituem UMA cadeia de evidência, não duas
+     fontes independentes; rastrear linhagem T59/T72 e recurso primário.
+  4. Mesma coordenada entre OSM, PRF e Inmetro é candidato a matching, nunca
+     decisão automática por si só. Para equipamento físico, priorizar série
+     contextualizada e registros técnicos compatíveis.
+  5. O mesmo número de série em várias faixas (como no JSON de EXEMPLO do
+     repositório G01) deve virar UM equipamento + MÚLTIPLAS faixas, quando
+     a identidade estiver confirmada; o exemplo sintético é fixture, não
+     comprovação oficial da situação do Acre.
+  6. Um radar com coordenadas OSM a 5 m de um cadastro oficial não deve ter a
+     latitude oficial substituída silenciosamente. Manter as observações,
+     incerteza geográfica, fontes, valores divergentes e decisão auditável.
+  7. Um trecho elegível à fiscalização portátil não é um ponto ativo.
+     Marcação comunitária de "mobile camera site" não comprova a ocorrência
+     pontual, nem permite inventar data/hora de operação.
+  8. Serializar o tipo de dispositivo e de fiscalização sem confundir câmera
+     semafórica, placa/ALPR, velocidade instantânea ou velocidade média.
+  9. Histórico metrológico não pode ser duplicado por faixa; um mesmo
+     certificado atrelado ao mesmo instrumento e verificação só aparece uma
+     vez, com vínculos corretos às demais entidades.
+ 10. A ausência de fonte oficial municipal para uma região nunca pode ser
+     compensada por afirmação de "cobertura completa" feita por OSM.
+
+17.5 MELHORIAS DE COLETA E CACHE INSPIRADAS NOS PROJETOS
+
+  - Descobrir fonte -> baixar arquivo bruto -> validar hash e esquema ->
+    persistir imutavelmente -> staging -> deduplicar -> publicar snapshot.
+  - Para OSM, priorizar extrações por UF/grade regional ou snapshots PBF
+    oficiais e permitidos ao invés de uma consulta global muito pesada.
+  - Manter cursor/versão/source timestamp e comparar com as versões anteriores.
+  - Implementar controle de dependências: se ANTT está indisponível, atualizar
+    PRF sem destruir os dados ANTT do snapshot consolidado.
+  - Aplicar 429 e Retry-After, timeouts e backoff e não abusar do Overpass.
+  - Pode existir arquivo de índice de células geográficas, mas os objetos
+    reais ficam no banco normalizado. Não transformar os tiles/cache em fonte
+    única da verdade.
+  - Não presumir que um serviço de terceiros no GitHub seja API estável.
+  - Manter testes de serialização entre TXT/JSON/NDJSON/XML/EDIFACT/DIF
+    usando a mesma consulta e valores canônicos; campos complexos devem ter
+    representação inequívoca, documentada e recuperável.
+
+17.6 TESTES DE ACEITAÇÃO ADICIONAIS
+
+  [ ] Carga de JSON de exemplo com duas faixas e mesmo número de série gera
+      somente um equipamento consolidado, se não houver contradição.
+  [ ] Registros OSM com mesmo número identificador mas tipos de elemento
+      diferentes (node e way) não colidem por chave externa.
+  [ ] Fonte OSM sem suporte oficial retorna confiabilidade não confirmada.
+  [ ] Duas bases copiadas do mesmo OSM não contam como duas provas.
+  [ ] Medição ALPR/câmera semafórica não aparece como radar de velocidade.
+  [ ] Divergência oficial/comunitária é registrada sem apagar dados oficiais.
+  [ ] Alteração de licença de recurso registra histórico sem apagar auditoria.
+  [ ] Erro no Overpass não impede resposta da API com snapshot local.
+  [ ] Radares separados por direção/faixa não são colapsados por proximidade.
+  [ ] Saídas em seis formatos continuam conformes após adicionar nova fonte.
+  [ ] Coletor verifica requisitos de licença e documentação antes de habilitar
+      ingestão automática e republicação de dados de terceiros.
+
+17.7 DIRETRIZ FINAL PARA A IA IMPLEMENTADORA
+
+Use os repositórios exclusivamente como referências técnicas e fontes de
+ideias. Consulte READMEs, exemplos e licenças; NÃO copie código sem respeitar
+licenciamento e segurança. Não assuma funcionamento atual de endpoints vistos
+em código de terceiro. Valide recursos na origem primária. Preserve todos os
+requisitos das seções 0 a 16: separação coletor/web, liberdade tecnológica,
+3FN, PK/FK/UNIQUE/CHECK, suporte a SGBDs relacionais sem PostGIS, seis formatos,
+GET/POST, /ajuda, deduplicação rastreável, cache, logs e atualização.
+
+A ampliação é ADITIVA e segura: F15/F16 são fontes condicionais não oficiais;
+T75/T76/T77 ampliam o modelo com natureza e licença por recurso. Nenhuma fonte
+comunitária pode substituir a confirmação do órgão público competente.
+
+======================================================================
+FIM DA ESPECIFICAÇÃO V1.1 — COM PESQUISA DE REFERÊNCIAS GITHUB
+======================================================================

@@ -1,0 +1,18 @@
+[Unit]
+Description=Radar Brasil - Coletor
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=radarbrasil
+Group=radarbrasil
+WorkingDirectory=/opt/radarbrasil
+EnvironmentFile=/etc/radarbrasil/radarbrasil.env
+ExecStart=/opt/radarbrasil/.venv/bin/python -m radarbrasil.collector update
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/radarbrasil /var/log/radarbrasil
+UMask=0027
+TimeoutStartSec=1800
