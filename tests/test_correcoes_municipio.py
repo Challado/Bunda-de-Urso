@@ -50,7 +50,12 @@ class TestCarregarCorrecoes(unittest.TestCase):
             self.assertTrue(row["codigo_ibge"].isdigit()
                             and len(row["codigo_ibge"]) == 7)
             self.assertIn(row["motivo"], ("malha_ibge",
-                                          "uf_divergente_confirmada"))
+                                          "uf_divergente_confirmada",
+                                          "escopo_da_fonte_df",
+                                          "coordenada_corrigida",
+                                          "nome_normalizado",
+                                          "uf_da_fonte_corrigida",
+                                          "nome_ibge_renomeado"))
 
 
 class TestAplicarIdempotente(unittest.TestCase):
