@@ -1,0 +1,26 @@
+Fixture: STTU Natal - portal institucional (sem cadastro estadual)
+==================================================================
+
+Arquivo: pagina_fixture.html
+Recorte verbatim (com tags minimas) do conteudo publicado na pagina oficial:
+
+  URL pagina : https://www.natal.rn.gov.br/sttu
+  URL final  : (mesma; HTTP 200, text/html; charset=UTF-8, 89706 bytes)
+  Coletado em: 10/10/2026 (curl -sSL -A "RadarBrasil/1.0")
+  sha256 da pagina original:
+    74e25fd88e756fa21a2f7b4a6273604021ab7ea06bc86f2a73bed7cf91491aef
+
+Conteudo estruturado: NAO EXISTE (para o ESTADO).
+  - E o portal da STTU (municipal, Natal). Traz informacao institucional,
+    CMtMU, servicos e documentos. Sem cadastro maquina-legivel.
+  - A subpagina MUNICIPAL https://www.natal.rn.gov.br/sttu/equipamentos
+    ("Equipamentos de Fiscalizacao Eletronica", HTTP 200, 88435 bytes) lista
+    PDFs por equipamento (lombadas eletronicas, radares, radares nos
+    cruzamentos), inclusive um "levantamento-tecnico". Sao documentos tecnicos
+    avulsos, restritos a capital — nao cobrem o estado.
+  - O DER-RN (https://www.der.rn.gov.br/) respondeu HTTP 503 em 10/10/2026.
+  - Sem CSV/JSON/GeoJSON/KML/XLS => tem_dataset_estruturado = False.
+
+Uso: teste offline do conector coletor/fontes/natal_rn.py (nenhum acesso a
+rede). O recorte preserva as frases/link citados; e um recorte reduzido, sem
+alterar o sentido.

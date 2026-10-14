@@ -87,15 +87,16 @@ class CatalogoUFsTest(unittest.TestCase):
             self.assertIs(e["cobertura_estadual_confirmada"], False,
                           "UF %s promete cobertura" % e["uf"])
 
-    def test_nosso_modulo_coerente_com_implementado(self):
-        # toda UF implementada deve apontar um modulo nosso; as demais, null.
+    def test_nosso_modulo_coerente_com_estado(self):
+        # UF com conector nosso (implementado OU parcial) aponta o modulo; as
+        # demais (pendente/sem_publicacao/pendente_lai) ficam null.
         for e in self.ufs:
-            if e["estado_integracao"] == "implementado":
+            if e["estado_integracao"] in ("implementado", "parcial"):
                 self.assertTrue(e["nosso_modulo"],
-                                "UF %s implementada sem modulo" % e["uf"])
+                                "UF %s com conector sem modulo" % e["uf"])
             else:
                 self.assertIsNone(e["nosso_modulo"],
-                                  "UF %s nao implementada com modulo" % e["uf"])
+                                  "UF %s sem conector com modulo" % e["uf"])
 
     def test_ufs_batem_com_o_doc(self):
         self.assertEqual(sorted(UFS_CANONICAS), sorted(_ufs_do_doc()))
@@ -124,6 +125,36 @@ class CatalogoUFsTest(unittest.TestCase):
         # complemento municipal de MG
         municipais = por_uf["MG"].get("modulos_municipais", [])
         self.assertIn("pbh", [m.get("modulo") for m in municipais])
+
+    def test_modulos_ondas_1_2_mapeados(self):
+        # estado REAL pos-ondas 1/2: o modulo do conector por UF.
+        por_uf = {e["uf"]: e for e in self.ufs}
+        esperado = {
+            "GO": "goinfra", "BA": "seinfra_ba", "CE": "amc_ce",
+            "RJ": "der_rj", "RS": "daer_rs", "ES": "cariacica_es",
+            "SC": "joinville_sc", "AM": "immu_am", "MS": "agetran_ms",
+            "PB": "semob_pb", "AP": "ctmac_ap", "RO": "semtran_ro",
+            "PA": "segbell_pa", "DF": "detran_df", "MA": "detran_ma",
+            "SE": "der_se", "TO": "araguaiana_to",
+        }
+        for uf, modulo in esperado.items():
+            self.assertEqual(por_uf[uf]["nosso_modulo"], modulo,
+                             "UF %s com modulo inesperado" % uf)
+
+    def test_diagnosticos_4_ufs_finais(self):
+        # AC/AL/RN/PI: conector diagnostico que DOCUMENTA a ausencia de
+        # cadastro (nao ha conector consumivel -> nosso_modulo null).
+        por_uf = {e["uf"]: e for e in self.ufs}
+        esperado = {
+            "AC": ("detran_ac", "pendente_lai"),
+            "PI": ("teresina_pi", "pendente_lai"),
+            "AL": ("der_al", "sem_publicacao"),
+            "RN": ("natal_rn", "sem_publicacao"),
+        }
+        for uf, (modulo, estado) in esperado.items():
+            self.assertEqual(por_uf[uf]["modulo_diagnostico"], modulo)
+            self.assertEqual(por_uf[uf]["estado_integracao"], estado)
+            self.assertIsNone(por_uf[uf]["nosso_modulo"])
 
 
 if __name__ == "__main__":

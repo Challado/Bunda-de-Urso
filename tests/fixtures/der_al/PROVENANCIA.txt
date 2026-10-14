@@ -1,0 +1,26 @@
+Fixture: DER-AL - canal institucional (sem lista)
+=================================================
+
+Arquivo: pagina_fixture.html
+Recorte verbatim (com tags minimas) do conteudo publicado na pagina oficial:
+
+  URL pagina : https://alagoasdigital.al.gov.br/orgao/49
+  URL final  : (mesma; HTTP 200, text/html; charset=UTF-8, 43169 bytes)
+  Coletado em: 10/10/2026 (curl -sSL -A "RadarBrasil/1.0")
+  sha256 da pagina original:
+    0f29a802e59c0b8ea89f2a7de241d44ae3bb0312e8275db8e67123bddb0c2599
+
+Conteudo estruturado: NAO EXISTE.
+  - E o CANAL INSTITUCIONAL do DER-AL no portal Alagoas Digital.
+  - Descreve competencia ("rodovias estaduais sao por ele fiscalizadas") e
+    servicos/contatos (Protocolo Geral do DER, Secao de Processamento de Multas,
+    Divisao de Faixa de Dominio). NAO publica relacao de radares/lombadas.
+  - Sem CSV/JSON/GeoJSON/KML/XLS => tem_dataset_estruturado = False.
+  - O dominio proprio do orgao (https://www.der.al.gov.br/) NAO respondeu em
+    10/10/2026 (falha de conexao). O DMT de Maceio
+    (https://maceio.al.gov.br/secretarias-e-orgaos/dmtt) tambem e apenas
+    institucional (sem lista) e cobre so a capital.
+
+Uso: teste offline do conector coletor/fontes/der_al.py (nenhum acesso a rede).
+O recorte preserva as frases citadas; e um recorte reduzido, sem alterar o
+sentido.
