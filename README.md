@@ -201,7 +201,7 @@ No fim das contas, é isso: transformar a lamúria em dado. Para que ninguém ma
 ## Licença
 
 - **Código e documentação (o que é nosso):** [MIT](LICENSE) — use, copie, modifique e redistribua, inclusive comercialmente; só mantenha o aviso de copyright.
-- **Dados:** o cadastro é compilado a partir de fontes oficiais públicas. A compilação e a estrutura são oferecidas sob **CC BY 4.0** (atribuição), respeitando os termos de cada fonte original.
+- **Dados:** o cadastro é compilado a partir de fontes oficiais públicas. A compilação e a estrutura são oferecidas sob **[CC BY 4.0](LICENSE-DATA.md)** (atribuição), respeitando os termos de cada fonte original.
 - **Terceiros:** a pasta `referencia/` é material de terceiros e mantém a licença de origem.
 
 ## Autoria e proveniência
