@@ -91,8 +91,21 @@ class ColetorDAERRS(ColetorBase):
 
     @classmethod
     def resolver_url(cls):
-        """URL da pagina oficial de entrada (a lista vem por descoberta)."""
-        return cls.PAGINA
+        """URLs CSV das planilhas oficiais (DAER -> CRBM/CPRv BM -> Sheets).
+
+        O tick entrega o retorno de ``resolver_url()`` direto ao
+        ``sincronizar``/``carregar``, que aceita uma LISTA de URLs.  Devolver
+        aqui a pagina de entrada faria o ``carregar`` tratar o HTML como CSV
+        (0 linhas).  Por isso ja resolvemos as planilhas; se nenhuma for
+        descoberta, levantamos ``ErroFonte`` para o tick registrar erro em vez
+        de um "0 registros" silencioso.
+        """
+        urls = cls.resolver_planilhas()
+        if not urls:
+            raise http.ErroFonte(
+                "nao foi possivel descobrir as planilhas de radares moveis "
+                "do CRBM/CPRv BM (%s)" % cls.PAGINA)
+        return urls
 
     # -- descoberta (offline-testavel) ------------------------------------
     @classmethod
