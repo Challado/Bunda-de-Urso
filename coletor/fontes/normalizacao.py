@@ -162,16 +162,50 @@ def buscar_municipio_por_nome(conn, uf_sigla, municipio_nome):
     return None
 
 
-def resolver_uf_municipio(conn, uf_sigla, municipio_nome, municipio_ibge):
+def municipio_por_geografia(conn, latitude, longitude):
+    """Resolve (codigo_ibge, uf_sigla) pela malha OFICIAL do IBGE, ou (None, None).
+
+    Fallback para quando o nome nao casa contra MUNICIPIO: se o registro tem
+    coordenada valida, o ponto-em-poligono sobre a malha municipal do IBGE
+    decide o municipio. Nada e inventado: coordenada ausente/implausivel ou
+    ponto fora de qualquer municipio (agua/limite) devolvem (None, None).
+    """
+    if latitude is None or longitude is None:
+        return None, None
+    try:
+        from core import geo_municipio as geo
+    except Exception:                                       # noqa: BLE001
+        return None, None
+    if not geo.coordenada_valida(latitude, longitude):
+        return None, None
+    codigo = geo.municipio_por_coordenada(latitude, longitude)
+    if not codigo:
+        return None, None
+    row = dbmod.query_one(
+        conn, "SELECT uf_sigla FROM MUNICIPIO WHERE codigo_ibge=?", (codigo,))
+    if row is None:
+        # Municipio da malha que nao esta no cadastro local: nao inventa
+        # (evita FK orfa num banco sem a carga oficial do IBGE).
+        log.debug("fallback geo achou %s, ausente em MUNICIPIO: fica NULL",
+                  codigo)
+        return None, None
+    return codigo, row["uf_sigla"]
+
+
+def resolver_uf_municipio(conn, uf_sigla, municipio_nome, municipio_ibge,
+                          latitude=None, longitude=None):
     """Resolve/cria municipio e retorna (uf_sigla, municipio_id).
 
     Ordem de resolucao:
       1. codigo IBGE publicado pela fonte (com cria se ainda nao existir);
-      2. (uf_sigla, nome) normalizado contra MUNICIPIO (carga oficial IBGE).
+      2. (uf_sigla, nome) normalizado contra MUNICIPIO (carga oficial IBGE);
+      3. FALLBACK GEOGRAFICO: se 1 e 2 falharam E o registro tem coordenada,
+         resolve por ponto-em-poligono sobre a malha oficial do IBGE
+         (``core.geo_municipio``) — registrado no log.
 
     Fontes mandam quase sempre o *nome* e raramente o codigo; por isso o
     passo 2 e o que evita perder o municipio. Nunca insere municipio com
-    codigo_ibge NULL: sem correspondencia oficial fica NULL (e fica no log).
+    codigo_ibge NULL: sem correspondencia oficial e sem coordenada fica NULL.
     """
     uf_sigla = (uf_sigla or "").strip().upper() or None
     if uf_sigla:
@@ -202,6 +236,15 @@ def resolver_uf_municipio(conn, uf_sigla, municipio_nome, municipio_ibge):
         if municipio_id is None:
             log.debug("municipio nao resolvido (uf=%r nome=%r): fica NULL",
                       uf_sigla, municipio_nome)
+    # FALLBACK GEOGRAFICO (malha oficial do IBGE) — so quando o nome falhou
+    if municipio_id is None:
+        codigo, uf_geo = municipio_por_geografia(conn, latitude, longitude)
+        if codigo:
+            municipio_id = codigo
+            uf_sigla = uf_geo or uf_sigla
+            log.info("municipio resolvido por coordenada (fallback geo): "
+                     "nome=%r uf=%r -> %s/%s", municipio_nome, uf_geo,
+                     uf_geo, codigo)
     return uf_sigla, municipio_id
 
 
@@ -219,7 +262,8 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None):
     """Insere um ponto normalizado (dict `d`) com equipamento, faixa,
     limites e vinculo. Retorna dict com ids criados."""
     uf_sigla, municipio_id = resolver_uf_municipio(
-        conn, d.get("uf"), d.get("municipio_nome"), d.get("municipio_ibge"))
+        conn, d.get("uf"), d.get("municipio_nome"), d.get("municipio_ibge"),
+        latitude=d.get("latitude"), longitude=d.get("longitude"))
     via_id = obter_via(conn, d.get("via_codigo"), d.get("via_tipo"))
 
     qualidade_id = dbmod.domain_id(conn, "QUALIDADE_POSICAO",

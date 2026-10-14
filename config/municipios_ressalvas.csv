@@ -1,0 +1,25 @@
+# pontos com coordenada que a malha OFICIAL do IBGE nao localiza (coordenada implausivel ou agua/limite); nada e inventado
+ponto_id;lat;lon;municipio_atual;motivo
+466;-22.871861;-43.147095;3303302;fora_da_malha_ibge_agua_ou_limite
+467;-22.870416;-43.163312;3303302;fora_da_malha_ibge_agua_ou_limite
+468;-22.868429;-43.185028;3303302;fora_da_malha_ibge_agua_ou_limite
+469;-22.868429;-43.185028;3303302;fora_da_malha_ibge_agua_ou_limite
+472;-22.871847;-43.14727;3303302;fora_da_malha_ibge_agua_ou_limite
+476;-22.868433;-43.185125;3304557;fora_da_malha_ibge_agua_ou_limite
+477;-22.868433;-43.185125;3304557;fora_da_malha_ibge_agua_ou_limite
+479;-22.870419;-43.163498;3304557;fora_da_malha_ibge_agua_ou_limite
+2060;-20.910116;48.459841;3506102;coordenada_implausivel_lon_positiva
+2061;-21.250479;43.549075;3531308;coordenada_implausivel_lon_positiva
+2455;-23.705176;-43.468188;3522802;fora_da_malha_ibge_agua_ou_limite
+2463;-21.9753;47.8889;3548906;coordenada_implausivel_lon_positiva
+45871;-22.868429;-43.185028;3303302;fora_da_malha_ibge_agua_ou_limite
+45872;-22.868429;-43.185028;3303302;fora_da_malha_ibge_agua_ou_limite
+45873;-22.870416;-43.163312;3304557;fora_da_malha_ibge_agua_ou_limite
+45874;-22.871861;-43.147095;3304557;fora_da_malha_ibge_agua_ou_limite
+48710;-16.615076;-16.615076;5212303;coordenada_implausivel_lat_igual_lon
+48711;-16.615076;-16.615076;5212303;coordenada_implausivel_lat_igual_lon
+48981;-16.425392;49.465963;5205208;coordenada_implausivel_lon_positiva
+48982;-16.425392;49.465963;5205208;coordenada_implausivel_lon_positiva
+49052;-16.202572;49.600823;5211404;coordenada_implausivel_lon_positiva
+49053;-16.202572;49.600823;5211404;coordenada_implausivel_lon_positiva
+49551;-12.6002;38.04553;2905701;coordenada_implausivel_lon_positiva
