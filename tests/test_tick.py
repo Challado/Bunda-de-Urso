@@ -123,6 +123,56 @@ class TestTick(unittest.TestCase):
         hist = [{"status": "erro", "iniciada_em": _ts(self.base)}]
         self.assertEqual(tick.espera_s(10, hist), 300)
 
+    # -- gancho pos-coleta -------------------------------------------------
+    def _agenda_com_pos(self, fn):
+        agenda = {k: dict(v) for k, v in AGENDA.items()}
+        agenda["antt"]["pos_coleta"] = fn
+        return agenda
+
+    def test_pos_coleta_roda_apos_sucesso(self):
+        chamadas = []
+
+        def pos(conn):
+            chamadas.append(conn)
+            return {"ok": True}
+
+        res = self._run(agenda=self._agenda_com_pos(pos),
+                        arquivos={"antt": common.ANTT_FIXTURE})
+        self.assertEqual(res[0]["acao"], "executado")
+        self.assertEqual(res[0]["pos_coleta"], {"ok": True})
+        self.assertEqual(len(chamadas), 1)
+
+    def test_pos_coleta_nao_roda_se_a_coleta_falha(self):
+        chamadas = []
+
+        def pos(conn):
+            chamadas.append(conn)
+            return {}
+
+        ruim = os.path.join(self.tmp, "ruim_pos.json")
+        with open(ruim, "w", encoding="utf-8") as f:
+            f.write("{{{ nao e json")
+        res = self._run(agenda=self._agenda_com_pos(pos),
+                        arquivos={"antt": ruim})
+        self.assertEqual(res[0]["acao"], "erro")
+        self.assertEqual(chamadas, [])
+
+    def test_erro_no_pos_coleta_nao_derruba_a_coleta(self):
+        def boom(conn):
+            raise RuntimeError("falhou de proposito")
+
+        res = self._run(agenda=self._agenda_com_pos(boom),
+                        arquivos={"antt": common.ANTT_FIXTURE})
+        self.assertEqual(res[0]["acao"], "executado")
+        self.assertEqual(res[0]["pos_coleta_erro"]["tipo"], "RuntimeError")
+
+    def test_resolver_pos_coleta_aceita_callable_e_spec(self):
+        self.assertIs(tick._resolver_pos_coleta("os:getcwd"), os.getcwd)
+        fn = lambda conn: None
+        self.assertIs(tick._resolver_pos_coleta(fn), fn)
+        with self.assertRaises(ValueError):
+            tick._resolver_pos_coleta("sem_dois_pontos")
+
 
 if __name__ == "__main__":
     unittest.main()
