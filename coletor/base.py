@@ -282,7 +282,8 @@ class ColetorBase(object):
         criados = 0
         atualizados = 0
         rejeitados = 0
-        pendentes = []      # (reg_id, d) normalizados, ainda nao inseridos
+        detalhes = []       # por registro aceito: indice/registro/ponto
+        pendentes = []      # (idx, reg_id, d) normalizados, ainda nao inseridos
         for idx, raw in enumerate(registros):
             reg_id = self.registrar_registro(
                 artefato_id, idx, self.identificador(raw), raw)
@@ -303,7 +304,7 @@ class ColetorBase(object):
             if d is None:
                 rejeitados += 1
                 continue
-            pendentes.append((reg_id, d))
+            pendentes.append((idx, reg_id, d))
         # Identificador que se REPETE no mesmo artefato designa pontos
         # DIFERENTES (endereco generico, codigo de rota): nao e identidade de
         # UM ponto. Nesses casos o registro ganha ponto proprio (comportamento
@@ -311,7 +312,7 @@ class ColetorBase(object):
         # evidencia — assim como nos casos em que o (fonte, tipo, valor) ja
         # aponta para mais de um ponto de coletas anteriores.
         ambiguos = self._identidades_ambiguas(pendentes)
-        for reg_id, d in pendentes:
+        for idx, reg_id, d in pendentes:
             # um registro ruim nao pode derrubar a fonte inteira:
             # cada registro entra num savepoint proprio.
             self.conn.execute("SAVEPOINT reg")
@@ -319,6 +320,10 @@ class ColetorBase(object):
                 if d.get("tipo_registro") == "trecho_elegivel":
                     nz.inserir_trecho(self.conn, reg_id, d, fonte_id)
                     criados += 1
+                    detalhes.append({"indice": idx, "registro_id": reg_id,
+                                     "ponto_id": None,
+                                     "ponto_criado": False,
+                                     "trecho": True})
                 else:
                     chave = _chave_identidade(d)
                     res = nz.inserir_normalizado(
@@ -329,6 +334,10 @@ class ColetorBase(object):
                         criados += 1
                     else:
                         atualizados += 1
+                    detalhes.append({"indice": idx, "registro_id": reg_id,
+                                     "ponto_id": res.get("ponto_id"),
+                                     "ponto_criado": bool(
+                                         res.get("ponto_criado"))})
             except Exception:                       # noqa: BLE001
                 self.conn.execute("ROLLBACK TO reg")
                 self.conn.execute("RELEASE reg")
@@ -350,6 +359,7 @@ class ColetorBase(object):
             "linhas_recebidas": len(registros),
             "criados": criados, "atualizados": atualizados,
             "rejeitados": rejeitados,
+            "detalhes": detalhes,
         }
 
     @staticmethod
@@ -359,7 +369,7 @@ class ColetorBase(object):
         Sao identidades AMBIGUAS: o mesmo valor descreve pontos diferentes.
         """
         from collections import Counter
-        contagem = Counter(_chave_identidade(d) for _, d in pendentes)
+        contagem = Counter(_chave_identidade(d) for _, _, d in pendentes)
         return {k for k, n in contagem.items() if k is not None and n > 1}
 
     def sincronizar(self, origem, publicar=True):

@@ -6,6 +6,7 @@ LIMIT so depois do calculo de distancia (spec 9.4).
 """
 import datetime
 import json
+import sqlite3
 
 from . import db as dbmod
 from . import geo
@@ -79,7 +80,18 @@ def _uf_do_ponto(conn, row):
     return (uf or _uf_original(conn, row["ponto_id"]) or "").upper() or None
 
 
-def _filtros_extra(filtros):
+def _governanca_do_ponto(conn, pid):
+    """Campos de governanca do ponto (ou {} se a base ainda nao os tem)."""
+    try:
+        row = dbmod.query_one(
+            conn, "SELECT procedencia, verificacao_status, removido_em, "
+            "motivo_remocao FROM PONTO_FISCALIZACAO WHERE id=?", (pid,))
+    except sqlite3.OperationalError:
+        return {}
+    return dict(row) if row is not None else {}
+
+
+def _filtros_extra(filtros, conn=None):
     clauses = []
     params = []
     # O filtro de UF NAO entra em SQL: a UF pode vir do municipio OU do
@@ -115,6 +127,17 @@ def _filtros_extra(filtros):
             "JOIN MODALIDADE_FISCALIZACAO mf ON mf.id=r.modalidade_id "
             "WHERE mf.codigo = ?)")
         params.append(filtros["modalidade"])
+    # GOVERNANCA: esconde removidos (tombstone) e desabilitados e, quando ha
+    # um colaborativo ativo correspondente a um oficial, prefere o colaborativo
+    # (esconde o oficial "perdedor"). Seguro se a base ainda nao tem a camada.
+    if conn is not None:
+        try:
+            from . import governanca as _gov
+            gclauses, gparams = _gov.clausulas_consulta(conn)
+            clauses.extend(gclauses)
+            params.extend(gparams)
+        except Exception:                       # noqa: BLE001
+            pass
     return clauses, params
 
 
@@ -158,7 +181,7 @@ def _pontos_inferidos_dentro(conn, lat, lon, raio, filtros):
         return []
     ids = sorted(dentro)
     placeholders = ",".join("?" * len(ids))
-    extra, extra_params = _filtros_extra(filtros)
+    extra, extra_params = _filtros_extra(filtros, conn)
     sql = _PONTO_SQL + " WHERE p.id IN (%s)" % placeholders
     if extra:
         sql += " AND " + " AND ".join(extra)
@@ -184,7 +207,7 @@ def buscar_pontos(conn, lat, lon, raio, filtros=None, limite=100, cursor=None):
     bbox_sql, bbox_params = _bbox_clause(
         bb["lat_min"], bb["lat_max"], bb["lon_min"], bb["lon_max"],
         bb["cruza_antimeridiano"])
-    extra, extra_params = _filtros_extra(filtros)
+    extra, extra_params = _filtros_extra(filtros, conn)
     where = bbox_sql if not extra else bbox_sql + " AND " + " AND ".join(extra)
     sql = _PONTO_SQL + " WHERE " + where
     rows = dbmod.query_all(conn, sql, bbox_params + extra_params)
@@ -455,6 +478,12 @@ def montar_registro(conn, r, distancia_metros=None, incluir_operacoes=True):
                         else "nao_avaliada")
     reg["observacoes"] = r["observacoes"]
     reg["proveniencia_campos"] = {}
+    gov = _governanca_do_ponto(conn, pid)
+    if gov:
+        reg["procedencia"] = gov.get("procedencia")
+        reg["verificacao_status"] = gov.get("verificacao_status")
+        reg["removido_em"] = gov.get("removido_em")
+        reg["motivo_remocao"] = gov.get("motivo_remocao")
     return reg
 
 
@@ -1243,7 +1272,7 @@ def buscar_trafego(conn, limite=100, ponto_id=None, cursor=None):
 # prova ausencia de fiscalizacao.
 def buscar_cadastral(conn, filtros=None, limite=100, cursor=None):
     filtros = filtros or {}
-    clauses, params = _filtros_extra(filtros)
+    clauses, params = _filtros_extra(filtros, conn)
     where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
     rows = dbmod.query_all(conn, _PONTO_SQL + where + " ORDER BY p.id",
                            params)
