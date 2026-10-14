@@ -1,0 +1,158 @@
+{
+  "sources": [
+    {
+      "code": "ANTT_RADARES",
+      "name": "ANTT - Dados dos Radares",
+      "url": "https://dados.antt.gov.br/dataset/79d287f4-f5ca-4385-a17c-f61f53831f17",
+      "ckan_api": "https://dados.antt.gov.br/api/3/action/package_show?id=79d287f4-f5ca-4385-a17c-f61f53831f17",
+      "format": "ckan",
+      "resource_formats": [
+        "JSON",
+        "CSV"
+      ],
+      "enabled": true,
+      "interval_seconds": 3600,
+      "esfera": "federal",
+      "organization": "ANTT"
+    },
+    {
+      "code": "DNIT_PNCV",
+      "name": "DNIT - Controle de Velocidade",
+      "url": "https://servicos.dnit.gov.br/dadosabertos/dataset/controle-de-velocidade",
+      "ckan_api": "https://servicos.dnit.gov.br/dadosabertos/api/3/action/package_show?id=controle-de-velocidade",
+      "format": "ckan",
+      "resource_formats": [
+        "XLSX",
+        "CSV"
+      ],
+      "enabled": true,
+      "interval_seconds": 3600,
+      "esfera": "federal",
+      "organization": "DNIT"
+    },
+    {
+      "code": "PRF_PORTATEIS",
+      "name": "PRF - Equipamentos portáteis",
+      "url": "https://www.gov.br/prf/pt-br/assuntos/fiscalizacao-de-velocidade/lista-de-radares",
+      "format": "prf_portateis",
+      "enabled": true,
+      "interval_seconds": 86400,
+      "esfera": "federal",
+      "organization": "PRF"
+    },
+    {
+      "code": "PRF_FIXOS",
+      "name": "PRF - Radares fixos (tabela)",
+      "url": "https://www.gov.br/prf/pt-br/assuntos/fiscalizacao-de-velocidade/radares-fixos",
+      "format": "prf_fixos",
+      "enabled": true,
+      "interval_seconds": 86400,
+      "esfera": "federal",
+      "organization": "PRF"
+    },
+    {
+      "code": "INMETRO_IMPORT",
+      "name": "Inmetro PSIE - importação de arquivo público",
+      "url": "https://servicos.rbmlq.gov.br/Instrumento",
+      "format": "manual_json",
+      "enabled": false,
+      "interval_seconds": 86400,
+      "esfera": "federal",
+      "organization": "INMETRO",
+      "reason": "Necessária validação de API pública e condições de automação; suporta importação manual de arquivo JSON/XML oficial."
+    },
+    {
+      "code": "OSM_COMPLEMENTAR",
+      "name": "OpenStreetMap - speed_camera complementar",
+      "url": "https://overpass-api.de/api/interpreter",
+      "format": "osm_overpass",
+      "enabled": false,
+      "interval_seconds": 86400,
+      "esfera": "outra",
+      "organization": "OSM",
+      "reason": "Fonte comunitária não comprova fiscalização oficial; habilitar conscientemente."
+    },
+    {
+      "code": "DER_SP",
+      "name": "DER São Paulo",
+      "url": "https://dadosabertos.sp.gov.br/dataset/radar",
+      "format": "manual_json",
+      "enabled": false,
+      "interval_seconds": 86400,
+      "esfera": "estadual",
+      "organization": "DER-SP",
+      "reason": "Site oficial catalogado; nenhum link de download/estrutura validado neste ambiente. Baixe CSV/XLSX/JSON da fonte e use import-file --file --format. NÃO habilitar update automático sem conector específico."
+    },
+    {
+      "code": "DER_PR",
+      "name": "DER Paraná",
+      "url": "https://www.der.pr.gov.br/Pagina/Fiscalizacao-de-velocidade",
+      "format": "manual_json",
+      "enabled": false,
+      "interval_seconds": 86400,
+      "esfera": "estadual",
+      "organization": "DER-PR",
+      "reason": "Site oficial catalogado; nenhum link de download/estrutura validado neste ambiente. Baixe CSV/XLSX/JSON da fonte e use import-file --file --format. NÃO habilitar update automático sem conector específico."
+    },
+    {
+      "code": "DER_MG",
+      "name": "DER Minas Gerais",
+      "url": "https://der.mg.gov.br/transportes/localizacao-de-radares-fixos-e-portateis",
+      "format": "manual_json",
+      "enabled": false,
+      "interval_seconds": 86400,
+      "esfera": "estadual",
+      "organization": "DER-MG",
+      "reason": "Site oficial catalogado; nenhum link de download/estrutura validado neste ambiente. Baixe CSV/XLSX/JSON da fonte e use import-file --file --format. NÃO habilitar update automático sem conector específico."
+    },
+    {
+      "code": "CURITIBA",
+      "name": "Curitiba - Fiscalização eletrônica",
+      "url": "https://transito.curitiba.pr.gov.br/fiscalizacaoeletronica",
+      "format": "manual_json",
+      "enabled": false,
+      "interval_seconds": 86400,
+      "esfera": "municipal",
+      "organization": "Prefeitura Curitiba",
+      "reason": "Site oficial catalogado; nenhum link de download/estrutura validado neste ambiente. Baixe CSV/XLSX/JSON da fonte e use import-file --file --format. NÃO habilitar update automático sem conector específico."
+    },
+    {
+      "code": "RECIFE",
+      "name": "Recife - Equipamentos de fiscalização",
+      "url": "https://dados.recife.pe.gov.br/dataset/equipamentos-de-monitoramento-e-fiscalizacao-de-transito",
+      "format": "manual_json",
+      "enabled": false,
+      "interval_seconds": 86400,
+      "esfera": "municipal",
+      "organization": "Prefeitura Recife",
+      "reason": "Site oficial catalogado; nenhum link de download/estrutura validado neste ambiente. Baixe CSV/XLSX/JSON da fonte e use import-file --file --format. NÃO habilitar update automático sem conector específico."
+    },
+    {
+      "code": "BELO_HORIZONTE",
+      "name": "Belo Horizonte - Fiscalização eletrônica",
+      "url": "https://dados.pbh.gov.br/pt_BR/dataset/fiscalizacao-eletronica",
+      "format": "manual_json",
+      "enabled": false,
+      "interval_seconds": 86400,
+      "esfera": "municipal",
+      "organization": "Prefeitura Belo Horizonte",
+      "reason": "Site oficial catalogado; nenhum link de download/estrutura validado neste ambiente. Baixe CSV/XLSX/JSON da fonte e use import-file --file --format. NÃO habilitar update automático sem conector específico."
+    },
+    {
+      "code": "ANTT_TRAFEGO",
+      "name": "ANTT - Tráfego nos radares (observações, não limites legais)",
+      "url": "https://dados.antt.gov.br/dataset/269aebaa-05e7-4d76-a105-408f12bf4094",
+      "ckan_api": "https://dados.antt.gov.br/api/3/action/package_show?id=269aebaa-05e7-4d76-a105-408f12bf4094",
+      "format": "ckan",
+      "resource_formats": [
+        "CSV",
+        "JSON"
+      ],
+      "enabled": false,
+      "interval_seconds": 86400,
+      "esfera": "federal",
+      "organization": "ANTT",
+      "reason": "Conector implementado; desabilitado por padrão por volume elevado e validação online não realizada. Nunca usar velocidade de passagem como limite regulamentado."
+    }
+  ]
+}

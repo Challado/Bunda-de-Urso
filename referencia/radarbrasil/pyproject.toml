@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "radarbrasil"
+version = "1.0.0"
+description = "Coletor relacional e API FastCGI de radares brasileiros"
+requires-python = ">=3.11"
+dependencies = ["SQLAlchemy>=2.0,<3", "requests>=2.31,<3", "beautifulsoup4>=4.12,<5", "openpyxl>=3.1,<4", "defusedxml>=0.7,<1"]
+
+[project.scripts]
+radarbrasil = "radarbrasil.collector:main"
+
+[tool.setuptools.packages.find]
+include=["radarbrasil*"]
