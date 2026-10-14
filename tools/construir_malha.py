@@ -28,6 +28,32 @@ from core import config                          # noqa: E402
 from core import geo_municipio as geo            # noqa: E402
 
 DESTINO_PADRAO = geo.MALHA_VERSIONADA
+CADASTRO_PADRAO = os.path.join(config.ROOT, "config", "municipios_ibge.json")
+
+
+def municipios_ausentes(codigos_malha, cadastro=CADASTRO_PADRAO):
+    """Municipios do cadastro IBGE que NAO tem poligono na malha.
+
+    Devolve lista ordenada de dicts ``{codigo_ibge, uf_sigla, nome}``. Nao
+    inventa geometria: serve para TORNAR VISIVEL o vao entre o cadastro
+    (localidades) e a malha (poligonos) — ex.: municipio novo cujo poligono
+    o IBGE ainda nao publicou na API de malhas.
+    """
+    codigos = {str(c).strip() for c in codigos_malha}
+    try:
+        with open(cadastro, "r", encoding="utf-8") as f:
+            dados = json.load(f)
+    except Exception:                                    # noqa: BLE001
+        return []
+    fora = []
+    for m in (dados or {}).get("municipios", []) or []:
+        cod = str(m.get("codigo_ibge") or "").strip()
+        if cod and cod not in codigos:
+            fora.append({"codigo_ibge": cod,
+                         "uf_sigla": m.get("uf_sigla"),
+                         "nome": m.get("nome")})
+    fora.sort(key=lambda d: d["codigo_ibge"])
+    return fora
 
 
 def _arredonda(v, casas):
@@ -116,6 +142,17 @@ def main(argv=None):
     # tamanho descomprimido (para o relatorio)
     with gzip.open(destino, "rb") as gz:
         cru = len(gz.read())
+    with gzip.open(destino, "rb") as gz:
+        codigos = {str((f.get("properties") or {}).get("codarea"))
+                   for f in json.loads(gz.read().decode("utf-8"))
+                   .get("features", [])}
+    ausentes = municipios_ausentes(codigos)
+    if ausentes:
+        print("AVISO: %d municipio(s) do cadastro IBGE sem poligono na malha:"
+              % len(ausentes), file=sys.stderr)
+        for a in ausentes:
+            print("  %s %s (%s)" % (a["codigo_ibge"], a["nome"],
+                                     a["uf_sigla"]), file=sys.stderr)
     print("municipios simplificados: %d" % n)
     print("cache por UF (bruto):      %.2f MB" % (bruto / 1048576.0))
     print("simplificado (descompact): %.2f MB" % (cru / 1048576.0))
