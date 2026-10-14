@@ -81,16 +81,18 @@ class ColetorRecife(ColetorBase):
         return list(csv.DictReader(io.StringIO(texto), delimiter=delim))
 
     def identificador(self, raw):
-        return nz.pick(raw, "id", "Id", "ID", "codigo", "Codigo")
+        return nz.pick(raw, "identificacao_equipamento", "id", "Id", "ID",
+                       "codigo", "Codigo")
 
     def normalizar(self, idx, raw):
         lat = nz.to_float(nz.pick(raw, "latitude", "Latitude", "lat"))
         lon = nz.to_float(nz.pick(raw, "longitude", "Longitude", "lon", "lng"))
         if lat is None or lon is None:
             return None
-        logradouro = nz.pick(raw, "endereco", "Endereco", "logradouro",
-                             "local", "Local")
-        tipo_txt = nz.pick(raw, "tipo", "Tipo", "equipamento", "Equipamento")
+        logradouro = nz.pick(raw, "local_instalacao", "endereco", "Endereco",
+                             "logradouro", "local", "Local")
+        tipo_txt = nz.pick(raw, "tipo_equipamento", "tipo", "Tipo",
+                           "equipamento", "Equipamento")
         d = {
             "identificador": self.identificador(raw),
             "latitude": lat,
@@ -106,14 +108,18 @@ class ColetorRecife(ColetorBase):
             "situacao": nz.normalizar_situacao(
                 nz.pick(raw, "situacao", "Situacao", "status")),
             "tipo_radar": nz.normalizar_tipo_radar(tipo_txt),
-            "numero_serie": nz.pick(raw, "numero_serie", "serie", "Serie"),
+            "numero_serie": nz.pick(raw, "numero_serie_fabricante",
+                                    "numero_serie", "serie", "Serie"),
             "fabricante": nz.pick(raw, "fabricante", "Fabricante"),
             "modelo": nz.pick(raw, "modelo", "Modelo"),
-            "velocidade_leves": nz.to_float(
-                nz.pick(raw, "velocidade", "Velocidade", "velocidade_limite")),
+            # Recife publica UMA velocidade fiscalizada (sem separar leve/pesado)
+            "velocidade_geral": nz.to_velocidade(
+                nz.pick(raw, "velocidade_fiscalizada", "velocidade",
+                        "Velocidade", "velocidade_limite")),
             "sentido": nz.normalizar_sentido(
-                nz.pick(raw, "sentido", "Sentido")),
-            "sentido_original": nz.pick(raw, "sentido", "Sentido"),
+                nz.pick(raw, "sentido_fiscalizacao", "sentido", "Sentido")),
+            "sentido_original": nz.pick(raw, "sentido_fiscalizacao", "sentido",
+                                        "Sentido"),
             "observacoes": nz.pick(raw, "bairro", "Bairro"),
         }
         return d

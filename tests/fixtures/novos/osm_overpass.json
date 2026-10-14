@@ -1,0 +1,44 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62",
+  "elements": [
+    {
+      "type": "node", "id": 577242, "lat": -23.5562976, "lon": -46.6558000,
+      "version": 7, "timestamp": "2018-05-04T20:11:36Z",
+      "tags": {"highway": "speed_camera"}
+    },
+    {
+      "type": "node", "id": 123, "lat": -23.5000000, "lon": -46.6000000,
+      "version": 1, "timestamp": "2020-01-01T00:00:00Z",
+      "tags": {"highway": "speed_camera", "enforcement": "red_light_camera"}
+    },
+    {
+      "type": "node", "id": 999, "lat": -23.6000000, "lon": -46.7000000,
+      "version": 1, "timestamp": "2022-01-01T00:00:00Z",
+      "tags": {"highway": "speed_camera", "enforcement": "traffic_signals"}
+    },
+    {
+      "type": "node", "id": 1000, "lat": -23.6100000, "lon": -46.7100000,
+      "version": 1, "timestamp": "2022-06-01T00:00:00Z",
+      "tags": {"highway": "surveillance", "surveillance:type": "ALPR"}
+    },
+    {
+      "type": "way", "id": 123,
+      "center": {"lat": -23.5100000, "lon": -46.6100000},
+      "version": 2, "timestamp": "2021-01-01T00:00:00Z",
+      "tags": {"highway": "speed_camera"}
+    },
+    {
+      "type": "relation", "id": 2165372,
+      "center": {"lat": -23.6454225, "lon": -46.6070646},
+      "version": 3, "timestamp": "2014-12-14T16:59:08Z",
+      "tags": {"type": "enforcement", "enforcement": "maxspeed"}
+    },
+    {
+      "type": "relation", "id": 4586165,
+      "center": {"lat": -23.5795421, "lon": -46.6397062},
+      "version": 1, "timestamp": "2015-02-13T10:59:26Z",
+      "tags": {"type": "enforcement", "enforcement": "traffic_signals"}
+    }
+  ]
+}

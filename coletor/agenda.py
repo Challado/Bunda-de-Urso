@@ -6,31 +6,119 @@ sobreposto por um JSON opcional (coletor/agenda.json) sem mexer no codigo.
 
 O tick (coletor/tick.py) NAO coleta tudo a cada passada: ele so dispara as
 fontes vencidas. E o que da o "cada um com o seu tempo" pedido.
+
+url_direta = None -> a origem e resolvida dinamicamente pelo conector
+(resolver_url). url_direta preenchido -> origem fixa (ex.: sigla/token que o
+proprio conector entende).
 """
 import json
 import os
 
 from coletor.fontes.antt import ColetorANTT
 from coletor.fontes.recife import ColetorRecife
+from coletor.fontes.dnit import ColetorDNIT
+from coletor.fontes.dersp import ColetorDERSP
+from coletor.fontes.derpr import ColetorDERPR
+from coletor.fontes.dermg import ColetorDERMG
+from coletor.fontes.pbh import ColetorPBH
+from coletor.fontes.prf import (ColetorPRFFixos, ColetorPRFPortateis,
+                                ColetorPRFTrechos)
+from coletor.fontes.osm import ColetorOSM
+from coletor.fontes.inmetro import ColetorINMETRO
 
-# Intervalo padrao por fonte (segundos) e URL direta do arquivo.
-# url_direta = None -> a origem publicada e uma pagina de dataset, nao um
-# arquivo estavel; o tick pula a fonte ao vivo (use --arquivo para ingestao
-# manual) em vez de baixar HTML e gravar lixo.
+HORA = 3600
+DIA = 86400
+SEMANA = 604800
+
 AGENDA_PADRAO = {
+    # -- ja em producao -------------------------------------------------
     "antt": {
         "rotulo": "ANTT - radares em rodovias concedidas",
         "conector": ColetorANTT,
-        "intervalo_s": 3600,        # 1x/hora
+        "intervalo_s": HORA,
         "url_direta": None,
         "ativo": True,
     },
     "recife": {
         "rotulo": "Recife - equipamentos de fiscalizacao",
         "conector": ColetorRecife,
-        "intervalo_s": 86400,       # 1x/dia
+        "intervalo_s": DIA,
         "url_direta": None,
         "ativo": True,
+    },
+    # -- estaduais / municipais (arquivo legivel) -----------------------
+    "dnit": {
+        "rotulo": "DNIT - controle de velocidade (PNCV)",
+        "conector": ColetorDNIT,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "dersp": {
+        "rotulo": "DER-SP - radares estaduais",
+        "conector": ColetorDERSP,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "derpr": {
+        "rotulo": "DER-PR - fiscalizacao fixa e portatil",
+        "conector": ColetorDERPR,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "dermg": {
+        "rotulo": "DER-MG - localizacao de radares",
+        "conector": ColetorDERMG,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "pbh": {
+        "rotulo": "Belo Horizonte - fiscalizacao eletronica",
+        "conector": ColetorPBH,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    # -- PRF (federal) --------------------------------------------------
+    "prf_fixos": {
+        "rotulo": "PRF - radares fixos",
+        "conector": ColetorPRFFixos,
+        "intervalo_s": DIA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "prf_portateis": {
+        "rotulo": "PRF - lista de radares portateis",
+        "conector": ColetorPRFPortateis,
+        "intervalo_s": DIA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "prf_trechos": {
+        "rotulo": "PRF - trechos criticos (elegiveis)",
+        "conector": ColetorPRFTrechos,
+        "intervalo_s": DIA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    # -- metrologia (INMETRO) — todas as UFs numa execucao --------------
+    "inmetro": {
+        "rotulo": "INMETRO/PSIE - instrumentos verificados (26 UFs)",
+        "conector": ColetorINMETRO,
+        "intervalo_s": SEMANA,
+        "url_direta": "TODAS",
+        "ativo": True,
+    },
+    # -- complementar (nao oficial) — opt-in ----------------------------
+    "osm": {
+        "rotulo": "OpenStreetMap/Overpass - radares (complementar)",
+        "conector": ColetorOSM,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": False,        # complementar: ligar so quando quiser
     },
 }
 
