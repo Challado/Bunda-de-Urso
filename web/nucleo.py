@@ -40,7 +40,7 @@ def _agora():
 PARAMS = [
     ("lat", "decimal", True, "-90..90", "latitude WGS84 (graus)"),
     ("lon", "decimal", True, "-180..180", "longitude WGS84 (graus)"),
-    ("raio", "inteiro", False, "1..50000", "raio em metros (padrao 1000)"),
+    ("raio", "inteiro", False, config.RAIO_FAIXA_TXT, "raio em metros (padrao 1000; cobre ate 1000 km)"),
     ("formato", "string", False, "|".join(FORMATOS), "json|ndjson|xml|txt|edi|edifact|dif"),
     ("delimitador", "string", False, "1 caractere", "apenas txt; padrao '|'; rejeita CR/LF/NUL/aspas"),
     ("detalhado", "boolean", False, "true|false", "todos os campos disponiveis (padrao true)"),
@@ -190,9 +190,37 @@ COLS_POR_ENDPOINT = {
 }
 
 
+# Explicacao do ".pse": o termo so faz sentido para quem conhece este servidor.
+# Fica no proprio texto de ajuda para que quem abre a API entenda o que e.
+COMO_FUNCIONA_PSE = [
+    "O QUE E ESTE ENDERECO (o \".pse\"):",
+    "  Nao e um servidor nem um framework. E um programa Python 3 (so a",
+    "  biblioteca padrao) que o nginx executa SOB DEMANDA via fcgiwrap",
+    "  (FastCGI -> CGI). A extensao \".pse\" e uma convencao historica deste",
+    "  servidor para scripts executaveis do site (ex.: cnpj.pse, frase.pse);",
+    "  equivale a um \".cgi\" com a extensao da casa. Cada requisicao sobe o",
+    "  processo, responde (JSON/XML/TXT/NDJSON/EDIFACT/DIF) e termina: sem",
+    "  daemon e sem porta propria.",
+    "  O nginx/fcgiwrap nao define PATH_INFO, entao a rota vai no parametro 'rota':",
+    "    api.pse?rota=/api/v1/radares&lat=-24.9555&lon=-53.4552&raio=5000&formato=json",
+    "",
+]
+COMO_FUNCIONA_PSE_TEXTO = (
+    "Este endereco \".pse\" e um programa Python 3 (so biblioteca padrao) "
+    "executado sob demanda pelo nginx via fcgiwrap (FastCGI->CGI) -- nao ha "
+    "servidor, daemon nem porta propria. A extensao .pse e a convencao "
+    "historica deste servidor para scripts do site. Como o nginx/fcgiwrap nao "
+    "define PATH_INFO, a rota vai no parametro 'rota' (ex.: "
+    "api.pse?rota=/api/v1/radares&lat=..&lon=..&raio=..)."
+)
+
+
 def ajuda_estrutura():
     return {
         "versao_api": config.API_VERSION,
+        "como_funciona": COMO_FUNCIONA_PSE_TEXTO,
+        "extensao_pse": ("convencao do servidor: fcgiwrap + nginx executam "
+                         "este .pse (programa Python 3 sob demanda)"),
         "versao_esquema": config.SCHEMA_VERSION,
         "endpoints": ENDPOINTS_AJUDA,
         "endpoints_descricao": ENDPOINTS_DESC,
@@ -249,6 +277,7 @@ def ajuda_estrutura():
 
 def ajuda_texto():
     linhas = ["RADAR BRASIL - AJUDA v%s" % config.API_VERSION, ""]
+    linhas.extend(COMO_FUNCIONA_PSE)
     linhas.append("ENDPOINTS:")
     for ep, metodos in ENDPOINTS_AJUDA.items():
         linhas.append("  %-28s %-10s %s" % (
@@ -568,9 +597,10 @@ def _radares(conn, params, formato, delimitador):
     try:
         raio = int(params.get("raio", config.DEFAULT_RAIO))
     except (TypeError, ValueError):
-        return _erro(422, "raio_invalido", "raio inteiro 1..50000")
+        return _erro(422, "raio_invalido",
+                     "raio inteiro " + config.RAIO_FAIXA_TXT)
     if raio < config.MIN_RAIO or raio > config.MAX_RAIO:
-        return _erro(422, "raio_invalido", "raio 1..50000")
+        return _erro(422, "raio_invalido", "raio " + config.RAIO_FAIXA_TXT)
     try:
         limite = int(params.get("limite", config.DEFAULT_LIMITE))
     except (TypeError, ValueError):
@@ -754,7 +784,7 @@ def _coord(params):
     raio = _param_raio(params)
     if raio is None:
         return None, None, None, _erro(
-            422, "raio_invalido", "raio inteiro 1..50000")
+            422, "raio_invalido", "raio inteiro " + config.RAIO_FAIXA_TXT)
     return lat, lon, raio, None
 
 

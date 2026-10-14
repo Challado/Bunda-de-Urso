@@ -114,7 +114,7 @@
   <label>Latitude<input id="lat" type="text" inputmode="decimal" placeholder="-17.625377"></label>
   <label>Longitude<input id="lon" type="text" inputmode="decimal" placeholder="-51.060863"></label>
   <label class="raioBox">Raio: <span class="raioVal" id="raioVal">2,0 km</span>
-    <input id="raio" type="range" min="200" max="50000" step="100" value="2000" aria-label="raio em metros">
+    <input id="raio" type="range" min="0" max="11" step="1" value="3" aria-label="raio (escala de 200 m a 1000 km)">
   </label>
   <button id="btConsultar">Consultar</button>
   <button id="btLocal" class="sec">Usar minha localização</button>
@@ -152,6 +152,10 @@
 (function(){
   "use strict";
   var API = "api.pse";
+  // Escada de raios: o slider anda em INDICE (0..11), nao em metros, para cobrir
+  // de 200 m a 1000 km mantendo o ajuste fino nos valores pequenos.
+  var ESCALA = [200, 500, 1000, 2000, 5000, 10000, 20000, 50000,
+                100000, 200000, 500000, 1000000];
   var map = L.map("mapa").setView([-15.78, -47.93], 4);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19, attribution: "&copy; OpenStreetMap"
@@ -166,7 +170,7 @@
     var lat = +c.lat.toFixed(6), lon = +c.lng.toFixed(6);
     var elLat2 = document.getElementById("lat"), elLon2 = document.getElementById("lon");
     elLat2.value = lat; elLon2.value = lon;
-    consultar(lat, lon, parseInt(elRaio.value, 10) || 2000);
+    consultar(lat, lon, raioAtual());
     var dica = document.getElementById("dicaAqui");
     if (dica) dica.classList.remove("on");
   }
@@ -256,7 +260,36 @@
   var reTimer = null;
 
   function fmtRaio(m){
-    return m >= 1000 ? (m/1000).toFixed(1).replace(".", ",") + " km" : m + " m";
+    if (m >= 1000){
+      var km = m / 1000;
+      return (km >= 10 ? Math.round(km) : km.toFixed(1).replace(".", ",")) + " km";
+    }
+    return m + " m";
+  }
+  // Raio (em metros) correspondente ao indice atual do slider.
+  function raioAtual(){
+    var i = parseInt(elRaio.value, 10);
+    if (isNaN(i) || i < 0) i = 0;
+    if (i >= ESCALA.length) i = ESCALA.length - 1;
+    return ESCALA[i];
+  }
+  // Indice da escada mais proximo de um raio em metros (para ?raio= da URL).
+  function idxMaisProximo(m){
+    var melhor = 0, dif = Infinity;
+    for (var i=0;i<ESCALA.length;i++){
+      var d = Math.abs(ESCALA[i] - m);
+      if (d < dif){ dif = d; melhor = i; }
+    }
+    return melhor;
+  }
+  // Distancias "human-readable": abaixo de 1 km em metros; de 1 km pra cima em km.
+  function fmtDist(m){
+    if (m == null) return "—";
+    m = Number(m);
+    if (!isFinite(m)) return "—";
+    if (m < 1000) return Math.round(m) + " m";
+    var s = (m / 1000).toFixed(2).replace(/\.?0+$/, "");
+    return s.replace(".", ",") + " km";
   }
   function desenharCirculo(lat, lon, raio){
     if (circleRaio){ map.removeLayer(circleRaio); circleRaio = null; }
@@ -305,7 +338,7 @@
     h += escapeHtml(viaTxt) + (km ? " — " + escapeHtml(km) : "") + "<br>";
     if (vel != null) h += "Velocidade: <span class='vel'>" + escapeHtml(vel) + " km/h</span><br>";
     if (s) h += "Sentido: " + escapeHtml(s) + "<br>";
-    if (loc.distancia_metros != null) h += "Distância: " + Math.round(loc.distancia_metros) + " m<br>";
+    if (loc.distancia_metros != null) h += "Distância: " + fmtDist(loc.distancia_metros) + "<br>";
     if (loc.qualidade) h += "Qualidade da posição: " + escapeHtml(loc.qualidade) + "<br>";
     h += "<a class='detalhe' href='detalhe.html?id=" + encodeURIComponent(p.id) + "'>Ver todos os detalhes &raquo;</a>";
     return h;
@@ -331,7 +364,7 @@
         "<td data-label='km'>" + (loc.km != null ? escapeHtml(loc.km) : "—") + "</td>" +
         "<td data-label='Velocidade'>" + (vel != null ? "<span class='vel'>" + escapeHtml(vel) + "</span>" : "—") + "</td>" +
         "<td data-label='Sentido'>" + escapeHtml(sentidoDoPonto(p) || "—") + "</td>" +
-        "<td data-label='Distância'>" + (loc.distancia_metros != null ? Math.round(loc.distancia_metros) + " m" : "—") + "</td>" +
+        "<td data-label='Distância'>" + fmtDist(loc.distancia_metros) + "</td>" +
         "<td data-label='Posição'>" + escapeHtml(loc.qualidade || "—") + "</td>" +
         "</tr>");
     });
@@ -344,6 +377,11 @@
     var resumo = "<span class='pill'>" + escapeHtml(st) + "</span> " +
       "<b>" + (meta ? meta.total_pontos : 0) + "</b> ponto(s) de fiscalização no raio";
     if (meta && meta.total_equipamentos != null) resumo += " · " + meta.total_equipamentos + " equipamento(s)";
+    if (meta && meta.proximo_cursor){
+      resumo += " <span class='aviso' style='display:inline-block'>mostrando os " +
+        (meta.retornados || 0) + " mais próximos de " + (meta.total_pontos || 0) +
+        " — reduza o raio para ver todos</span>";
+    }
     elRes.innerHTML = resumo + tabela;
   }
 
@@ -389,7 +427,7 @@
     navigator.geolocation.getCurrentPosition(function(pos){
       var lat = +pos.coords.latitude.toFixed(6), lon = +pos.coords.longitude.toFixed(6);
       elLat.value = lat; elLon.value = lon;
-      var r = +elRaio.value || 2000;
+      var r = raioAtual();
       consultar(lat, lon, r);
     }, function(err){
       elRes.innerHTML = "<div class='err'>Não foi possível obter a localização: " + escapeHtml(err.message) + "</div>";
@@ -398,7 +436,7 @@
   }
 
   document.getElementById("btConsultar").addEventListener("click", function(){
-    consultar(parseFloat(elLat.value), parseFloat(elLon.value), parseInt(elRaio.value, 10));
+    consultar(parseFloat(elLat.value), parseFloat(elLon.value), raioAtual());
   });
   document.getElementById("btLocal").addEventListener("click", usarLocalizacao);
   document.getElementById("btAqui").addEventListener("click", consultarCentroMapa);
@@ -411,7 +449,7 @@
   // Enter nos campos dispara a consulta
   [elLat, elLon, elRaio].forEach(function(el){
     el.addEventListener("keydown", function(e){
-      if (e.key === "Enter") consultar(parseFloat(elLat.value), parseFloat(elLon.value), parseInt(elRaio.value, 10));
+      if (e.key === "Enter") consultar(parseFloat(elLat.value), parseFloat(elLon.value), raioAtual());
     });
   });
 
@@ -479,7 +517,7 @@
     fecharSug();
     elLat.value = m.a; elLon.value = m.o;
     elBarra.textContent = "Município " + m.n + "/" + m.u + " …";
-    consultar(m.a, m.o, parseInt(elRaio.value, 10) || 2000);
+    consultar(m.a, m.o, raioAtual());
   }
 
   function irParaMunicipio(){
@@ -529,14 +567,14 @@
     fecharSug();
   });
   // Slider do raio: arrasta e o mapa/circulo acompanham; solta e consulta de novo
-  elRaioVal.textContent = fmtRaio(parseInt(elRaio.value, 10));
+  elRaioVal.textContent = fmtRaio(raioAtual());
   // mantem o mapa justo quando a tela muda de tamanho/rotacao (celular)
   window.addEventListener("resize", function(){ setTimeout(function(){ map.invalidateSize(); }, 200); });
   window.addEventListener("orientationchange", function(){ setTimeout(function(){ map.invalidateSize(); }, 350); });
   var pendente = null;   // hoisted no IIFE; guarda a consulta agendada
   elRaio.addEventListener("input", function(){
     // ENQUANTO ARRASTA: so o visual acompanha (numero + circulo); NAO consulta.
-    var r = parseInt(elRaio.value, 10);
+    var r = raioAtual();
     elRaioVal.textContent = fmtRaio(r);
     if (ultimo){
       desenharCirculo(ultimo.lat, ultimo.lon, r);
@@ -547,7 +585,7 @@
   });
   elRaio.addEventListener("change", function(){
     // SOLTOU a barrinha: conta 1s e so entao consulta.
-    var r = parseInt(elRaio.value, 10);
+    var r = raioAtual();
     if (pendente) clearTimeout(pendente);
     pendente = setTimeout(function(){
       pendente = null;
@@ -559,9 +597,12 @@
   var qp = new URLSearchParams(location.search);
   if (qp.has("lat") && qp.has("lon")){
     elLat.value = qp.get("lat"); elLon.value = qp.get("lon");
-    if (qp.has("raio")) elRaio.value = qp.get("raio");
-    elRaioVal.textContent = fmtRaio(parseInt(elRaio.value, 10));
-    consultar(parseFloat(elLat.value), parseFloat(elLon.value), parseInt(elRaio.value, 10));
+    if (qp.has("raio")){
+      var _m = parseInt(qp.get("raio"), 10);
+      if (!isNaN(_m)) elRaio.value = idxMaisProximo(_m);
+    }
+    elRaioVal.textContent = fmtRaio(raioAtual());
+    consultar(parseFloat(elLat.value), parseFloat(elLon.value), raioAtual());
   } else if (qp.has("local")){
     usarLocalizacao();
   } else {

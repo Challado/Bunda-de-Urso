@@ -1051,7 +1051,7 @@ ENDPOINTS OBRIGATÓRIOS:
 PARÂMETROS DA CONSULTA /radares:
   lat             decimal   obrigatório; -90..90 (graus WGS84)
   lon             decimal   obrigatório; -180..180 (graus WGS84)
-  raio            inteiro   opcional; 1..50000 metros; padrão 1000
+  raio            inteiro   opcional; 1..1000000 metros (até 1000 km); padrão 1000
   formato         string    opcional; txt|json|ndjson|xml|edi|edifact|dif;
                              padrão json; edi alias edifact
   delimitador     string    opcional apenas txt; padrão '|'; 1 caractere,

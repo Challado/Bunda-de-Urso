@@ -25,7 +25,7 @@ API_VERSION = "1.0"
 SCHEMA_VERSION = "1.0"
 DEFAULT_RAIO = 1000
 MIN_RAIO = 1
-MAX_RAIO = 50000
+MAX_RAIO = 1000000     # 1000 km: consulta/zoom de area ampla (era 50000 = 50 km)
 DEFAULT_LIMITE = 100
 MIN_LIMITE = 1
 MAX_LIMITE = 1000
@@ -37,6 +37,9 @@ EARTH_RADIUS_M = 6371008.8   # raio medio WGS84 (spec 9.2)
 DEFAULT_TIMEOUT = 30          # segundos
 DEFAULT_TENTATIVAS = 3
 USER_AGENT = "RadarBrasil/1.0 (+https://github.com/Challado/Bunda-de-Urso)"
+
+# Descricao curta do limite de raio, para mensagens/ajuda (mantidas em sincronia).
+RAIO_FAIXA_TXT = "%d..%d" % (MIN_RAIO, MAX_RAIO)
 
 
 def ensure_dirs():
