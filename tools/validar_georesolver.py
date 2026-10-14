@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Validacao leave-one-out do resolvedor km->coordenada.
+"""Validacao leave-one-out do resolvedor km->coordenada (por segmento).
 
-Para cada via com >=3 ancoras oficiais, retira-se UMA ancora de cada vez e
-resolve-se o km dela com o resto da calibracao; mede-se o erro Haversine (m)
-contra a coordenada real que ficou de fora. Agrega por via (mediana/p90/max)
-e no geral.
+Para cada (via, segmento) com >=3 ancoras, retira-se UMA ancora de cada vez e
+resolve-se o km dela usando SO as ancoras restantes daquele segmento — ou seja o
+trecho e conhecido, medindo a precisao alcancavel pelo interpolador. Mede-se o
+erro Haversine (m) contra a coordenada real que ficou de fora. Agrega por
+(via, segmento) e no geral.
 
-Saidas:
-  dados/calibracao/validacao.csv   via;n;erro_mediano_m;erro_p90_m;erro_max_m
+Saidas (default):
+  dados/calibracao/validacao_limpa.csv  via;segmento;n;erro_mediano_m;erro_p90_m;erro_max_m
   resumo geral + top 10 vias no stdout.
 
 Uso:
-  python3 tools/validar_georesolver.py [--ancoras CSV] [--db CAMINHO] [--saida DIR]
+  python3 tools/validar_georesolver.py [--ancoras CSV] [--db CAMINHO]
+                                       [--saida DIR] [--nome ARQUIVO.csv]
 """
 import argparse
 import csv
@@ -46,8 +48,12 @@ def percentil(valores, p):
     return s[f] + (s[c] - s[f]) * (k - f)
 
 
-def validar_via(via, ancoras):
-    """Leave-one-out de uma via. Retorna lista de erros (m)."""
+def validar_segmento(via, segmento, ancoras):
+    """Leave-one-out de um segmento. Retorna lista de erros (m).
+
+    A resolucao usa apenas as ancoras restantes DESTE segmento (calibracao
+    sintetica ``{via: resto}``), garantindo que o trecho e conhecido.
+    """
     erros = []
     n = len(ancoras)
     if n < 3:
@@ -65,17 +71,21 @@ def validar_via(via, ancoras):
 
 
 def coletar_erros(calibracao):
-    por_via = {}
+    """Agrega os erros leave-one-out por (via, segmento)."""
+    por_seg = {}
     for via, ancoras in calibracao.items():
-        if len(ancoras) >= 3:
-            erros = validar_via(via, ancoras)
+        segmentos = georesolver.agrupar_segmentos(ancoras)
+        for seg, arr in segmentos.items():
+            if len(arr) < 3:
+                continue
+            erros = validar_segmento(via, seg, arr)
             if erros:
-                por_via[via] = erros
-    return por_via
+                por_seg[(via, seg)] = erros
+    return por_seg
 
 
-def contar_resolviveis(db, calibracao):
-    """Dos pontos com km no banco, quantos caem na faixa calibrada de uma via."""
+def classificar_ponto(db, calibracao):
+    """Dos pontos com km no banco, quantos cascateiam em cada status."""
     if not os.path.exists(db):
         return None
     uri = "file:%s?mode=ro" % os.path.abspath(db)
@@ -89,61 +99,61 @@ def contar_resolviveis(db, calibracao):
     finally:
         con.close()
 
-    total = resolvivel = sem_cal = fora = 0
+    info = {"total": 0, "ok": 0, "ambiguo": 0, "fora_de_faixa": 0,
+            "sem_calibracao": 0}
     for r in rows:
-        total += 1
-        via = (r["via"] or "").strip() or None
-        ancoras = calibracao.get(via) if via else None
-        if not ancoras or len(ancoras) < 2:
-            sem_cal += 1
-            continue
-        kms = [a["km"] for a in ancoras]
-        km = float(r["km"])
-        if km < min(kms) or km > max(kms):
-            fora += 1
-            continue
-        resolvivel += 1
-    return {"total": total, "resolvivel": resolvivel,
-            "sem_calibracao": sem_cal, "fora_de_faixa": fora}
+        info["total"] += 1
+        res = georesolver.resolver(r["via"], r["km"], calibracao)
+        info[res["status"]] = info.get(res["status"], 0) + 1
+    return info
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Validacao leave-one-out do georesolver.")
-    ap.add_argument("--ancoras", default=georesolver.CAMINHO_ANCORAS_PADRAO)
+    ap.add_argument("--ancoras", default=georesolver.CAMINHO_ANCORAS_PADRAO,
+                    help="CSV de ancoras (default: ancoras_limpas.csv)")
     ap.add_argument("--db", default=DB_PADRAO)
     ap.add_argument("--saida", default=SAIDA_PADRAO)
+    ap.add_argument("--nome", default="validacao_limpa.csv",
+                    help="nome do CSV de saida dentro de --saida")
     args = ap.parse_args(argv)
 
     if not os.path.exists(args.ancoras):
-        print("ERRO: ancoras nao encontradas: %s (rode tools/gerar_calibracao.py)"
+        print("ERRO: ancoras nao encontradas: %s (rode tools/limpar_calibracao.py)"
               % args.ancoras, file=sys.stderr)
         return 2
 
     calibracao = georesolver.carregar_ancoras(args.ancoras)
-    por_via = coletar_erros(calibracao)
+    por_seg = coletar_erros(calibracao)
 
     os.makedirs(args.saida, exist_ok=True)
-    cam = os.path.join(args.saida, "validacao.csv")
+    cam = os.path.join(args.saida, args.nome)
     todos = []
     with open(cam, "w", encoding="utf-8", newline="") as f:
         w = csv.writer(f, delimiter=";")
-        w.writerow(["via", "n", "erro_mediano_m", "erro_p90_m", "erro_max_m"])
-        for via in sorted(por_via, key=lambda v: (-len(por_via[v]), v)):
-            erros = por_via[via]
+        w.writerow(["via", "segmento", "n", "erro_mediano_m",
+                    "erro_p90_m", "erro_max_m"])
+        for (via, seg) in sorted(por_seg, key=lambda k: (-len(por_seg[k]), k)):
+            erros = por_seg[(via, seg)]
             todos.extend(erros)
-            w.writerow([via, len(erros),
+            w.writerow([via, seg, len(erros),
                         "%.3f" % percentil(erros, 0.5),
                         "%.3f" % percentil(erros, 0.9),
                         "%.3f" % max(erros)])
 
-    print("validacao.csv: %s" % cam)
-    print("vias testadas (>=3 ancoras): %d" % len(por_via))
+    print("validacao: %s" % cam)
+    print("segmentos testados (>=3 ancoras): %d" % len(por_seg))
     print("pontos leave-one-out: %d" % len(todos))
     if todos:
         print("ERRO GERAL (m): mediana=%.1f  p90=%.1f  max=%.1f"
               % (percentil(todos, 0.5), percentil(todos, 0.9), max(todos)))
 
-    print("\nTop 10 vias por n de ancoras:")
+    # Ranking por via (agrega os segmentos da mesma via) — top 10 por n.
+    por_via = {}
+    for (via, seg), erros in por_seg.items():
+        por_via.setdefault(via, []).extend(erros)
+
+    print("\nTop 10 vias por n de pontos leave-one-out:")
     print("%-12s %6s %12s %12s %12s" % ("via", "n", "mediano_m", "p90_m", "max_m"))
     rank = sorted(por_via, key=lambda v: (-len(por_via[v]), v))[:10]
     for via in rank:
@@ -152,12 +162,13 @@ def main(argv=None):
               % (via, len(erros), percentil(erros, 0.5),
                  percentil(erros, 0.9), max(erros)))
 
-    info = contar_resolviveis(args.db, calibracao)
+    info = classificar_ponto(args.db, calibracao)
     if info:
         print("\nPontos com km no banco: %d" % info["total"])
-        print("  resolviveis pela calibracao atual: %d" % info["resolvivel"])
-        print("  sem calibracao (<2 ancoras na via): %d" % info["sem_calibracao"])
-        print("  fora de faixa: %d" % info["fora_de_faixa"])
+        print("  ok (interpolaveis):    %d" % info["ok"])
+        print("  ambiguos:              %d" % info.get("ambiguo", 0))
+        print("  fora de faixa:         %d" % info["fora_de_faixa"])
+        print("  sem calibracao:        %d" % info["sem_calibracao"])
     return 0
 
 
