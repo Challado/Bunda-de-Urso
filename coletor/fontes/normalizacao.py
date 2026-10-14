@@ -272,9 +272,103 @@ def obter_via(conn, codigo, tipo_codigo=None):
                                [tipo_id, codigo])
 
 
+# Faixa geografica do Brasil. Nenhuma longitude valida no pais e positiva
+# (o territorio esta a oeste de Greenwich): -74 a -32 graus. Usada para
+# detectar e consertar sinal oeste perdido na fonte.
+BRASIL_LAT_MIN, BRASIL_LAT_MAX = -34.0, 6.0
+BRASIL_LON_MIN, BRASIL_LON_MAX = -74.0, -32.0
+
+
+def _localizar_uf_brasil(lat, lon):
+    """(codigo_ibge, uf) do municipio da malha oficial que contem o ponto."""
+    try:
+        from core import geo_municipio as geo
+        return geo.municipio_uf_por_coordenada(lat, lon)
+    except Exception:                                    # noqa: BLE001
+        return None, None
+
+
+def normalizar_sinal_longitude(lat, lon, uf_esperada=None, localizar=None):
+    """Conserta longitude positiva (sinal oeste perdido) de ponto no Brasil.
+
+    Nenhuma longitude valida no Brasil e positiva. Quando a fonte publica o
+    valor sem o sinal (ex.: ``48.459841`` em vez de ``-48.459841``), a
+    leitura correta e ``-abs(lon)``. A troca nao e chute: so e aceita quando
+    o ponto corrigido cai na malha municipal oficial do IBGE e a UF
+    (quando conhecida) confere com a declarada; fora disso devolve o valor
+    original e o motivo, para quarentena.
+
+    Devolve ``(longitude_final, corrigido, motivo)``:
+      - ``corrigido=True`` com ``longitude_final == -abs(lon)`` validado;
+      - ``corrigido=False`` com a longitude original e ``motivo`` textual
+        quando o valor e implausivel e nao pode ser consertado (ou ``None``
+        quando nao ha o que corrigir).
+    """
+    if lat is None or lon is None:
+        return lon, False, None
+    if lon <= 0.0:
+        return lon, False, None
+    if not (BRASIL_LAT_MIN <= lat <= BRASIL_LAT_MAX):
+        return lon, False, ("longitude positiva (%.6f) em latitude fora do "
+                            "Brasil" % lon)
+    candidata = -lon
+    if not (BRASIL_LON_MIN <= candidata <= BRASIL_LON_MAX):
+        return lon, False, ("longitude positiva (%.6f) fora da faixa "
+                            "longitudinal do Brasil" % lon)
+    localizar = localizar or _localizar_uf_brasil
+    codigo, uf_geo = (localizar(lat, candidata) or (None, None))
+    if not codigo:
+        return lon, False, ("longitude positiva (%.6f): ponto corrigido "
+                            "fora da malha municipal do IBGE" % lon)
+    if uf_esperada and uf_geo and str(uf_geo).upper() != str(uf_esperada).upper():
+        return lon, False, ("longitude positiva (%.6f): ponto corrigido em "
+                            "%s, nao em %s" % (lon, uf_geo, uf_esperada))
+    return candidata, True, None
+
+
+def _anotar_observacao(d, texto):
+    atual = (d.get("observacoes") or "").strip()
+    d["observacoes"] = (atual + "; " + texto) if atual else texto
+
+
+def ajustar_coordenada_brasil(d):
+    """Conserta/marca, no dict normalizado ``d``, coordenada implausivel.
+
+    - longitude positiva (sinal oeste perdido) VALIDADA pela malha: troca o
+      sinal e anota o valor original nas observacoes;
+    - longitude positiva nao consertavel, ou ``latitude == longitude``
+      (dado degenerado): preserva o bruto e marca qualidade "conflitante"
+      (quarentena), sem inventar posicao.
+    """
+    lat, lon = d.get("latitude"), d.get("longitude")
+    if lat is None or lon is None:
+        return
+    if lat == 0.0 and lon == 0.0:
+        return
+    if abs(lat - lon) < 1e-9:
+        d["qualidade"] = "conflitante"
+        _anotar_observacao(
+            d, "QUARENTENA: latitude igual a longitude (%.6f): coordenada "
+               "degenerada na fonte" % lat)
+        return
+    if lon <= 0.0:
+        return
+    nova, corrigido, motivo = normalizar_sinal_longitude(lat, lon, d.get("uf"))
+    if corrigido:
+        d["longitude"] = nova
+        _anotar_observacao(
+            d, "longitude normalizada para o hemisferio oeste (sinal oeste "
+               "perdido na fonte): %.6f -> %.6f" % (lon, nova))
+        return
+    if motivo:
+        d["qualidade"] = "conflitante"
+        _anotar_observacao(d, "QUARENTENA: %s" % motivo)
+
+
 def inserir_normalizado(conn, registro_id, d, fonte_id=None):
     """Insere um ponto normalizado (dict `d`) com equipamento, faixa,
     limites e vinculo. Retorna dict com ids criados."""
+    ajustar_coordenada_brasil(d)
     uf_sigla, municipio_id = resolver_uf_municipio(
         conn, d.get("uf"), d.get("municipio_nome"), d.get("municipio_ibge"),
         latitude=d.get("latitude"), longitude=d.get("longitude"))

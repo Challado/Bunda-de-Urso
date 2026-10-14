@@ -377,3 +377,26 @@ def municipio_por_coordenada(lat, lon, malha=None):
     if m is None or len(m) == 0:
         return None
     return m.localizar(float(lon), float(lat))
+
+
+def municipio_uf_por_coordenada(lat, lon, malha=None):
+    """(codigo_ibge, uf) do municipio que contem (lat, lon); (None, None)
+    quando nada contem.
+
+    Igual a :func:`municipio_por_coordenada`, mas tambem devolve a UF da
+    malha. Nao inventa: coordenada invalida, ponto em agua/fora das malhas
+    ou falha de carga devolvem ``(None, None)``.
+    """
+    if not coordenada_valida(lat, lon):
+        return None, None
+    try:
+        m = malha if malha is not None else _malha_padrao()
+    except Exception:                            # noqa: BLE001
+        return None, None
+    if m is None or len(m) == 0:
+        return None, None
+    codigo = m.localizar(float(lon), float(lat))
+    if codigo is None:
+        return None, None
+    mun = m.por_cod.get(codigo)
+    return codigo, (getattr(mun, "uf", None) if mun is not None else None)
