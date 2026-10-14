@@ -1,6 +1,8 @@
 # BUNDA DE URSO
 ## Cadastro nacional aberto, rastreável e auditável de radares e fiscalização eletrônica de trânsito
 
+[![Testes](https://github.com/Challado/Bunda-de-Urso/actions/workflows/testes.yml/badge.svg)](https://github.com/Challado/Bunda-de-Urso/actions/workflows/testes.yml)
+
 ![Bunda de Urso — a bunda do urso com o radar tatuado](docs/bunda-de-urso.png)
 
 > **O nome é uma provocação; o propósito é sério.**
