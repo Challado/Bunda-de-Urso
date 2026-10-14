@@ -193,6 +193,21 @@ def carregar(conn, registros, aplicar=True):
     return res
 
 
+def carregar_do_banco(conn, aplicar=True):
+    """Pos-coleta: le os payloads INMETRO ja gravados e carrega a verificacao.
+
+    Pensado para rodar logo depois da coleta do PSIE/INMETRO (via gancho
+    ``pos_coleta`` da agenda), para que instrumento novo nao entre sem o
+    atestado. Idempotente (mesma chave de `carregar`); faz commit se aplica.
+    """
+    registros = [(r["registro_id"], r["equipamento_id"], r["payload"])
+                 for r in conn.execute(SQL_INMETRO)]
+    res = carregar(conn, registros, aplicar=aplicar)
+    if aplicar:
+        conn.commit()
+    return res
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(
         description="Carrega a verificacao metrologica do PSIE/INMETRO.")

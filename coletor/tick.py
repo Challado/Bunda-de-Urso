@@ -15,6 +15,7 @@ Nada aqui roda em tempo de requisicao da API.
 import argparse
 import datetime
 import fcntl
+import importlib
 import json
 import os
 import sys
@@ -97,6 +98,20 @@ def situacao(conn, item, agora):
             "faltam_s": int(espera - decorrido)}
 
 
+def _resolver_pos_coleta(spec):
+    """Aceita callable ou 'modulo:funcao' e devolve a funcao (import tardio).
+
+    O import e tardio de proposito: a agenda nao precisa carregar o modulo de
+    pos-coleta so para decidir o que esta vencido.
+    """
+    if callable(spec):
+        return spec
+    nome_mod, _, nome_fn = str(spec).partition(":")
+    if not (nome_mod and nome_fn):
+        raise ValueError("pos_coleta invalido: %r" % (spec,))
+    return getattr(importlib.import_module(nome_mod), nome_fn)
+
+
 def executar(db_path=None, agora=None, forcar=None, arquivos=None,
              dry_run=False, agenda=None):
     """Uma passada. Retorna a lista de decisoes (testavel sem rede)."""
@@ -145,11 +160,21 @@ def executar(db_path=None, agora=None, forcar=None, arquivos=None,
             conector = item["conector"](conn=conn)
             try:
                 resumo = conector.sincronizar(origem)
-                resultados.append({
+                resultado = {
                     "fonte": chave, "acao": "executado",
                     "motivo": diag["motivo"], "criados": resumo["criados"],
                     "rejeitados": resumo["rejeitados"],
-                    "recebidos": resumo["linhas_recebidas"]})
+                    "recebidos": resumo["linhas_recebidas"]}
+                # Gancho pos-coleta: so roda se a coleta deu certo. Erro no
+                # gancho NAO derruba a coleta (fica registrado no resultado).
+                spec = item.get("pos_coleta")
+                if spec:
+                    try:
+                        resultado["pos_coleta"] = _resolver_pos_coleta(spec)(conn)
+                    except Exception as exc:               # noqa: BLE001
+                        resultado["pos_coleta_erro"] = {
+                            "tipo": type(exc).__name__, "detalhe": str(exc)[:200]}
+                resultados.append(resultado)
             except Exception as exc:                       # noqa: BLE001
                 resultados.append({
                     "fonte": chave, "acao": "erro",

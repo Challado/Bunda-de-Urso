@@ -85,7 +85,6 @@ class TestExtrair(unittest.TestCase):
 
 
 class TestCarregar(unittest.TestCase):
-
     def setUp(self):
         self.con = banco_memoria()
         # a FK de registro e exercitada na producao; aqui o alvo e a idempotencia
@@ -114,6 +113,65 @@ class TestCarregar(unittest.TestCase):
                         aplicar=True)
         self.assertEqual(r["sem_equipamento"], 1)
         self.assertEqual(r["inseridas"], 0)
+
+
+class TestCarregarDoBanco(unittest.TestCase):
+    """O gancho pos-coleta le os payloads INMETRO ja gravados no banco."""
+
+    def setUp(self):
+        self.con = banco_memoria()
+        org = dbmod.insert(self.con, "ORGANIZACAO", {
+            "nome": "Inmetro", "tipo_organizacao_id": dbmod.domain_id(
+                self.con, "TIPO_ORGANIZACAO", "orgao_publico")})
+        fonte = dbmod.insert(self.con, "FONTE", {
+            "organizacao_id": org,
+            "natureza_id": dbmod.domain_id(self.con, "NATUREZA_FONTE",
+                                           "oficial"),
+            "nome": "INMETRO / PSIE - instrumentos",
+            "url_institucional": "https://exemplo/inmetro",
+            "esfera": "federal", "situacao": "ativa"})
+        rec = dbmod.insert(self.con, "RECURSO_FONTE", {
+            "fonte_id": fonte, "nome": "medidores",
+            "url_recurso": "https://exemplo/medidores.json",
+            "formato_origem": "json", "ativo": 1,
+            "status_integracao": "ok"})
+        art = dbmod.insert(self.con, "ARTEFATO_COLETA", {
+            "recurso_id": rec, "hash_sha256": "h1",
+            "caminho_cache": "/tmp/medidores.json", "bytes_arquivo": 10,
+            "baixado_em": "2026-10-10T00:00:00+00:00",
+            "resultado_validacao": "ok"})
+        self.reg = dbmod.insert(self.con, "REGISTRO_FONTE", {
+            "artefato_id": art, "numero_ordem": 1,
+            "payload_original": json.dumps(PAYLOAD), "hash_registro": "r1",
+            "status_validacao": "ok"})
+        equip = dbmod.insert(self.con, "EQUIPAMENTO", {
+            "tipo_radar_id": dbmod.domain_id(self.con, "TIPO_RADAR", "fixo")})
+        self.con.execute("INSERT INTO VINCULO_REGISTRO_EQUIPAMENTO "
+                         "(registro_id, equipamento_id) VALUES (?,?)",
+                         (self.reg, equip))
+        self.con.commit()
+
+    def tearDown(self):
+        self.con.close()
+
+    def test_le_do_banco_e_e_idempotente(self):
+        r1 = vm.carregar_do_banco(self.con)
+        self.assertEqual(r1["registros"], 1)
+        self.assertEqual(r1["inseridas"], 2)
+        self.assertEqual(self.con.execute(
+            "SELECT COUNT(*) FROM VERIFICACAO_METROLOGICA").fetchone()[0], 2)
+        self.assertEqual(self.con.execute(
+            "SELECT COUNT(*) FROM VINCULO_REGISTRO_VERIFICACAO"
+        ).fetchone()[0], 2)
+        r2 = vm.carregar_do_banco(self.con)     # reaplicar nao duplica
+        self.assertEqual(r2["inseridas"], 0)
+        self.assertEqual(r2["duplicadas"], 2)
+
+    def test_dry_run_nao_grava(self):
+        r = vm.carregar_do_banco(self.con, aplicar=False)
+        self.assertEqual(r["inseridas"], 2)
+        self.assertEqual(self.con.execute(
+            "SELECT COUNT(*) FROM VERIFICACAO_METROLOGICA").fetchone()[0], 0)
 
 
 if __name__ == "__main__":
