@@ -23,11 +23,26 @@ def connect(path=None):
     return con
 
 
+def esquema_carregado(conn):
+    """True se as tabelas canonicas ja existem (init_db e idempotente)."""
+    row = conn.execute(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN "
+        "('UF','PONTO_FISCALIZACAO','RECURSO_LICENCA')").fetchone()
+    return row is not None and row[0] == 3
+
+
 def init_db(conn, schema_path=None):
-    """Cria o esquema canonico (se ainda nao existir) e carrega dominios."""
+    """Cria o esquema canonico (se ainda nao existir) e carrega dominios.
+
+    Idempotente: pode ser chamada a cada passada do coletor sem recriar nada.
+    """
     schema_path = schema_path or config.SCHEMA_SQLITE
-    with open(schema_path, "r", encoding="utf-8") as f:
-        conn.executescript(f.read())
+    if not esquema_carregado(conn):
+        with open(schema_path, "r", encoding="utf-8") as f:
+            script = f.read()
+        # Uma transacao so: sem isso cada CREATE TABLE vira um COMMIT/fsync
+        # proprio e a carga do esquema passa de ~9 s para ~0,1 s.
+        conn.executescript("BEGIN;\n" + script + "\nCOMMIT;")
     seed_dominios(conn)
     conn.commit()
 
