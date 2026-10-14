@@ -230,7 +230,25 @@ No fim das contas, é isso: transformar a lamúria em dado. Para que ninguém ma
 
 ## Licença
 
-- **Código e documentação (o que é nosso):** [MIT](LICENSE) — use, copie, modifique e redistribua, inclusive comercialmente; só mantenha o aviso de copyright.
+O Bunda de Urso é **código-fonte disponível**, não software livre: o código está à vista, mas tem dono e regras de uso. Em resumo (o que vale é o texto do [`LICENSE`](LICENSE)):
+
+| ✅ Pode | ❌ Não pode |
+|---|---|
+| instalar e usar para você, a sua família ou a sua organização | criar um projeto novo baseado neste código, no todo ou em parte, nem reescrito em outra linguagem |
+| alterar o código da sua instalação | distribuir o código, original ou alterado, fora deste repositório |
+| propor melhorias por pull request aqui | oferecer o sistema como serviço para outras pessoas |
+| fazer fork no GitHub para preparar essas propostas | manter um fork como projeto separado |
+| consultar e usar os **dados** publicados (mapa e API), sob CC BY 4.0 | apresentar os dados sem atribuição, ou como se fossem de outra origem |
+
+Para qualquer outro uso, peça autorização pelo GitHub ([Challado](https://github.com/Challado)).
+
+> 💡 **Contribua, não copie.** Ser contribuidor do Bunda de Urso é muito melhor que fazer um fork: a sua melhoria entra
+> para todos, com o seu nome no histórico, e você não corre risco nenhum. Já um fork que vira projeto próprio viola a
+> licença, e os direitos sobre este código são defendidos: pedido de remoção nas plataformas, ação judicial com
+> indenização e até ação penal (a Lei 9.609/98 trata a violação de direito de autor de software como crime). Mesmo quem
+> acha que está certo pode ter de se defender, e isso custa tempo e advogado. **Na dúvida, pergunte antes:** a resposta é
+> de graça, a discussão depois não é.
+
 - **Dados:** o cadastro é compilado a partir de fontes oficiais públicas. A compilação e a estrutura são oferecidas sob **[CC BY 4.0](LICENSE-DATA.md)** (atribuição), respeitando os termos de cada fonte original.
 - **Terceiros:** a pasta `referencia/` é material de terceiros e mantém a licença de origem.
 
