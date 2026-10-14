@@ -1,0 +1,193 @@
+{
+  "versao": "2026-10-10",
+  "politica": "Somente fontes oficiais. São pontos de descoberta documental; nenhuma coleta remota feita neste ambiente.",
+  "fontes": [
+    {
+      "uf": "BA",
+      "codigo": "SEINFRA_BA_RAR_202609",
+      "orgao": "SEINFRA Bahia — radares fixos",
+      "url": "https://www.ba.gov.br/infraestrutura/sites/site-seinfra/files/2026-09/Mapa-Radar_15-09-2026.rar",
+      "nivel_evidencia": "arquivo_oficial_geografico",
+      "tipo_recurso": "rar",
+      "orientacao": "Link que a página oficial rotula como KML aponta para arquivo RAR; descompactar em área isolada, listar nomes, extrair e validar geometria antes de importar.",
+      "teste_download_real": "pendente_no_servidor",
+      "cobertura_estadual_completa": false
+    },
+    {
+      "uf": "BA",
+      "codigo": "SEINFRA_BA_ESTATICOS",
+      "orgao": "SEINFRA Bahia — radares estáticos",
+      "url": "https://sit.infraestrutura.ba.gov.br/docs/download/mapas/radar-estatico-4CIA.zip",
+      "nivel_evidencia": "arquivo_oficial_geografico",
+      "tipo_recurso": "zip",
+      "orientacao": "ZIP oficial anunciado com KML; verificar MIME/magic, CRC e conteúdo do pacote.",
+      "teste_download_real": "pendente_no_servidor",
+      "cobertura_estadual_completa": false
+    },
+    {
+      "uf": "CE",
+      "codigo": "FORTALEZA_GEOJSON_2026",
+      "orgao": "Fortaleza AMC — fiscalização eletrônica",
+      "url": "https://mapas.fortaleza.ce.gov.br/api/download/geojson/538",
+      "nivel_evidencia": "arquivo_oficial_geografico",
+      "tipo_recurso": "geojson",
+      "orientacao": "Camada oficial com atualização declarada em 2026-06-11 e geometria; sem aferição de quantos objetos realmente retornam.",
+      "teste_download_real": "pendente_no_servidor",
+      "cobertura_estadual_completa": false
+    },
+    {
+      "uf": "GO",
+      "codigo": "GOINFRA_202610",
+      "orgao": "Goinfra — equipamentos ativos",
+      "url": "https://goias.gov.br/goinfra/wp-content/uploads/sites/77/2026/10/Lista_de_Equipamento_02_10_2026.xlsx-Equipamentos-Ativos.pdf",
+      "nivel_evidencia": "arquivo_oficial_tabulado",
+      "tipo_recurso": "pdf",
+      "orientacao": "Colunas verificadas visualmente e no texto do PDF: lat/lon inteiros com 6 casas implícitas, série, equipamento, faixa, sentido, velocidade, datas. Coordenadas referenciais.",
+      "teste_download_real": "pendente_no_servidor",
+      "cobertura_estadual_completa": false
+    },
+    {
+      "uf": "MG",
+      "codigo": "DERMG_ARCGIS",
+      "orgao": "Observatório MG — radares",
+      "url": "https://observatorio.infraestrutura.mg.gov.br/server/rest/services/Hosted/Radares_atualizado/FeatureServer/0",
+      "nivel_evidencia": "servico_arcgis_indicado",
+      "tipo_recurso": "arcgis",
+      "orientacao": "Serviço Radares_atualizado consta no catálogo ArcGIS estadual; endpoint de camada não foi aberto com sucesso pela ferramenta nesta sessão. Testar f=pjson, query pagination, extent, outSR=4326.",
+      "teste_download_real": "pendente_no_servidor",
+      "cobertura_estadual_completa": false
+    },
+    {
+      "uf": "MG",
+      "codigo": "DERMG_RELACAO",
+      "orgao": "DER-MG — radares fixos",
+      "url": "https://der.mg.gov.br/transportes/localizacao-de-radares-fixos-e-portateis",
+      "nivel_evidencia": "lista_oficial_estruturada",
+      "tipo_recurso": "html",
+      "orientacao": "Publicação de setembro de 2026 informa rodovia, km, municípios, velocidade, identificador e número de série; não presumir latitude.",
+      "teste_download_real": "pendente_no_servidor",
+      "cobertura_estadual_completa": false
+    },
+    {
+      "uf": "PE",
+      "codigo": "RECIFE_CTTU_202603",
+      "orgao": "Recife — equipamentos de fiscalização",
+      "url": "https://dados.recife.pe.gov.br/dataset/equipamentos-de-monitoramento-e-fiscalizacao-de-transito",
+      "nivel_evidencia": "arquivo_oficial_geografico",
+      "tipo_recurso": "ckan",
+      "orientacao": "CKAN: obter arquivos CSV e dicionário JSON por API package_show e validar CRS/dados; atualização declarada 2026-03-02.",
+      "teste_download_real": "pendente_no_servidor",
+      "cobertura_estadual_completa": false
+    },
+    {
+      "uf": "MG",
+      "codigo": "BH_FISCALIZACAO",
+      "orgao": "Belo Horizonte — fiscalização eletrônica",
+      "url": "https://dados.pbh.gov.br/pt_BR/dataset/fiscalizacao-eletronica",
+      "nivel_evidencia": "arquivo_oficial_geografico",
+      "tipo_recurso": "ckan",
+      "orientacao": "CSV com coordenadas em EPSG:31983 conforme instrução do portal; reprojetar para WGS84 usando transformador confiável, nunca interpretar UTM como lat/lon.",
+      "teste_download_real": "pendente_no_servidor",
+      "cobertura_estadual_completa": false
+    },
+    {
+      "uf": "RS",
+      "codigo": "DAER_PARDAIS",
+      "orgao": "DAER — pardais rodovias estaduais",
+      "url": "https://www.daer.rs.gov.br/pardais/1000",
+      "nivel_evidencia": "cadastro_oficial_documentos",
+      "tipo_recurso": "html/pdf",
+      "orientacao": "Cadastros e levantamentos; separar equipamento e faixa; local rodovia/km pode exigir georreferenciamento adicional.",
+      "teste_download_real": "pendente_no_servidor",
+      "cobertura_estadual_completa": false
+    },
+    {
+      "uf": "RS",
+      "codigo": "DAER_LOMBADAS",
+      "orgao": "DAER — lombadas rodovias estaduais",
+      "url": "https://www.daer.rs.gov.br/localizacao-das-lombadas",
+      "nivel_evidencia": "cadastro_oficial_documentos",
+      "tipo_recurso": "html/pdf",
+      "orientacao": "Relaciona equipamentos fixos e estudos técnicos; data de cada anexo deve ser verificada.",
+      "teste_download_real": "pendente_no_servidor",
+      "cobertura_estadual_completa": false
+    },
+    {
+      "uf": "SE",
+      "codigo": "DERSE_LOCALIZACOES",
+      "orgao": "DER-SE — radares fixos",
+      "url": "https://der.se.gov.br/localizacao-de-radares-fixos/",
+      "nivel_evidencia": "cadastro_oficial_documentos",
+      "tipo_recurso": "html/pdf",
+      "orientacao": "Página oficial com relatório de localização e estudos técnicos; distinguir planejado, instalado e ativo.",
+      "teste_download_real": "pendente_no_servidor",
+      "cobertura_estadual_completa": false
+    },
+    {
+      "uf": "SP",
+      "codigo": "DERSP_RADARes",
+      "orgao": "DER-SP — Radar dados abertos",
+      "url": "https://dadosabertos.sp.gov.br/dataset/radar",
+      "nivel_evidencia": "catalogo_dados",
+      "tipo_recurso": "xlsx",
+      "orientacao": "Portal cadastral indica relação de radares em planilha; inspecionar arquivo e datas.",
+      "teste_download_real": "pendente_no_servidor",
+      "cobertura_estadual_completa": false
+    },
+    {
+      "uf": "PR",
+      "codigo": "CURITIBA_RADARes",
+      "orgao": "Curitiba — fiscalização eletrônica",
+      "url": "https://transito.curitiba.pr.gov.br/fiscalizacaoeletronica",
+      "nivel_evidencia": "cadastro_oficial_interativo",
+      "tipo_recurso": "html",
+      "orientacao": "IDs de radares e locais com mapa; validar URL de serviços geográficos antes de derivar coordenadas.",
+      "teste_download_real": "pendente_no_servidor",
+      "cobertura_estadual_completa": false
+    },
+    {
+      "uf": "DF",
+      "codigo": "DETRAN_DF_GEO",
+      "orgao": "Detran-DF — localização geoportal",
+      "url": "https://detran.df.gov.br/wp-content/uploads/2022/10/Equipamentos_Eletronicos.pdf",
+      "nivel_evidencia": "geoportal_documentado",
+      "tipo_recurso": "pdf",
+      "orientacao": "Manual de acesso; identificar camada e URL de serviço público do Geoportal; não confundir manual com base extraída.",
+      "teste_download_real": "pendente_no_servidor",
+      "cobertura_estadual_completa": false
+    },
+    {
+      "uf": "AM",
+      "codigo": "MANAUS_2026",
+      "orgao": "Manaus — locais oficiais",
+      "url": "https://www.manaus.am.gov.br/noticia/transito/fiscalizacao-eletronica-salvar-vidas/",
+      "nivel_evidencia": "lista_oficial_localizacao",
+      "tipo_recurso": "html",
+      "orientacao": "Lista 2026 de vias e sentidos, sem lat/lon diretamente conferidos.",
+      "teste_download_real": "pendente_no_servidor",
+      "cobertura_estadual_completa": false
+    },
+    {
+      "uf": "SC",
+      "codigo": "JOINVILLE_DOCUMENTOS",
+      "orgao": "Joinville — estudos radares",
+      "url": "https://www.joinville.sc.gov.br/publicacoes/estudos-tecnicos-equipamentos-de-fiscalizacao-eletronica-radares-e-lombadas/",
+      "nivel_evidencia": "cadastro_oficial_documentos",
+      "tipo_recurso": "pdf/html",
+      "orientacao": "Estudos recentes, inclusive agosto de 2026; mapear identificador do equipamento e endereço.",
+      "teste_download_real": "pendente_no_servidor",
+      "cobertura_estadual_completa": false
+    },
+    {
+      "uf": "PR",
+      "codigo": "DERPR_FIXOS",
+      "orgao": "DER-PR — fiscalização fixa e portátil",
+      "url": "https://www.der.pr.gov.br/Pagina/Fiscalizacao-de-velocidade",
+      "nivel_evidencia": "cadastro_oficial_documentos",
+      "tipo_recurso": "html/pdf",
+      "orientacao": "Separar lista de equipamentos fixos/portáteis e locais elegíveis de operação.",
+      "teste_download_real": "pendente_no_servidor",
+      "cobertura_estadual_completa": false
+    }
+  ]
+}

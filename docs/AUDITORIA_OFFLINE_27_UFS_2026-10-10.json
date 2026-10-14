@@ -1,0 +1,342 @@
+{
+  "data_auditoria": "2026-10-10T21:13:51.114826+00:00",
+  "modo": "inventario_sem_rede",
+  "escopo": "somente fontes oficiais; portal estadual/municipal não garante cobertura estadual",
+  "fontes": [
+    {
+      "uf": "AC",
+      "fonte": "DERACRE",
+      "url": "https://agencia.ac.gov.br/detran-anuncia-retorno-da-fiscalizacao-eletronica/",
+      "classificacao_previa": "lista_historica",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "AL",
+      "fonte": "DER_AL",
+      "url": "https://alagoasdigital.al.gov.br/orgao/49",
+      "classificacao_previa": "institucional_sem_lista",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "AP",
+      "fonte": "MACAPA_CT",
+      "url": "https://macapa.ap.gov.br/radares-de-macapa-passam-a-ter-velocidade-maxima-permitida-de-60-km-h-a-partir-desta-terca-21/",
+      "classificacao_previa": "lista_localizacao_historica",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "AM",
+      "fonte": "MANAUS_IMMU",
+      "url": "https://www.manaus.am.gov.br/noticia/transito/fiscalizacao-eletronica-salvar-vidas/",
+      "classificacao_previa": "lista_localizacao",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "BA",
+      "fonte": "SEINFRA_BA",
+      "url": "https://www.ba.gov.br/infraestrutura/12046/mapas",
+      "classificacao_previa": "geoarquivo_oficial",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "CE",
+      "fonte": "FORTALEZA_AMC",
+      "url": "https://mapas.fortaleza.ce.gov.br/mapa/538/equipamentos-de-fiscalizacao-eletronica",
+      "classificacao_previa": "geoarquivo_oficial",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "DF",
+      "fonte": "DETRAN_DF_GEOPORTAL",
+      "url": "https://detran.df.gov.br/wp-content/uploads/2022/10/Equipamentos_Eletronicos.pdf",
+      "classificacao_previa": "geoportal_documentado",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "ES",
+      "fonte": "CARIACICA",
+      "url": "https://cariacica.es.gov.br/pagina/ler/861/mapa-radares",
+      "classificacao_previa": "lista_documentos",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "GO",
+      "fonte": "GOINFRA",
+      "url": "https://goias.gov.br/goinfra/relatorio-de-equipamentos-de-monitoramento-da-goinfra/",
+      "classificacao_previa": "relatorio_oficial",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "MA",
+      "fonte": "DETRAN_MA",
+      "url": "https://www.detran.ma.gov.br/inicio/paginas/Pagina.xhtml?id=23582",
+      "classificacao_previa": "lista_localizacao",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "MG",
+      "fonte": "DER_MG",
+      "url": "https://der.mg.gov.br/transportes/localizacao-de-radares-fixos-e-portateis",
+      "classificacao_previa": "lista_localizacao",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "MS",
+      "fonte": "CAMPO_GRANDE_AGETRAN",
+      "url": "https://www.campogrande.ms.gov.br/cgnoticias/noticia/novos-radares-operam-em-carater-educativo-ate-14-de-julho/",
+      "classificacao_previa": "lista_localizacao",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "MT",
+      "fonte": "CUIABA_SEMOB",
+      "url": "https://www.cuiaba.mt.gov.br/noticias/comeca-campanha-de-esclarecimento-sobre-a-fiscalizacao-eletronica",
+      "classificacao_previa": "lista_historica",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "PA",
+      "fonte": "BELEM_SEGBEL",
+      "url": "https://seguranca.belem.pa.gov.br/portarias-de-ativacao-e-desativacao-de-radares/",
+      "classificacao_previa": "lista_documentos",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "PB",
+      "fonte": "SEMOB_JP",
+      "url": "https://www.joaopessoa.pb.gov.br/noticias/secretarias-e-orgaos/semob/semobjp-orienta-populacao-sobre-novos-locais-com-radares-medidores-de-velocidade/",
+      "classificacao_previa": "lista_localizacao",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "PR",
+      "fonte": "DER_PR",
+      "url": "https://www.der.pr.gov.br/Pagina/Fiscalizacao-de-velocidade",
+      "classificacao_previa": "lista_localizacao",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "PE",
+      "fonte": "CTTU_RECIFE",
+      "url": "https://dados.recife.pe.gov.br/dataset/equipamentos-de-monitoramento-e-fiscalizacao-de-transito",
+      "classificacao_previa": "conjunto_dados",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "PI",
+      "fonte": "STRANS_TERESINA",
+      "url": "https://antigo.pmt.pi.gov.br/2019/04/10/localizacao-dos-radares-sera-divulgada-mensalmente-no-site-da-prefeitura/",
+      "classificacao_previa": "lista_historica",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "RJ",
+      "fonte": "DER_RJ",
+      "url": "https://sgitp.der.rj.gov.br/radares-portateis",
+      "classificacao_previa": "lista_localizacao",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "RN",
+      "fonte": "STTU_NATAL",
+      "url": "https://www.natal.rn.gov.br/sttu",
+      "classificacao_previa": "institucional_sem_lista",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "RS",
+      "fonte": "DAER_RS",
+      "url": "https://www.daer.rs.gov.br/radares-moveis",
+      "classificacao_previa": "lista_trechos",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "RO",
+      "fonte": "SEMTRAN_PVH",
+      "url": "https://semtran.portovelho.ro.gov.br/pagina/fiscalizacao-eletronica-radares-fixos",
+      "classificacao_previa": "lista_documentos",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "RR",
+      "fonte": "BOAVISTA_SMST",
+      "url": "https://boavista.rr.gov.br/noticias/2024/1/prefeitura-instala-novos-equipamentos-de-fiscalizacao-eletronica-para-reduzir-acidentes-em-boa-vista",
+      "classificacao_previa": "lista_localizacao_historica",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "SC",
+      "fonte": "JOINVILLE_DETRANS",
+      "url": "https://www.joinville.sc.gov.br/publicacoes/estudos-tecnicos-equipamentos-de-fiscalizacao-eletronica-radares-e-lombadas/",
+      "classificacao_previa": "lista_documentos",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "SP",
+      "fonte": "DER_SP",
+      "url": "https://dadosabertos.sp.gov.br/dataset/radar",
+      "classificacao_previa": "conjunto_dados",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "SE",
+      "fonte": "DER_SE",
+      "url": "https://der.se.gov.br/localizacao-de-radares-fixos/",
+      "classificacao_previa": "lista_documentos",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "TO",
+      "fonte": "ASTT_ARAGUAINA",
+      "url": "https://www.araguaina.to.gov.br/servicos/medidores-de-velocidade-lista-de-enderecos",
+      "classificacao_previa": "lista_localizacao",
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "BA",
+      "fonte": "SEINFRA_BA_ESTATICOS",
+      "url": "https://www.ba.gov.br/infraestrutura/12046/mapas",
+      "classificacao_previa": null,
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "CE",
+      "fonte": "AMC_FORTALEZA_CKAN",
+      "url": "https://dados.fortaleza.ce.gov.br/dataset/fiscalizacao-eletronica",
+      "classificacao_previa": null,
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "GO",
+      "fonte": "GOINFRA_ESTUDOS",
+      "url": "https://goias.gov.br/goinfra/operacao-rodoviaria/estudos-tecnicos-2/",
+      "classificacao_previa": null,
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "MA",
+      "fonte": "SMTT_SAO_LUIS",
+      "url": "https://www.saoluis.ma.gov.br/fiscalizacao-eletronica---smtt/0/",
+      "classificacao_previa": null,
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "PR",
+      "fonte": "CURITIBA",
+      "url": "https://transito.curitiba.pr.gov.br/fiscalizacaoeletronica",
+      "classificacao_previa": null,
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "MG",
+      "fonte": "BELO_HORIZONTE",
+      "url": "https://dados.pbh.gov.br/pt_BR/dataset/fiscalizacao-eletronica",
+      "classificacao_previa": null,
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "RJ",
+      "fonte": "DER_RJ_FIXOS",
+      "url": "https://www.der.rj.gov.br/bandeira.asp",
+      "classificacao_previa": null,
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "RS",
+      "fonte": "DAER_RS_PORTATEIS",
+      "url": "https://www.daer.rs.gov.br/radares-moveis",
+      "classificacao_previa": null,
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "DF",
+      "fonte": "DER_DF_HISTORICO",
+      "url": "https://www.der.df.gov.br/wp-content/uploads/2018/01/Pardais_2011.pdf",
+      "classificacao_previa": null,
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    },
+    {
+      "uf": "SE",
+      "fonte": "SMTT_ARACAJU",
+      "url": "https://smtt.aracaju.se.gov.br/smttsite/Medidores%20de%20Velocidade/equipamentos%20de%20fiscalizao%20eletrnica%20smtt%20aracaju.pdf",
+      "classificacao_previa": null,
+      "coordenadas_confirmadas_pelo_script": false,
+      "cobertura_estadual_confirmada": false,
+      "situacao": "nao_testada"
+    }
+  ],
+  "quantidade_fontes": 37,
+  "quantidade_ufs": 27
+}
