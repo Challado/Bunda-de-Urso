@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """Testes offline do conector Detran-DF (equipamentos eletronicos).
 
-Sem rede: usam a fixture real de ``equipamentos.js`` (subconjunto real de
-10/10/2026) e dubles para a descoberta de URL / download.
+Sem rede: usam a fixture real de ``equipamentos.js`` (lista completa de
+10/10/2026, 407 registros) e dubles para a descoberta de URL / download.
 
-ATENCAO: o modulo e PARCIAL.  O arquivo de dados real e servido a navegadores,
-mas um WAF F5/BigIP reseta a conexao de clientes nao-navegador (ver o
-docstring do modulo).  Por isso o teste de download confirma que o erro de rede
-e PROPAGADO (sem fallback silencioso), alem de validar descobrimento/parse.
+O arquivo de dados real e servido a navegadores; um WAF F5/BigIP reseta a
+conexao de clientes nao-navegador.  Por isso o modulo TENTA primeiro
+``coletor.http.baixar`` e, se o WAF resetar, cai no CONTORNO de navegador
+(Chromium headless em 2 passos).  Estes testes cobrem os dois caminhos com
+dubles (sem subir navegador).
 """
 import os
 import unittest
@@ -37,16 +38,21 @@ def _resp(conteudo, url="https://x/"):
     return (dados, {}, url)
 
 
+def _pre(texto):
+    return "<html><body><pre style=\"white-space: pre-wrap;\">%s</pre></body></html>" % texto
+
+
 class TestDetranDFCarregar(unittest.TestCase):
 
     def test_carregar_fixture(self):
         _, ext, mime, regs = ColetorDetranDF().carregar(JS)
         self.assertEqual(ext, ".js")
         self.assertEqual(mime, "application/javascript")
-        self.assertEqual(len(regs), 10)
-        self.assertEqual(regs[0]["identificacao"], "FIS001")
-        self.assertEqual(regs[3]["identificacao"], "KR007")
-        self.assertEqual(regs[6]["identificacao"], "RE001")
+        self.assertEqual(len(regs), 407)              # lista completa real
+        por_id = {r["identificacao"]: r for r in regs}
+        self.assertEqual(por_id["FIS001"]["tipo"], "AVANÇO DE SINAL VERMELHO")
+        self.assertEqual(por_id["KR007"]["numero_serie"], "516301114, 516301204")
+        self.assertEqual(por_id["RE001"]["numero_serie"], "R13195/R13188")
 
     def test_tipos_presentes(self):
         _, _, _, regs = ColetorDetranDF().carregar(JS)
@@ -57,14 +63,13 @@ class TestDetranDFCarregar(unittest.TestCase):
 
 class TestDetranDFNormalizar(unittest.TestCase):
 
-    def _regs(self):
-        return ColetorDetranDF().carregar(JS)[3]
+    def _por_id(self):
+        regs = ColetorDetranDF().carregar(JS)[3]
+        return {r["identificacao"]: r for r in regs}
 
     def test_radar_vira_fixo_sem_coordenada(self):
         c = ColetorDetranDF()
-        regs = self._regs()
-        radar = [r for r in regs if r["identificacao"] == "KR007"][0]
-        d = c.normalizar(0, radar)
+        d = c.normalizar(0, self._por_id()["KR007"])
         self.assertEqual(d["identificador"], "KR007")
         self.assertEqual(d["uf"], "DF")
         self.assertEqual(d["tipo_radar"], "fixo")
@@ -75,15 +80,13 @@ class TestDetranDFNormalizar(unittest.TestCase):
 
     def test_lombada_vira_fixo(self):
         c = ColetorDetranDF()
-        regs = self._regs()
-        lomb = [r for r in regs if r["identificacao"] == "RE001"][0]
-        d = c.normalizar(0, lomb)
+        d = c.normalizar(0, self._por_id()["RE001"])
         self.assertEqual(d["tipo_radar"], "fixo")
         self.assertEqual(d["numero_serie"], "R13195/R13188")
 
     def test_avanco_de_sinal_nao_e_radar(self):
         c = ColetorDetranDF()
-        d = c.normalizar(0, self._regs()[0])   # FIS001
+        d = c.normalizar(0, self._por_id()["FIS001"])
         self.assertIsNone(d["tipo_radar"])
         self.assertIn("Nao e medidor de velocidade", d["observacoes"])
 
@@ -111,10 +114,37 @@ class TestDetranDFDescobrir(unittest.TestCase):
             url = ColetorDetranDF.resolver_url()
         self.assertEqual(url, ColetorDetranDF.URL_DADOS_FALLBACK)
 
-    def test_erro_de_waf_e_propagado(self):
-        # cliente nao-navegador: o WAF reseta a conexao -> erro sobe
-        with mock.patch.object(http, "baixar",
-                               side_effect=http.ErroFonte("reset")):
+
+class TestDetranDFContornoWaf(unittest.TestCase):
+    """Contorno do WAF F5: 2 passos (index.html -> equipamentos.js)."""
+
+    def test_waf_resetado_cai_no_navegador(self):
+        with open(JS, encoding="utf-8") as fh:
+            texto_js = fh.read()
+        chamadas = []
+
+        def _fake_dump(navegador, url, perfil, timeout=90):
+            chamadas.append(url)
+            return _pre(texto_js) if url.endswith(".js") else _pre("<html></html>")
+
+        with mock.patch.object(detran_df.http, "baixar",
+                               side_effect=http.ErroFonte("reset pelo WAF")), \
+                mock.patch.object(detran_df, "_achar_navegador",
+                                  return_value="/usr/bin/chromium"), \
+                mock.patch.object(detran_df, "_dump_dom", side_effect=_fake_dump):
+            _, _, _, regs = ColetorDetranDF().carregar(
+                ColetorDetranDF.URL_DADOS_FALLBACK)
+        self.assertEqual(len(regs), 407)
+        # passo 1 no index.html, passo 2 no equipamentos.js, mesmo perfil
+        self.assertEqual(len(chamadas), 2)
+        self.assertTrue(chamadas[0].endswith("lista_equipto/index.html"))
+        self.assertTrue(chamadas[1].endswith("lista_equipto/equipamentos.js"))
+
+    def test_sem_navegador_o_erro_sobe(self):
+        with mock.patch.object(detran_df.http, "baixar",
+                               side_effect=http.ErroFonte("reset pelo WAF")), \
+                mock.patch.object(detran_df, "_achar_navegador",
+                                  return_value=None):
             with self.assertRaises(http.ErroFonte):
                 ColetorDetranDF().carregar(ColetorDetranDF.URL_DADOS_FALLBACK)
 
@@ -126,12 +156,12 @@ class TestDetranDFSync(unittest.TestCase):
         c = ColetorDetranDF(db_path=config.DB_PATH)
         try:
             resumo = c.sincronizar(JS, publicar=False)
-            self.assertEqual(resumo["linhas_recebidas"], 10)
-            self.assertEqual(resumo["criados"], 10)
+            self.assertEqual(resumo["linhas_recebidas"], 407)
+            self.assertEqual(resumo["criados"], 407)
             self.assertEqual(resumo["rejeitados"], 0)
             self.assertEqual(
                 dbmod.scalar(c.conn, "SELECT COUNT(*) FROM PONTO_FISCALIZACAO"),
-                10)
+                407)
             # sem coordenadas -> nenhuma posicao geografica
             self.assertEqual(
                 dbmod.scalar(c.conn, "SELECT COUNT(*) FROM POSICAO_GEOGRAFICA"),
