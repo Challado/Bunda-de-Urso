@@ -147,7 +147,10 @@ def buscar_municipio_por_nome(conn, uf_sigla, municipio_nome):
     """Casa (uf_sigla, nome) contra MUNICIPIO com normalizacao de
     maiusculas/acentos/espacos. Devolve o codigo_ibge ou None.
 
-    Nada e inventado: sem correspondencia na lista oficial, devolve None.
+    Dois degraus: (1) casamento exato normalizado; (2) na falta dele,
+    casamento APROXIMADO (fuzzy + fonetico) via ``core.casamento_municipio``,
+    confiante so com ratio/margem. Nada e inventado: sem correspondencia
+    oficial na lista, devolve None.
     """
     if not uf_sigla or not municipio_nome:
         return None
@@ -159,6 +162,17 @@ def buscar_municipio_por_nome(conn, uf_sigla, municipio_nome):
             (uf_sigla,)):
         if normalizar_nome_texto(row["nome"]) == alvo:
             return row["codigo_ibge"]
+    # 2o degrau: nome grafado diferente do oficial (renome, abreviacao,
+    # acento, erro de digitacao). Conservador: so preenche com confianca.
+    from core import casamento_municipio as cm      # import tardio: sem ciclo
+    d = cm.melhor_por_nome(conn, uf_sigla, municipio_nome)
+    if d and d.get("codigo"):
+        log.info("municipio casado por aproximacao: nome=%r uf=%r -> %s "
+                 "(motivo=%s score=%.3f)", municipio_nome, uf_sigla,
+                 d["codigo"], d["motivo"], d["score"])
+        return d["codigo"]
+    log.debug("municipio nao resolvido (uf=%r nome=%r): fica NULL",
+              uf_sigla, municipio_nome)
     return None
 
 
