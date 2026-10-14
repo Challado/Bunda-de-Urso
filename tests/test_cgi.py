@@ -99,7 +99,7 @@ class TestCgi(unittest.TestCase):
 
     def test_radares_raio_fora_do_limite(self):
         status, _h, _c = self._req(
-            "/api/v1/radares", "lat=-24.9&lon=-53.4&raio=99999")
+            "/api/v1/radares", "lat=-24.9&lon=-53.4&raio=1000001")
         self.assertEqual(status, 422)
 
     def test_formato_invalido(self):

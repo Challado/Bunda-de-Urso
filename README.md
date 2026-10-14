@@ -67,7 +67,24 @@ O projeto separa duas responsabilidades:
 1. **Coletor e normalizador:** processo independente que descobre recursos oficiais, baixa documentos, interpreta formatos, valida campos, registra alterações e alimenta o banco relacional.
 2. **Aplicação web/API:** interface de consulta que lê o banco local, sem consultar portais governamentais a cada requisição.
 
-A implementação é em **Python 3, só stdlib** (`urllib`, `sqlite3`, `csv`, `json`, `xml.etree`) — sem pip, sem dependência externa. A aplicação web é servida por **Nginx + fcgiwrap**, por meio de um executável Python com extensão **`.pse`**, preservando a convenção histórica do servidor. Não utiliza `import cgi`.
+A implementação é em **Python 3, só stdlib** (`urllib`, `sqlite3`, `csv`, `json`, `xml.etree`) — sem pip, sem dependência externa. Não utiliza `import cgi`.
+
+### O que é o “`.pse`”? (o servidor web, explicado)
+
+Quem esbarra em `api.pse` não tem como adivinhar o que é — e não precisa: **`.pse` é apenas uma extensão de arquivo**, uma convenção histórica **deste servidor** (não é formato, linguagem nem produto). Todo script executável do site usa `.pse` — por exemplo `cnpj.pse`, `frase.pse`, `pythoninfo.pse` e, aqui, `api.pse`. É o equivalente local de um `.cgi`.
+
+Na prática, a API é:
+
+- um **programa Python 3** (só a biblioteca padrão), guardado **fora** da pasta pública;
+- que o **nginx** executa **sob demanda** via **`fcgiwrap`** (o adaptador FastCGI→CGI do servidor);
+- **sem servidor de aplicação, sem daemon e sem porta própria** — cada requisição sobe o processo, responde (*JSON*, *XML*, *TXT*, *NDJSON*, *EDIFACT* ou *DIF*) e termina;
+- com a **rota no parâmetro `rota`**, porque o `fcgiwrap` deste servidor não define `PATH_INFO`:
+
+```
+https://servidor3.lucas.inf.br/openclaw/radar/api.pse?rota=/api/v1/radares&lat=-24.9555&lon=-53.4552&raio=5000&formato=json
+```
+
+Resumindo: **nginx + fcgiwrap + Python** executando um arquivo `.pse`. Nada mais exótico que isso.
 
 O esquema é **SQL canônico, sem ORM** — nada de SQLAlchemy por aqui. São **77 tabelas** (T01..T77) definidas uma única vez em `tools/build_schema.py`, que gera as duas DDLs gêmeas (`sql/schema.sqlite.sql` e `sql/schema.postgres.sql`), com chaves primárias/estrangeiras, `CHECK`, `UNIQUE` e índices, incluindo equipamentos, pontos, instalações, faixas, órgãos, fontes, documentos, verificações, operações, evidências e candidatos geográficos. O banco padrão é SQLite, sem PostGIS. A compatibilidade efetiva com outros SGBDs requer homologação específica.
 
@@ -126,7 +143,7 @@ O tipo de equipamento (fixo, portátil), a função (controlador, redutor), o se
 
 ## API e formatos
 
-A API web `.pse` oferece consultas por latitude, longitude e raio; identificação do equipamento; UF, rodovia e quilômetro; além de fontes, atualizações, situação do serviço, operações, trechos e tráfego.
+A API web (arquivo `.pse`: **nginx + fcgiwrap + Python**, explicado acima) oferece consultas por latitude, longitude e raio (até **1000 km**); identificação do equipamento; UF, rodovia e quilômetro; além de fontes, atualizações, situação do serviço, operações, trechos e tráfego.
 
 Os endpoints da API são:
 

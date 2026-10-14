@@ -19,8 +19,16 @@ O projeto é dividido em **duas partes independentes**:
 - **Banco:** relacional normalizado (3FN). SQLite para desenvolvimento; Postgres
   suportado pela DDL gêmea. **Sem PostGIS** — a consulta geográfica usa
   *bounding box* em SQL + distância Haversine na aplicação.
-- **Web:** **CGI** no padrão da casa — `fcgiwrap` + nginx executando um `.pse`
-  (entry point fino); toda a lógica mora fora do webroot.
+- **Web:** **CGI** no padrão da casa — `fcgiwrap` + `nginx` executando um
+  arquivo **`.pse`** (entry point fino); toda a lógica mora fora do webroot.
+  **O que é `.pse`:** é só uma **extensão de arquivo** — a convenção histórica
+  deste servidor para scripts executáveis do site (`cnpj.pse`, `frase.pse`,
+  `pythoninfo.pse`, `api.pse`...), equivalente a um `.cgi`. A API **não** é um
+  servidor nem um framework: é um **programa Python 3 (só stdlib)** que o nginx
+  executa **sob demanda** via **fcgiwrap** (FastCGI→CGI), **sem daemon e sem
+  porta própria** — cada requisição sobe o processo, responde e termina. Como o
+  `fcgiwrap` daqui não define `PATH_INFO`, a rota vai no parâmetro `rota`
+  (ex.: `api.pse?rota=/api/v1/radares&lat=..&lon=..&raio=..`).
 
 ## Estrutura
 
@@ -97,7 +105,7 @@ PATH_INFO='/api/v1/radares' python3 web/api.pse
 ```
 
 Endpoint → parâmetros (spec §10): `lat`, `lon` (obrigatórios em `/radares`),
-`raio` (1..50000, padrão 1000), `formato` (`json|ndjson|xml|txt|edi|edifact|dif`),
+`raio` (1..1000000, até 1000 km; padrão 1000), `formato` (`json|ndjson|xml|txt|edi|edifact|dif`),
 `delimitador` (só `txt`), `limite` (1..1000, padrão 100), `cursor`, `uf`,
 `municipio_ibge`, `rodovia`, `incluir_inativos`, etc. `GET` e `POST`
 (JSON ou form) devolvem o mesmo resultado.
