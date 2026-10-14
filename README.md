@@ -1,7 +1,7 @@
 # BUNDA DE URSO
 ## Cadastro nacional aberto, rastreável e auditável de radares e fiscalização eletrônica de trânsito
 
-[![Testes](https://github.com/Challado/Bunda-de-Urso/actions/workflows/testes.yml/badge.svg)](https://github.com/Challado/Bunda-de-Urso/actions/workflows/testes.yml)
+[![Validação](https://github.com/Challado/Bunda-de-Urso/actions/workflows/testes.yml/badge.svg)](https://github.com/Challado/Bunda-de-Urso/actions/workflows/testes.yml)
 
 ![Bunda de Urso — a bunda do urso com o radar tatuado](docs/bunda-de-urso.png)
 
@@ -252,6 +252,36 @@ O projeto implementa a **ESPECIFICACAO_v1.1.txt (10/10/2026)**: coletor/sincroni
 **Ainda precisam de trabalho e validação:** integração e importação real de todas as fontes federais, estaduais e municipais; resolução das coordenadas ausentes; homologação de cada formato e SGBD utilizado; verificação de qualidade e atualização de cada órgão; aferição da cobertura nacional; avaliação de licenças para redistribuição de cada conjunto de dados.
 
 O projeto não deve divulgar percentuais de cobertura, contagens nacionais ou precisão de localização sem medi-los efetivamente. Equipamentos sem coordenada comprovada continuam no inventário para investigação — porque apagar o que não sabemos localizar seria a pior lamúria de todas: esconder o problema debaixo do tapete.
+
+## Validação automática (CI)
+
+Todo push no `main`, todo pull request e um disparo manual rodam a validação
+rígida no GitHub Actions (`.github/workflows/testes.yml`). Nada passa por
+"parece que está bom": cada checagem reprova o build.
+
+**Suíte de testes** — Python 3.13, `compileall` de todo o código e a suíte
+completa (`unittest`). O runner roda com piso de testes: se a coleta quebrar e
+a suíte rodar "verde vazio", o job reprova.
+
+**Rígido (contratos e invariantes)** — verificadores em `.github/scripts/`:
+
+- **Paridade dos esquemas SQL** (`verificar_sql.py`): as tabelas e colunas dos
+dois dialetos (`sqlite` × `postgres`) são as mesmas, e o DDL do SQLite executa
+de verdade num banco em memória.
+- **JSON** (`verificar_json.py`): todo JSON versionado parseia e não tem chave
+repetida.
+- **Segredos** (`verificar_segredos.py`): tokens do GitHub, AWS, Google, Slack
+  e Telegram, chaves privadas e JWT; e arquivos que nunca podem entrar no git
+  (`.env`, `config.php`, `*.pem`, `*.key`, credencial de conta de serviço).
+- **Front** (`verificar_web.py`): todo `href`/`src` local existe, toda página
+tem `viewport` (celular/tablet/PC) e as rotas que o front chama são atendidas
+pela API (`web/nucleo.py`).
+- **Escrita no banco** (`verificar_banco.py`): o painel (`web/`) só fala com a
+API — nunca com o SQLite; no núcleo (`core/`, `coletor/`) a única conexão é
+`core/db.py`.
+- **Estrutura** (`verificar_estrutura.py`): arquivos obrigatórios presentes e
+nenhum artefato de build/execução versionado (`__pycache__`, `.pyc`, bancos,
+logs).
 
 ## Transparência e segurança viária
 
