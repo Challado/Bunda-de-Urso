@@ -30,6 +30,40 @@ DEFAULT_LIMITE = 100
 MIN_LIMITE = 1
 MAX_LIMITE = 1000
 
+# Ingestao (escrita) via API: token NUNCA no codigo. Resolvido, nesta ordem:
+#   1. variavel de ambiente RADAR_API_TOKEN;
+#   2. arquivo indicado por RADAR_API_TOKEN_FILE;
+#   3. arquivo padrao /etc/radar-brasil/api_token (se existir).
+# Sem token configurado a escrita fica DESABILITADA e a API responde 401.
+API_TOKEN_ENV = "RADAR_API_TOKEN"
+API_TOKEN_FILE_ENV = "RADAR_API_TOKEN_FILE"
+API_TOKEN_FILE_PADRAO = "/etc/radar-brasil/api_token"
+
+
+def token_ingestao():
+    """Token de escrita configurado (env -> arquivo), ou "" se nao houver."""
+    tok = (os.environ.get(API_TOKEN_ENV) or "").strip()
+    if tok:
+        return tok
+    caminhos = []
+    indicado = (os.environ.get(API_TOKEN_FILE_ENV) or "").strip()
+    if indicado:
+        caminhos.append(indicado)
+    caminhos.append(API_TOKEN_FILE_PADRAO)
+    for caminho in caminhos:
+        try:
+            with open(caminho, "r", encoding="utf-8") as f:
+                texto = f.read().strip()
+        except OSError:
+            continue
+        if texto:
+            return texto
+    return ""
+
+
+# Ingestao via API: tamanho maximo do corpo aceito (protege o CGI).
+API_MAX_BODY = int(os.environ.get("RADAR_API_MAX_BODY", 8 * 1024 * 1024))
+
 # Geodesia
 EARTH_RADIUS_M = 6371008.8   # raio medio WGS84 (spec 9.2)
 

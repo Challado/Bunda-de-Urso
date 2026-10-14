@@ -48,6 +48,7 @@ from coletor.fontes.detran_ac import ColetorDetranAC
 from coletor.fontes.der_al import ColetorDerAL
 from coletor.fontes.natal_rn import ColetorNatalRN
 from coletor.fontes.teresina_pi import ColetorTeresinaPI
+from coletor.fontes.base_lwb import ColetorBaseLWB
 
 HORA = 3600
 DIA = 86400
@@ -301,6 +302,18 @@ AGENDA_PADRAO = {
         "intervalo_s": SEMANA,
         "url_direta": None,
         "ativo": True,
+    },
+    # -- cadastro PROPRIO (alimentado pela API de escrita) -------------
+    # Nao e publicacao de orgao: e a NOSSA base (Bundita de Urso). Entra pela
+    # API (POST /api/v1/radares); nao ha coleta agendada (ativo False) e o
+    # tick NAO a dispara. O conector existe para compartilhar normalizacao e
+    # upsert com as demais fontes.
+    "base_lwb": {
+        "rotulo": "Bundita de Urso - A base do Bunda de urso",
+        "conector": ColetorBaseLWB,
+        "intervalo_s": None,
+        "url_direta": None,
+        "ativo": False,
     },
     # -- complementar (nao oficial) — opt-in ----------------------------
     "osm": {
