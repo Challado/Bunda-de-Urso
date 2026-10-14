@@ -6,6 +6,7 @@ stdin; emite headers + corpo. NENHUMA chamada a servico externo: consulta
 somente o banco local ja validado (spec 13.1).
 """
 import datetime
+import hmac
 import json
 import os
 import sys
@@ -463,9 +464,158 @@ def _rota(environ):
     return caminho
 
 
+def _token_escrita(environ):
+    """Valida o token de escrita (cabecalho X-Api-Token).
+
+    O token NUNCA mora no codigo: vem de RADAR_API_TOKEN (ambiente), de
+    RADAR_API_TOKEN_FILE (arquivo) ou do padrao /etc/radar-brasil/api_token.
+    Sem token configurado a escrita fica DESABILITADA e a resposta e 401
+    (falha segura). A comparacao e em tempo constante (hmac.compare_digest).
+
+    Devolve ``(ok, codigo)``.
+    """
+    configurado = config.token_ingestao()
+    if not configurado:
+        return False, "ingestao_desabilitada"
+    enviado = environ.get("HTTP_X_API_TOKEN") or ""
+    if not enviado or not hmac.compare_digest(str(enviado), configurado):
+        return False, "nao_autorizado"
+    return True, None
+
+
+def _validar_item_radar(item):
+    """Valida o minimo de cada radar enviado. Devolve (campo, msg) ou None.
+
+    Exigencia: coordenada plausivel (latitude+longitude) OU municipio+via.
+    """
+    if not isinstance(item, dict):
+        return None, "cada item deve ser um objeto JSON"
+    from coletor.fontes import normalizacao as nz
+    lat = nz.to_float(nz.pick(item, "latitude", "lat"))
+    lon = nz.to_float(nz.pick(item, "longitude", "lon", "lng"))
+    if lat is not None or lon is not None:
+        if lat is None or lon is None:
+            return "latitude", "informe latitude E longitude juntas"
+        if not (-90 <= lat <= 90):
+            return "latitude", "latitude fora de -90..90"
+        if not (-180 <= lon <= 180):
+            return "longitude", "longitude fora de -180..180"
+        return None
+    municipio = nz.pick(item, "municipio", "municipio_nome", "cidade",
+                        "municipio_ibge", "codigo_ibge", "ibge")
+    via = nz.pick(item, "via", "via_codigo", "rodovia", "br")
+    if not municipio:
+        return "municipio", "informe latitude/longitude ou municipio+via"
+    if not via:
+        return "via", "informe latitude/longitude ou municipio+via"
+    return None
+
+
+def _eh_ingestao(caminho, metodo, environ, stdin_bytes):
+    """Decide se POST /api/v1/radares e ESCRITA (ingestao) ou consulta.
+
+    E escrita quando: (a) vem o cabecalho X-Api-Token; ou (b) o corpo e um
+    array JSON (uma consulta nunca usa array). Sem isso, mantem o contrato
+    antigo (POST com lat/lon = consulta). A submissao PUBLICA (sem token) usa
+    a rota propria /api/v1/radares/submeter.
+    """
+    if metodo != "POST":
+        return False
+    if caminho.rstrip("/") != "/api/v1/radares":
+        return False
+    if (environ.get("HTTP_X_API_TOKEN") or "").strip():
+        return True
+    if "application/json" in (environ.get("CONTENT_TYPE") or ""):
+        try:
+            dados = json.loads(stdin_bytes.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return False
+        if isinstance(dados, list):
+            return True
+    return False
+
+
+def _ingestao_radares(environ, stdin_bytes):
+    """POST /api/v1/radares — escrita autenticada (a base NOSSA).
+
+    Aceita um objeto JSON ou um array. Reutiliza a MESMA normalizacao + upsert
+    do coletor (ColetorBaseLWB.ingerir_registros) para que o radar ingerido
+    pela API se comporte igual ao coletado. Resposta:
+    ``{ok, criados, atualizados, rejeitados, erros:[{indice,campo,mensagem}]}``.
+    """
+    if len(stdin_bytes) > config.API_MAX_BODY:
+        return _erro(413, "corpo_muito_grande",
+                     "corpo excede %d bytes" % config.API_MAX_BODY)
+    ok, codigo = _token_escrita(environ)
+    if not ok:
+        msg = ("token de escrita nao configurado no servidor "
+               "(RADAR_API_TOKEN / RADAR_API_TOKEN_FILE)"
+               if codigo == "ingestao_desabilitada" else
+               "token ausente ou invalido no cabecalho X-Api-Token")
+        return _erro(401, codigo, msg, campo="X-Api-Token")
+    try:
+        dados = json.loads(stdin_bytes.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError) as exc:
+        return _erro(400, "json_invalido",
+                     "corpo JSON invalido: %s" % str(exc)[:200])
+    if isinstance(dados, dict):
+        itens = [dados]
+    elif isinstance(dados, list):
+        itens = dados
+    else:
+        return _erro(422, "payload_invalido",
+                     "envie um objeto JSON ou um array de objetos")
+    if not itens:
+        return _erro(422, "payload_vazio", "nenhum radar enviado")
+
+    validos = []
+    erros = []
+    for i, item in enumerate(itens):
+        erro = _validar_item_radar(item)
+        if erro is None:
+            validos.append(item)
+        else:
+            campo, mensagem = erro
+            erros.append({"indice": i, "campo": campo,
+                          "mensagem": mensagem})
+
+    criados = atualizados = 0
+    rejeitados = len(erros)
+    if validos:
+        from coletor.fontes.base_lwb import ColetorBaseLWB
+        conector = ColetorBaseLWB(db_path=config.DB_PATH)
+        try:
+            resumo = conector.ingerir_registros(validos)
+            criados = resumo["criados"]
+            atualizados = resumo["atualizados"]
+            rejeitados += resumo["rejeitados"]
+        except Exception as exc:                       # noqa: BLE001
+            return _erro(500, "falha_ingestao", str(exc)[:300])
+        finally:
+            conector.conn.close()
+
+    aceitos = criados + atualizados
+    if aceitos == 0 and not erros:
+        erros.append({"indice": None, "campo": None,
+                      "mensagem": "nenhum registro aceito"})
+        rejeitados = len(itens)
+    corpo = {
+        "ok": rejeitados == 0 and aceitos > 0,
+        "criados": criados,
+        "atualizados": atualizados,
+        "rejeitados": rejeitados,
+        "erros": erros,
+    }
+    status = 200 if aceitos > 0 else 422
+    return status, {"Content-Type": "application/json; charset=utf-8"}, corpo
+
+
 def handle_request(environ, stdin_bytes=b""):
     metodo = environ.get("REQUEST_METHOD", "GET").upper()
     caminho = _rota(environ)
+    # escrita autenticada ANTES do parsing de consulta (corpo pode ser array)
+    if _eh_ingestao(caminho, metodo, environ, stdin_bytes):
+        return _ingestao_radares(environ, stdin_bytes)
     params = _parse_params(environ, stdin_bytes)
 
     if caminho in ("/health/live", "/api/v1/health/live"):

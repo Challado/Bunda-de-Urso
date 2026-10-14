@@ -22,6 +22,20 @@ def agora_utc():
         "%Y-%m-%dT%H:%M:%S+00:00")
 
 
+def _chave_identidade(d):
+    """Chave de identidade externa de um dict normalizado, ou None.
+
+    (tipo_identificador, valor_normalizado) — a MESMA chave que o upsert usa
+    para resolver o ponto (fonte_id entra em separado). Registro sem
+    identificador devolve None (nao ha identidade a comparar).
+    """
+    ident = d.get("identificador")
+    if ident in (None, ""):
+        return None
+    return (str(d.get("tipo_identificador") or "id_orgao"),
+            str(ident).strip().upper())
+
+
 def sha256_bytes(dados):
     return hashlib.sha256(dados).hexdigest()
 
@@ -254,19 +268,110 @@ class ColetorBase(object):
         return None
 
     # -- orquestracao ------------------------------------------------------
+    def _ingerir_registros(self, conteudo, ext, mime, registros, exec_id,
+                           recurso_id, publicar=True, fonte_id=None):
+        """Ingere uma lista de registros ja parseados (nucleo reutilizavel).
+
+        E o MESMO caminho usado pela coleta e pela API de escrita: artefato
+        imutavel -> REGISTRO_FONTE -> normalizar -> upsert (inserir_normalizado).
+        Retorna o resumo com contadores ``criados``/``atualizados``/``rejeitados``.
+        """
+        from coletor.fontes import normalizacao as nz  # noqa: F401
+        artefato_id, h, caminho = self.registrar_artefato(
+            recurso_id, conteudo, ext, mime)
+        criados = 0
+        atualizados = 0
+        rejeitados = 0
+        pendentes = []      # (reg_id, d) normalizados, ainda nao inseridos
+        for idx, raw in enumerate(registros):
+            reg_id = self.registrar_registro(
+                artefato_id, idx, self.identificador(raw), raw)
+            # idempotencia: mesmo artefato (hash) ja ligado a um ponto
+            # significa que esta versao ja foi ingerida -> pular.
+            if dbmod.query_one(
+                    self.conn,
+                    "SELECT 1 AS x FROM VINCULO_REGISTRO_PONTO "
+                    "WHERE registro_id=? LIMIT 1", (reg_id,)) is not None:
+                continue
+            if dbmod.query_one(
+                    self.conn,
+                    "SELECT 1 AS x FROM TRECHO_ELEGIVEL "
+                    "WHERE registro_fonte_id=? LIMIT 1",
+                    (reg_id,)) is not None:
+                continue
+            d = self.normalizar(idx, raw)
+            if d is None:
+                rejeitados += 1
+                continue
+            pendentes.append((reg_id, d))
+        # Identificador que se REPETE no mesmo artefato designa pontos
+        # DIFERENTES (endereco generico, codigo de rota): nao e identidade de
+        # UM ponto. Nesses casos o registro ganha ponto proprio (comportamento
+        # de fonte sem identificador confiavel) e o valor fica so como
+        # evidencia — assim como nos casos em que o (fonte, tipo, valor) ja
+        # aponta para mais de um ponto de coletas anteriores.
+        ambiguos = self._identidades_ambiguas(pendentes)
+        for reg_id, d in pendentes:
+            # um registro ruim nao pode derrubar a fonte inteira:
+            # cada registro entra num savepoint proprio.
+            self.conn.execute("SAVEPOINT reg")
+            try:
+                if d.get("tipo_registro") == "trecho_elegivel":
+                    nz.inserir_trecho(self.conn, reg_id, d, fonte_id)
+                    criados += 1
+                else:
+                    chave = _chave_identidade(d)
+                    res = nz.inserir_normalizado(
+                        self.conn, reg_id, d, fonte_id,
+                        reutilizar_identidade=(chave is None
+                                               or chave not in ambiguos))
+                    if res.get("ponto_criado"):
+                        criados += 1
+                    else:
+                        atualizados += 1
+            except Exception:                       # noqa: BLE001
+                self.conn.execute("ROLLBACK TO reg")
+                self.conn.execute("RELEASE reg")
+                rejeitados += 1
+                continue
+            self.conn.execute("RELEASE reg")
+        self.conn.commit()
+        snap_id = None
+        versao = None
+        if publicar:
+            snap_id, versao = self.publicar_snapshot(
+                [(recurso_id, artefato_id)],
+                resumo="%d criados, %d atualizados" % (criados, atualizados))
+        return {
+            "fonte": self.FONTE["nome"],
+            "recurso_id": recurso_id, "artefato_id": artefato_id,
+            "execucao_id": exec_id, "snapshot_id": snap_id,
+            "versao": versao, "hash_sha256": h, "cache": caminho,
+            "linhas_recebidas": len(registros),
+            "criados": criados, "atualizados": atualizados,
+            "rejeitados": rejeitados,
+        }
+
+    @staticmethod
+    def _identidades_ambiguas(pendentes):
+        """Chaves (tipo, valor) que aparecem em >1 registro do MESMO artefato.
+
+        Sao identidades AMBIGUAS: o mesmo valor descreve pontos diferentes.
+        """
+        from collections import Counter
+        contagem = Counter(_chave_identidade(d) for _, d in pendentes)
+        return {k for k, n in contagem.items() if k is not None and n > 1}
+
     def sincronizar(self, origem, publicar=True):
         """Executa o pipeline completo para uma origem (arquivo local ou URL).
 
         Fluxo atomico: tudo entra numa transacao; o snapshot so e publicado
         se nao houver erro. Retorna um resumo com contadores.
         """
-        from coletor.fontes import normalizacao as nz  # noqa: F401
         config.ensure_dirs()
         dbmod.init_db(self.conn)
         fonte_id, recurso_id = self.garantir_referencias()
         exec_id = self.iniciar_execucao(recurso_id)
-        criados = 0
-        rejeitados = 0
         try:
             conteudo, ext, mime, registros = self.carregar(origem)
             # Snapshot repetido nao se reingere (spec 8.1-A / 17.4-3): a
@@ -280,65 +385,58 @@ class ColetorBase(object):
                     "fonte": self.FONTE["nome"], "recurso_id": recurso_id,
                     "execucao_id": exec_id, "sem_mudanca": True,
                     "linhas_recebidas": len(registros),
-                    "criados": 0, "rejeitados": 0,
+                    "criados": 0, "atualizados": 0, "rejeitados": 0,
                 }
-            artefato_id, h, caminho = self.registrar_artefato(
-                recurso_id, conteudo, ext, mime)
-            for idx, raw in enumerate(registros):
-                reg_id = self.registrar_registro(
-                    artefato_id, idx, self.identificador(raw), raw)
-                # idempotencia: mesmo artefato (hash) ja ligado a um ponto
-                # significa que esta versao ja foi ingerida -> pular.
-                if dbmod.query_one(
-                        self.conn,
-                        "SELECT 1 AS x FROM VINCULO_REGISTRO_PONTO "
-                        "WHERE registro_id=? LIMIT 1", (reg_id,)) is not None:
-                    continue
-                if dbmod.query_one(
-                        self.conn,
-                        "SELECT 1 AS x FROM TRECHO_ELEGIVEL "
-                        "WHERE registro_fonte_id=? LIMIT 1",
-                        (reg_id,)) is not None:
-                    continue
-                d = self.normalizar(idx, raw)
-                if d is None:
-                    rejeitados += 1
-                    continue
-                # um registro ruim nao pode derrubar a fonte inteira:
-                # cada registro entra num savepoint proprio.
-                self.conn.execute("SAVEPOINT reg")
-                try:
-                    if d.get("tipo_registro") == "trecho_elegivel":
-                        nz.inserir_trecho(self.conn, reg_id, d, fonte_id)
-                    else:
-                        nz.inserir_normalizado(self.conn, reg_id, d, fonte_id)
-                except Exception:                       # noqa: BLE001
-                    self.conn.execute("ROLLBACK TO reg")
-                    self.conn.execute("RELEASE reg")
-                    rejeitados += 1
-                    continue
-                self.conn.execute("RELEASE reg")
-                criados += 1
-            self.conn.commit()
-            snap_id = None
-            versao = None
-            if publicar:
-                snap_id, versao = self.publicar_snapshot(
-                    [(recurso_id, artefato_id)],
-                    resumo="%d pontos normalizados" % criados)
+            resumo = self._ingerir_registros(
+                conteudo, ext, mime, registros, exec_id, recurso_id,
+                publicar=publicar, fonte_id=fonte_id)
             self.encerrar_execucao(
-                exec_id, "ok", artefato_id=artefato_id,
-                linhas_recebidas=len(registros), linhas_validas=criados,
-                linhas_rejeitadas=rejeitados, registros_criados=criados,
+                exec_id, "ok", artefato_id=resumo["artefato_id"],
+                linhas_recebidas=resumo["linhas_recebidas"],
+                linhas_validas=resumo["criados"] + resumo["atualizados"],
+                linhas_rejeitadas=resumo["rejeitados"],
+                registros_criados=resumo["criados"],
+                registros_alterados=resumo["atualizados"],
                 http_status=200)
-            return {
-                "fonte": self.FONTE["nome"],
-                "recurso_id": recurso_id, "artefato_id": artefato_id,
-                "execucao_id": exec_id, "snapshot_id": snap_id,
-                "versao": versao, "hash_sha256": h,
-                "cache": caminho, "linhas_recebidas": len(registros),
-                "criados": criados, "rejeitados": rejeitados,
-            }
+            return resumo
+        except Exception as exc:   # noqa: BLE001
+            self.conn.rollback()
+            try:
+                self.encerrar_execucao(
+                    exec_id, "erro", erro_codigo=type(exc).__name__,
+                    erro_detalhe=str(exc)[:500])
+            except Exception:      # pragma: no cover
+                pass
+            raise
+
+    def ingerir_registros(self, registros, conteudo=None, ext=".json",
+                          mime="application/json", publicar=False):
+        """Ingere registros JA normalizaveis (usado pela API de escrita).
+
+        Abre uma EXECUCAO_COLETA para o recurso da fonte, roda o MESMO
+        pipeline do coletor (upsert idempotente) e encerra com os contadores.
+        """
+        import json as _json
+        config.ensure_dirs()
+        dbmod.init_db(self.conn)
+        fonte_id, recurso_id = self.garantir_referencias()
+        exec_id = self.iniciar_execucao(recurso_id)
+        if conteudo is None:
+            conteudo = _json.dumps(registros, ensure_ascii=False,
+                                   separators=(",", ":")).encode("utf-8")
+        try:
+            resumo = self._ingerir_registros(
+                conteudo, ext, mime, registros, exec_id, recurso_id,
+                publicar=publicar, fonte_id=fonte_id)
+            self.encerrar_execucao(
+                exec_id, "ok", artefato_id=resumo["artefato_id"],
+                linhas_recebidas=resumo["linhas_recebidas"],
+                linhas_validas=resumo["criados"] + resumo["atualizados"],
+                linhas_rejeitadas=resumo["rejeitados"],
+                registros_criados=resumo["criados"],
+                registros_alterados=resumo["atualizados"],
+                http_status=200)
+            return resumo
         except Exception as exc:   # noqa: BLE001
             self.conn.rollback()
             try:

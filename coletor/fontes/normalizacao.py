@@ -365,9 +365,134 @@ def ajustar_coordenada_brasil(d):
         _anotar_observacao(d, "QUARENTENA: %s" % motivo)
 
 
-def inserir_normalizado(conn, registro_id, d, fonte_id=None):
-    """Insere um ponto normalizado (dict `d`) com equipamento, faixa,
-    limites e vinculo. Retorna dict com ids criados."""
+def _buscar_por(conn, tabela, campos):
+    """Primeiro id de `tabela` que casa com `campos` (None = IS NULL).
+
+    Usado para reaproveitar linhas derivadas no upsert sem estourar UNIQUE.
+    """
+    clausulas, params = [], []
+    for col, val in campos.items():
+        if val is None:
+            clausulas.append("%s IS NULL" % col)
+        else:
+            clausulas.append("%s = ?" % col)
+            params.append(val)
+    sql = "SELECT id FROM %s WHERE %s LIMIT 1" % (tabela,
+                                                   " AND ".join(clausulas))
+    row = dbmod.query_one(conn, sql, params)
+    return row["id"] if row is not None else None
+
+
+def _obter_ou_inserir(conn, tabela, campos, dados):
+    """Reusa a linha que casa com `campos` ou insere `dados`: (id, criado)."""
+    existente = _buscar_por(conn, tabela, campos)
+    if existente is not None:
+        return existente, False
+    return dbmod.insert(conn, tabela, dados), True
+
+
+def _resolver_ponto_identificado(conn, fonte_id, d):
+    """Resolve a identidade externa (fonte_id, tipo, valor) -> ponto.
+
+    Devolve ``(ponto_id, identificador_id)``. ``identificador_id`` e a linha
+    de IDENTIFICADOR_EXTERNO (criada sob demanda); ``ponto_id`` e None quando
+    a identidade NAO designa UM ponto unico.
+
+    Guarda de correcao (colapso de pontos distintos): so reaproveita o ponto
+    quando a identidade esta ligada a EXATAMENTE UM ponto canonico. Se o mesmo
+    (fonte, tipo, valor) ja aponta para varios pontos (identificador ambiguo —
+    endereco generico, codigo de rota, etc.), nao se funde nada: e registrado
+    como identidade ambigua e o registro ganha ponto proprio, como uma fonte
+    sem identificador confiavel.
+    """
+    if fonte_id is None or d.get("identificador") in (None, ""):
+        return None, None
+    tipo_id = dbmod.domain_id(conn, "TIPO_IDENTIFICADOR",
+                              d.get("tipo_identificador", "id_orgao"))
+    valor_norm = str(d["identificador"]).strip().upper()
+    identificador_id = _buscar_por(conn, "IDENTIFICADOR_EXTERNO", {
+        "fonte_id": fonte_id, "tipo_identificador_id": tipo_id,
+        "valor_normalizado": valor_norm})
+    if identificador_id is None:
+        identificador_id = dbmod.insert(conn, "IDENTIFICADOR_EXTERNO", {
+            "fonte_id": fonte_id,
+            "tipo_identificador_id": tipo_id,
+            "valor": d["identificador"],
+            "valor_normalizado": valor_norm,
+        })
+        return None, identificador_id
+    pontos = dbmod.query_all(
+        conn, "SELECT DISTINCT ponto_id FROM IDENTIFICADOR_PONTO "
+              "WHERE identificador_id=?", (identificador_id,))
+    if len(pontos) != 1:
+        # 0 pontos (nunca ligado) ou >1 pontos (identificador ambiguo)
+        return None, identificador_id
+    return pontos[0]["ponto_id"], identificador_id
+
+
+def _identificador_externo_id(conn, fonte_id, d):
+    """Linha de IDENTIFICADOR_EXTERNO do registro (criada sob demanda).
+
+    Usada quando NAO se reutiliza a identidade (identificador ambiguo): o
+    vinculo e gravado como EVIDENCIA, sem servir de chave de fusao.
+    """
+    if fonte_id is None or d.get("identificador") in (None, ""):
+        return None
+    tipo_id = dbmod.domain_id(conn, "TIPO_IDENTIFICADOR",
+                              d.get("tipo_identificador", "id_orgao"))
+    valor_norm = str(d["identificador"]).strip().upper()
+    identificador_id = _buscar_por(conn, "IDENTIFICADOR_EXTERNO", {
+        "fonte_id": fonte_id, "tipo_identificador_id": tipo_id,
+        "valor_normalizado": valor_norm})
+    if identificador_id is None:
+        identificador_id = dbmod.insert(conn, "IDENTIFICADOR_EXTERNO", {
+            "fonte_id": fonte_id,
+            "tipo_identificador_id": tipo_id,
+            "valor": d["identificador"],
+            "valor_normalizado": valor_norm,
+        })
+    return identificador_id
+
+
+def _equipamento_do_ponto(conn, ponto_id, tipo_radar_id, numero_serie):
+    """Equipamento ja instalado NESTE ponto com o mesmo tipo/serie (ou None).
+
+    Reaproveitar evita que o reingesto idempotente do MESMO ponto crie um
+    equipamento novo a cada coleta (upsert). Compara serie com IS NULL.
+    """
+    for row in dbmod.query_all(
+            conn,
+            "SELECT e.id AS id, e.numero_serie AS numero_serie "
+            "FROM EQUIPAMENTO e JOIN INSTALACAO i "
+            "ON i.equipamento_id = e.id "
+            "WHERE i.ponto_id=? AND e.tipo_radar_id=?",
+            (ponto_id, tipo_radar_id)):
+        if (row["numero_serie"] or None) == (numero_serie or None):
+            return row["id"]
+    return None
+
+
+def inserir_normalizado(conn, registro_id, d, fonte_id=None,
+                        reutilizar_identidade=True):
+    """Insere OU atualiza o ponto normalizado (dict `d`), preservando evidencia.
+
+    Identidade externa (spec 8.2): quando o registro traz `identificador` e uma
+    `fonte_id`, o par (fonte_id, tipo_identificador, valor_normalizado) resolve
+    UM ponto canonico via IDENTIFICADOR_EXTERNO + IDENTIFICADOR_PONTO. Se o
+    ponto ja existe E a identidade designa UM unico ponto, ele e ATUALIZADO
+    (municipio/via/km/pista/situacao/observacoes, por COALESCE — dado novo nao
+    nulo sobrescreve, NULL preserva o que ja havia) e as linhas derivadas sao
+    reaproveitadas; NAO se cria ponto duplicado. Cada registro adiciona o SEU
+    proprio vinculo de evidencia (VINCULO_REGISTRO_PONTO + POSICAO_GEOGRAFICA
+    por registro).
+
+    ``reutilizar_identidade=False`` (identificador ambiguo DENTRO do mesmo
+    artefato: o mesmo valor aparece em >1 registro que sao pontos diferentes)
+    forca o comportamento de fonte sem identificador confiavel: cada registro
+    cria o seu ponto. O identificador continua sendo gravado como evidencia.
+
+    Devolve dict com ids e ``ponto_criado``/``atualizado``.
+    """
     ajustar_coordenada_brasil(d)
     uf_sigla, municipio_id = resolver_uf_municipio(
         conn, d.get("uf"), d.get("municipio_nome"), d.get("municipio_ibge"),
@@ -396,7 +521,15 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None):
     if d.get("situacao"):
         situacao_id = dbmod.domain_id(conn, "SITUACAO_OPERACIONAL",
                                       d["situacao"])
-    ponto_id = dbmod.insert(conn, "PONTO_FISCALIZACAO", {
+
+    # --- identidade externa: ponto existente OU novo ---------------------
+    if reutilizar_identidade:
+        ponto_existente_id, identificador_id = _resolver_ponto_identificado(
+            conn, fonte_id, d)
+    else:
+        ponto_existente_id = None
+        identificador_id = _identificador_externo_id(conn, fonte_id, d)
+    campos_ponto = {
         "posicao_id": posicao_id,
         "municipio_id": municipio_id,
         "via_id": via_id,
@@ -404,7 +537,27 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None):
         "tipo_pista": d.get("tipo_pista"),
         "situacao_operacional_id": situacao_id,
         "observacoes": d.get("observacoes"),
-    })
+    }
+    if ponto_existente_id is None:
+        ponto_id = dbmod.insert(conn, "PONTO_FISCALIZACAO", campos_ponto)
+        ponto_criado = True
+    else:
+        ponto_id = ponto_existente_id
+        ponto_criado = False
+        # COALESCE: valor novo nao nulo atualiza; NULL preserva o existente
+        # (uma coleta mais pobre nao apaga o que ja se sabia do ponto).
+        sets = ", ".join("%s=COALESCE(?, %s)" % (k, k)
+                         for k in campos_ponto)
+        conn.execute("UPDATE PONTO_FISCALIZACAO SET %s WHERE id=?" % sets,
+                     list(campos_ponto.values()) + [ponto_id])
+
+    # identidade externa -> ponto canonico (varios registros -> 1 ponto)
+    if identificador_id is not None:
+        if _buscar_por(conn, "IDENTIFICADOR_PONTO", {
+                "identificador_id": identificador_id,
+                "ponto_id": ponto_id}) is None:
+            dbmod.insert(conn, "IDENTIFICADOR_PONTO", {
+                "identificador_id": identificador_id, "ponto_id": ponto_id})
 
     # faixa (sentido) — so quando a fonte informa sentido/pista
     faixa_id = None
@@ -412,12 +565,11 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None):
         sentido_id = None
         if d.get("sentido"):
             sentido_id = dbmod.domain_id(conn, "SENTIDO", d["sentido"])
-        faixa_id = dbmod.insert(conn, "FAIXA_FISCALIZACAO", {
-            "ponto_id": ponto_id,
-            "sentido_id": sentido_id,
-            "sentido_original": d.get("sentido_original"),
-            "descricao": d.get("tipo_pista"),
-        })
+        campos = {"ponto_id": ponto_id, "sentido_id": sentido_id,
+                  "sentido_original": d.get("sentido_original"),
+                  "descricao": d.get("tipo_pista")}
+        faixa_id, _ = _obter_ou_inserir(conn, "FAIXA_FISCALIZACAO", campos,
+                                        campos)
 
     # limites de velocidade por categoria (sem inventar velocidade geral)
     limites = []
@@ -437,9 +589,16 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None):
             # exatamente um entre ponto_id/faixa_id (CHECK T28)
             if faixa_id is not None:
                 limite["faixa_id"] = faixa_id
+                campos = {"faixa_id": faixa_id,
+                          "categoria_veiculo_id": cat_id,
+                          "velocidade_kmh": val}
             else:
                 limite["ponto_id"] = ponto_id
-            lid = dbmod.insert(conn, "LIMITE_VELOCIDADE", limite)
+                campos = {"ponto_id": ponto_id,
+                          "categoria_veiculo_id": cat_id,
+                          "velocidade_kmh": val}
+            lid, _ = _obter_ou_inserir(conn, "LIMITE_VELOCIDADE", campos,
+                                       limite)
             limites.append(lid)
 
     # regime de fiscalizacao
@@ -449,7 +608,9 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None):
                       else "desconhecida")
     modalidade_id = dbmod.domain_id(conn, "MODALIDADE_FISCALIZACAO",
                                     modalidade)
-    regime_id = dbmod.insert(conn, "REGIME_FISCALIZACAO", {
+    campos = {"ponto_id": ponto_id, "modalidade_id": modalidade_id,
+              "situacao_operacional_id": situacao_id}
+    regime_id, _ = _obter_ou_inserir(conn, "REGIME_FISCALIZACAO", campos, {
         "ponto_id": ponto_id,
         "modalidade_id": modalidade_id,
         "situacao_operacional_id": situacao_id,
@@ -470,43 +631,29 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None):
         modelo_id = dbmod.upsert_lookup(
             conn, "MODELO_EQUIPAMENTO", ["fabricante_id", "nome_modelo"],
             [fabricante_id, d.get("modelo") or "desconhecido"])
-    equipamento_id = dbmod.insert(conn, "EQUIPAMENTO", {
-        "modelo_id": modelo_id,
-        "tipo_radar_id": tipo_radar_id,
-        "numero_serie": d.get("numero_serie"),
-        "ano_fabricacao": d.get("ano_fabricacao"),
-    })
-    instalacao_id = dbmod.insert(conn, "INSTALACAO", {
-        "ponto_id": ponto_id,
-        "equipamento_id": equipamento_id,
-        "situacao_operacional_id": situacao_id,
-    })
-
-    # identificador externo (administrativo) — nao e numero de serie
-    identificador_id = None
-    if fonte_id is not None and d.get("identificador"):
-        tipo_ident_id = dbmod.domain_id(conn, "TIPO_IDENTIFICADOR",
-                                        d.get("tipo_identificador", "id_orgao"))
-        valor_norm = str(d["identificador"]).strip().upper()
-        row = dbmod.query_one(
-            conn, "SELECT id FROM IDENTIFICADOR_EXTERNO WHERE fonte_id=? AND "
-            "tipo_identificador_id=? AND valor_normalizado=?",
-            (fonte_id, tipo_ident_id, valor_norm))
-        if row is not None:
-            identificador_id = row["id"]
-        else:
-            identificador_id = dbmod.insert(conn, "IDENTIFICADOR_EXTERNO", {
-                "fonte_id": fonte_id,
-                "tipo_identificador_id": tipo_ident_id,
-                "valor": d["identificador"],
-                "valor_normalizado": valor_norm,
-            })
-        dbmod.insert(conn, "IDENTIFICADOR_PONTO", {
-            "identificador_id": identificador_id,
+    # upsert: reaproveita o equipamento ja instalado NESTE ponto (mesmo
+    # tipo/serie) em vez de criar um novo a cada reingestao do MESMO ponto.
+    equipamento_id = None
+    if not ponto_criado:
+        equipamento_id = _equipamento_do_ponto(
+            conn, ponto_id, tipo_radar_id, d.get("numero_serie"))
+    if equipamento_id is None:
+        equipamento_id = dbmod.insert(conn, "EQUIPAMENTO", {
+            "modelo_id": modelo_id,
+            "tipo_radar_id": tipo_radar_id,
+            "numero_serie": d.get("numero_serie"),
+            "ano_fabricacao": d.get("ano_fabricacao"),
+        })
+    instalacao_id = _buscar_por(conn, "INSTALACAO", {
+        "ponto_id": ponto_id, "equipamento_id": equipamento_id})
+    if instalacao_id is None:
+        instalacao_id = dbmod.insert(conn, "INSTALACAO", {
             "ponto_id": ponto_id,
+            "equipamento_id": equipamento_id,
+            "situacao_operacional_id": situacao_id,
         })
 
-    # vinculo de proveniencia
+    # vinculo de proveniencia (cada registro -> o ponto canonico)
     conn.execute(
         "INSERT OR IGNORE INTO VINCULO_REGISTRO_PONTO (registro_id, ponto_id) "
         "VALUES (?,?)", (registro_id, ponto_id))
@@ -519,7 +666,8 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None):
             "faixa_id": faixa_id, "regime_id": regime_id,
             "instalacao_id": instalacao_id, "limites": limites,
             "posicao_id": posicao_id, "via_id": via_id,
-            "municipio_id": municipio_id}
+            "municipio_id": municipio_id,
+            "ponto_criado": ponto_criado, "atualizado": not ponto_criado}
 
 
 def inserir_trecho(conn, registro_id, d, fonte_id=None):
