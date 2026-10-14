@@ -8,7 +8,7 @@
   :root{--azul:#12508f;--verde:#178a3d;--borda:#d7d7de}
   *{box-sizing:border-box}
   body{margin:0;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1d1d22;background:#f7f7f9}
-  header{background:var(--azul);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px}
+  header{background:var(--azul);color:#fff;padding:10px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:12px}
   header .logo{height:54px;width:auto;border-radius:8px;background:#fff;padding:3px;box-shadow:0 1px 4px rgba(0,0,0,.3);flex:0 0 auto}
   header .cabTxt{min-width:0}
   header h1{margin:0;font-size:19px}
@@ -24,12 +24,17 @@
   .grade{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   label{display:flex;flex-direction:column;font-size:12.5px;color:#4a4a55;gap:3px}
   label.wide{grid-column:1/-1}
-  input,select,textarea{font:inherit;padding:8px 10px;border:1px solid var(--borda);border-radius:7px;background:#fff;color:#1d1d22;width:100%}
+  /* font-size:16px evita o zoom automatico dos campos no iOS */
+  input,select,textarea{font:inherit;font-size:16px;padding:8px 10px;border:1px solid var(--borda);border-radius:7px;background:#fff;color:#1d1d22;width:100%}
   textarea{min-height:64px;resize:vertical}
-  button{margin-top:12px;padding:10px 16px;border:0;border-radius:7px;background:var(--azul);color:#fff;font:600 15px/1 inherit;cursor:pointer}
+  button{margin-top:12px;padding:11px 16px;min-height:44px;border:0;border-radius:7px;background:var(--azul);color:#fff;font:600 15px/1 inherit;cursor:pointer}
   button:disabled{opacity:.6;cursor:default}
   .dica{color:#6b7280;font-size:12.5px;margin-top:8px}
-  @media (max-width:560px){.grade{grid-template-columns:1fr}header .logo{height:40px}}
+  .dica.ok{color:var(--verde)}
+  .dica.erro{color:#7a1f1f}
+  .geoBox{margin-top:10px;display:flex;flex-direction:column;gap:4px}
+  .geoBox button{background:var(--verde);margin-top:0}
+  @media (max-width:560px){.grade{grid-template-columns:1fr}header .logo{height:40px}.geoBox button{width:100%}}
 </style>
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" href="favicon-32.png" sizes="32x32">
@@ -68,6 +73,12 @@
       <label>km<input name="km" inputmode="decimal" placeholder="27.3" autocomplete="off"></label>
     </div>
 
+    <div class="geoBox">
+      <button type="button" id="btGeo" class="geo">📍 Usar minha localização atual</button>
+      <div id="geoInfo" class="dica" role="status" aria-live="polite"></div>
+      <div class="dica">A localização vem do GPS do aparelho: funciona melhor <b>a céu aberto</b> e com o <b>GPS ligado</b>. O navegador só fornece a posição em páginas <b>HTTPS</b> — e esta página já é segura.</div>
+    </div>
+
     <h2>Fiscalização</h2>
     <div class="grade">
       <label>Velocidade (km/h)<input name="velocidade_geral" inputmode="numeric" placeholder="80" autocomplete="off"></label>
@@ -87,6 +98,84 @@ var CAMPOS = ["identificador","tipo_radar","modelo","latitude","longitude","uf",
 var form = document.getElementById("form");
 function val(n){ var el = form.elements[n]; return el ? el.value.trim() : ""; }
 function diz(html, cls){ document.getElementById("res").innerHTML = "<div class='aviso " + (cls||"") + "'>" + html + "</div>"; }
+
+// ---------------- Localização atual (GPS do aparelho) ----------------
+// A pessoa pode estar NA ESTRADA cadastrando o radar: um toque preenche lat/lon.
+var btGeo = document.getElementById("btGeo");
+var geoInfo = document.getElementById("geoInfo");
+var geoSup = !!(navigator.geolocation && navigator.geolocation.getCurrentPosition);
+var GEO_LABEL = "📍 Usar minha localização atual";
+var jaAutoGeo = false;
+
+function geoMsg(html, cls){
+  if (!geoInfo) return;
+  geoInfo.className = "dica" + (cls ? " " + cls : "");
+  geoInfo.innerHTML = html;
+}
+function geoOcupado(ligado){
+  if (!btGeo) return;
+  btGeo.disabled = !!ligado;
+  btGeo.textContent = ligado ? "Obtendo localização…" : GEO_LABEL;
+}
+function geoPreenche(lat, lon, acu){
+  var elLat = form.elements["latitude"], elLon = form.elements["longitude"];
+  if (elLat) elLat.value = lat;
+  if (elLon) elLon.value = lon;
+  var txt = "Localização preenchida.";
+  if (acu != null && isFinite(acu)) txt += " Precisão informada: <b>±" + Math.round(acu) + " m</b>.";
+  if (acu != null && isFinite(acu) && acu > 100) txt += " Precisão baixa — a céu aberto com o GPS ligado ela melhora.";
+  geoMsg(txt, "ok");
+}
+function geoErro(err){
+  // codigos: 1 = permissao negada, 2 = indisponivel, 3 = timeout
+  var code = (err && typeof err.code === "number") ? err.code : 0;
+  var msg;
+  if (code === 1) msg = "Permissão de localização <b>negada</b>. Libere o acesso à localização no navegador (ícone do cadeado) e tente de novo — ou informe as coordenadas à mão.";
+  else if (code === 2) msg = "Localização <b>indisponível</b> agora. Confira se o GPS está ligado e tente a céu aberto — ou informe as coordenadas à mão.";
+  else if (code === 3) msg = "A localização <b>demorou demais</b> para responder. Vá para um local aberto e tente novamente (ou informe as coordenadas à mão).";
+  else msg = "Não foi possível obter a sua localização" + (err && err.message ? ": " + err.message : ".") + " Tente a céu aberto ou informe as coordenadas à mão.";
+  geoMsg(msg, "erro");
+}
+function geoBuscar(){
+  if (!geoSup){
+    geoMsg("Este navegador não oferece localização. Preencha a latitude e a longitude manualmente.", "erro");
+    return;
+  }
+  geoOcupado(true);
+  geoMsg("Obtendo a sua localização…");
+  navigator.geolocation.getCurrentPosition(function(pos){
+    var lat = +pos.coords.latitude.toFixed(6), lon = +pos.coords.longitude.toFixed(6);
+    geoPreenche(lat, lon, pos.coords.accuracy);
+    geoOcupado(false);
+  }, function(err){
+    geoErro(err);
+    geoOcupado(false);
+  }, {enableHighAccuracy: true, timeout: 15000, maximumAge: 60000});
+}
+if (!geoSup && btGeo){
+  // navegador sem suporte: botao desabilitado (nao quebra a pagina nem o envio)
+  btGeo.disabled = true;
+  btGeo.title = "Este navegador não oferece localização.";
+}
+if (btGeo){
+  btGeo.addEventListener("click", geoBuscar);   // type="button": nunca dispara o submit
+}
+// Ao abrir: se a permissao JA estiver concedida, tenta preencher UMA vez (Permissions API).
+function geoAuto(){
+  if (jaAutoGeo || !geoSup) return;
+  jaAutoGeo = true;
+  var elLat = form.elements["latitude"], elLon = form.elements["longitude"];
+  if (elLat && elLon && (elLat.value.trim() || elLon.value.trim())) return;  // nao sobrescreve o que ja veio
+  geoBuscar();
+}
+if (geoSup && navigator.permissions && navigator.permissions.query){
+  try {
+    navigator.permissions.query({name: "geolocation"}).then(function(p){
+      if (p && p.state === "granted") geoAuto();
+    }).catch(function(){ /* API sem suporte a geolocation: segue sem o preenchimento automatico */ });
+  } catch (e) { /* navegador sem essa consulta: segue sem o preenchimento automatico */ }
+}
+
 form.addEventListener("submit", function(ev){
   ev.preventDefault();
   var body = {};

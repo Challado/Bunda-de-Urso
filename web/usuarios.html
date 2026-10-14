@@ -8,7 +8,7 @@
   :root{--azul:#12508f;--vermelho:#c0392b;--verde:#178a3d;--cinza:#f4f4f6;--borda:#d7d7de}
   *{box-sizing:border-box}
   body{margin:0;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1d1d22;background:#f7f7f9}
-  header{background:var(--azul);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px}
+  header{background:var(--azul);color:#fff;padding:10px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:12px}
   header .logo{height:54px;width:auto;border-radius:8px;background:#fff;padding:3px;box-shadow:0 1px 4px rgba(0,0,0,.3);flex:0 0 auto}
   header .cabTxt{min-width:0}
   header h1{margin:0;font-size:19px}
@@ -19,7 +19,8 @@
   h2{font-size:14px;margin:18px 0 8px;color:#4a4a55;text-transform:uppercase;letter-spacing:.4px}
   .cartao{background:#fff;border:1px solid var(--borda);border-radius:10px;padding:16px;max-width:440px}
   label{display:flex;flex-direction:column;font-size:12.5px;color:#4a4a55;gap:3px;margin-bottom:10px}
-  input,select{font:inherit;padding:8px 10px;border:1px solid var(--borda);border-radius:7px;background:#fff;color:#1d1d22;width:100%}
+  /* font-size:16px evita o zoom automatico dos campos no iOS */
+  input,select{font:inherit;font-size:16px;padding:8px 10px;border:1px solid var(--borda);border-radius:7px;background:#fff;color:#1d1d22;width:100%}
   button{padding:9px 14px;border:0;border-radius:7px;background:var(--azul);color:#fff;font:600 14px/1 inherit;cursor:pointer}
   button.sec{background:#5b6472}
   button.perigo{background:var(--vermelho)}
@@ -35,6 +36,8 @@
   .pill.ruim{background:#fdecea;color:var(--vermelho)}
   .pill.neutro{background:#eceef2;color:#4a4a55}
   table{border-collapse:collapse;width:100%;font-size:13.5px;background:#fff;border:1px solid var(--borda);border-radius:10px;overflow:hidden}
+  /* cada tabela rola na horizontal dentro deste container, sem estourar a pagina */
+  .tabWrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
   th,td{border-bottom:1px solid var(--borda);padding:7px 9px;text-align:left;vertical-align:middle}
   th{background:var(--cinza)}
   tr:last-child td{border-bottom:0}
@@ -48,7 +51,14 @@
   .tokenVal{display:block;background:#f4f4f6;border:1px dashed var(--azul);border-radius:8px;padding:10px;font:600 14px/1.4 ui-monospace,Menlo,Consolas,monospace;word-break:break-all;margin:8px 0}
   .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
   td select{min-width:120px}
-  @media (max-width:640px){ header .logo{height:40px} }
+  @media (max-width:640px){
+    header .logo{height:40px}
+    /* alvo de toque confortavel e campos em largura cheia no celular */
+    button{min-height:44px}
+    button.mini{min-height:38px}
+    .linha > label{width:100%}
+    .cartao{max-width:100%}
+  }
 </style>
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" href="favicon-32.png" sizes="32x32">
@@ -230,7 +240,7 @@
       if (o.status === 401){ location.replace("gestao.html"); return; }
       if (o.status !== 200){ el.innerHTML = "<div class='aviso err'>" + esc(erroMsg(o)) + "</div>"; return; }
       var us = o.body.usuarios || [];
-      var h = "<table><thead><tr><th>#</th><th>Login</th><th>Nome</th><th>Papel</th><th>Ativo</th><th>Trocar senha</th><th>Último login</th><th>Ações</th></tr></thead><tbody>";
+      var h = "<div class='tabWrap'><table><thead><tr><th>#</th><th>Login</th><th>Nome</th><th>Papel</th><th>Ativo</th><th>Trocar senha</th><th>Último login</th><th>Ações</th></tr></thead><tbody>";
       us.forEach(function(u){
         h += "<tr>" +
           "<td>" + esc(u.id) + "</td>" +
@@ -248,7 +258,7 @@
             "<button class='mini' data-senha='" + esc(u.id) + "' data-login='" + esc(u.login) + "'>resetar senha</button>" +
           "</td></tr>";
       });
-      h += "</tbody></table>";
+      h += "</tbody></table></div>";
       el.innerHTML = h;
 
       el.querySelectorAll("[data-papel]").forEach(function(sel){
@@ -323,7 +333,7 @@
       if (o.status !== 200){ el.innerHTML = "<div class='aviso err'>" + esc(erroMsg(o)) + "</div>"; return; }
       var ts = o.body.tokens || [];
       if (!ts.length){ el.innerHTML = "<div class='vazio'>Nenhum token emitido.</div>"; return; }
-      var h = "<table><thead><tr><th>#</th><th>Nome</th><th>Escopo</th><th>Prefixo</th><th>Criado</th><th>Último uso</th><th>Revogado</th><th></th></tr></thead><tbody>";
+      var h = "<div class='tabWrap'><table><thead><tr><th>#</th><th>Nome</th><th>Escopo</th><th>Prefixo</th><th>Criado</th><th>Último uso</th><th>Revogado</th><th></th></tr></thead><tbody>";
       ts.forEach(function(t){
         h += "<tr><td>" + esc(t.id) + "</td><td>" + esc(t.nome) + "</td><td>" + esc(t.escopo) + "</td>" +
           "<td class='mono'>" + esc(t.prefixo || "—") + "…</td><td class='mono'>" + esc(t.criado_em||"") + "</td>" +
@@ -331,7 +341,7 @@
           "<td>" + (t.revogado_em ? "<span class='pill ruim'>revogado</span>" : "<span class='pill ok'>ativo</span>") + "</td><td>" +
           (!t.revogado_em ? "<button class='mini perigo' data-revtk='" + esc(t.id) + "'>revogar</button>" : "") + "</td></tr>";
       });
-      h += "</tbody></table>";
+      h += "</tbody></table></div>";
       el.innerHTML = h;
       el.querySelectorAll("[data-revtk]").forEach(function(b){
         b.addEventListener("click", function(){
