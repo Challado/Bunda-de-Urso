@@ -412,5 +412,53 @@ class TestRegras17p4(BaseDedup):
         self.assertEqual(dup[0]["n"], 2)
 
 
+class TestSerieGenerica(BaseDedup):
+    """Codigo curto/repetido nao e identidade de instrumento (spec 8.5)."""
+
+    def test_regra_por_valor(self):
+        self.assertTrue(dedup.serie_generica(None))
+        self.assertTrue(dedup.serie_generica("9"))
+        self.assertTrue(dedup.serie_generica("224"))
+        self.assertFalse(dedup.serie_generica("2244"))     # 4 digitos: ok
+        self.assertFalse(dedup.serie_generica("TC005867"))
+        self.assertTrue(dedup.serie_generica("1591", municipios=[1, 2]))
+        self.assertFalse(dedup.serie_generica("1591", municipios=[1, 1]))
+
+    def test_nao_confirma_nem_bloqueia(self):
+        a = {"numero_serie": "9", "serie_generica": True}
+        b = {"numero_serie": "9", "serie_generica": True}
+        res = dedup.pontuar(a, b)
+        nomes = {c["nome"] for c in res["componentes"]}
+        self.assertIn("serie_generica", nomes)
+        self.assertNotIn("serie_igual", nomes)
+        self.assertEqual(res["bloqueadores"], [])
+
+    def test_curta_nao_gera_bloqueio_por_serie(self):
+        f1 = self.fonte("PRF", "oficial")
+        self.registro(self.artefato(self.recurso(f1, "a")),
+                      {"numero_serie": "9", "latitude": -25.0,
+                       "longitude": -54.0})
+        f2 = self.fonte("OSM", "comunitaria")
+        self.registro(self.artefato(self.recurso(f2, "b")),
+                      {"numero_serie": "9", "latitude": -20.0,
+                       "longitude": -44.0})
+        # series iguais mas genericas: nao viram bloqueio -> nenhum par
+        self.assertEqual(dedup.gerar_candidatos(self.con)["criados"], [])
+
+    def test_serie_real_ainda_vira_candidato(self):
+        # Contraponto: serie de verdade (>=4 digitos, so um municipio) segue
+        # contando como identidade forte, como manda a spec 8.3.
+        f1 = self.fonte("ANTT", "oficial")
+        self.registro(self.artefato(self.recurso(f1, "a")),
+                      {"numero_serie": "TC005867", "latitude": -25.0,
+                       "longitude": -54.0})
+        f2 = self.fonte("PRF", "oficial")
+        self.registro(self.artefato(self.recurso(f2, "b")),
+                      {"numero_serie": "TC005867", "latitude": -25.0,
+                       "longitude": -54.0})
+        res = dedup.gerar_candidatos(self.con)
+        self.assertEqual(len(res["criados"]), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -185,6 +185,40 @@ class ColetorBase(object):
             "status_validacao": "ok",
         })
 
+    def _assinatura(self, registros):
+        """Assinatura estavel do CONTEUDO dos registros.
+
+        Independe do hash do arquivo bruto: paginas dinamicas (Joomla, etc.)
+        mudam token/contador a cada coleta sem mudar um unico radar.
+        """
+        hs = []
+        for raw in registros:
+            texto = raw if isinstance(raw, str) else json.dumps(
+                raw, ensure_ascii=False, separators=(",", ":"))
+            hs.append(sha256_bytes(texto.encode("utf-8")))
+        return sha256_bytes("".join(sorted(hs)).encode("utf-8"))
+
+    def _snapshot_repetido(self, recurso_id, registros):
+        """True se o conteudo bate com o do ULTIMO artefato COM registros.
+
+        Evita reingerir a mesma tabela quando so mudou token/contador da
+        pagina (o hash do arquivo muda e duplicaria todos os registros).
+        """
+        if not registros:
+            return False
+        row = dbmod.query_one(
+            self.conn, "SELECT id FROM ARTEFATO_COLETA WHERE recurso_id = ? "
+                       "ORDER BY id DESC LIMIT 1", (recurso_id,))
+        if row is None:
+            return False
+        hs = [r[0] for r in dbmod.query_all(
+            self.conn, "SELECT hash_registro FROM REGISTRO_FONTE "
+                       "WHERE artefato_id = ? ORDER BY id", (row["id"],))]
+        if not hs:
+            return False
+        return sha256_bytes("".join(sorted(hs)).encode("utf-8")) == \
+            self._assinatura(registros)
+
     # -- snapshot ----------------------------------------------------------
     def publicar_snapshot(self, pares, resumo="ok", status="publicado"):
         """pares: lista de (recurso_id, artefato_id)."""
@@ -235,6 +269,19 @@ class ColetorBase(object):
         rejeitados = 0
         try:
             conteudo, ext, mime, registros = self.carregar(origem)
+            # Snapshot repetido nao se reingere (spec 8.1-A / 17.4-3): a
+            # pagina pode mudar so em token/contador, o que trocaria o hash
+            # do artefato e duplicaria TODOS os registros (DER-MG 10/2026).
+            if self._snapshot_repetido(recurso_id, registros):
+                self.encerrar_execucao(
+                    exec_id, "sem_mudanca", http_status=200,
+                    linhas_recebidas=len(registros))
+                return {
+                    "fonte": self.FONTE["nome"], "recurso_id": recurso_id,
+                    "execucao_id": exec_id, "sem_mudanca": True,
+                    "linhas_recebidas": len(registros),
+                    "criados": 0, "rejeitados": 0,
+                }
             artefato_id, h, caminho = self.registrar_artefato(
                 recurso_id, conteudo, ext, mime)
             for idx, raw in enumerate(registros):
