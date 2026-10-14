@@ -1,0 +1,59 @@
+[
+  {
+    "Codigo": "RAD-001",
+    "Rodovia": "BR-277",
+    "Km": "580,5",
+    "Latitude": -24.9555,
+    "Longitude": -53.4552,
+    "Municipio": "Cascavel",
+    "CodigoIBGE": "4104808",
+    "UF": "PR",
+    "Sentido": "Crescente",
+    "Pista": "Principal",
+    "Tipo": "Fixo",
+    "Situacao": "Ativo",
+    "VelocidadeLeves": "110",
+    "VelocidadePesados": "90",
+    "NumeroSerie": "TC005867",
+    "Fabricante": "Traffic Tech",
+    "Modelo": "TT-100",
+    "Concessionaria": "Via Araucaria"
+  },
+  {
+    "Codigo": "RAD-002",
+    "Rodovia": "BR-277",
+    "Km": "581,0",
+    "Latitude": -24.9500,
+    "Longitude": -53.4500,
+    "Municipio": "Cascavel",
+    "CodigoIBGE": "4104808",
+    "UF": "PR",
+    "Sentido": "Decrescente",
+    "Tipo": "Fixo",
+    "Situacao": "Ativo",
+    "VelocidadeLeves": "110"
+  },
+  {
+    "Codigo": "RAD-999",
+    "Rodovia": "BR-116",
+    "Km": "100,0",
+    "Latitude": -25.5000,
+    "Longitude": -49.3000,
+    "Municipio": "Curitiba",
+    "CodigoIBGE": "4106902",
+    "UF": "PR",
+    "Tipo": "Portatil",
+    "Situacao": "Inativo",
+    "VelocidadeLeves": "80"
+  },
+  {
+    "Codigo": "RAD-003",
+    "Rodovia": "BR-101",
+    "Km": "0",
+    "Latitude": null,
+    "Longitude": null,
+    "Municipio": "Joinville",
+    "UF": "SC",
+    "Tipo": "Fixo"
+  }
+]
