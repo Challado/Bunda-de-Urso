@@ -240,11 +240,37 @@ class ColetorBase(object):
             for idx, raw in enumerate(registros):
                 reg_id = self.registrar_registro(
                     artefato_id, idx, self.identificador(raw), raw)
+                # idempotencia: mesmo artefato (hash) ja ligado a um ponto
+                # significa que esta versao ja foi ingerida -> pular.
+                if dbmod.query_one(
+                        self.conn,
+                        "SELECT 1 AS x FROM VINCULO_REGISTRO_PONTO "
+                        "WHERE registro_id=? LIMIT 1", (reg_id,)) is not None:
+                    continue
+                if dbmod.query_one(
+                        self.conn,
+                        "SELECT 1 AS x FROM TRECHO_ELEGIVEL "
+                        "WHERE registro_fonte_id=? LIMIT 1",
+                        (reg_id,)) is not None:
+                    continue
                 d = self.normalizar(idx, raw)
                 if d is None:
                     rejeitados += 1
                     continue
-                nz.inserir_normalizado(self.conn, reg_id, d, fonte_id)
+                # um registro ruim nao pode derrubar a fonte inteira:
+                # cada registro entra num savepoint proprio.
+                self.conn.execute("SAVEPOINT reg")
+                try:
+                    if d.get("tipo_registro") == "trecho_elegivel":
+                        nz.inserir_trecho(self.conn, reg_id, d, fonte_id)
+                    else:
+                        nz.inserir_normalizado(self.conn, reg_id, d, fonte_id)
+                except Exception:                       # noqa: BLE001
+                    self.conn.execute("ROLLBACK TO reg")
+                    self.conn.execute("RELEASE reg")
+                    rejeitados += 1
+                    continue
+                self.conn.execute("RELEASE reg")
                 criados += 1
             self.conn.commit()
             snap_id = None

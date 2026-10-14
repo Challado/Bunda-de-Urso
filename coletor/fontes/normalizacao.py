@@ -5,6 +5,8 @@ canonico, preservando proveniencia (REGISTRO_FONTE + VINCULO_*).
 Nada e inventado: campos ausentes viram NULL; o payload bruto permanece em
 REGISTRO_FONTE.payload_original (spec 3.7, 11).
 """
+import re
+
 from core import db as dbmod
 
 
@@ -85,6 +87,28 @@ def to_float(v):
         return None
 
 
+def to_velocidade(v):
+    """Converte velocidade publicada em texto livre para float.
+
+    Ex.: "40 Km/h" -> 40.0 ; "60" -> 60.0 ; "N/I" -> None.
+    Nao arredonda nem inventa: extrai apenas o numero publicado.
+    """
+    if v is None or v == "":
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    m = re.search(r"\d+(?:[.,]\d+)?", str(v))
+    if not m:
+        return None
+    s = m.group(0)
+    if "," in s and "." not in s:
+        s = s.replace(",", ".")
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
 def to_int(v):
     f = to_float(v)
     return None if f is None else int(round(f))
@@ -148,10 +172,15 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None):
     qualidade_id = dbmod.domain_id(conn, "QUALIDADE_POSICAO",
                                    d.get("qualidade") or "desconhecida")
     posicao_id = None
-    if d.get("latitude") is not None and d.get("longitude") is not None:
+    lat, lon = d.get("latitude"), d.get("longitude")
+    # coordenada fora de faixa (ou 0,0) nao vira POSICAO: o registro e
+    # preservado sem posicao em vez de estourar o CHECK / apontar pro mar.
+    if (lat is not None and lon is not None
+            and -90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0
+            and not (lat == 0.0 and lon == 0.0)):
         posicao_id = dbmod.insert(conn, "POSICAO_GEOGRAFICA", {
-            "latitude": d["latitude"],
-            "longitude": d["longitude"],
+            "latitude": lat,
+            "longitude": lon,
             "precisao_metros": d.get("precisao_metros"),
             "qualidade_posicao_id": qualidade_id,
             "metodo_obtencao": d.get("metodo_obtencao"),
@@ -188,9 +217,12 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None):
     # limites de velocidade por categoria (sem inventar velocidade geral)
     limites = []
     for categoria, chave in (("leves", "velocidade_leves"),
-                             ("pesados", "velocidade_pesados")):
+                             ("pesados", "velocidade_pesados"),
+                             ("geral", "velocidade_geral")):
         val = d.get(chave)
-        if val is not None:
+        # velocidade publicada fora da faixa plausivel (0..350) fica so no
+        # payload bruto, nunca num LIMITE_VELOCIDADE invalido.
+        if val is not None and 0 < val <= 350:
             cat_id = dbmod.domain_id(conn, "CATEGORIA_VEICULO", categoria)
             limite = {
                 "categoria_veiculo_id": cat_id,
@@ -283,3 +315,32 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None):
             "instalacao_id": instalacao_id, "limites": limites,
             "posicao_id": posicao_id, "via_id": via_id,
             "municipio_id": municipio_id}
+
+
+def inserir_trecho(conn, registro_id, d, fonte_id=None):
+    """Insere um TRECHO_ELEGIVEL (spec F07 / 11.5).
+
+    Trecho elegivel NAO e ponto, NAO e equipamento e NAO e operacao
+    confirmada: por isso grava direto em TRECHO_ELEGIVEL, sem criar
+    PONTO_FISCALIZACAO. Sem via, nao ha trecho (payload fica no bruto).
+    """
+    via_id = obter_via(conn, d.get("via_codigo"), d.get("via_tipo"))
+    if via_id is None:
+        return None
+    sentido_id = None
+    if d.get("sentido"):
+        sentido_id = dbmod.domain_id(conn, "SENTIDO", d["sentido"])
+    trecho_id = dbmod.insert(conn, "TRECHO_ELEGIVEL", {
+        "via_id": via_id,
+        "km_inicio": d.get("km_inicio"),
+        "km_fim": d.get("km_fim"),
+        "sentido_id": sentido_id,
+        "criterio_inclusao": d.get("criterio_inclusao"),
+        "vigencia_inicio": d.get("vigencia_inicio"),
+        "vigencia_fim": d.get("vigencia_fim"),
+        "situacao": d.get("situacao"),
+        "registro_fonte_id": registro_id,
+    })
+    return {"trecho_id": trecho_id,
+            "indicador": d.get("indicador"),
+            "radar_instalado_confirmado": d.get("radar_instalado_confirmado")}
