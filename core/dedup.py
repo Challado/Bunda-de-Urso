@@ -41,7 +41,7 @@ from . import geo
 
 __all__ = [
     "normalizar_texto", "normalizar_serie", "normalizar_rodovia",
-    "normalizar_km", "normalizar_sentido",
+    "normalizar_km", "normalizar_sentido", "serie_generica",
     "cadeia_evidencia", "mesma_cadeia", "evidencias_independentes",
     "atributos_registro", "pontuar", "gerar_candidatos", "candidatos",
     "decidir", "decisao_ativa", "listar_decisoes", "aplicar",
@@ -72,6 +72,30 @@ FAIXAS_PROXIMIDADE = ((50.0, 1.0), (200.0, 0.7), (1000.0, 0.35), (5000.0, 0.10))
 TOLERANCIA_KM = 0.5       # km considerado "o mesmo"
 CONFLITO_KM = 5.0         # acima disso, mesma via = contradicao
 TOLERANCIA_POSICAO_M = 1.0
+# Numero curto (< isto) e contador local da fonte, nao identidade.
+SERIE_CURTA_MAX_DIGITOS = 4
+
+
+def serie_generica(numero_serie, municipios=None):
+    """True quando o valor NAO identifica um instrumento (spec 8.3/8.5).
+
+    Dois sinais, ambos conservadores (nunca viram bloqueador: apenas deixam
+    de valer como "serie igual"):
+      * puramente numerico e curto (menos de SERIE_CURTA_MAX_DIGITOS
+        digitos): e contador local da fonte, nao numero de serie;
+      * a mesma serie espalhada por 2+ municipios: codigo reutilizado, nao
+        identidade de um instrumento.
+    """
+    if not numero_serie:
+        return True
+    s = str(numero_serie)
+    if s.isdigit() and len(s) < SERIE_CURTA_MAX_DIGITOS:
+        return True
+    if municipios:
+        distintos = {m for m in municipios if m is not None}
+        if len(distintos) >= 2:
+            return True
+    return False
 
 _ESTADO_POR_DECISAO = {
     "unificar": "decidido_unificar",
@@ -466,6 +490,7 @@ def atributos_registro(conn, registro_id):
                   _extrair(payload, "sentido")))
     at["precisao_metros"] = precisao
     at["qualidade_posicao"] = qualidade
+    at["serie_generica"] = serie_generica(at.get("numero_serie"))
     return at
 
 
@@ -496,7 +521,10 @@ def pontuar(a, b, pesos=None):
     sa, sb = a.get("numero_serie"), b.get("numero_serie")
     fa, fb = a.get("fabricante"), b.get("fabricante")
     ma, mb = a.get("modelo"), b.get("modelo")
-    tem_serie = bool(sa and sb)
+    # serie "generica" (contador curto/codigo repetido) NAO identifica
+    # instrumento: nem confirma nem bloqueia (spec 8.5).
+    generica = bool(a.get("serie_generica") or b.get("serie_generica"))
+    tem_serie = bool(sa and sb) and not generica
 
     if tem_serie:
         if sa == sb:
@@ -507,6 +535,11 @@ def pontuar(a, b, pesos=None):
             bloqueadores.append({
                 "nome": "serie_conflitante",
                 "detalhe": "series divergentes: %s vs %s" % (sa, sb)})
+    elif sa and sb:
+        componentes.append(_componente(
+            "serie_generica", 0.0, 0.0,
+            "serie %r nao identifica instrumento (codigo curto ou repetido "
+            "entre municipios)" % sa))
     if ma and mb and ma != mb:
         bloqueadores.append({
             "nome": "modelo_conflitante",
@@ -649,7 +682,7 @@ def _pares_candidatos(ids, attrs, raio_m):
     por_via = {}
     for rid in ids:
         at = attrs[rid]
-        if at.get("numero_serie"):
+        if at.get("numero_serie") and not at.get("serie_generica"):
             por_serie.setdefault(at["numero_serie"], []).append(rid)
         if at.get("rodovia"):
             por_via.setdefault(at["rodovia"], []).append(rid)
@@ -686,6 +719,29 @@ def _pares_candidatos(ids, attrs, raio_m):
     return sorted(pares)
 
 
+def _marcar_series_genericas(conn, ids, attrs):
+    """Marca em `attrs` as series que NAO identificam instrumento.
+
+    Alem do corte por tamanho (`serie_generica` estatico), considera generica
+    a serie que se repete entre MUNICIPIOS diferentes (codigo reutilizado).
+    """
+    mun = {r[0]: r[1] for r in dbmod.query_all(
+        conn, "SELECT vp.registro_id, p.municipio_id "
+              "FROM VINCULO_REGISTRO_PONTO vp "
+              "JOIN PONTO_FISCALIZACAO p ON p.id = vp.ponto_id "
+              "WHERE p.municipio_id IS NOT NULL")}
+    por_serie = {}
+    for rid in ids:
+        s = attrs[rid].get("numero_serie")
+        if s and rid in mun:
+            por_serie.setdefault(s, set()).add(mun[rid])
+    for rid in ids:
+        s = attrs[rid].get("numero_serie")
+        if s:
+            attrs[rid]["serie_generica"] = serie_generica(
+                s, por_serie.get(s))
+
+
 def gerar_candidatos(conn, regra=None, pesos=None, raio_m=None, agora=None):
     """Gera CANDIDATO_DUPLICIDADE a partir dos REGISTRO_FONTE (spec 8.3).
 
@@ -702,6 +758,7 @@ def gerar_candidatos(conn, regra=None, pesos=None, raio_m=None, agora=None):
     ids = [r[0] for r in dbmod.query_all(
         conn, "SELECT id FROM REGISTRO_FONTE ORDER BY id")]
     attrs = {rid: atributos_registro(conn, rid) for rid in ids}
+    _marcar_series_genericas(conn, ids, attrs)
 
     criados, existentes, ignorados = [], [], 0
     for a, b in _pares_candidatos(ids, attrs, raio_m):
