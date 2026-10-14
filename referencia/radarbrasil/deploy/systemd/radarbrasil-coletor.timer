@@ -1,0 +1,11 @@
+[Unit]
+Description=Radar Brasil - verifica fontes de hora em hora
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target
