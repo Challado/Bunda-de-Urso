@@ -9,9 +9,9 @@ import csv
 import io
 import json
 import os
-import urllib.request
 
 from core import config
+from coletor import http
 from coletor.base import ColetorBase
 from coletor.fontes import normalizacao as nz
 
@@ -87,9 +87,8 @@ class ColetorANTT(ColetorBase):
         return conteudo, ext, mime, registros
 
     def _baixar(self, url):
-        req = urllib.request.Request(url, headers={"User-Agent": config.USER_AGENT})
-        with urllib.request.urlopen(req, timeout=config.DEFAULT_TIMEOUT) as resp:
-            return resp.read()
+        corpo, _headers, _url_final = http.baixar(url)
+        return corpo
 
     @staticmethod
     def _parece_csv(conteudo):

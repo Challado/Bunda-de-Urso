@@ -5,9 +5,9 @@ transito (CSV + dicionario JSON). Aceita arquivo local para testes.
 import csv
 import io
 import os
-import urllib.request
 
 from core import config
+from coletor import http
 from coletor.base import ColetorBase
 from coletor.fontes import normalizacao as nz
 
@@ -63,11 +63,8 @@ class ColetorRecife(ColetorBase):
                 conteudo = f.read()
             ext = os.path.splitext(origem)[1].lower() or ".csv"
         else:
-            req = urllib.request.Request(
-                origem or self.RECURSO["url_recurso"],
-                headers={"User-Agent": config.USER_AGENT})
-            with urllib.request.urlopen(req, timeout=config.DEFAULT_TIMEOUT) as resp:
-                conteudo = resp.read()
+            url = origem or self.RECURSO["url_recurso"]
+            conteudo, _headers, _url_final = http.baixar(url)
             ext = ".csv"
         registros = self._parse_csv(conteudo)
         return conteudo, ext, "text/csv", registros

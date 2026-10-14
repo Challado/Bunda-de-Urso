@@ -16,6 +16,7 @@ import re
 import urllib.request
 
 from core import config
+from coletor import http
 from coletor.base import ColetorBase
 from coletor.fontes import normalizacao as nz
 from coletor.fontes import planilha as pl
@@ -91,11 +92,7 @@ class ColetorDERPR(ColetorBase):
             ext = os.path.splitext(origem)[1].lower()
         else:
             url = origem or self.resolver_url()
-            req = urllib.request.Request(
-                url, headers={"User-Agent": config.USER_AGENT})
-            with urllib.request.urlopen(
-                    req, timeout=config.DEFAULT_TIMEOUT) as resp:
-                conteudo = resp.read()
+            conteudo, _headers, _url_final = http.baixar(url)
             ext = os.path.splitext(url.split("?")[0])[1].lower()
         if ext in (".txt", ".text"):
             texto = conteudo.decode("utf-8", "replace")
