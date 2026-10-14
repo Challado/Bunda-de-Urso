@@ -40,6 +40,32 @@ class ColetorANTT(ColetorBase):
         "status_integracao": "ok",
     }
 
+    # -- resolucao de URL -------------------------------------------------
+    CKAN_BASE = "https://dados.antt.gov.br"
+    CKAN_DATASET = "79d287f4-f5ca-4385-a17c-f61f53831f17"
+    URL_FALLBACK = ("https://dados.antt.gov.br/dataset/"
+                    "79d287f4-f5ca-4385-a17c-f61f53831f17/resource/"
+                    "eaace43a-aedf-4f69-949e-5001ae54173b/download/"
+                    "dados-dos-radares6_2026.json")
+
+    @classmethod
+    def resolver_url(cls):
+        """URL direta da edicao mais nova (API CKAN); fallback fixo.
+
+        A URL de um arquivo mensal muda a cada edicao; por isso nao fixamos
+        a URL no codigo: perguntamos ao portal qual e o recurso mais recente.
+        """
+        try:
+            from coletor.fontes import ckan
+            url = ckan.url_do_mais_novo(
+                cls.CKAN_BASE, cls.CKAN_DATASET, "JSON",
+                r"dados-dos-radares(\d+)_(\d{4})", ckan.versao_numerica())
+            if url:
+                return url
+        except Exception:                                  # noqa: BLE001
+            pass
+        return cls.URL_FALLBACK
+
     # -- carregar ----------------------------------------------------------
     def carregar(self, origem):
         """origem: caminho local OU url. Retorna (bytes, ext, mime, registros)."""
