@@ -229,10 +229,12 @@ class TestGerarCandidatos(BaseDedup):
         a2 = self.artefato(self.recurso(f, "r2"))
         r2 = self.registro(a2, {"numero_serie": "BBB2", "latitude": -25.0,
                                 "longitude": -54.0})
-        # mesma coordenada, series diferentes: cand. mas contraditorio
+        ##-- BUNDITA DE URSO #{26} -- Mesma coordenada admite revisao de ponto; series diferentes continuam bloqueando o instrumento. ##
         self.assertEqual(len(dedup.gerar_candidatos(self.con)["criados"]), 1)
         ev = json.loads(self.candidato_unico()["evidencias_resumo"])
-        self.assertEqual(ev["nivel"], "contraditorio")
+        self.assertEqual(ev["nivel"], "moderado")
+        self.assertEqual(ev["escopos_sugeridos"], ["ponto"])
+        self.assertEqual(ev["avaliacao_escopos"]["equipamento"]["nivel"], "contraditorio")
         self.assertTrue(any(b["nome"] == "serie_conflitante"
                             for b in ev["bloqueadores"]))
 

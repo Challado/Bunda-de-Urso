@@ -5,6 +5,7 @@ import argparse
 import collections
 import hashlib
 import json
+import os
 from pathlib import Path
 import sqlite3
 import sys
@@ -73,8 +74,48 @@ def _conservacao_consulta(conn):
 
 
 ##-- BUNDITA DE URSO #{4} -- Comparar uma nova regra nao deve sobrescrever fila historica ou banco de producao. ##
-def auditar(caminho):
+##-- BUNDITA DE URSO #{26} -- A fila precisa informar quantas propostas cabem em cada escopo e quantas sao apenas diagnostico. ##
+def _resumo_fila(conn):
+    revisao = dedup.candidatos(conn, estado="pendente")
+    todas = dedup.candidatos(conn, estado="pendente", incluir_diagnosticos=True)
+    por_escopo = collections.Counter()
+    por_origem = collections.Counter()
+    fontes = dict(conn.execute("SELECT a.id, b.fonte_id FROM REGISTRO_FONTE a "
+                               "JOIN ARTEFATO_COLETA b1 ON b1.id=a.artefato_id "
+                               "JOIN RECURSO_FONTE b ON b.id=b1.recurso_id"))
+    for row in revisao:
+        ev = json.loads(row["evidencias_resumo"])
+        por_escopo.update(ev.get("escopos_sugeridos", ()))
+        if set(ev.get("escopos_sugeridos", ())) == {"ponto", "equipamento"}:
+            por_escopo["ambos"] += 1
+        por_origem["mesma_fonte" if fontes[row["registro_a_id"]] == fontes[row["registro_b_id"]]
+                   else "fontes_distintas"] += 1
+    return {"fila_vigente_pendente": len(revisao),
+            "diagnosticos_pendentes": len(todas) - len(revisao),
+            "propostas_por_escopo": dict(por_escopo),
+            "propostas_por_origem": dict(por_origem)}
+
+
+def _salvar_copia(conn, destino):
+    with tempfile.NamedTemporaryFile(dir=destino.parent, suffix=".sqlite3", delete=False) as tmp:
+        temporario = Path(tmp.name)
+    try:
+        copia = sqlite3.connect(temporario)
+        try:
+            conn.backup(copia)
+            copia.execute("PRAGMA journal_mode=DELETE")
+        finally:
+            copia.close()
+        os.link(temporario, destino)
+    finally:
+        temporario.unlink(missing_ok=True)
+
+
+def auditar(caminho, salvar_copia=None):
     origem = Path(caminho).resolve(strict=True)
+    destino = Path(salvar_copia).resolve() if salvar_copia else None
+    if destino and (destino == origem or destino.exists()):
+        raise ValueError("a copia deve ser um arquivo novo, diferente da origem")
     with tempfile.TemporaryDirectory(prefix="bundita-auditoria-") as pasta:
         copia = db.connect(str(Path(pasta, "radar.sqlite3")))
         try:
@@ -87,13 +128,16 @@ def auditar(caminho):
             inventario_antes = _inventario(copia)
             resultado = dedup.gerar_candidatos(copia)
             inventario_depois = _inventario(copia)
-            return {
+            relatorio = {
                 "regra": dedup.VERSAO_REGRA_PADRAO,
                 "antes": antes, "depois": _resumo(copia),
                 "registros": resultado["total_registros"],
                 "candidatos_criados": len(resultado["criados"]),
                 "candidatos_existentes": len(resultado["existentes"]),
-                "fila_vigente_pendente": len(dedup.candidatos(copia, estado="pendente")),
+                **_resumo_fila(copia),
+                "registros_representantes": resultado["registros_representantes"],
+                "observacoes_equivalentes_agrupadas": resultado["observacoes_equivalentes_agrupadas"],
+                "pares_ja_associados": resultado["pares_ja_associados"],
                 "decisoes_aplicadas_nesta_auditoria": 0,
                 "conservacao": {
                     "inventario_original_inalterado": inventario_antes == inventario_depois,
@@ -101,6 +145,12 @@ def auditar(caminho):
                     **_conservacao_consulta(copia),
                 },
             }
+            if destino:
+                if (not relatorio["conservacao"]["inventario_original_inalterado"]
+                        or relatorio["conservacao"]["marcacoes_nao_representadas"]):
+                    raise ValueError("a auditoria de conservacao falhou; copia nao publicada")
+                _salvar_copia(copia, destino)
+            return relatorio
         finally:
             copia.close()
 
@@ -108,8 +158,9 @@ def auditar(caminho):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", required=True, help="banco existente, aberto somente para leitura")
+    parser.add_argument("--salvar-copia", help="salva o banco auditado em arquivo NOVO para revisar a fila")
     args = parser.parse_args(argv)
-    resultado = auditar(args.db)
+    resultado = auditar(args.db, args.salvar_copia)
     print(json.dumps(resultado, ensure_ascii=False, indent=2, sort_keys=True))
     conservacao = resultado["conservacao"]
     return int(not conservacao["inventario_original_inalterado"] or bool(conservacao["marcacoes_nao_representadas"]))

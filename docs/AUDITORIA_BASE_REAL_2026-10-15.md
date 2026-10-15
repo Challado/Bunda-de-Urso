@@ -58,6 +58,8 @@ Além desses cenários, o paginador JavaScript foi ligado à API local lendo o b
 
 ## A fila nova não encolheu
 
+**Atualização posterior:** a causa foi corrigida em `dedup-1.2`; veja [AJUSTE_FILA_DEDUP_1_2_2026-10-15.md](AJUSTE_FILA_DEDUP_1_2_2026-10-15.md). Os números desta seção registram o diagnóstico anterior.
+
 A previsão anterior de redução da fila não se confirmou neste backup.
 
 | Resultado | dedup-1.0 armazenada | dedup-1.1 gerada na cópia |

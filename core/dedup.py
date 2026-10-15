@@ -39,12 +39,13 @@ import unicodedata
 from . import db as dbmod
 from . import geo
 from . import identidade
+from .domains import UFS
 
 __all__ = [
     "normalizar_texto", "normalizar_serie", "normalizar_rodovia",
     "normalizar_km", "normalizar_sentido", "serie_generica",
     "cadeia_evidencia", "mesma_cadeia", "evidencias_independentes",
-    "atributos_registro", "pontuar", "gerar_candidatos", "candidatos",
+    "atributos_registro", "pontuar", "avaliar_escopos", "gerar_candidatos", "candidatos",
     "decidir", "decisao_ativa", "listar_decisoes", "aplicar",
     "reverter_decisao", "verificacoes_duplicadas", "classificacao_evidencia",
     "registrar_regra",
@@ -53,7 +54,8 @@ __all__ = [
 # --------------------------------------------------------------- constantes
 
 ##-- BUNDITA DE URSO #{4} -- Regras alteradas precisam de nova versao para nao reutilizar evidencias antigas. ##
-VERSAO_REGRA_PADRAO = "dedup-1.1"
+##-- BUNDITA DE URSO #{26} -- A fila passa a avaliar separadamente a identidade do ponto e a do instrumento, sem reutilizar a regra antiga. ##
+VERSAO_REGRA_PADRAO = "dedup-1.2"
 
 # Pesos versionaveis (spec 8.5: definir e versionar apos inspecionar amostras).
 PESOS_PADRAO = {
@@ -76,6 +78,7 @@ CONFLITO_KM = 5.0         # acima disso, mesma via = contradicao
 TOLERANCIA_POSICAO_M = 1.0
 # Numero curto (< isto) nao tem contexto suficiente para identidade global.
 SERIE_CURTA_MAX_DIGITOS = 4
+DISTANCIA_REVISAO_PONTO_M = 200.0
 
 
 def serie_generica(numero_serie, municipios=None):
@@ -202,6 +205,24 @@ def normalizar_texto(valor):
     s = s.upper().strip()
     s = re.sub(r"\s+", " ", s)
     return s or None
+
+
+##-- BUNDITA DE URSO #{24} -- ESTADO na PRF e situacao operacional; ATIVO nao pode substituir a UF publicada. ##
+_UF_POR_NOME = {normalizar_texto(nome): sigla for sigla, nome in UFS}
+_UF_SIGLAS = {sigla for sigla, _ in UFS}
+
+
+def _uf_valida(valor):
+    texto = normalizar_texto(valor)
+    return texto if texto in _UF_SIGLAS else _UF_POR_NOME.get(texto)
+
+
+def _uf_payload(payload):
+    for chave in ("uf", "uf_sigla", "siglauf", "sigla_uf", "estado"):
+        uf = _uf_valida(payload.get(chave))
+        if uf:
+            return uf
+    return None
 
 
 def normalizar_serie(valor):
@@ -424,6 +445,7 @@ def atributos_registro(conn, registro_id):
     if pos is not None:
         lat, lon = pos["latitude"], pos["longitude"]
         precisao, qualidade = pos["precisao_metros"], pos["qualidade"]
+    posicao_observada = (lat, lon)
 
     for pid in at["ponto_ids"]:
         p = dbmod.query_one(conn, "SELECT * FROM PONTO_FISCALIZACAO WHERE id = ?",
@@ -480,10 +502,11 @@ def atributos_registro(conn, registro_id):
     except (TypeError, ValueError):
         payload = {}
 
-    at["latitude"] = _num(_primeiro(valores.get("latitude"), lat,
-                                    _extrair(payload, "latitude")))
-    at["longitude"] = _num(_primeiro(valores.get("longitude"), lon,
-                                     _extrair(payload, "longitude")))
+    ##-- BUNDITA DE URSO #{24} -- GPS do ponto mutavel nao pode ocultar uma observacao original diferente e faze-la parecer historico equivalente. ##
+    at["latitude"] = _num(_primeiro(valores.get("latitude"), posicao_observada[0],
+                                    _extrair(payload, "latitude"), lat))
+    at["longitude"] = _num(_primeiro(valores.get("longitude"), posicao_observada[1],
+                                     _extrair(payload, "longitude"), lon))
     at["numero_serie"] = normalizar_serie(
         _primeiro(valores.get("numero_serie"), _extrair(payload, "numero_serie"), serie))
     at["fabricante"] = normalizar_texto(
@@ -501,7 +524,11 @@ def atributos_registro(conn, registro_id):
         uf = dbmod.scalar(conn, "SELECT m.uf_sigla FROM PONTO_FISCALIZACAO p "
                           "JOIN MUNICIPIO m ON m.codigo_ibge=p.municipio_id WHERE p.id=?",
                           (at["ponto_ids"][0],))
-    at["uf"] = normalizar_texto(_primeiro(valores.get("uf"), _extrair(payload, "uf"), uf))
+    at["uf"] = (_uf_valida(valores.get("uf")) or _uf_payload(payload) or _uf_valida(uf))
+    ##-- BUNDITA DE URSO #{24} -- Coordenadas fora da faixa nao servem como evidencia geografica, mesmo sendo numeros finitos. ##
+    if (at["latitude"] is None or at["longitude"] is None
+            or not -90 <= at["latitude"] <= 90 or not -180 <= at["longitude"] <= 180):
+        at["latitude"] = at["longitude"] = None
     at["precisao_metros"] = precisao
     at["qualidade_posicao"] = qualidade
     at["serie_generica"] = serie_generica(at.get("numero_serie"))
@@ -584,10 +611,11 @@ def pontuar(a, b, pesos=None):
             "detalhe": "fabricantes divergentes: %s vs %s" % (fa, fb)})
 
     dist = None
-    if None not in (a.get("latitude"), a.get("longitude"),
-                    b.get("latitude"), b.get("longitude")):
-        dist = geo.haversine_m(a["latitude"], a["longitude"],
-                               b["latitude"], b["longitude"])
+    ##-- BUNDITA DE URSO #{24} -- A API pura de pontuacao tambem deve recusar coordenadas invalidas antes do Haversine. ##
+    coords = tuple(_num(at.get(k)) for at in (a, b) for k in ("latitude", "longitude"))
+    if (None not in coords and -90 <= coords[0] <= 90 and -180 <= coords[1] <= 180
+            and -90 <= coords[2] <= 90 and -180 <= coords[3] <= 180):
+        dist = geo.haversine_m(*coords)
         fator = 0.0
         for limite, valor in FAIXAS_PROXIMIDADE:
             if dist <= limite:
@@ -668,7 +696,8 @@ def pontuar(a, b, pesos=None):
     # identidade de instrumentos sem GPS (inclusive portateis).
     via_km_contextualizado = (va and va == vb and ka is not None and kb is not None
                               and abs(ka - kb) <= TOLERANCIA_KM
-                              and a.get("uf") and a.get("uf") == b.get("uf"))
+                              and _uf_valida(a.get("uf"))
+                              and _uf_valida(a.get("uf")) == _uf_valida(b.get("uf")))
     corrobora = ((dist is not None and dist <= 200.0)
                 or via_km_contextualizado
                 or (fa and fa == fb and ma and ma == mb))
@@ -689,6 +718,84 @@ def pontuar(a, b, pesos=None):
     }
 
 
+##-- BUNDITA DE URSO #{26} -- Serie divergente bloqueia instrumento, nao necessariamente local; sentido oposto nao invalida aparelho portatil. ##
+def _mesma_entidade(a, b, tipo, visao=None):
+    def ids(at):
+        return {visao.canonico(tipo, i) if visao else i
+                for i in at.get(tipo + "_ids", ())}
+    aa, bb = ids(a), ids(b)
+    return len(aa) == len(bb) == 1 and aa == bb
+
+
+def avaliar_escopos(a, b, pontuacao=None, visao=None):
+    """Separa sugestoes de ponto/instrumento; nunca decide nem altera dados."""
+    res = dict(pontuacao if pontuacao is not None else pontuar(a, b))
+    bloqueios = res["bloqueadores"]
+    dist = res["distancia_m"]
+    va, vb = a.get("rodovia"), b.get("rodovia")
+    ua, ub = _uf_valida(a.get("uf")), _uf_valida(b.get("uf"))
+    ka, kb = a.get("km"), b.get("km")
+    via_km = bool(va and va == vb and ua and ua == ub
+                  and ka is not None and kb is not None
+                  and abs(ka - kb) <= TOLERANCIA_KM)
+    proximo = dist is not None and dist <= DISTANCIA_REVISAO_PONTO_M
+    bloqueios_ponto = [b for b in bloqueios if b["nome"] in ("sentido_oposto", "km_incompativel")]
+    for condicao, nome, detalhe in (
+            (va and vb and va != vb, "via_divergente", "vias publicadas diferentes: requer revisar local"),
+            (ua and ub and ua != ub, "uf_divergente", "UFs publicadas diferentes: requer revisar local"),
+            (dist is not None and not proximo, "posicao_distante", "posicoes acima da tolerancia de revisao do ponto")):
+        if condicao:
+            bloqueios_ponto.append({"nome": nome, "detalhe": detalhe})
+    componentes_ponto = {"proximidade", "via_km", "sentido_igual", "corroboracao_independente"}
+    score_ponto = round(sum(c["contribuicao"] for c in res["componentes"]
+                            if c["nome"] in componentes_ponto), 4)
+    ponto = {"score": score_ponto, "bloqueadores": bloqueios_ponto,
+             "componentes": [c for c in res["componentes"] if c["nome"] in componentes_ponto]}
+    if _mesma_entidade(a, b, "ponto", visao):
+        ponto["nivel"] = "ja_associado"
+    elif bloqueios_ponto:
+        ponto["nivel"] = "contraditorio"
+    elif (proximo or via_km) and score_ponto >= LIMIAR_MODERADO:
+        # Mesmo local ainda exige revisao; coordenada isolada nao e prova forte.
+        ponto["nivel"] = "moderado"
+    else:
+        ponto["nivel"] = "fraco"
+
+    sa, sb = a.get("numero_serie"), b.get("numero_serie")
+    serie = bool(sa and sa == sb and not (a.get("serie_generica") or b.get("serie_generica")
+                                         or serie_generica(sa)))
+    modelo = bool(a.get("fabricante") and a["fabricante"] == b.get("fabricante")
+                  and a.get("modelo") and a["modelo"] == b.get("modelo"))
+    bloqueios_equipamento = [b for b in bloqueios if b["nome"] in
+                            ("serie_conflitante", "modelo_conflitante", "fabricante_conflitante")]
+    equipamento = {"score": res["score"], "bloqueadores": bloqueios_equipamento,
+                   "componentes": res["componentes"]}
+    if _mesma_entidade(a, b, "equipamento", visao):
+        equipamento["nivel"] = "ja_associado"
+    elif bloqueios_equipamento:
+        equipamento["nivel"] = "contraditorio"
+    elif serie and (proximo or via_km or modelo) and res["score"] >= LIMIAR_MODERADO:
+        equipamento["nivel"] = ("forte" if res["score"] >= LIMIAR_FORTE
+                                 and res["n_evidencias_independentes"] >= 2 else "moderado")
+    else:
+        equipamento["nivel"] = "fraco"
+    escopos = {"ponto": ponto, "equipamento": equipamento}
+    sugeridos = [tipo for tipo, ev in escopos.items() if ev["nivel"] in ("moderado", "forte")]
+    res["nivel_original"] = res["nivel"]
+    res["score_original"] = res["score"]
+    if sugeridos:
+        melhor = max((escopos[t] for t in sugeridos),
+                     key=lambda ev: (ev["nivel"] == "forte", ev["score"]))
+        res.update(nivel=melhor["nivel"], score=melhor["score"], encaminhamento="revisao")
+    elif all(ev["nivel"] == "ja_associado" for ev in escopos.values()):
+        res.update(nivel="ja_associado", encaminhamento="ja_associado")
+    else:
+        res.update(nivel="contraditorio" if any(ev["nivel"] == "contraditorio" for ev in escopos.values()) else "fraco",
+                   encaminhamento="diagnostico")
+    res.update(avaliacao_escopos=escopos, escopos_sugeridos=sugeridos)
+    return res
+
+
 # --------------------------------------------------------- regra versionada
 
 ##-- BUNDITA DE URSO #{4} -- A mesma versao aceitava pesos novos sem atualizar sua configuracao persistida. ##
@@ -696,6 +803,8 @@ def registrar_regra(conn, versao=None, pesos=None, raio_m=None, descricao=None,
                     agora=None):
     """Insere (ou recupera) a REGRA_DEDUPLICACAO versionada. Retorna o id."""
     versao = versao or VERSAO_REGRA_PADRAO
+    if versao in ("dedup-1.0", "dedup-1.1"):
+        raise ValueError("versao antiga apenas para consulta; use a regra vigente ou uma nova versao")
     pesos = _pesos_validos(pesos)
     raio_m = RAIO_CANDIDATO_M if raio_m is None else float(raio_m)
     if not math.isfinite(raio_m) or raio_m <= 0:
@@ -715,6 +824,12 @@ def registrar_regra(conn, versao=None, pesos=None, raio_m=None, descricao=None,
         "via_km_exige_uf": True,
         "generica_por_municipio": False,
         "indice_espacial": "esfera_cartesiana",
+        ##-- BUNDITA DE URSO #{26} -- Persistir os criterios de escopo impede chamar uma mudanca de politica de mesma regra. ##
+        "avaliacao_por_escopo": True,
+        "distancia_revisao_ponto_m": DISTANCIA_REVISAO_PONTO_M,
+        "fila_padrao": "escopo_moderado_ou_forte",
+        "uf_validada": True,
+        "historico_equivalente": "mesma_origem_entidades_e_atributos",
     }, sort_keys=True, ensure_ascii=False)
     row = dbmod.query_one(
         conn, "SELECT id, configuracao_serializada FROM REGRA_DEDUPLICACAO "
@@ -735,6 +850,23 @@ def registrar_regra(conn, versao=None, pesos=None, raio_m=None, descricao=None,
 
 def _ord(a, b):
     return (a, b) if a < b else (b, a)
+
+
+##-- BUNDITA DE URSO #{25} -- Novas coletas do mesmo cadastro e com os mesmos atributos multiplicavam pares sem acrescentar evidencia de identidade. ##
+def _representantes(attrs):
+    grupos = {}
+    campos = ("latitude", "longitude", "precisao_metros", "qualidade_posicao",
+              "numero_serie", "serie_generica", "fabricante", "modelo", "rodovia", "km", "sentido", "uf")
+    for rid in sorted(attrs):
+        at = attrs[rid]
+        entidades = (tuple(sorted(at.get("ponto_ids", ()))),
+                     tuple(sorted(at.get("equipamento_ids", ()))))
+        # Sem entidade original nao ha prova de que dois brutos sejam o mesmo cadastro.
+        chave = ((at.get("fonte_id"), at.get("recurso_id"), entidades,
+                  tuple(at.get(c) for c in campos)) if any(entidades) else ("registro", rid))
+        grupos.setdefault(chave, []).append(rid)
+    # O menor ID e estavel ao acrescentar uma nova observacao equivalente.
+    return {membros[0]: membros for membros in grupos.values()}
 
 
 ##-- BUNDITA DE URSO #{14} -- A grade em graus perdia vizinhos e uma rodovia inteira gerava pares quadraticos. ##
@@ -787,8 +919,9 @@ def _pares_candidatos(ids, attrs, raio_m):
 def gerar_candidatos(conn, regra=None, pesos=None, raio_m=None, agora=None):
     """Gera CANDIDATO_DUPLICIDADE a partir dos REGISTRO_FONTE (spec 8.3).
 
-    Nunca decide: todo candidato nasce com estado 'pendente'. Pares na MESMA
-    cadeia de evidencia sao ignorados (copia do mesmo registro bruto, 8.1-A).
+    Nunca decide: todo candidato nasce com estado 'pendente'. Copias do mesmo
+    bruto e arquivo sao ignoradas; observacoes equivalentes usam representante
+    estavel, preservando seus registros na evidencia.
     Idempotente: UNIQUE(registro_a_id, registro_b_id, regra_id).
     """
     raio_m = RAIO_CANDIDATO_M if raio_m is None else float(raio_m)
@@ -802,9 +935,11 @@ def gerar_candidatos(conn, regra=None, pesos=None, raio_m=None, agora=None):
     ids = [r[0] for r in dbmod.query_all(
         conn, "SELECT id FROM REGISTRO_FONTE ORDER BY id")]
     attrs = {rid: atributos_registro(conn, rid) for rid in ids}
+    grupos = _representantes(attrs)
+    visao = identidade.VisaoCanonica(conn)
 
-    criados, existentes, ignorados = [], [], 0
-    for a, b in _pares_candidatos(ids, attrs, raio_m):
+    criados, existentes, ignorados, associados = [], [], 0, 0
+    for a, b in _pares_candidatos(sorted(grupos), attrs, raio_m):
         if (attrs[a]["hash_registro"]
                 and attrs[a]["hash_registro"] == attrs[b]["hash_registro"]
                 and attrs[a]["artefato_hash"] == attrs[b]["artefato_hash"]):
@@ -812,6 +947,10 @@ def gerar_candidatos(conn, regra=None, pesos=None, raio_m=None, agora=None):
             continue
         res = pontuar(attrs[a], attrs[b], pesos)
         if not res["bloqueadores"] and res["score"] < LIMIAR_MIN_CANDIDATO:
+            continue
+        res = avaliar_escopos(attrs[a], attrs[b], res, visao)
+        if res["encaminhamento"] == "ja_associado":
+            associados += 1
             continue
         ev = {
             "score": res["score"],
@@ -822,6 +961,12 @@ def gerar_candidatos(conn, regra=None, pesos=None, raio_m=None, agora=None):
             "n_evidencias_independentes": res["n_evidencias_independentes"],
             "cadeia_a": attrs[a]["cadeia"],
             "cadeia_b": attrs[b]["cadeia"],
+            "nivel_original": res["nivel_original"],
+            "score_original": res["score_original"],
+            "avaliacao_escopos": res["avaliacao_escopos"],
+            "escopos_sugeridos": res["escopos_sugeridos"],
+            "encaminhamento": res["encaminhamento"],
+            "observacoes_equivalentes": {"a": grupos[a], "b": grupos[b]},
         }
         cur = conn.execute(
             "INSERT OR IGNORE INTO CANDIDATO_DUPLICIDADE "
@@ -837,6 +982,11 @@ def gerar_candidatos(conn, regra=None, pesos=None, raio_m=None, agora=None):
                       "WHERE registro_a_id=? AND registro_b_id=? AND regra_id=?",
                 (a, b, regra_id))
             existentes.append(row["id"])
+            # Atualizar apenas a lista de observacoes da pendencia ainda nunca decidida.
+            conn.execute("UPDATE CANDIDATO_DUPLICIDADE SET evidencias_resumo=? "
+                         "WHERE id=? AND estado='pendente' AND NOT EXISTS "
+                         "(SELECT 1 FROM DECISAO_DUPLICIDADE WHERE candidato_id=?)",
+                         (json.dumps(ev, sort_keys=True, ensure_ascii=False), row["id"], row["id"]))
     conn.commit()
     return {
         "regra_id": regra_id,
@@ -844,13 +994,22 @@ def gerar_candidatos(conn, regra=None, pesos=None, raio_m=None, agora=None):
         "criados": criados,
         "existentes": existentes,
         "ignorados_mesma_origem": ignorados,
+        "registros_representantes": len(grupos),
+        "observacoes_equivalentes_agrupadas": len(ids) - len(grupos),
+        "pares_ja_associados": associados,
     }
 
 
 ##-- BUNDITA DE URSO #{4} -- Misturar geracoes antigas com a regra vigente mantinha a fila obsoleta. ##
 def candidatos(conn, ponto_id=None, estado=None, regra=VERSAO_REGRA_PADRAO,
-               incluir_fracos=False):
-    """Fila vigente. Diagnostico completo: regra=None, incluir_fracos=True."""
+               incluir_fracos=False, incluir_diagnosticos=False, escopo=None):
+    """Fila de revisao vigente. Diagnostico completo: incluir_diagnosticos=True.
+
+    `incluir_fracos` continua aceito como alias para diagnostico completo.
+    `regra=None` permite consultar tambem as geracoes historicas.
+    """
+    if escopo is not None and escopo not in identidade.ESCOPOS:
+        raise ValueError("escopo deve ser ponto, equipamento ou ambos")
     sql = ("SELECT cd.*, ra.identificador_na_fonte AS a_identificador, "
            "rb.identificador_na_fonte AS b_identificador "
            "FROM CANDIDATO_DUPLICIDADE cd "
@@ -873,8 +1032,34 @@ def candidatos(conn, ponto_id=None, estado=None, regra=VERSAO_REGRA_PADRAO,
         sql += "WHERE " + " AND ".join(cond) + " "
     sql += "ORDER BY cd.id"
     rows = [dict(r) for r in dbmod.query_all(conn, sql, params)]
-    return [r for r in rows if incluir_fracos or r["estado"] != "pendente"
-            or _load_json(r["evidencias_resumo"]).get("nivel") != "fraco"]
+    ##-- BUNDITA DE URSO #{26} -- Contraditorios e pistas fracas nao podem parecer propostas prontas de unificacao. ##
+    saida = []
+    diagnostico = incluir_diagnosticos or incluir_fracos
+    visao = None
+    for row in rows:
+        ev = _load_json(row["evidencias_resumo"])
+        if row["estado"] == "pendente" and ev.get("escopos_sugeridos"):
+            # Decisoes de outros pares podem ter associado estas entidades.
+            # Isso retira trabalho ja feito; nao serve como evidencia nova.
+            if visao is None:
+                visao = identidade.VisaoCanonica(conn)
+            aa, bb = ({tipo + "_ids": identidade.originais(conn, tipo, row[chave])
+                       for tipo in identidade.TIPOS} for chave in ("registro_a_id", "registro_b_id"))
+            ja = [tipo for tipo in ev["escopos_sugeridos"] if _mesma_entidade(aa, bb, tipo, visao)]
+            if ja:
+                ev["escopos_ja_associados"] = ja
+                ev["escopos_sugeridos"] = [t for t in ev["escopos_sugeridos"] if t not in ja]
+                if not ev["escopos_sugeridos"]:
+                    ev["encaminhamento"] = "ja_associado"
+                row["evidencias_resumo"] = json.dumps(ev, sort_keys=True, ensure_ascii=False)
+        if not diagnostico and row["estado"] == "pendente":
+            if ev.get("encaminhamento") not in (None, "revisao") or ev.get("nivel") not in ("moderado", "forte"):
+                continue
+        if escopo is not None and not diagnostico:
+            if not set(identidade.ESCOPOS[escopo]) <= set(ev.get("escopos_sugeridos", ())):
+                continue
+        saida.append(row)
+    return saida
 
 
 # --------------------------------------------------------------- decisoes
@@ -1029,7 +1214,11 @@ def aplicar(conn, candidato_id=None, usuario=None, agora=None):
             obs = _load_json(dec["observacoes"])
             bloqueadores = evid.get("bloqueadores", [])
             tipos = identidade.ESCOPOS.get(obs.get("escopo") or "ambos", ())
-            if tipos == ("ponto",):
+            ##-- BUNDITA DE URSO #{26} -- Aplicar deve respeitar o conflito do escopo escolhido, inclusive via/UF/posicao divergentes. ##
+            if evid.get("avaliacao_escopos"):
+                bloqueadores = [b for tipo in tipos for b in
+                                evid["avaliacao_escopos"][tipo]["bloqueadores"]]
+            elif tipos == ("ponto",):
                 bloqueadores = [b for b in bloqueadores if b["nome"] not in
                                 ("serie_conflitante", "modelo_conflitante", "fabricante_conflitante")]
             elif tipos == ("equipamento",):

@@ -31,6 +31,9 @@ Um mesmo número aparece nos pontos necessários para resolver o mesmo problema.
 | 21 | A junção de regimes pontual e permanente podia retirar um ponto do filtro de fiscalização permanente. O ponto satisfaz ambos os filtros e o booleano fica indeterminado quando as modalidades são mistas. |
 | 22 | O normalizador atual recupera quatro coordenadas ASTT que continuavam ausentes nos cadastros legados. A ferramenta `recuperar_posicoes_legadas.py` reinterpreta o bruto com esse parser, recusa divergências e só escreve em uma nova cópia, preservando IDs, dados originais e GPS existentes. |
 | 23 | O mapa carregava só a primeira página, deixando pontos do raio fora da tela. Agora percorre os cursores, acumula as marcações e cancela consultas substituídas. Erros mantêm a consulta identificada como incompleta; respostas antigas não substituem a nova. |
+| 24 | Na PRF, `ESTADO=ATIVO/INOPERANTE` encobria a UF real. A comparação valida siglas/nomes de UF, prioriza a observação original sobre o ponto mutável e não calcula distâncias com coordenadas fora da faixa. |
+| 25 | Observações históricas equivalentes do mesmo cadastro multiplicavam pares. A geração usa um representante estável por origem, entidades e atributos, mantendo todos os registros equivalentes na evidência. Observações divergentes e faixas distintas permanecem separadas. |
+| 26 | A fila misturava identidade de ponto/instrumento e tratava contraditórios como propostas de unificação. `dedup-1.2` avalia cada escopo, separa diagnóstico de revisão e aplica os bloqueadores do escopo escolhido. A fila omite trabalho já resolvido por decisões transitivas e pode ser salva numa cópia para revisão por CLI. |
 
 ## Decisões e compatibilidade
 
@@ -58,16 +61,17 @@ A reversão preserva o histórico e reconstrói a visão das demais decisões. O
 
 ## Regra e fila
 
-A versão vigente é `dedup-1.1`. A versão anterior permanece no histórico. Alterar pesos, raio ou políticas requer outro identificador de versão, em vez de reutilizar uma regra registrada.
+A versão vigente é `dedup-1.2`. As versões 1.0 e 1.1 permanecem consultáveis no histórico e não podem ser geradas com a política nova. Alterar pesos, raio ou políticas requer outro identificador de versão, em vez de reutilizar uma regra registrada. A [medição real da correção da fila](AJUSTE_FILA_DEDUP_1_2_2026-10-15.md) descreve os resultados.
 
-`dedup.candidatos(conn)` mostra a fila vigente e omite pendências fracas. As evidências fracas continuam armazenadas para diagnóstico:
+`dedup.candidatos(conn)` mostra a geração vigente e omite pendências de diagnóstico. Para uma fila operacional, use `estado="pendente"`; para separar as perguntas, use `escopo="ponto"`, `"equipamento"` ou `"ambos"`. Evidências fracas e contraditórias continuam armazenadas:
 
 ```python
-dedup.candidatos(conn, incluir_fracos=True)
-dedup.candidatos(conn, regra=None, incluir_fracos=True)  # todas as versões
+dedup.candidatos(conn, estado="pendente", escopo="equipamento")
+dedup.candidatos(conn, incluir_diagnosticos=True)
+dedup.candidatos(conn, regra=None, incluir_diagnosticos=True)  # todas as versões
 ```
 
-Os limiares permanecem 0,20 para armazenar candidato, 0,30 para moderado e 0,75 para forte, sujeitos às exigências de evidência. Um score numérico acima de 0,30 ainda pode ser fraco se só houver série isolada. Nenhum nível provoca fusão automática.
+`incluir_fracos=True` permanece como alias do diagnóstico completo. Os limiares permanecem 0,20 para a pontuação de entrada (bloqueadores também são registrados), 0,30 para moderado e 0,75 para forte, sujeitos às exigências de evidência. A regra calcula níveis por escopo: série isolada não promove instrumento, e coordenada sozinha não vira evidência forte. O nível global resume o melhor escopo sugerido, com todos os conflitos preservados em `avaliacao_escopos`. Nenhum nível provoca fusão automática.
 
 Série curta é uma pista insuficiente para identidade global, não prova de aparelhos diferentes. Série legítima sem GPS pode receber corroboração documental; não se exige posição em todos os casos. UF/via/km apenas encaminha revisão, sem dispensar análise de trecho, sentido, período e documentos.
 

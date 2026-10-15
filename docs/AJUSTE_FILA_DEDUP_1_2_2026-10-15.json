@@ -1,0 +1,368 @@
+{
+  "backup": "base de dados/radar-2026-10-15_144017.sqlite3.gz",
+  "referencia_codigo_anterior": "a28130e",
+  "comparacao_dedup_1_1": {
+    "total_candidatos": 48067,
+    "fila_operacional": 33545
+  },
+  "auditoria_dedup_1_2": {
+    "antes": {
+      "dedup-1.0": {
+        "por_estado": {
+          "pendente": 5575
+        },
+        "por_nivel": {
+          "fraco": 1418,
+          "moderado": 4157
+        },
+        "total": 5575
+      }
+    },
+    "candidatos_criados": 27482,
+    "candidatos_existentes": 0,
+    "conservacao": {
+      "antes": {
+        "EQUIPAMENTO": {
+          "registros": 50200,
+          "sha256": "c07b572fff7412a6230135d68b42817136e8fc6226f4c16ea1e3d091bd2981b5"
+        },
+        "FAIXA_FISCALIZACAO": {
+          "registros": 46114,
+          "sha256": "cf19d115d7bbb00fcc9fc08ebf95d7c6e18c6caeda1d77fdf2710fa8d8f8538d"
+        },
+        "INSTALACAO": {
+          "registros": 50200,
+          "sha256": "f2c791ff8e80076ddce070ba1c93a3800c88bad45c0d496521b8199b7bb3998e"
+        },
+        "LIMITE_VELOCIDADE": {
+          "registros": 40058,
+          "sha256": "5592921b162b75a8d8456690ec3791b7a22e9539489b9b9c5df41498788805b0"
+        },
+        "PONTO_FISCALIZACAO": {
+          "registros": 50200,
+          "sha256": "de8315f5d40595001bfc1ab69c5caec3035525ead068db75cfcf3d434f57394d"
+        },
+        "POSICAO_GEOGRAFICA": {
+          "registros": 9876,
+          "sha256": "ac70d37f14ae5ff57867c4d0282625f64bbb0db9936dd6834d29fc165fe1241a"
+        },
+        "REGIME_FISCALIZACAO": {
+          "registros": 50200,
+          "sha256": "591150bb5c08c60dd0caf165ba0c0768ee705b81b6d4fa42e58e9e45c555e0ce"
+        },
+        "REGISTRO_FONTE": {
+          "registros": 56921,
+          "sha256": "93553885debbe9fb0b96b44cbac08c9db88263beaa49b61910c360b3d0f9e0b0"
+        },
+        "VERIFICACAO_METROLOGICA": {
+          "registros": 171669,
+          "sha256": "b9402793485163c18b27b1899b1cc5738e8934f7fb52dfd0d038a5c2fd1bb865"
+        }
+      },
+      "depois": {
+        "EQUIPAMENTO": {
+          "registros": 50200,
+          "sha256": "c07b572fff7412a6230135d68b42817136e8fc6226f4c16ea1e3d091bd2981b5"
+        },
+        "FAIXA_FISCALIZACAO": {
+          "registros": 46114,
+          "sha256": "cf19d115d7bbb00fcc9fc08ebf95d7c6e18c6caeda1d77fdf2710fa8d8f8538d"
+        },
+        "INSTALACAO": {
+          "registros": 50200,
+          "sha256": "f2c791ff8e80076ddce070ba1c93a3800c88bad45c0d496521b8199b7bb3998e"
+        },
+        "LIMITE_VELOCIDADE": {
+          "registros": 40058,
+          "sha256": "5592921b162b75a8d8456690ec3791b7a22e9539489b9b9c5df41498788805b0"
+        },
+        "PONTO_FISCALIZACAO": {
+          "registros": 50200,
+          "sha256": "de8315f5d40595001bfc1ab69c5caec3035525ead068db75cfcf3d434f57394d"
+        },
+        "POSICAO_GEOGRAFICA": {
+          "registros": 9876,
+          "sha256": "ac70d37f14ae5ff57867c4d0282625f64bbb0db9936dd6834d29fc165fe1241a"
+        },
+        "REGIME_FISCALIZACAO": {
+          "registros": 50200,
+          "sha256": "591150bb5c08c60dd0caf165ba0c0768ee705b81b6d4fa42e58e9e45c555e0ce"
+        },
+        "REGISTRO_FONTE": {
+          "registros": 56921,
+          "sha256": "93553885debbe9fb0b96b44cbac08c9db88263beaa49b61910c360b3d0f9e0b0"
+        },
+        "VERIFICACAO_METROLOGICA": {
+          "registros": 171669,
+          "sha256": "b9402793485163c18b27b1899b1cc5738e8934f7fb52dfd0d038a5c2fd1bb865"
+        }
+      },
+      "inventario_original_inalterado": true,
+      "marcacoes_com_gps_examinadas": 7463,
+      "marcacoes_nao_representadas": [],
+      "ocultacoes_explicitas_de_aliases": 0
+    },
+    "decisoes_aplicadas_nesta_auditoria": 0,
+    "depois": {
+      "dedup-1.0": {
+        "por_estado": {
+          "pendente": 5575
+        },
+        "por_nivel": {
+          "fraco": 1418,
+          "moderado": 4157
+        },
+        "total": 5575
+      },
+      "dedup-1.2": {
+        "por_estado": {
+          "pendente": 27482
+        },
+        "por_nivel": {
+          "contraditorio": 16287,
+          "fraco": 9062,
+          "moderado": 2133
+        },
+        "total": 27482
+      }
+    },
+    "diagnosticos_pendentes": 25349,
+    "fila_vigente_pendente": 2133,
+    "observacoes_equivalentes_agrupadas": 3148,
+    "pares_ja_associados": 0,
+    "propostas_por_escopo": {
+      "ambos": 253,
+      "equipamento": 378,
+      "ponto": 2008
+    },
+    "propostas_por_origem": {
+      "fontes_distintas": 912,
+      "mesma_fonte": 1221
+    },
+    "registros": 56921,
+    "registros_representantes": 53773,
+    "regra": "dedup-1.2"
+  },
+  "diagnostico_uf": {
+    "registros_com_situacao_usada_como_uf": 4767,
+    "valores_incorretos": {
+      "ATIVO": 2481,
+      "E/L OU CERTIFICADO VENCIDOS": 813,
+      "INOPERANTE": 1473
+    }
+  },
+  "reexecucao": {
+    "novos_candidatos": 0,
+    "candidatos_existentes": 27482,
+    "inventario_inalterado": true,
+    "fila_vigente_pendente": 2133,
+    "diagnosticos_pendentes": 25349,
+    "propostas_por_escopo": {
+      "ponto": 2008,
+      "equipamento": 378,
+      "ambos": 253
+    },
+    "propostas_por_origem": {
+      "fontes_distintas": 912,
+      "mesma_fonte": 1221
+    },
+    "sha256_original_preservado": "93d0245193cc4e87d62e5e5f6a23ab8dcbd8d415626ee2cf59f4dafd128fca6b"
+  },
+  "verificacao_api": {
+    "consultas": 54,
+    "ufs": [
+      "AC",
+      "AL",
+      "AM",
+      "AP",
+      "BA",
+      "CE",
+      "DF",
+      "ES",
+      "GO",
+      "MA",
+      "MG",
+      "MS",
+      "MT",
+      "PA",
+      "PB",
+      "PE",
+      "PI",
+      "PR",
+      "RJ",
+      "RN",
+      "RO",
+      "RR",
+      "RS",
+      "SC",
+      "SE",
+      "SP",
+      "TO"
+    ],
+    "raio_m": 1,
+    "comparacao_antes_depois": "mesmos_ids_e_coordenadas",
+    "divergencias": []
+  },
+  "copia_local_preparada": "dados/auditoria/fila-dedup-1.2.sqlite3",
+  "propostas_por_escopo_exclusivo": {
+    "somente_ponto": 1755,
+    "somente_equipamento": 125,
+    "ambos": 253
+  },
+  "auditoria_final_reexecucao": {
+    "antes": {
+      "dedup-1.0": {
+        "por_estado": {
+          "pendente": 5575
+        },
+        "por_nivel": {
+          "fraco": 1418,
+          "moderado": 4157
+        },
+        "total": 5575
+      },
+      "dedup-1.2": {
+        "por_estado": {
+          "pendente": 27482
+        },
+        "por_nivel": {
+          "contraditorio": 16287,
+          "fraco": 9062,
+          "moderado": 2133
+        },
+        "total": 27482
+      }
+    },
+    "candidatos_criados": 0,
+    "candidatos_existentes": 27482,
+    "conservacao": {
+      "antes": {
+        "EQUIPAMENTO": {
+          "registros": 50200,
+          "sha256": "c07b572fff7412a6230135d68b42817136e8fc6226f4c16ea1e3d091bd2981b5"
+        },
+        "FAIXA_FISCALIZACAO": {
+          "registros": 46114,
+          "sha256": "cf19d115d7bbb00fcc9fc08ebf95d7c6e18c6caeda1d77fdf2710fa8d8f8538d"
+        },
+        "INSTALACAO": {
+          "registros": 50200,
+          "sha256": "f2c791ff8e80076ddce070ba1c93a3800c88bad45c0d496521b8199b7bb3998e"
+        },
+        "LIMITE_VELOCIDADE": {
+          "registros": 40058,
+          "sha256": "5592921b162b75a8d8456690ec3791b7a22e9539489b9b9c5df41498788805b0"
+        },
+        "PONTO_FISCALIZACAO": {
+          "registros": 50200,
+          "sha256": "de8315f5d40595001bfc1ab69c5caec3035525ead068db75cfcf3d434f57394d"
+        },
+        "POSICAO_GEOGRAFICA": {
+          "registros": 9876,
+          "sha256": "ac70d37f14ae5ff57867c4d0282625f64bbb0db9936dd6834d29fc165fe1241a"
+        },
+        "REGIME_FISCALIZACAO": {
+          "registros": 50200,
+          "sha256": "591150bb5c08c60dd0caf165ba0c0768ee705b81b6d4fa42e58e9e45c555e0ce"
+        },
+        "REGISTRO_FONTE": {
+          "registros": 56921,
+          "sha256": "93553885debbe9fb0b96b44cbac08c9db88263beaa49b61910c360b3d0f9e0b0"
+        },
+        "VERIFICACAO_METROLOGICA": {
+          "registros": 171669,
+          "sha256": "b9402793485163c18b27b1899b1cc5738e8934f7fb52dfd0d038a5c2fd1bb865"
+        }
+      },
+      "depois": {
+        "EQUIPAMENTO": {
+          "registros": 50200,
+          "sha256": "c07b572fff7412a6230135d68b42817136e8fc6226f4c16ea1e3d091bd2981b5"
+        },
+        "FAIXA_FISCALIZACAO": {
+          "registros": 46114,
+          "sha256": "cf19d115d7bbb00fcc9fc08ebf95d7c6e18c6caeda1d77fdf2710fa8d8f8538d"
+        },
+        "INSTALACAO": {
+          "registros": 50200,
+          "sha256": "f2c791ff8e80076ddce070ba1c93a3800c88bad45c0d496521b8199b7bb3998e"
+        },
+        "LIMITE_VELOCIDADE": {
+          "registros": 40058,
+          "sha256": "5592921b162b75a8d8456690ec3791b7a22e9539489b9b9c5df41498788805b0"
+        },
+        "PONTO_FISCALIZACAO": {
+          "registros": 50200,
+          "sha256": "de8315f5d40595001bfc1ab69c5caec3035525ead068db75cfcf3d434f57394d"
+        },
+        "POSICAO_GEOGRAFICA": {
+          "registros": 9876,
+          "sha256": "ac70d37f14ae5ff57867c4d0282625f64bbb0db9936dd6834d29fc165fe1241a"
+        },
+        "REGIME_FISCALIZACAO": {
+          "registros": 50200,
+          "sha256": "591150bb5c08c60dd0caf165ba0c0768ee705b81b6d4fa42e58e9e45c555e0ce"
+        },
+        "REGISTRO_FONTE": {
+          "registros": 56921,
+          "sha256": "93553885debbe9fb0b96b44cbac08c9db88263beaa49b61910c360b3d0f9e0b0"
+        },
+        "VERIFICACAO_METROLOGICA": {
+          "registros": 171669,
+          "sha256": "b9402793485163c18b27b1899b1cc5738e8934f7fb52dfd0d038a5c2fd1bb865"
+        }
+      },
+      "inventario_original_inalterado": true,
+      "marcacoes_com_gps_examinadas": 7463,
+      "marcacoes_nao_representadas": [],
+      "ocultacoes_explicitas_de_aliases": 0
+    },
+    "decisoes_aplicadas_nesta_auditoria": 0,
+    "depois": {
+      "dedup-1.0": {
+        "por_estado": {
+          "pendente": 5575
+        },
+        "por_nivel": {
+          "fraco": 1418,
+          "moderado": 4157
+        },
+        "total": 5575
+      },
+      "dedup-1.2": {
+        "por_estado": {
+          "pendente": 27482
+        },
+        "por_nivel": {
+          "contraditorio": 16287,
+          "fraco": 9062,
+          "moderado": 2133
+        },
+        "total": 27482
+      }
+    },
+    "diagnosticos_pendentes": 25349,
+    "fila_vigente_pendente": 2133,
+    "observacoes_equivalentes_agrupadas": 3148,
+    "pares_ja_associados": 0,
+    "propostas_por_escopo": {
+      "ambos": 253,
+      "equipamento": 378,
+      "ponto": 2008
+    },
+    "propostas_por_origem": {
+      "fontes_distintas": 912,
+      "mesma_fonte": 1221
+    },
+    "registros": 56921,
+    "registros_representantes": 53773,
+    "regra": "dedup-1.2"
+  },
+  "suite": {
+    "executados": 701,
+    "falhas": 0,
+    "erros": 0,
+    "pulados": 0
+  },
+  "verificadores_aprovados": 6
+}
