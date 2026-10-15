@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import shutil
+import sqlite3
 
 from core import config
 from core import db as dbmod
@@ -225,6 +226,10 @@ class ColetorBase(object):
                        "ORDER BY id DESC LIMIT 1", (recurso_id,))
         if row is None:
             return False
+        ##-- BUNDITA DE URSO #{9} -- Conteudo de uma tentativa rejeitada precisa poder ser reprocessado. ##
+        if not dbmod.scalar(self.conn, "SELECT 1 FROM EXECUCAO_COLETA "
+                            "WHERE artefato_id=? AND status='ok' LIMIT 1", (row["id"],)):
+            return False
         hs = [r[0] for r in dbmod.query_all(
             self.conn, "SELECT hash_registro FROM REGISTRO_FONTE "
                        "WHERE artefato_id = ? ORDER BY id", (row["id"],))]
@@ -268,6 +273,15 @@ class ColetorBase(object):
         return None
 
     # -- orquestracao ------------------------------------------------------
+    ##-- BUNDITA DE URSO #{9} -- Rejeicoes perdiam a causa e falhas do programa eram publicadas como sucesso. ##
+    def _rejeitar(self, registro_id, exec_id, codigo, descricao):
+        self.conn.execute("UPDATE REGISTRO_FONTE SET status_validacao='rejeitado' WHERE id=?",
+                          (registro_id,))
+        dbmod.insert(self.conn, "ERRO_VALIDACAO", {
+            "registro_id": registro_id, "execucao_id": exec_id,
+            "codigo_erro": codigo, "descricao": descricao[:500],
+            "severidade": "erro", "registrado_em": agora_utc()})
+
     def _ingerir_registros(self, conteudo, ext, mime, registros, exec_id,
                            recurso_id, publicar=True, fonte_id=None):
         """Ingere uma lista de registros ja parseados (nucleo reutilizavel).
@@ -276,12 +290,14 @@ class ColetorBase(object):
         imutavel -> REGISTRO_FONTE -> normalizar -> upsert (inserir_normalizado).
         Retorna o resumo com contadores ``criados``/``atualizados``/``rejeitados``.
         """
+        ##-- BUNDITA DE URSO #{9} -- Registrar rejeicoes de dados e deixar falhas inesperadas abortarem a transacao. ##
         from coletor.fontes import normalizacao as nz  # noqa: F401
         artefato_id, h, caminho = self.registrar_artefato(
             recurso_id, conteudo, ext, mime)
         criados = 0
         atualizados = 0
         rejeitados = 0
+        ignorados = 0
         detalhes = []       # por registro aceito: indice/registro/ponto
         pendentes = []      # (idx, reg_id, d) normalizados, ainda nao inseridos
         for idx, raw in enumerate(registros):
@@ -293,15 +309,24 @@ class ColetorBase(object):
                     self.conn,
                     "SELECT 1 AS x FROM VINCULO_REGISTRO_PONTO "
                     "WHERE registro_id=? LIMIT 1", (reg_id,)) is not None:
+                ignorados += 1
                 continue
             if dbmod.query_one(
                     self.conn,
                     "SELECT 1 AS x FROM TRECHO_ELEGIVEL "
                     "WHERE registro_fonte_id=? LIMIT 1",
                     (reg_id,)) is not None:
+                ignorados += 1
                 continue
-            d = self.normalizar(idx, raw)
+            try:
+                d = self.normalizar(idx, raw)
+            except ValueError as exc:
+                self._rejeitar(reg_id, exec_id, type(exc).__name__, str(exc))
+                rejeitados += 1
+                continue
             if d is None:
+                self._rejeitar(reg_id, exec_id, "registro_nao_normalizavel",
+                               "O conector nao reconheceu um registro valido nesta entrada")
                 rejeitados += 1
                 continue
             pendentes.append((idx, reg_id, d))
@@ -338,20 +363,29 @@ class ColetorBase(object):
                                      "ponto_id": res.get("ponto_id"),
                                      "ponto_criado": bool(
                                          res.get("ponto_criado"))})
-            except Exception:                       # noqa: BLE001
+            except (ValueError, sqlite3.IntegrityError) as exc:
                 self.conn.execute("ROLLBACK TO reg")
                 self.conn.execute("RELEASE reg")
+                self._rejeitar(reg_id, exec_id, type(exc).__name__, str(exc))
                 rejeitados += 1
                 continue
             self.conn.execute("RELEASE reg")
-        self.conn.commit()
+            self.conn.execute("UPDATE REGISTRO_FONTE SET status_validacao='ok' WHERE id=?", (reg_id,))
         snap_id = None
         versao = None
-        if publicar:
+        status = ("erro" if registros and rejeitados == len(registros)
+                  else "sem_mudanca" if ignorados == len(registros) and registros
+                  else "sem_dados" if not registros else "ok")
+        # Publicacao e dados normalizados compartilham a mesma transacao.
+        # Um lote vazio/rejeitado nao atesta atualidade nem substitui o snapshot bom.
+        if publicar and status == "ok":
             snap_id, versao = self.publicar_snapshot(
                 [(recurso_id, artefato_id)],
                 resumo="%d criados, %d atualizados" % (criados, atualizados))
+        else:
+            self.conn.commit()
         return {
+            "status": status,
             "fonte": self.FONTE["nome"],
             "recurso_id": recurso_id, "artefato_id": artefato_id,
             "execucao_id": exec_id, "snapshot_id": snap_id,
@@ -359,6 +393,7 @@ class ColetorBase(object):
             "linhas_recebidas": len(registros),
             "criados": criados, "atualizados": atualizados,
             "rejeitados": rejeitados,
+            "ignorados": ignorados,
             "detalhes": detalhes,
         }
 
@@ -400,8 +435,10 @@ class ColetorBase(object):
             resumo = self._ingerir_registros(
                 conteudo, ext, mime, registros, exec_id, recurso_id,
                 publicar=publicar, fonte_id=fonte_id)
+            ##-- BUNDITA DE URSO #{9} -- Persistir o resultado real do lote, em vez de declarar sucesso incondicional. ##
             self.encerrar_execucao(
-                exec_id, "ok", artefato_id=resumo["artefato_id"],
+                exec_id, resumo["status"], artefato_id=resumo["artefato_id"],
+                erro_codigo="lote_sem_registros_validos" if resumo["status"] == "erro" else None,
                 linhas_recebidas=resumo["linhas_recebidas"],
                 linhas_validas=resumo["criados"] + resumo["atualizados"],
                 linhas_rejeitadas=resumo["rejeitados"],
@@ -438,8 +475,10 @@ class ColetorBase(object):
             resumo = self._ingerir_registros(
                 conteudo, ext, mime, registros, exec_id, recurso_id,
                 publicar=publicar, fonte_id=fonte_id)
+            ##-- BUNDITA DE URSO #{9} -- Persistir o resultado real do lote, em vez de declarar sucesso incondicional. ##
             self.encerrar_execucao(
-                exec_id, "ok", artefato_id=resumo["artefato_id"],
+                exec_id, resumo["status"], artefato_id=resumo["artefato_id"],
+                erro_codigo="lote_sem_registros_validos" if resumo["status"] == "erro" else None,
                 linhas_recebidas=resumo["linhas_recebidas"],
                 linhas_validas=resumo["criados"] + resumo["atualizados"],
                 linhas_rejeitadas=resumo["rejeitados"],

@@ -12,6 +12,7 @@ from core import config
 from core import db as dbmod
 from core import governanca as gov
 from coletor.fontes.base_lwb import ColetorBaseLWB
+from coletor.fontes.antt import ColetorANTT
 from web import nucleo
 import tests.common as common
 
@@ -85,12 +86,13 @@ class BaseGov(unittest.TestCase):
             con.close()
         return valor
 
+    ##-- BUNDITA DE URSO #{8} -- Fixture oficial precisa de fonte governamental, nao do rotulo padrao da base propria. ##
     def _oficial(self, lat, lon, ident):
         con = dbmod.connect(config.DB_PATH)
         try:
-            c = ColetorBaseLWB(conn=con)
-            c.ingerir_registros([{"latitude": lat, "longitude": lon,
-                                  "identificador": ident}], publicar=False)
+            c = ColetorANTT(conn=con)
+            c.ingerir_registros([{"Latitude": lat, "Longitude": lon,
+                                  "Codigo": ident}], publicar=False)
         finally:
             con.close()
 
@@ -237,14 +239,15 @@ class TestSubmissaoPublica(BaseGov):
         self.assertEqual(self._doc((status, _h, corpo))["erro"]["detalhes"][0]
                          ["tipo"], "marcacao_falsa")
 
-    def test_correspondencia_com_oficial_corrobora(self):
+    def test_correspondencia_com_oficial_apenas_sugere_revisao(self):
         self._oficial(-23.5500, -46.6300, "OFICIAL-1")
         status, _h, corpo = self._req(
             "POST", "/api/v1/radares/submeter",
             {"latitude": -23.5501, "longitude": -46.6301})
         self.assertEqual(status, 201, corpo)
         doc = self._doc((status, _h, corpo))
-        self.assertEqual(doc["resultado"]["corroborados"], 1)
+        self.assertEqual(doc["resultado"]["corroborados"], 0)
+        self.assertEqual(doc["resultado"]["correspondencias_sugeridas"], 1)
         con = dbmod.connect(config.DB_PATH)
         try:
             colab = con.execute(
@@ -252,7 +255,7 @@ class TestSubmissaoPublica(BaseGov):
                 "'colaborativo'").fetchone()["id"]
             self.assertEqual(con.execute(
                 "SELECT verificacao_status FROM PONTO_FISCALIZACAO WHERE id=?",
-                (colab,)).fetchone()[0], "verificado")
+                (colab,)).fetchone()[0], "nao_verificado")
             cp = con.execute(
                 "SELECT * FROM CORRESPONDENCIA_PONTO WHERE "
                 "ponto_colaborativo_id=?", (colab,)).fetchone()
@@ -381,7 +384,7 @@ class TestGestaoRadar(BaseGov):
         doc = self._doc((status, _h, corpo))
         self.assertGreaterEqual(doc["resultado"]["total"], 1)
 
-    def test_consulta_publica_esconde_removido_e_prefere_colaborativo(self):
+    def test_consulta_publica_preserva_oficial_ate_revisao(self):
         self._admin()
         cookie = self._sessao()
         # oficial + dois colaborativos (um correspondente, outro removido)
@@ -391,15 +394,14 @@ class TestGestaoRadar(BaseGov):
         self._req("POST", "/api/v1/gestao/radar/%d/remover" % removido,
                   {"motivo": "duplicado"},
                   headers={"HTTP_COOKIE": cookie})
-        # consulta no ponto do oficial: so o colaborativo aparece (oficial
-        # escondido; removido escondido)
+        # Proximidade nao substitui o cadastro oficial. O removido fica oculto.
         status, _h, corpo = self._req(
             "GET", "/api/v1/radares",
             query="lat=-23.5500&lon=-46.6300&raio=500")
         self.assertEqual(status, 200, corpo)
         doc = self._doc((status, _h, corpo))
         ids = [p["id"] for p in doc["resultado"]["pontos"]]
-        self.assertEqual(ids, ["P-%d" % pid])
+        self.assertEqual(ids, ["P-1", "P-%d" % pid])
         # a coordenada removida nao aparece
         status, _h, corpo = self._req(
             "GET", "/api/v1/radares",

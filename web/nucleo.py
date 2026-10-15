@@ -7,6 +7,7 @@ somente o banco local ja validado (spec 13.1).
 """
 import datetime
 import hmac
+import ipaddress
 import json
 import os
 import re
@@ -331,14 +332,15 @@ def ajuda_texto():
         "    (sem token): entra como colaborativo NAO verificado e publica na",
         "    hora, com rate limit por IP e procedencia (IP/user-agent/quando).",
         "  - Se houver ponto OFICIAL no raio de correspondencia (config",
-        "    RAIO_CORRESPONDENCIA_M), o colaborativo e corroborado",
-        "    automaticamente e ganha vinculo em CORRESPONDENCIA_PONTO.",
+        ##-- BUNDITA DE URSO #{8} -- A ajuda precisa distinguir proximidade de verificacao por moderador. ##
+        "    RAIO_CORRESPONDENCIA_M), cria-se uma sugestao de correspondencia;",
+        "    o colaborativo continua NAO verificado ate revisao.",
         "  - Geofencing: coordenada dentro de BLOQUEIO_GEOGRAFICO ativo",
         "    (marcacao_falsa / zona_sombra) e recusada com 409 e motivo.",
         "  - Gestao exige sessao (login) ou cabecalho X-Api-Token; escopos:",
         "    contribuidor (le) < moderador (verifica/edita/remove) < admin",
         "    (usuarios, tokens, bloqueios). Remocao e TOMBSTONE: nada e apagado.",
-        "  - Consulta publica PREFERE o colaborativo e esconde removidos e",
+        "  - Consulta publica preserva o oficial ate decisao de moderacao e esconde removidos e",
         "    desabilitados; GET /api/v1/radares/{id}/historico e publico.",
     ])
     linhas.append("")
@@ -460,6 +462,7 @@ def _erro(status, codigo, mensagem, campo=None):
     return status, {"Content-Type": "application/json; charset=utf-8"}, body
 
 
+##-- BUNDITA DE URSO #{10} -- Sem medicao de idade nao existe evidencia para afirmar cache fresco. ##
 def _base_meta():
     return {
         "versao_api": config.API_VERSION,
@@ -474,7 +477,7 @@ def _base_meta():
             "idade_snapshot_segundos": None,
             "ultima_sincronizacao_valida": None,
             "idade_publicacao_origem_segundos": None,
-            "status_cache": "fresco", "alertas": [],
+            "status_cache": "desconhecido", "alertas": [],
         },
     }
 
@@ -687,8 +690,25 @@ def _pid(parte):
 
 
 def _ip_requisicao(environ):
-    return (environ.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
-            or environ.get("REMOTE_ADDR"))
+    ##-- BUNDITA DE URSO #{12} -- X-Forwarded-For arbitrario permitia trocar IP e contornar o rate limit. ##
+    remoto = environ.get("REMOTE_ADDR") or "desconhecido"
+    redes = []
+    for especificacao in config.TRUSTED_PROXIES:
+        try:
+            redes.append(ipaddress.ip_network(especificacao, strict=False))
+        except ValueError:
+            continue  # Configuracao invalida nunca amplia a confianca.
+    try:
+        ip = ipaddress.ip_address(remoto)
+        if not any(ip in rede for rede in redes):
+            return remoto
+        for parte in reversed(environ.get("HTTP_X_FORWARDED_FOR", "").split(",")):
+            ip = ipaddress.ip_address(parte.strip())
+            if not any(ip in rede for rede in redes):
+                return str(ip)
+    except ValueError:
+        pass
+    return remoto
 
 
 def _consulta_params(environ):
@@ -1041,13 +1061,23 @@ def handle_request(environ, stdin_bytes=b""):
         return 200, {"Content-Type": ctype}, corpo
 
     # --- endpoints com banco -------------------------------------------------
-    conn = _conn()
     if caminho in ("/health/ready", "/api/v1/health/ready"):
-        if conn is None:
+        ##-- BUNDITA DE URSO #{11} -- Arquivo existente nao comprova banco legivel nem schema inicializado. ##
+        conn = None
+        try:
+            conn = _conn()
+            pronto = conn is not None and dbmod.esquema_carregado(conn)
+        except Exception:
+            pronto = False
+        finally:
+            if conn is not None:
+                conn.close()
+        if not pronto:
             return 503, {"Content-Type": "application/json; charset=utf-8"}, \
-                {"status": "not-ready", "motivo": "banco ausente"}
-        conn.close()
+                {"status": "not-ready", "motivo": "banco ausente, ilegivel ou nao inicializado"}
         return 200, {"Content-Type": "application/json; charset=utf-8"}, {"status": "ready"}
+
+    conn = _conn()
 
     if conn is None:
         return _erro(503, "snapshot_indisponivel",
@@ -1192,7 +1222,8 @@ def _radares(conn, params, formato, delimitador):
         operacoes.extend(registro.get("operacoes") or [])
     res["operacoes"] = operacoes
     res["total_operacoes"] = len(operacoes)
-    res["status"] = "completo" if res["total_pontos"] else "sem_cobertura"
+    ##-- BUNDITA DE URSO #{10} -- Encontrar um ponto nao comprova cobertura completa do territorio. ##
+    res["status"] = "parcial" if res["total_pontos"] else "sem_cobertura"
     res["encontrado"] = bool(res["total_pontos"])
 
     if incluir_trechos:
@@ -1242,7 +1273,8 @@ def _envelope(st, consulta, resultado):
     meta["cobertura"]["fontes_ativas"] = [f["nome"] for f in st["fontes"]]
     meta["base"]["snapshot_id"] = st["snapshot_id"]
     meta["base"]["publicado_em"] = st["publicado_em"]
-    meta["base"]["status_cache"] = "fresco" if st["snapshot_id"] else "sem_cache"
+    ##-- BUNDITA DE URSO #{10} -- Ter snapshot nao demonstra atualidade das publicacoes de origem. ##
+    meta["base"]["status_cache"] = "desconhecido" if st["snapshot_id"] else "sem_cache"
     return meta
 
 

@@ -11,6 +11,7 @@ import sqlite3
 from . import db as dbmod
 from . import geo
 from . import georesolver
+from .identidade import VisaoCanonica
 
 _PONTO_SQL = """
 SELECT p.id AS ponto_id, p.km AS km, p.tipo_pista AS tipo_pista,
@@ -45,6 +46,7 @@ def _bbox_clause(lat_min, lat_max, lon_min, lon_max, cruza):
             [lat_min, lat_max, lon_min, lon_max])
 
 
+##-- BUNDITA DE URSO #{17} -- A UF de um alias nao pode alterar a localizacao original escolhida para o canonico. ##
 def _uf_original(conn, pid):
     """UF derivada do payload original quando NAO ha municipio cadastrado.
 
@@ -56,7 +58,7 @@ def _uf_original(conn, pid):
             conn, "SELECT r.payload_original AS p "
             "FROM VINCULO_REGISTRO_PONTO vp "
             "JOIN REGISTRO_FONTE r ON r.id=vp.registro_id "
-            "WHERE vp.ponto_id=? ORDER BY r.id", (pid,)):
+            "WHERE vp.ponto_id=? AND vp.decisao_id IS NULL ORDER BY r.id", (pid,)):
         try:
             d = json.loads(r["p"])
         except (ValueError, TypeError):
@@ -128,16 +130,14 @@ def _filtros_extra(filtros, conn=None):
             "WHERE mf.codigo = ?)")
         params.append(filtros["modalidade"])
     # GOVERNANCA: esconde removidos (tombstone) e desabilitados e, quando ha
-    # um colaborativo ativo correspondente a um oficial, prefere o colaborativo
-    # (esconde o oficial "perdedor"). Seguro se a base ainda nao tem a camada.
+    # uma decisao explicita de moderacao, pode preferir o colaborativo.
+    # Proximidade sozinha nunca oculta o oficial. Bases antigas sao suportadas.
     if conn is not None:
-        try:
-            from . import governanca as _gov
-            gclauses, gparams = _gov.clausulas_consulta(conn)
-            clauses.extend(gclauses)
-            params.extend(gparams)
-        except Exception:                       # noqa: BLE001
-            pass
+        ##-- BUNDITA DE URSO #{8} -- Erro de governanca nao pode desativar silenciosamente os filtros de remocao. ##
+        from . import governanca as _gov
+        gclauses, gparams = _gov.clausulas_consulta(conn)
+        clauses.extend(gclauses)
+        params.extend(gparams)
     return clauses, params
 
 
@@ -199,6 +199,7 @@ def _pontos_inferidos_dentro(conn, lat, lon, raio, filtros):
     return saida
 
 
+##-- BUNDITA DE URSO #{1} -- Consultas ignoravam a unificacao e contavam entidades duplicadas. ##
 def buscar_pontos(conn, lat, lon, raio, filtros=None, limite=100, cursor=None):
     """Retorna (records, meta) com pontos dentro do raio, ordenados por
     distancia. `meta` traz total_pontos/total_equipamentos/proximo_cursor."""
@@ -212,9 +213,14 @@ def buscar_pontos(conn, lat, lon, raio, filtros=None, limite=100, cursor=None):
     sql = _PONTO_SQL + " WHERE " + where
     rows = dbmod.query_all(conn, sql, bbox_params + extra_params)
 
+    visao = VisaoCanonica(conn)
     uf_filtro = (filtros.get("uf") or "").upper() or None
     dentro = []
+    encontrados = set()
     for r in rows:
+        r = _linha_canonica(conn, r, visao)
+        if r is None or r["ponto_id"] in encontrados:
+            continue
         if r["latitude"] is None or r["longitude"] is None:
             continue
         if uf_filtro and _uf_do_ponto(conn, r) != uf_filtro:
@@ -222,50 +228,61 @@ def buscar_pontos(conn, lat, lon, raio, filtros=None, limite=100, cursor=None):
         dist = geo.haversine_m(lat, lon, r["latitude"], r["longitude"])
         if dist <= raio:
             dentro.append((dist, r))
+            encontrados.add(r["ponto_id"])
     dentro.sort(key=lambda t: (t[0], t[1]["ponto_id"]))
 
     inferidos = _pontos_inferidos_dentro(conn, lat, lon, raio, filtros)
     uf_inf = (filtros.get("uf") or "").upper() or None
-    n_inferidos = 0
     for dist, r in inferidos:
+        r = _linha_canonica(conn, r, visao)
+        if r is None or r["ponto_id"] in encontrados:
+            continue
+        if r["latitude"] is None or r["longitude"] is None:
+            continue
+        dist = geo.haversine_m(lat, lon, r["latitude"], r["longitude"])
+        if dist > raio:
+            continue
         if uf_inf and _uf_do_ponto(conn, r) != uf_inf:
             continue
         dentro.append((dist, r))
-        n_inferidos += 1
+        encontrados.add(r["ponto_id"])
     dentro.sort(key=lambda t: (t[0], t[1]["ponto_id"]))
 
-    total = len(dentro)
-    offset = 0
-    if cursor:
-        try:
-            offset = int(cursor)
-        except (TypeError, ValueError):
-            offset = 0
-    recorte = dentro[offset:offset + limite]
-    proximo = None
-    if offset + limite < total:
-        proximo = str(offset + limite)
-
     incluir_operacoes = filtros.get("incluir_operacoes", True)
-    pontual_filtro = filtros.get("fiscalizacao_pontual")
-    records = []
-    total_equip = 0
-    for dist, r in recorte:
-        registro = montar_registro(conn, r, distancia_metros=round(dist, 3),
-                                   incluir_operacoes=incluir_operacoes)
-        if pontual_filtro is not None:
-            if registro.get("fiscalizacao_pontual") is None:
-                continue                     # desconhecido fica fora
-            if bool(registro["fiscalizacao_pontual"]) != bool(pontual_filtro):
-                continue
-        records.append(registro)
-        total_equip += len(registro.get("equipamentos") or [])
+    pontual = filtros.get("fiscalizacao_pontual")
+    pre_montados = {}
+    ##-- BUNDITA DE URSO #{15} -- Filtrar depois de paginar produzia totais e paginas incorretos. ##
+    if pontual is not None:
+        filtrados = []
+        for dist, row in dentro:
+            registro = montar_registro(conn, row, round(dist, 3), incluir_operacoes, visao)
+            ##-- BUNDITA DE URSO #{21} -- Regimes mistos satisfazem ambos os filtros; um regime nao pode apagar o outro. ##
+            modalidades = {rg["modalidade_fiscalizacao"] == "pontual"
+                           for rg in registro["regimes"]
+                           if rg.get("modalidade_fiscalizacao") not in (None, "", "desconhecida")}
+            if bool(pontual) in modalidades:
+                filtrados.append((dist, row))
+                pre_montados[row["ponto_id"]] = registro
+        dentro = filtrados
+    total = len(dentro)
+    offset = max(0, _offset_cursor(cursor))
+    recorte = dentro[offset:offset + limite]
+    records = [pre_montados.get(r["ponto_id"]) or montar_registro(
+        conn, r, round(dist, 3), incluir_operacoes, visao) for dist, r in recorte]
+    # Contagem de instrumentos de todo o resultado, nao so da pagina.
+    pontos = {m for _, r in dentro for m in visao.membros("ponto", r["ponto_id"])}
+    equipamentos = set()
+    if pontos:
+        # Consultas por ponto evitam exceder o limite de parametros SQLite.
+        for pid in pontos:
+            equipamentos.update(visao.canonico("equipamento", row[0]) for row in conn.execute(
+                "SELECT equipamento_id FROM INSTALACAO WHERE ponto_id=?", (pid,)))
     return records, {
         "total_pontos": total,
-        "total_equipamentos": total_equip,
+        "total_equipamentos": len(equipamentos),
         "retornados": len(records),
-        "proximo_cursor": proximo,
-        "total_inferidos": n_inferidos,
+        "proximo_cursor": str(offset + limite) if offset + limite < total else None,
+        "total_inferidos": sum(r["qualidade"] == georesolver.QUALIDADE_INFERIDA for _, r in dentro),
     }
 
 
@@ -336,7 +353,7 @@ def _top_velocidade(resolvidos, categoria):
     return None
 
 
-def montar_registro(conn, r, distancia_metros=None, incluir_operacoes=True):
+def _montar_registro_original(conn, r, distancia_metros=None, incluir_operacoes=True):
     pid = r["ponto_id"]
     reg = _row_to_base(r, distancia_metros)
     if reg["localizacao"].get("uf") is None:
@@ -487,11 +504,116 @@ def montar_registro(conn, r, distancia_metros=None, incluir_operacoes=True):
     return reg
 
 
+def _unicos(itens):
+    vistos, saida = set(), []
+    for item in itens:
+        chave = json.dumps(item, sort_keys=True, ensure_ascii=False)
+        if chave not in vistos:
+            vistos.add(chave)
+            saida.append(item)
+    return saida
+
+
+##-- BUNDITA DE URSO #{1} -- Aliases precisam resolver o ponto vencedor sem ressuscitar entidades removidas. ##
+def _linha_canonica(conn, row, visao):
+    pid = visao.canonico("ponto", row["ponto_id"])
+    if pid == row["ponto_id"]:
+        return row
+    # Uma entidade removida/desabilitada nao pode reaparecer por um alias.
+    from . import governanca
+    clausulas, params = governanca.clausulas_consulta(conn)
+    sql = _PONTO_SQL + " WHERE p.id=?"
+    canonico = dbmod.query_one(conn, sql, (pid,))
+    if canonico is None:
+        return row
+    ##-- BUNDITA DE URSO #{20} -- Escolher o ID canonico nao pode apagar GPS divergente, valido ou inferido de outra fonte. ##
+    localizado = row["latitude"] is not None and row["longitude"] is not None
+    if localizado and any(row[k] != canonico[k] for k in ("latitude", "longitude")):
+        return row
+    # Filtros foram satisfeitos pela observacao original. Nao trocar seus
+    # atributos por uma versao inativa ou de outra UF/via depois do filtro.
+    if any(row[k] != canonico[k] for k in
+           ("codigo_ibge", "via_codigo", "km", "situacao_operacional")):
+        return row
+    if _uf_do_ponto(conn, row) != _uf_do_ponto(conn, canonico):
+        return row
+    if clausulas:
+        # Uma remocao do canonico so oculta aliases equivalentes. Outra
+        # posicao publicada e uma divergencia preservada, nao uma exclusao.
+        return dbmod.query_one(conn, sql + " AND " + " AND ".join(clausulas), [pid] + params)
+    return canonico
+
+
+##-- BUNDITA DE URSO #{1} -- Consolidar requer preservar faixas, fontes e divergencias dos pontos originais. ##
+def montar_registro(conn, r, distancia_metros=None, incluir_operacoes=True, visao=None):
+    visao = visao or VisaoCanonica(conn)
+    r = _linha_canonica(conn, r, visao)
+    if r is None:
+        return None
+    pid = r["ponto_id"]
+    reg = _montar_registro_original(conn, r, distancia_metros, incluir_operacoes)
+    membros = visao.membros("ponto", pid)
+    campos_lista = ("faixas", "limites_velocidade", "regimes", "equipamentos",
+                    "organizacoes", "documentos", "fontes", "operacoes")
+    for outro in membros:
+        if outro == pid:
+            continue
+        row = dbmod.query_one(conn, _PONTO_SQL + " WHERE p.id=?", (outro,))
+        if row is None:
+            continue
+        original = _montar_registro_original(conn, row, incluir_operacoes=incluir_operacoes)
+        for campo in campos_lista:
+            reg[campo].extend(original[campo])
+        ##-- BUNDITA DE URSO #{20} -- Ausencia de GPS nao e uma coordenada contraditoria; preservar e comparar apenas valores publicados. ##
+        comparaveis = [(original["localizacao"].get(k), reg["localizacao"].get(k))
+                      for k in ("latitude", "longitude", "km", "uf", "codigo_ibge")]
+        comparaveis.append((original["localizacao"]["via"].get("codigo"),
+                            reg["localizacao"]["via"].get("codigo")))
+        if any(a is not None and b is not None and a != b for a, b in comparaveis):
+            reg["conflitos"].append({"campo": "localizacao", "ponto_original_id": original["id"],
+                                     "valor_original": original["localizacao"]})
+    for campo in campos_lista:
+        reg[campo] = _unicos(reg[campo])
+    # Mesmo instrumento em duas instalacoes e uma entidade, com ambos os historicos.
+    equipamentos, vistos = [], set()
+    for equip in reg["equipamentos"]:
+        eid = visao.canonico("equipamento", int(equip["id"][2:]))
+        if eid in vistos:
+            continue
+        vistos.add(eid)
+        if len(visao.membros("equipamento", eid)) > 1:
+            equip = buscar_equipamento_por_id(conn, eid, visao=visao)
+        equipamentos.append(equip)
+    reg["equipamentos"] = equipamentos
+    reg["tipos_radar_presentes"] = sorted({e["tipo_radar"] for e in equipamentos if e["tipo_radar"]})
+    resolvidos, conflitos = _resolver_velocidades(reg["limites_velocidade"])
+    reg["velocidades_resolvidas"] = resolvidos
+    for categoria in ("leves", "pesados", "geral"):
+        reg["velocidade_" + categoria + "_kmh"] = _top_velocidade(resolvidos, categoria)
+    reg["conflitos"] = _unicos(reg["conflitos"] + conflitos)
+    reg["fiscalizacao_pontual"] = _derivar_pontual(reg["regimes"])
+    if reg["conflitos"]:
+        reg["confianca"] = "conflitante"
+    if len(membros) > 1:
+        reg["aliases"] = ["P-%d" % i for i in membros if i != pid]
+        ##-- BUNDITA DE URSO #{20} -- Uma marcacao preservada precisa informar sua identidade comum sem perder a coordenada original. ##
+        reg["ponto_canonico_id"] = "P-%d" % visao.canonico("ponto", pid)
+        reg["proveniencia_campos"]["reconciliacao"] = {
+            "ponto_canonico_id": reg["ponto_canonico_id"],
+            "marcacao_original_id": reg["id"],
+            "pontos_originais": ["P-%d" % i for i in membros],
+        }
+    return reg
+
+
 def _derivar_pontual(regimes):
     if not regimes:
         return None
     modalidades = [rg.get("modalidade_fiscalizacao") for rg in regimes]
     if any(m == "pontual" for m in modalidades):
+        ##-- BUNDITA DE URSO #{21} -- Modalidades permanente e pontual coexistentes nao cabem num unico booleano. ##
+        if any(m not in (None, "", "pontual", "desconhecida") for m in modalidades):
+            return None
         return True
     if all(m and m != "desconhecida" for m in modalidades):
         return False
@@ -560,15 +682,18 @@ def operacoes_do_ponto(conn, pid):
     return out
 
 
+##-- BUNDITA DE URSO #{1} -- O detalhe de um alias deve retornar a mesma entidade canonica da busca. ##
 def buscar_ponto_por_id(conn, pid_str):
     try:
         pid = int(str(pid_str).upper().replace("P-", ""))
     except (TypeError, ValueError):
         return None
+    visao = VisaoCanonica(conn)
+    ##-- BUNDITA DE URSO #{20} -- O detalhe do alias tambem precisa preservar a posicao que aparece no mapa. ##
     r = dbmod.query_one(conn, _PONTO_SQL + " WHERE p.id = ?", (pid,))
     if r is None:
         return None
-    return montar_registro(conn, r)
+    return montar_registro(conn, r, visao=visao)
 
 
 def listar_fontes(conn):
@@ -600,12 +725,16 @@ def listar_fontes(conn):
     return out
 
 
+##-- BUNDITA DE URSO #{1} -- As contagens publicas ainda somavam aliases como entidades distintas. ##
 def status_base(conn):
     snap = dbmod.query_one(
         conn, "SELECT id, identificador_versao, publicado_em, status "
         "FROM SNAPSHOT_PUBLICADO ORDER BY publicado_em DESC LIMIT 1")
     total_pontos = dbmod.scalar(conn, "SELECT count(*) FROM PONTO_FISCALIZACAO")
     total_equip = dbmod.scalar(conn, "SELECT count(*) FROM EQUIPAMENTO")
+    visao = VisaoCanonica(conn)
+    total_pontos -= len(visao.aliases("ponto"))
+    total_equip -= len(visao.aliases("equipamento"))
     total_fontes = dbmod.scalar(conn, "SELECT count(*) FROM FONTE")
     return {
         "snapshot_id": (snap["identificador_versao"] if snap else None),
@@ -991,7 +1120,7 @@ def _situacao_metrologica(validade_ate):
     return "vencida" if vencida else "valida"
 
 
-def montar_equipamento(conn, r):
+def _montar_equipamento_original(conn, r):
     eid = r["equipamento_id"]
     instalacoes = []
     funcao = None
@@ -1086,15 +1215,57 @@ def montar_equipamento(conn, r):
     }
 
 
-def buscar_equipamento_por_id(conn, ident):
+##-- BUNDITA DE URSO #{1} -- Um instrumento consolidado precisa manter todas as instalacoes e verificacoes. ##
+def montar_equipamento(conn, r, visao=None):
+    visao = visao or VisaoCanonica(conn)
+    eid = visao.canonico("equipamento", r["equipamento_id"])
+    if eid != r["equipamento_id"]:
+        r = dbmod.query_one(conn, _EQUIP_SQL, (eid,))
+    reg = _montar_equipamento_original(conn, r)
+    membros = visao.membros("equipamento", eid)
+    for outro in membros:
+        if outro == eid:
+            continue
+        row = dbmod.query_one(conn, _EQUIP_SQL, (outro,))
+        original = _montar_equipamento_original(conn, row)
+        for campo in ("instalacoes", "verificacoes_metrologicas", "identificadores_oficiais"):
+            reg[campo].extend(original[campo])
+    for campo in ("instalacoes", "identificadores_oficiais"):
+        reg[campo] = _unicos(reg[campo])
+    for instalacao in reg["instalacoes"]:
+        if instalacao["ponto_id"]:
+            instalacao["ponto_id"] = "P-%d" % visao.canonico("ponto", int(instalacao["ponto_id"][2:]))
+    ##-- BUNDITA DE URSO #{1} -- Certificado sem data ou executor nao basta para eliminar uma verificacao do historico. ##
+    vistos, verificacoes = {}, []
+    for verificacao in reg["verificacoes_metrologicas"]:
+        certificado = (verificacao["numero_certificado"] and verificacao["data_verificacao"]
+                       and verificacao["orgao_executor"])
+        chave = tuple(verificacao.get(k) for k in
+                      ("numero_certificado", "data_verificacao", "tipo_verificacao", "orgao_executor",
+                       "resultado", "validade_ate", "norma_aplicada")) if certificado else verificacao["id"]
+        if chave in vistos:
+            vistos[chave].setdefault("aliases", []).append(verificacao["id"])
+        else:
+            vistos[chave] = verificacao
+            verificacoes.append(verificacao)
+    reg["verificacoes_metrologicas"] = verificacoes
+    if len(membros) > 1:
+        reg["aliases"] = ["E-%d" % i for i in membros if i != eid]
+    return reg
+
+
+##-- BUNDITA DE URSO #{1} -- IDs de equipamento reconciliados nao eram resolvidos nas consultas. ##
+def buscar_equipamento_por_id(conn, ident, visao=None):
     try:
         eid = int(str(ident).upper().replace("E-", ""))
     except (TypeError, ValueError):
         return None
+    visao = visao or VisaoCanonica(conn)
+    eid = visao.canonico("equipamento", eid)
     r = dbmod.query_one(conn, _EQUIP_SQL, (eid,))
     if r is None:
         return None
-    return montar_equipamento(conn, r)
+    return montar_equipamento(conn, r, visao=visao)
 
 
 # =========================================================================
@@ -1270,24 +1441,28 @@ def buscar_trafego(conn, limite=100, ponto_id=None, cursor=None):
 # =========================================================================
 # Mesma projecao de /radares. Cobertura parcial: ausencia de resultado NAO
 # prova ausencia de fiscalizacao.
+##-- BUNDITA DE URSO #{1} -- Busca cadastral tambem precisa consolidar antes de paginar. ##
 def buscar_cadastral(conn, filtros=None, limite=100, cursor=None):
     filtros = filtros or {}
     clauses, params = _filtros_extra(filtros, conn)
     where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
     rows = dbmod.query_all(conn, _PONTO_SQL + where + " ORDER BY p.id",
                            params)
+    visao = VisaoCanonica(conn)
+    canonicos = {}
+    for row in rows:
+        row = _linha_canonica(conn, row, visao)
+        if row is not None:
+            canonicos[row["ponto_id"]] = row
+    rows = [canonicos[pid] for pid in sorted(canonicos)]
     uf_filtro = (filtros.get("uf") or "").upper() or None
     if uf_filtro:
         rows = [r for r in rows if _uf_do_ponto(conn, r) == uf_filtro]
     total = len(rows)
-    offset = _offset_cursor(cursor)
+    offset = max(0, _offset_cursor(cursor))
     recorte = rows[offset:offset + limite]
-    proximo = None
-    if offset + limite < total:
-        proximo = str(offset + limite)
-    recs = [montar_registro(
-        conn, r,
-        incluir_operacoes=filtros.get("incluir_operacoes", True))
-        for r in recorte]
+    recs = [montar_registro(conn, r,
+             incluir_operacoes=filtros.get("incluir_operacoes", True), visao=visao)
+            for r in recorte]
     return recs, {"total_pontos": total, "retornados": len(recs),
-                  "proximo_cursor": proximo}
+                  "proximo_cursor": str(offset + limite) if offset + limite < total else None}

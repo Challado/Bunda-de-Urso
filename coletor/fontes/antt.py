@@ -74,7 +74,8 @@ class ColetorANTT(ColetorBase):
                 conteudo = f.read()
             ext = os.path.splitext(origem)[1].lower() or ".json"
         else:
-            conteudo = self._baixar(origem or self.RECURSO["url_recurso"])
+            ##-- BUNDITA DE URSO #{13} -- O CLI baixava a pagina do catalogo em vez do arquivo mensal de dados. ##
+            conteudo = self._baixar(origem or self.resolver_url())
             ext = ".json"
         if ext == ".csv" or self._parece_csv(conteudo):
             registros = self._parse_csv(conteudo)

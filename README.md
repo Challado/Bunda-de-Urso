@@ -190,13 +190,17 @@ app. As camadas de confiança são:
   obrigatório): o radar sai do mapa/consulta, mas a linha e o histórico permanecem.
 - **Correspondência com o oficial:** ao ingerir um colaborativo, procura-se um ponto
   OFICIAL no raio `RAIO_CORRESPONDENCIA_M` (default 150 m). Havendo, o colaborativo é
-  **corroborado automaticamente** (`verificado`) e cria-se o vínculo
-  `CORRESPONDENCIA_PONTO` (`distancia_m`, `status`).
+  ligado a uma **sugestão de correspondência**, permanecendo **não verificado**.
+  Uma decisão fundamentada de moderador é necessária para substituir o oficial.
 - **Anti-sabotagem:** coordenada dentro de um `BLOQUEIO_GEOGRAFICO` ativo
   (`marcacao_falsa` | `zona_sombra`) é **recusada (409)** com o motivo.
-- **Consulta pública:** prefere o **colaborativo** sobre o oficial correspondente e
+- **Consulta pública:** preserva o oficial até decisão explícita de moderação e
   **esconde** pontos removidos/desabilitados. `GET /api/v1/radares/{id}/historico` é
   público (transparência: “removido em X por Y, motivo Z”).
+
+Submissões públicas possuem fonte própria e não podem atualizar a base autenticada
+por meio de IDs enviados pelo usuário. As correções de reconciliação e operação
+estão descritas em `docs/CORRECOES_BUNDITA_DE_URSO.md`.
 
 A configuração versionada mora em `config/governanca.json`; o esquema aditivo da
 camada em `sql/migracoes/`. Detalhes e exemplos `curl` em `docs/GOVERNANCA.md`.

@@ -385,6 +385,10 @@
     if (s) h += "Sentido: " + escapeHtml(s) + "<br>";
     if (loc.distancia_metros != null) h += "Distância: " + fmtDist(loc.distancia_metros) + "<br>";
     if (loc.qualidade) h += "Qualidade da posição: " + escapeHtml(loc.qualidade) + "<br>";
+    // ##-- BUNDITA DE URSO #{20} -- Manter as marcacoes divergentes sem apresenta-las como localizacoes igualmente confirmadas. ##
+    if ((p.conflitos || []).some(function(c){ return c.campo === "localizacao"; })){
+      h += "Há informações de localização divergentes entre fontes.<br>";
+    }
     h += "<a class='detalhe' href='detalhe.html?id=" + encodeURIComponent(p.id) + "'>Ver todos os detalhes &raquo;</a>";
     return h;
   }

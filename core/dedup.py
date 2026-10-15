@@ -38,6 +38,7 @@ import unicodedata
 
 from . import db as dbmod
 from . import geo
+from . import identidade
 
 __all__ = [
     "normalizar_texto", "normalizar_serie", "normalizar_rodovia",
@@ -51,7 +52,8 @@ __all__ = [
 
 # --------------------------------------------------------------- constantes
 
-VERSAO_REGRA_PADRAO = "dedup-1.0"
+##-- BUNDITA DE URSO #{4} -- Regras alteradas precisam de nova versao para nao reutilizar evidencias antigas. ##
+VERSAO_REGRA_PADRAO = "dedup-1.1"
 
 # Pesos versionaveis (spec 8.5: definir e versionar apos inspecionar amostras).
 PESOS_PADRAO = {
@@ -72,29 +74,23 @@ FAIXAS_PROXIMIDADE = ((50.0, 1.0), (200.0, 0.7), (1000.0, 0.35), (5000.0, 0.10))
 TOLERANCIA_KM = 0.5       # km considerado "o mesmo"
 CONFLITO_KM = 5.0         # acima disso, mesma via = contradicao
 TOLERANCIA_POSICAO_M = 1.0
-# Numero curto (< isto) e contador local da fonte, nao identidade.
+# Numero curto (< isto) nao tem contexto suficiente para identidade global.
 SERIE_CURTA_MAX_DIGITOS = 4
 
 
 def serie_generica(numero_serie, municipios=None):
-    """True quando o valor NAO identifica um instrumento (spec 8.3/8.5).
+    """True quando o valor nao sustenta identidade global sem contexto.
 
-    Dois sinais, ambos conservadores (nunca viram bloqueador: apenas deixam
-    de valer como "serie igual"):
-      * puramente numerico e curto (menos de SERIE_CURTA_MAX_DIGITOS
-        digitos): e contador local da fonte, nao numero de serie;
-      * a mesma serie espalhada por 2+ municipios: codigo reutilizado, nao
-        identidade de um instrumento.
+    Ausencia e numeros curtos nao pontuam como identidade. `municipios` e
+    mantido por compatibilidade, mas mover um instrumento entre municipios
+    nao invalida sua serie. Nenhum desses sinais comprova aparelho distinto.
     """
     if not numero_serie:
         return True
     s = str(numero_serie)
     if s.isdigit() and len(s) < SERIE_CURTA_MAX_DIGITOS:
         return True
-    if municipios:
-        distintos = {m for m in municipios if m is not None}
-        if len(distintos) >= 2:
-            return True
+    ##-- BUNDITA DE URSO #{5} -- Um aparelho pode mudar de municipio; repeticao nao invalida sua serie. ##
     return False
 
 _ESTADO_POR_DECISAO = {
@@ -106,7 +102,8 @@ _ESTADO_POR_DECISAO = {
 CAMPO_ALIASES = {
     "latitude": {"latitude", "lat"},
     "longitude": {"longitude", "lon", "lng", "long"},
-    "numero_serie": {"numero_serie", "serie", "serial", "numero_de_serie", "ns"},
+    "numero_serie": {"numero_serie", "numeroserie", "serie", "serial", "numero_de_serie", "ns"},
+    "uf": {"uf", "uf_sigla", "estado", "siglauf", "sigla_uf"},
     "fabricante": {"fabricante", "marca"},
     "modelo": {"modelo"},
     "rodovia": {"rodovia", "via"},
@@ -143,15 +140,18 @@ def _primeiro(*valores):
     return None
 
 
+##-- BUNDITA DE URSO #{18} -- NaN e infinito vindos da fonte podiam quebrar a indexacao geografica. ##
 def _num(valor):
     if valor is None or valor == "":
         return None
     if isinstance(valor, bool):
         return None
     if isinstance(valor, (int, float)):
-        return float(valor)
+        numero = float(valor)
+        return numero if math.isfinite(numero) else None
     try:
-        return float(str(valor).strip().replace(",", "."))
+        numero = float(str(valor).strip().replace(",", "."))
+        return numero if math.isfinite(numero) else None
     except (TypeError, ValueError):
         return None
 
@@ -235,6 +235,7 @@ def normalizar_rodovia(valor):
     return re.sub(r"[^A-Z0-9]", "", s) or None
 
 
+##-- BUNDITA DE URSO #{18} -- Quilometragem numerica nao finita tambem precisa ser descartada. ##
 def normalizar_km(valor):
     """Aceita virgula decimal, ponto e sufixo 'km' (spec 8.2)."""
     if valor is None or valor == "":
@@ -242,7 +243,7 @@ def normalizar_km(valor):
     if isinstance(valor, bool):
         return None
     if isinstance(valor, (int, float)):
-        return float(valor)
+        return _num(valor)
     s = str(valor).strip().lower().replace("km", "").replace("\u00a0", "")
     s = re.sub(r"[^0-9,.\-]", "", s)
     if not s:
@@ -257,6 +258,7 @@ def normalizar_km(valor):
         return None
 
 
+##-- BUNDITA DE URSO #{7} -- Decrescente contem crescente; testar primeiro evitava inverter o sentido. ##
 def normalizar_sentido(valor):
     """Sentido canonico: crescente|decrescente|ambos|desconhecido."""
     if valor is None:
@@ -267,10 +269,10 @@ def normalizar_sentido(valor):
     chave = s.lower()
     if chave in _SENTIDOS:
         return _SENTIDOS[chave]
-    if "crescente" in chave:
-        return "crescente"
     if "decrescente" in chave:
         return "decrescente"
+    if "crescente" in chave:
+        return "crescente"
     if "ambos" in chave or "bidi" in chave:
         return "ambos"
     return "desconhecido"
@@ -342,33 +344,42 @@ def mesma_cadeia(conn, registro_a, registro_b):
     return False
 
 
+##-- BUNDITA DE URSO #{6} -- Contar apenas arquivos diferentes superestimava a independencia da evidencia. ##
 def evidencias_independentes(conn, registro_ids):
     """Numero de cadeias de evidencia distintas entre os registros dados."""
-    chaves = set()
-    for rid in registro_ids:
-        chaves.add(cadeia_evidencia(conn, rid)["chave"])
-    return len(chaves)
+    # Union-find por chaves evita comparar todos os registros entre si.
+    parents, vistos = {}, {}
+
+    def raiz(item):
+        while parents[item] != item:
+            parents[item] = parents[parents[item]]
+            item = parents[item]
+        return item
+
+    for rid in dict.fromkeys(registro_ids):
+        parents[rid] = rid
+        cadeia = cadeia_evidencia(conn, rid)
+        for nome in ("chave", "recurso_id", "hash_registro"):
+            valor = cadeia[nome]
+            if valor is None:
+                continue
+            chave = (nome, valor)
+            if chave in vistos:
+                parents[raiz(rid)] = raiz(vistos[chave])
+            vistos[chave] = rid
+    return len({raiz(rid) for rid in parents})
+
 
 
 # ------------------------------------------------------------- atributos
 
-def _pontos(conn, registro_id):
-    return [r[0] for r in dbmod.query_all(
-        conn, "SELECT ponto_id FROM VINCULO_REGISTRO_PONTO "
-              "WHERE registro_id = ? ORDER BY ponto_id", (registro_id,))]
-
-
-def _equipamentos(conn, registro_id):
-    return [r[0] for r in dbmod.query_all(
-        conn, "SELECT equipamento_id FROM VINCULO_REGISTRO_EQUIPAMENTO "
-              "WHERE registro_id = ? ORDER BY equipamento_id", (registro_id,))]
-
-
+##-- BUNDITA DE URSO #{17} -- Vinculos de decisoes anteriores nao podem servir de prova para a proxima decisao. ##
 def atributos_registro(conn, registro_id):
     """Atributos normalizados de um registro (spec 8.2), sem alterar o dado.
 
-    Ordem de precedencia do valor: VALOR_OBSERVADO (T72, ja normalizado) >
-    entidades ligadas (PONTO/EQUIPAMENTO/POSICAO) > JSON de payload_original.
+    Valores observados e payload original precedem entidades mutaveis.
+    Coordenadas normalizadas da propria observacao mantem precedencia.
+    Vinculos derivados de outras decisoes nunca alimentam a comparacao.
     """
     base = _base_registro(conn, registro_id)
     if base is None:
@@ -383,8 +394,8 @@ def atributos_registro(conn, registro_id):
         "artefato_hash": base["artefato_hash"],
         "hash_registro": base["hash_registro"],
         "identificador_na_fonte": base["identificador_na_fonte"],
-        "ponto_ids": _pontos(conn, registro_id),
-        "equipamento_ids": _equipamentos(conn, registro_id),
+        "ponto_ids": identidade.originais(conn, "ponto", registro_id),
+        "equipamento_ids": identidade.originais(conn, "equipamento", registro_id),
     }
     at["cadeia"] = cadeia_evidencia(conn, registro_id)["chave"]
 
@@ -462,7 +473,7 @@ def atributos_registro(conn, registro_id):
         if fabricante is None and e["fabricante"]:
             fabricante = e["fabricante"]
 
-    # 3) payload JSON (menor prioridade)
+    # 3) payload original tem precedencia sobre entidades mutaveis por recoleta.
     payload = {}
     try:
         payload = _achatar(json.loads(base["payload_original"] or "{}"))
@@ -474,20 +485,23 @@ def atributos_registro(conn, registro_id):
     at["longitude"] = _num(_primeiro(valores.get("longitude"), lon,
                                      _extrair(payload, "longitude")))
     at["numero_serie"] = normalizar_serie(
-        _primeiro(valores.get("numero_serie"), serie,
-                  _extrair(payload, "numero_serie")))
+        _primeiro(valores.get("numero_serie"), _extrair(payload, "numero_serie"), serie))
     at["fabricante"] = normalizar_texto(
-        _primeiro(valores.get("fabricante"), fabricante,
-                  _extrair(payload, "fabricante")))
+        _primeiro(valores.get("fabricante"), _extrair(payload, "fabricante"), fabricante))
     at["modelo"] = normalizar_texto(
-        _primeiro(valores.get("modelo"), modelo, _extrair(payload, "modelo")))
+        _primeiro(valores.get("modelo"), _extrair(payload, "modelo"), modelo))
     at["rodovia"] = normalizar_rodovia(
-        _primeiro(valores.get("rodovia"), via, _extrair(payload, "rodovia")))
+        _primeiro(valores.get("rodovia"), _extrair(payload, "rodovia"), via))
     at["km"] = normalizar_km(
-        _primeiro(valores.get("km"), km, _extrair(payload, "km")))
+        _primeiro(valores.get("km"), _extrair(payload, "km"), km))
     at["sentido"] = normalizar_sentido(
-        _primeiro(valores.get("sentido"), sentido,
-                  _extrair(payload, "sentido")))
+        _primeiro(valores.get("sentido"), _extrair(payload, "sentido"), sentido))
+    uf = None
+    if at["ponto_ids"]:
+        uf = dbmod.scalar(conn, "SELECT m.uf_sigla FROM PONTO_FISCALIZACAO p "
+                          "JOIN MUNICIPIO m ON m.codigo_ibge=p.municipio_id WHERE p.id=?",
+                          (at["ponto_ids"][0],))
+    at["uf"] = normalizar_texto(_primeiro(valores.get("uf"), _extrair(payload, "uf"), uf))
     at["precisao_metros"] = precisao
     at["qualidade_posicao"] = qualidade
     at["serie_generica"] = serie_generica(at.get("numero_serie"))
@@ -503,6 +517,25 @@ def _componente(nome, peso, fator, explicacao):
             "explicacao": explicacao}
 
 
+##-- BUNDITA DE URSO #{4} -- Pesos invalidos ou incompletos nao podem produzir regra parcialmente registrada. ##
+def _pesos_validos(pesos):
+    valores = dict(PESOS_PADRAO)
+    if pesos is not None:
+        if set(pesos) - set(valores):
+            raise ValueError("peso desconhecido na regra")
+        valores.update(pesos)
+    for nome, valor in valores.items():
+        try:
+            numero = float(valor)
+        except (TypeError, ValueError):
+            raise ValueError("peso invalido: %s" % nome) from None
+        if isinstance(valor, bool) or not math.isfinite(numero) or not 0 <= numero <= 1:
+            raise ValueError("peso deve estar entre zero e um: %s" % nome)
+        valores[nome] = numero
+    return valores
+
+
+##-- BUNDITA DE URSO #{5} -- Serie isolada e ausencia de contexto nao sustentam evidencia moderada. ##
 def pontuar(a, b, pesos=None):
     """Escore explicavel entre dois conjuntos de atributos (spec 8.5).
 
@@ -514,7 +547,7 @@ def pontuar(a, b, pesos=None):
     componentes (por que casou), bloqueadores (por que NAO casaria) e a
     distancia em metros. Nunca consolida: apenas mede evidencia.
     """
-    pesos = dict(PESOS_PADRAO if pesos is None else pesos)
+    pesos = _pesos_validos(pesos)
     componentes = []
     bloqueadores = []
 
@@ -523,7 +556,8 @@ def pontuar(a, b, pesos=None):
     ma, mb = a.get("modelo"), b.get("modelo")
     # serie "generica" (contador curto/codigo repetido) NAO identifica
     # instrumento: nem confirma nem bloqueia (spec 8.5).
-    generica = bool(a.get("serie_generica") or b.get("serie_generica"))
+    generica = bool(a.get("serie_generica") or b.get("serie_generica")
+                    or serie_generica(sa) or serie_generica(sb))
     tem_serie = bool(sa and sb) and not generica
 
     if tem_serie:
@@ -600,15 +634,16 @@ def pontuar(a, b, pesos=None):
                 "detalhe": "sentidos opostos (%s vs %s): nao colapsar por "
                            "proximidade" % (sea, seb)})
 
-    mesma = bool(a.get("cadeia") and a.get("cadeia") == b.get("cadeia"))
-    n_indep = 1 if mesma else 2
+    mesma = any(a.get(chave) is not None and a.get(chave) == b.get(chave)
+                for chave in ("cadeia", "recurso_id", "hash_registro"))
+    n_indep = (1 if mesma else 2) if a.get("cadeia") and b.get("cadeia") else int(bool(a.get("cadeia") or b.get("cadeia")))
     if mesma:
         componentes.append({
             "nome": "origem_compartilhada", "peso": 0.0, "fator": 1.0,
             "contribuicao": 0.0,
             "explicacao": "mesma cadeia de evidencia (T59/T72): nao conta "
                           "como confirmacao independente"})
-    elif a.get("cadeia") or b.get("cadeia"):
+    elif a.get("cadeia") and b.get("cadeia"):
         componentes.append(_componente(
             "corroboracao_independente",
             pesos.get("corroboracao_independente", 0.0), 1.0,
@@ -629,6 +664,19 @@ def pontuar(a, b, pesos=None):
     # coordenada sozinha NUNCA vira 'forte' (8.5 / 17.4-4).
     if nivel == "forte" and (not tem_serie or mesma):
         nivel = "moderado"
+    # Serie isolada e apenas uma pista. Fabricante/modelo contextualizam a
+    # identidade de instrumentos sem GPS (inclusive portateis).
+    via_km_contextualizado = (va and va == vb and ka is not None and kb is not None
+                              and abs(ka - kb) <= TOLERANCIA_KM
+                              and a.get("uf") and a.get("uf") == b.get("uf"))
+    corrobora = ((dist is not None and dist <= 200.0)
+                or via_km_contextualizado
+                or (fa and fa == fb and ma and ma == mb))
+    if nivel in ("moderado", "forte") and tem_serie and sa == sb and not corrobora:
+        nivel = "fraco"
+        componentes.append(_componente(
+            "serie_sem_corrob", 0.0, 0.0,
+            "serie isolada: falta posicao proxima, via/km/UF ou fabricante/modelo"))
 
     return {
         "score": score,
@@ -643,16 +691,17 @@ def pontuar(a, b, pesos=None):
 
 # --------------------------------------------------------- regra versionada
 
+##-- BUNDITA DE URSO #{4} -- A mesma versao aceitava pesos novos sem atualizar sua configuracao persistida. ##
 def registrar_regra(conn, versao=None, pesos=None, raio_m=None, descricao=None,
                     agora=None):
     """Insere (ou recupera) a REGRA_DEDUPLICACAO versionada. Retorna o id."""
     versao = versao or VERSAO_REGRA_PADRAO
-    row = dbmod.query_one(
-        conn, "SELECT id FROM REGRA_DEDUPLICACAO WHERE versao = ?", (versao,))
-    if row is not None:
-        return row["id"]
+    pesos = _pesos_validos(pesos)
+    raio_m = RAIO_CANDIDATO_M if raio_m is None else float(raio_m)
+    if not math.isfinite(raio_m) or raio_m <= 0:
+        raise ValueError("raio_m deve ser finito e positivo")
     cfg = json.dumps({
-        "pesos": pesos or PESOS_PADRAO,
+        "pesos": pesos,
         "raio_m": RAIO_CANDIDATO_M if raio_m is None else float(raio_m),
         "limiar_forte": LIMIAR_FORTE,
         "limiar_moderado": LIMIAR_MODERADO,
@@ -660,7 +709,20 @@ def registrar_regra(conn, versao=None, pesos=None, raio_m=None, descricao=None,
         "tolerancia_km": TOLERANCIA_KM,
         "conflito_km": CONFLITO_KM,
         "faixas_proximidade": FAIXAS_PROXIMIDADE,
+        "serie_curta_max_digitos": SERIE_CURTA_MAX_DIGITOS,
+        "serie_isolada": "fraco",
+        "corroboracao_posicao_max_m": 200.0,
+        "via_km_exige_uf": True,
+        "generica_por_municipio": False,
+        "indice_espacial": "esfera_cartesiana",
     }, sort_keys=True, ensure_ascii=False)
+    row = dbmod.query_one(
+        conn, "SELECT id, configuracao_serializada FROM REGRA_DEDUPLICACAO "
+              "WHERE versao = ?", (versao,))
+    if row is not None:
+        if _load_json(row["configuracao_serializada"]) != _load_json(cfg):
+            raise ValueError("configuracao diferente: use uma nova versao da regra")
+        return row["id"]
     return dbmod.insert(conn, "REGRA_DEDUPLICACAO", {
         "versao": versao,
         "descricao": descricao or "Deduplicacao rastreavel (spec 8/17.4)",
@@ -675,73 +737,53 @@ def _ord(a, b):
     return (a, b) if a < b else (b, a)
 
 
+##-- BUNDITA DE URSO #{14} -- A grade em graus perdia vizinhos e uma rodovia inteira gerava pares quadraticos. ##
 def _pares_candidatos(ids, attrs, raio_m):
-    """Blocking por chaves (serie, via) + grade geografica (spec 8.3)."""
-    pares = set()
-    por_serie = {}
-    por_via = {}
+    """Indices por serie, UF/via/km e celulas 3D na esfera terrestre.
+
+    A corda e menor que o arco: pontos dentro do raio geodesico estao na
+    mesma celula cartesiana ou numa das 26 vizinhas, inclusive nos polos.
+    """
+    pares, por_serie, por_trecho = set(), {}, {}
     for rid in ids:
         at = attrs[rid]
         if at.get("numero_serie") and not at.get("serie_generica"):
             por_serie.setdefault(at["numero_serie"], []).append(rid)
-        if at.get("rodovia"):
-            por_via.setdefault(at["rodovia"], []).append(rid)
-    for grupo in list(por_serie.values()) + list(por_via.values()):
-        for i in range(len(grupo)):
-            for j in range(i + 1, len(grupo)):
-                pares.add(_ord(grupo[i], grupo[j]))
-
-    celula = max(float(raio_m), 1.0) / 111320.0
+        if at.get("rodovia") and at.get("km") is not None and at.get("uf"):
+            faixa = int(math.floor(at["km"] / TOLERANCIA_KM))
+            chave = (at["uf"], at["rodovia"], faixa)
+            for vizinha in (faixa - 1, faixa, faixa + 1):
+                for outro in por_trecho.get((at["uf"], at["rodovia"], vizinha), ()):
+                    if abs(at["km"] - attrs[outro]["km"]) <= TOLERANCIA_KM:
+                        pares.add(_ord(rid, outro))
+            por_trecho.setdefault(chave, []).append(rid)
+    for grupo in por_serie.values():
+        for i, rid in enumerate(grupo):
+            for outro in grupo[i + 1:]:
+                pares.add(_ord(rid, outro))
     grade = {}
     for rid in ids:
         at = attrs[rid]
-        if at.get("latitude") is None or at.get("longitude") is None:
+        lat, lon = at.get("latitude"), at.get("longitude")
+        if lat is None or lon is None or not (-90 <= lat <= 90 and -180 <= lon <= 180):
             continue
-        cx = int(math.floor(at["latitude"] / celula))
-        cy = int(math.floor(at["longitude"] / celula))
-        grade.setdefault((cx, cy), []).append(rid)
-    for (cx, cy), grupo in grade.items():
-        vizinhos = []
+        phi, lamb = math.radians(lat), math.radians(lon)
+        xyz = (geo.EARTH_RADIUS_M * math.cos(phi) * math.cos(lamb),
+               geo.EARTH_RADIUS_M * math.cos(phi) * math.sin(lamb),
+               geo.EARTH_RADIUS_M * math.sin(phi))
+        cx, cy, cz = (math.floor(v / raio_m) for v in xyz)
         for dx in (-1, 0, 1):
             for dy in (-1, 0, 1):
-                vizinhos.extend(grade.get((cx + dx, cy + dy), []))
-        for i in grupo:
-            for j in vizinhos:
-                if i == j:
-                    continue
-                ai, aj = attrs[i], attrs[j]
-                if None in (ai.get("latitude"), ai.get("longitude"),
-                            aj.get("latitude"), aj.get("longitude")):
-                    continue
-                if geo.haversine_m(ai["latitude"], ai["longitude"],
-                                   aj["latitude"], aj["longitude"]) <= raio_m:
-                    pares.add(_ord(i, j))
+                for dz in (-1, 0, 1):
+                    for outro in grade.get((cx + dx, cy + dy, cz + dz), ()):
+                        aj = attrs[outro]
+                        if geo.haversine_m(lat, lon, aj["latitude"], aj["longitude"]) <= raio_m:
+                            pares.add(_ord(rid, outro))
+        grade.setdefault((cx, cy, cz), []).append(rid)
     return sorted(pares)
 
 
-def _marcar_series_genericas(conn, ids, attrs):
-    """Marca em `attrs` as series que NAO identificam instrumento.
-
-    Alem do corte por tamanho (`serie_generica` estatico), considera generica
-    a serie que se repete entre MUNICIPIOS diferentes (codigo reutilizado).
-    """
-    mun = {r[0]: r[1] for r in dbmod.query_all(
-        conn, "SELECT vp.registro_id, p.municipio_id "
-              "FROM VINCULO_REGISTRO_PONTO vp "
-              "JOIN PONTO_FISCALIZACAO p ON p.id = vp.ponto_id "
-              "WHERE p.municipio_id IS NOT NULL")}
-    por_serie = {}
-    for rid in ids:
-        s = attrs[rid].get("numero_serie")
-        if s and rid in mun:
-            por_serie.setdefault(s, set()).add(mun[rid])
-    for rid in ids:
-        s = attrs[rid].get("numero_serie")
-        if s:
-            attrs[rid]["serie_generica"] = serie_generica(
-                s, por_serie.get(s))
-
-
+##-- BUNDITA DE URSO #{6} -- Registros diferentes no mesmo arquivo podem descrever faixas do mesmo instrumento. ##
 def gerar_candidatos(conn, regra=None, pesos=None, raio_m=None, agora=None):
     """Gera CANDIDATO_DUPLICIDADE a partir dos REGISTRO_FONTE (spec 8.3).
 
@@ -750,7 +792,9 @@ def gerar_candidatos(conn, regra=None, pesos=None, raio_m=None, agora=None):
     Idempotente: UNIQUE(registro_a_id, registro_b_id, regra_id).
     """
     raio_m = RAIO_CANDIDATO_M if raio_m is None else float(raio_m)
-    pesos = PESOS_PADRAO if pesos is None else pesos
+    if not math.isfinite(raio_m) or raio_m <= 0:
+        raise ValueError("raio_m deve ser finito e positivo")
+    pesos = _pesos_validos(pesos)
     regra_id = registrar_regra(conn, versao=regra, pesos=pesos, raio_m=raio_m,
                                agora=agora)
     agora = agora or _agora()
@@ -758,11 +802,12 @@ def gerar_candidatos(conn, regra=None, pesos=None, raio_m=None, agora=None):
     ids = [r[0] for r in dbmod.query_all(
         conn, "SELECT id FROM REGISTRO_FONTE ORDER BY id")]
     attrs = {rid: atributos_registro(conn, rid) for rid in ids}
-    _marcar_series_genericas(conn, ids, attrs)
 
     criados, existentes, ignorados = [], [], 0
     for a, b in _pares_candidatos(ids, attrs, raio_m):
-        if attrs[a]["cadeia"] == attrs[b]["cadeia"]:
+        if (attrs[a]["hash_registro"]
+                and attrs[a]["hash_registro"] == attrs[b]["hash_registro"]
+                and attrs[a]["artefato_hash"] == attrs[b]["artefato_hash"]):
             ignorados += 1                      # mesma origem: nao e duplicata
             continue
         res = pontuar(attrs[a], attrs[b], pesos)
@@ -802,14 +847,19 @@ def gerar_candidatos(conn, regra=None, pesos=None, raio_m=None, agora=None):
     }
 
 
-def candidatos(conn, ponto_id=None, estado=None):
-    """Lista candidatos (opcionalmente por ponto ou estado)."""
+##-- BUNDITA DE URSO #{4} -- Misturar geracoes antigas com a regra vigente mantinha a fila obsoleta. ##
+def candidatos(conn, ponto_id=None, estado=None, regra=VERSAO_REGRA_PADRAO,
+               incluir_fracos=False):
+    """Fila vigente. Diagnostico completo: regra=None, incluir_fracos=True."""
     sql = ("SELECT cd.*, ra.identificador_na_fonte AS a_identificador, "
            "rb.identificador_na_fonte AS b_identificador "
            "FROM CANDIDATO_DUPLICIDADE cd "
            "JOIN REGISTRO_FONTE ra ON ra.id = cd.registro_a_id "
            "JOIN REGISTRO_FONTE rb ON rb.id = cd.registro_b_id ")
     cond, params = [], []
+    if regra is not None:
+        cond.append("cd.regra_id IN (SELECT id FROM REGRA_DEDUPLICACAO WHERE versao=?)")
+        params.append(regra)
     if estado:
         cond.append("cd.estado = ?")
         params.append(estado)
@@ -822,13 +872,16 @@ def candidatos(conn, ponto_id=None, estado=None):
     if cond:
         sql += "WHERE " + " AND ".join(cond) + " "
     sql += "ORDER BY cd.id"
-    return [dict(r) for r in dbmod.query_all(conn, sql, params)]
+    rows = [dict(r) for r in dbmod.query_all(conn, sql, params)]
+    return [r for r in rows if incluir_fracos or r["estado"] != "pendente"
+            or _load_json(r["evidencias_resumo"]).get("nivel") != "fraco"]
 
 
 # --------------------------------------------------------------- decisoes
 
+##-- BUNDITA DE URSO #{2} -- A decisao precisa distinguir instrumento e ponto, com autor e escopo explicitos. ##
 def decidir(conn, candidato_id, decisao, usuario, motivo, observacoes=None,
-            forcar=False, agora=None):
+            forcar=False, agora=None, escopo=None):
     """Grava DECISAO_DUPLICIDADE (append-only) com a evidencia e o autor.
 
     `motivo` e a fundamentacao obrigatoria. Retorna o id da decisao. Nunca
@@ -838,29 +891,45 @@ def decidir(conn, candidato_id, decisao, usuario, motivo, observacoes=None,
         raise ValueError("decisao invalida: %r" % (decisao,))
     if not motivo or not str(motivo).strip():
         raise ValueError("fundamentacao (motivo) obrigatoria")
+    if not usuario or not str(usuario).strip():
+        raise ValueError("autor (usuario) obrigatorio")
+    if decisao in ("unificar", "manter_separados") and escopo not in identidade.ESCOPOS:
+        raise ValueError("indique escopo: ponto, equipamento ou ambos")
     cand = dbmod.query_one(
         conn, "SELECT * FROM CANDIDATO_DUPLICIDADE WHERE id = ?", (candidato_id,))
     if cand is None:
         raise ValueError("CANDIDATO_DUPLICIDADE %r inexistente" % (candidato_id,))
+    if decisao_ativa(conn, candidato_id) is not None:
+        raise ValueError("reverta a decisao ativa antes de registrar outra")
     agora = agora or _agora()
     obs = {
         "evidencia": _load_json(cand["evidencias_resumo"]),
         "decisao": decisao,
         "forcar": bool(forcar),
+        "escopo": escopo,
     }
+    if decisao in ("unificar", "manter_separados"):
+        obs["entidades"] = {
+            tipo: {str(rid): identidade.originais(conn, tipo, rid)
+                   for rid in (cand["registro_a_id"], cand["registro_b_id"])}
+            for tipo in identidade.ESCOPOS[escopo]}
+        if any(len(ids) != 1 for valores in obs["entidades"].values()
+               for ids in valores.values()):
+            raise ValueError("escopo requer uma entidade original inequivoca por registro")
     if observacoes:
         obs["observacoes"] = observacoes
-    decisao_id = dbmod.insert(conn, "DECISAO_DUPLICIDADE", {
-        "candidato_id": candidato_id,
-        "decisao": decisao,
-        "fundamentacao": str(motivo),
-        "ator": usuario,
-        "decidida_em": agora,
-        "observacoes": json.dumps(obs, sort_keys=True, ensure_ascii=False),
-    })
-    conn.execute("UPDATE CANDIDATO_DUPLICIDADE SET estado = ? WHERE id = ?",
-                 (_ESTADO_POR_DECISAO[decisao], candidato_id))
-    conn.commit()
+    with conn:
+        decisao_id = dbmod.insert(conn, "DECISAO_DUPLICIDADE", {
+            "candidato_id": candidato_id,
+            "decisao": decisao,
+            "fundamentacao": str(motivo),
+            "ator": usuario,
+            "decidida_em": agora,
+            "observacoes": json.dumps(obs, sort_keys=True, ensure_ascii=False),
+        })
+        conn.execute("UPDATE CANDIDATO_DUPLICIDADE SET estado = ? WHERE id = ?",
+                     (_ESTADO_POR_DECISAO[decisao], candidato_id))
+        identidade.VisaoCanonica(conn)
     return decisao_id
 
 
@@ -887,32 +956,6 @@ def _natureza(conn, registro_id):
     return None if base is None else base["natureza"]
 
 
-def _escolher_canonico(conn, lista_a, lista_b, nat_a, nat_b):
-    if not lista_a and not lista_b:
-        return None
-    if lista_a and not lista_b:
-        return min(lista_a)
-    if lista_b and not lista_a:
-        return min(lista_b)
-    if nat_a == "oficial" and nat_b != "oficial":
-        return min(lista_a)
-    if nat_b == "oficial" and nat_a != "oficial":
-        return min(lista_b)
-    return min(min(lista_a), min(lista_b))
-
-
-def _vincular(conn, tabela, coluna, registro_id, entidade_id, decisao_id):
-    existe = conn.execute(
-        "SELECT 1 FROM %s WHERE registro_id = ? AND %s = ?" % (tabela, coluna),
-        (registro_id, entidade_id)).fetchone()
-    if existe is not None:
-        return 0                    # preserva vinculo preexistente do pipeline
-    conn.execute(
-        "INSERT INTO %s (registro_id, %s, decisao_id) VALUES (?,?,?)"
-        % (tabela, coluna), (registro_id, entidade_id, decisao_id))
-    return 1
-
-
 def _divergencia(at_a, at_b, tolerancia=TOLERANCIA_POSICAO_M):
     if None in (at_a.get("latitude"), at_a.get("longitude"),
                 at_b.get("latitude"), at_b.get("longitude")):
@@ -936,126 +979,138 @@ def _divergencia(at_a, at_b, tolerancia=TOLERANCIA_POSICAO_M):
     }
 
 
-def _aplicar_um(conn, candidato_id, usuario, agora):
-    cand = dbmod.query_one(
-        conn, "SELECT * FROM CANDIDATO_DUPLICIDADE WHERE id = ?", (candidato_id,))
-    if cand is None:
-        return {"candidato_id": candidato_id, "aplicado": False,
-                "motivo": "candidato inexistente"}
-    dec = decisao_ativa(conn, candidato_id)
-    if dec is None or dec["decisao"] != "unificar":
-        return {"candidato_id": candidato_id, "aplicado": False,
-                "motivo": "sem decisao ativa de unificar"}
-
-    evid = _load_json(cand["evidencias_resumo"])
-    obs_dec = _load_json(dec["observacoes"])
-    if evid.get("nivel") == "contraditorio" and not obs_dec.get("forcar"):
-        return {"candidato_id": candidato_id, "aplicado": False,
-                "motivo": "evidencia contraditoria: requer decisao explicita "
-                          "com forcar=True"}
-
-    a, b = cand["registro_a_id"], cand["registro_b_id"]
-    nat_a, nat_b = _natureza(conn, a), _natureza(conn, b)
-    ponto_canonico = _escolher_canonico(
-        conn, _pontos(conn, a), _pontos(conn, b), nat_a, nat_b)
-    equip_canonico = _escolher_canonico(
-        conn, _equipamentos(conn, a), _equipamentos(conn, b), nat_a, nat_b)
-
-    vinculos = 0
-    if ponto_canonico is not None:
-        for rid in (a, b):
-            vinculos += _vincular(conn, "VINCULO_REGISTRO_PONTO", "ponto_id",
-                                  rid, ponto_canonico, dec["id"])
-    if equip_canonico is not None:
-        for rid in (a, b):
-            vinculos += _vincular(conn, "VINCULO_REGISTRO_EQUIPAMENTO",
-                                  "equipamento_id", rid, equip_canonico,
-                                  dec["id"])
-
-    div = _divergencia(atributos_registro(conn, a), atributos_registro(conn, b))
-    if div is not None:
-        evid["divergencia_posicao"] = div
-    evid["aplicado_em"] = agora
-    evid["aplicado_por"] = usuario
-    evid["ponto_canonico"] = ponto_canonico
-    evid["equipamento_canonico"] = equip_canonico
-    evid["vinculos_criados"] = vinculos
-    conn.execute(
-        "UPDATE CANDIDATO_DUPLICIDADE SET estado = 'consolidado', "
-        "evidencias_resumo = ? WHERE id = ?",
-        (json.dumps(evid, sort_keys=True, ensure_ascii=False), candidato_id))
-    return {"candidato_id": candidato_id, "aplicado": True,
-            "ponto_canonico": ponto_canonico,
-            "equipamento_canonico": equip_canonico,
-            "vinculos_criados": vinculos, "divergencia": div}
+##-- BUNDITA DE URSO #{3} -- Decisoes encadeadas precisam atualizar o canonico quando uma aresta e revertida. ##
+def _atualizar_canonicos(conn, visao):
+    for decisao in visao.decisoes:
+        row = dbmod.query_one(conn, "SELECT evidencias_resumo FROM "
+                             "CANDIDATO_DUPLICIDADE WHERE id=?",
+                             (decisao["candidato_id"],))
+        evid = _load_json(row[0])
+        for tipo in identidade.TIPOS:
+            ids = [i for valores in decisao["entidades"].get(tipo, {}).values()
+                   for i in valores]
+            evid[tipo + "_canonico"] = (visao.canonico(tipo, ids[0])
+                                        if ids else None)
+        conn.execute("UPDATE CANDIDATO_DUPLICIDADE SET estado='consolidado', "
+                     "evidencias_resumo=? WHERE id=?",
+                     (json.dumps(evid, sort_keys=True, ensure_ascii=False),
+                      decisao["candidato_id"]))
 
 
+##-- BUNDITA DE URSO #{3} -- Recalcular todos os vinculos ativos evita dependencia da ordem e permite rollback atomico. ##
 def aplicar(conn, candidato_id=None, usuario=None, agora=None):
-    """Consolida apenas quando ha decisao ativa 'unificar' (spec 8.4/8.7).
+    """Aplica decisoes explicitas e reconstroi os vinculos ativos atomicamente.
 
-    Cria/garante ligacoes VINCULO_* (T63/T64) marcadas com o `decisao_id`,
-    escolhendo a entidade canonica (dado oficial tem precedencia). NAO apaga
-    nem altera POSICAO_GEOGRAFICA, FONTE ou REGISTRO_FONTE. Idempotente.
-    Retorna a lista de resultados (um por candidato tratado).
+    Nenhuma entidade de origem e alterada. O escopo da decisao separa ponto
+    e equipamento; a API resolve aliases pela mesma visao canonica.
     """
     agora = agora or _agora()
     if candidato_id is None:
-        alvos = [r["id"] for r in dbmod.query_all(
-            conn, "SELECT id FROM CANDIDATO_DUPLICIDADE "
-                  "WHERE estado = 'decidido_unificar' ORDER BY id")]
+        alvos = [r[0] for r in conn.execute(
+            "SELECT id FROM CANDIDATO_DUPLICIDADE "
+            "WHERE estado='decidido_unificar' ORDER BY id")]
     else:
         alvos = [candidato_id]
-    resultados = [_aplicar_um(conn, cid, usuario, agora) for cid in alvos]
-    conn.commit()
+    resultados = []
+    with conn:
+        antes = {(tipo, r[0], r[1])
+                 for tipo, (tabela, coluna) in identidade.TIPOS.items()
+                 for r in conn.execute("SELECT registro_id, %s FROM %s"
+                                       % (coluna, tabela))}
+        for cid in alvos:
+            cand = dbmod.query_one(conn, "SELECT * FROM CANDIDATO_DUPLICIDADE "
+                                  "WHERE id=?", (cid,))
+            dec = decisao_ativa(conn, cid)
+            if cand is None or dec is None or dec["decisao"] != "unificar":
+                resultados.append({"candidato_id": cid, "aplicado": False,
+                                   "motivo": "sem decisao ativa de unificar"})
+                continue
+            evid = _load_json(cand["evidencias_resumo"])
+            obs = _load_json(dec["observacoes"])
+            bloqueadores = evid.get("bloqueadores", [])
+            tipos = identidade.ESCOPOS.get(obs.get("escopo") or "ambos", ())
+            if tipos == ("ponto",):
+                bloqueadores = [b for b in bloqueadores if b["nome"] not in
+                                ("serie_conflitante", "modelo_conflitante", "fabricante_conflitante")]
+            elif tipos == ("equipamento",):
+                bloqueadores = [b for b in bloqueadores if b["nome"] not in
+                                ("sentido_oposto", "km_incompativel")]
+            if bloqueadores and not obs.get("forcar"):
+                resultados.append({"candidato_id": cid, "aplicado": False,
+                                   "motivo": "evidencia contraditoria: requer forcar=True"})
+                continue
+            a, b = cand["registro_a_id"], cand["registro_b_id"]
+            # Medir antes dos vinculos derivados: a decisao nao e sua propria prova.
+            div = _divergencia(atributos_registro(conn, a), atributos_registro(conn, b))
+            if div:
+                evid["divergencia_posicao"] = div
+            obs.setdefault("aplicada_em", agora)
+            obs.setdefault("aplicada_por", usuario)
+            evid.setdefault("aplicado_em", agora)
+            evid.setdefault("aplicado_por", usuario)
+            conn.execute("UPDATE DECISAO_DUPLICIDADE SET observacoes=? WHERE id=?",
+                         (json.dumps(obs, sort_keys=True, ensure_ascii=False), dec["id"]))
+            conn.execute("UPDATE CANDIDATO_DUPLICIDADE SET evidencias_resumo=? WHERE id=?",
+                         (json.dumps(evid, sort_keys=True, ensure_ascii=False), cid))
+            resultados.append({"candidato_id": cid, "aplicado": True,
+                               "decisao_id": dec["id"], "divergencia": div})
+        visao = identidade.reconstruir_vinculos(conn)
+        _atualizar_canonicos(conn, visao)
+        for res in resultados:
+            if not res["aplicado"]:
+                continue
+            evid = _load_json(dbmod.scalar(
+                conn, "SELECT evidencias_resumo FROM CANDIDATO_DUPLICIDADE WHERE id=?",
+                (res["candidato_id"],)))
+            for tipo in identidade.TIPOS:
+                res[tipo + "_canonico"] = evid.get(tipo + "_canonico")
+            res["vinculos_criados"] = sum(
+                (tipo, r[0], r[1]) not in antes
+                for tipo, (tabela, coluna) in identidade.TIPOS.items()
+                for r in conn.execute("SELECT registro_id, %s FROM %s WHERE decisao_id=?"
+                                      % (coluna, tabela), (res["decisao_id"],)))
     return resultados
 
 
-# --------------------------------------------------------------- reversao
-
-def _remover_vinculos(conn, decisao_id):
-    total = 0
-    for tabela in ("VINCULO_REGISTRO_PONTO", "VINCULO_REGISTRO_EQUIPAMENTO",
-                   "VINCULO_REGISTRO_OPERACAO", "VINCULO_REGISTRO_TRECHO"):
-        cur = conn.execute(
-            "DELETE FROM %s WHERE decisao_id = ?" % tabela, (decisao_id,))
-        total += cur.rowcount
-    return total
-
-
+##-- BUNDITA DE URSO #{3} -- Apagar apenas os vinculos da decisao deixava as demais unificacoes inconsistentes. ##
 def reverter_decisao(conn, decisao_id, usuario, motivo=None, agora=None):
-    """Desfaz uma decisao SEM apagar auditoria (spec 8.7).
-
-    Marca `revertida_em`, remove as ligacoes criadas por `aplicar` (aquelas
-    com o `decisao_id`) e restaura o estado anterior do candidato. A linha de
-    DECISAO permanece, com o registro da reversao.
-    """
-    dec = dbmod.query_one(
-        conn, "SELECT * FROM DECISAO_DUPLICIDADE WHERE id = ?", (decisao_id,))
+    """Retira uma decisao e recalcula a visao das restantes, com auditoria."""
+    dec = dbmod.query_one(conn, "SELECT * FROM DECISAO_DUPLICIDADE WHERE id=?",
+                         (decisao_id,))
     if dec is None:
         raise ValueError("DECISAO_DUPLICIDADE %r inexistente" % (decisao_id,))
     if dec["revertida_em"]:
         return {"decisao_id": decisao_id, "revertida": False,
                 "motivo": "decisao ja revertida"}
     agora = agora or _agora()
-    obs = _load_json(dec["observacoes"])
-    obs["reversao"] = {"por": usuario, "em": agora, "motivo": motivo}
-    conn.execute(
-        "UPDATE DECISAO_DUPLICIDADE SET revertida_em = ?, observacoes = ? "
-        "WHERE id = ?",
-        (agora, json.dumps(obs, sort_keys=True, ensure_ascii=False), decisao_id))
-    removidos = _remover_vinculos(conn, decisao_id)
-
-    anterior = dbmod.query_one(conn, """
-        SELECT decisao FROM DECISAO_DUPLICIDADE
-        WHERE candidato_id = ? AND revertida_em IS NULL
-        ORDER BY id DESC LIMIT 1""", (dec["candidato_id"],))
-    novo_estado = (_ESTADO_POR_DECISAO[anterior["decisao"]]
-                   if anterior is not None else "pendente")
-    conn.execute("UPDATE CANDIDATO_DUPLICIDADE SET estado = ? WHERE id = ?",
-                 (novo_estado, dec["candidato_id"]))
-    conn.commit()
+    with conn:
+        removidos = sum(dbmod.scalar(conn, "SELECT COUNT(*) FROM %s WHERE decisao_id=?"
+                                     % tabela, (decisao_id,))
+                        for tabela, _ in identidade.TIPOS.values())
+        obs = _load_json(dec["observacoes"])
+        obs["reversao"] = {"por": usuario, "em": agora, "motivo": motivo}
+        conn.execute("UPDATE DECISAO_DUPLICIDADE SET revertida_em=?, observacoes=? WHERE id=?",
+                     (agora, json.dumps(obs, sort_keys=True, ensure_ascii=False), decisao_id))
+        anterior = decisao_ativa(conn, dec["candidato_id"])
+        estado = (_ESTADO_POR_DECISAO[anterior["decisao"]] if anterior else "pendente")
+        row = dbmod.scalar(conn, "SELECT evidencias_resumo FROM CANDIDATO_DUPLICIDADE WHERE id=?",
+                           (dec["candidato_id"],))
+        evid = _load_json(row)
+        for chave in ("aplicado_em", "aplicado_por", "ponto_canonico",
+                      "equipamento_canonico", "vinculos_criados", "divergencia_posicao"):
+            evid.pop(chave, None)
+        conn.execute("UPDATE CANDIDATO_DUPLICIDADE SET estado=?, evidencias_resumo=? WHERE id=?",
+                     (estado, json.dumps(evid, sort_keys=True, ensure_ascii=False), dec["candidato_id"]))
+        visao = identidade.reconstruir_vinculos(conn)
+        _atualizar_canonicos(conn, visao)
+        # Compatibilidade com eventuais vinculos legados de operacoes/trechos.
+        for tabela in ("VINCULO_REGISTRO_OPERACAO", "VINCULO_REGISTRO_TRECHO"):
+            cur = conn.execute("DELETE FROM %s WHERE decisao_id=?" % tabela, (decisao_id,))
+            removidos += cur.rowcount
+        estado = dbmod.scalar(conn, "SELECT estado FROM CANDIDATO_DUPLICIDADE WHERE id=?",
+                              (dec["candidato_id"],))
     return {"decisao_id": decisao_id, "revertida": True,
-            "vinculos_removidos": removidos, "estado": novo_estado}
+            "vinculos_removidos": removidos, "estado": estado}
 
 
 # ------------------------------------------------------- consultas auxiliares

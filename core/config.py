@@ -124,6 +124,9 @@ DEFAULT_TIMEOUT = 30          # segundos
 DEFAULT_TENTATIVAS = 3
 USER_AGENT = "RadarBrasil/1.0 (+https://github.com/Challado/Bunda-de-Urso)"
 
+##-- BUNDITA DE URSO #{12} -- Cabecalhos de cliente so podem identificar IP quando enviados por proxy confiavel. ##
+TRUSTED_PROXIES = tuple(p.strip() for p in os.environ.get("RADAR_TRUSTED_PROXIES", "").split(",") if p.strip())
+
 # Descricao curta do limite de raio, para mensagens/ajuda (mantidas em sincronia).
 RAIO_FAIXA_TXT = "%d..%d" % (MIN_RAIO, MAX_RAIO)
 

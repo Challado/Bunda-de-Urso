@@ -506,10 +506,12 @@
       h += "<div class='bloco'><h3>Vínculos de correspondência com ponto oficial</h3>";
       h += "<div class='tabWrap'><table><thead><tr><th>#</th><th>Oficial</th><th>Colaborativo</th><th>Distância</th><th>Status</th><th></th></tr></thead><tbody>";
       corrs.forEach(function(c){
+        // ##-- BUNDITA DE URSO #{8} -- Proximidade e uma sugestao pendente; os botoes tambem devem aceitar o status legado corroborado. ##
+        var statusExibido = c.status === "corroborado" ? "aguardando revisão" : c.status;
         h += "<tr><td>" + esc(c.id) + "</td><td>" + esc(c.ponto_oficial_id) + "</td><td>" + esc(c.ponto_colaborativo_id) + "</td>" +
           "<td>" + esc(c.distancia_metros != null ? Math.round(c.distancia_metros) + " m" : "—") + "</td>" +
-          "<td>" + esc(c.status || "—") + "</td><td>";
-        if (ehModerador() && (c.status === "pendente" || !c.status)){
+          "<td>" + esc(statusExibido || "—") + "</td><td>";
+        if (ehModerador() && !c.resolvido_em && (c.status === "corroborado" || c.status === "pendente" || !c.status)){
           h += "<button class='mini' data-corr='" + esc(c.id) + "' data-status='colaborativo_vence'>colaborativo vence</button> " +
                "<button class='mini sec' data-corr='" + esc(c.id) + "' data-status='oficial_vence'>oficial vence</button>";
         }
@@ -588,10 +590,15 @@
     }).catch(function(e){ res.innerHTML = "<div class='aviso err'>Erro de rede: " + esc(e.message) + "</div>"; });
   }
   function resolverCorr(cid, status){
+    // ##-- BUNDITA DE URSO #{8} -- Substituicao do oficial exige motivo tambem no formulario de moderacao. ##
     abrirModal({titulo:"Resolver vínculo #" + cid + " → " + status.replace(/_/g," "),
-      corpo:"<label>Motivo (opcional)<input id='cMotivo'></label>",
+      corpo:"<label>Motivo" + (status === "colaborativo_vence" ? " (obrigatório)" : " (opcional)") + "<input id='cMotivo'></label>",
       perigo: status === "oficial_vence", ok:"Confirmar",
-      ler:function(){ return {status: status, motivo:(document.getElementById("cMotivo").value||"").trim() || null}; }
+      ler:function(){
+        var motivo = (document.getElementById("cMotivo").value||"").trim();
+        if (status === "colaborativo_vence" && !motivo){ alert("Informe o motivo para substituir o ponto oficial."); return; }
+        return {status: status, motivo:motivo || null};
+      }
     }).then(function(r){ if(!r) return;
       req("/api/v1/gestao/correspondencias/" + encodeURIComponent(cid), {method:"POST", body:r}).then(function(o){
         if (o.status === 401){ sessaoCaiu(); return; }

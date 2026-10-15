@@ -10,8 +10,8 @@ CORRESPONDENCIA_PONTO, SUBMISSAO_PUBLICA) e marca o estado do radar
 Camadas de confianca (especificacao aprovada 13/10/2026):
   - leitura aberta;
   - submissao publica entra como ``colaborativo`` NAO verificado e publica na
-    hora; se cair no raio de um ponto OFICIAL vira ``verificado`` (corroborado)
-    e ganha vinculo em CORRESPONDENCIA_PONTO;
+    hora; proximidade de ponto OFICIAL apenas sugere correspondencia para
+    revisao; verificacao e substituicao exigem moderacao;
   - verificacao / edicao / remocao exigem sessao ou X-Api-Token de gestao;
   - remocao e TOMBSTONE (soft delete): a linha nunca e apagada.
 
@@ -685,6 +685,7 @@ def _coordenada_ponto(conn, ponto_id):
     return row["latitude"], row["longitude"]
 
 
+##-- BUNDITA DE URSO #{8} -- Rotulo padrao de procedencia nao comprova origem oficial; verificar a cadeia documental. ##
 def _oficial_perto(conn, lat, lon, raio):
     """Ponto OFICIAL mais proximo dentro do raio, ou (None, None)."""
     bb = geo.bounding_box(lat, lon, raio)
@@ -694,7 +695,15 @@ def _oficial_perto(conn, lat, lon, raio):
         "JOIN POSICAO_GEOGRAFICA pos ON pos.id=p.posicao_id "
         "WHERE pos.latitude BETWEEN ? AND ? AND pos.longitude BETWEEN ? AND ? "
         "AND (p.procedencia IS NULL OR p.procedencia <> 'colaborativo') "
-        "AND p.removido_em IS NULL",
+        "AND p.removido_em IS NULL "
+        "AND (p.verificacao_status IS NULL OR p.verificacao_status <> 'desabilitado') "
+        "AND EXISTS (SELECT 1 FROM VINCULO_REGISTRO_PONTO vp "
+        "JOIN REGISTRO_FONTE r ON r.id=vp.registro_id "
+        "JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id "
+        "JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id "
+        "JOIN FONTE f ON f.id=rf.fonte_id "
+        "JOIN NATUREZA_FONTE nf ON nf.id=f.natureza_id "
+        "WHERE vp.ponto_id=p.id AND vp.decisao_id IS NULL AND nf.codigo='oficial')",
         (bb["lat_min"], bb["lat_max"], bb["lon_min"], bb["lon_max"])).fetchall()
     melhor = (None, None)
     for r in rows:
@@ -792,11 +801,12 @@ def _checar_rate_limit(conn, ip):
 # ---------------------------------------------------------------------------
 # Submissao PUBLICA
 # ---------------------------------------------------------------------------
+##-- BUNDITA DE URSO #{8} -- Proximidade de contribuicao publica nao comprova identidade nem verifica seus campos. ##
 def submeter(conn, dados, procedencia=None):
     """POST /api/v1/radares/submeter — criacao aberta (sem token).
 
     Publica NA HORA como ``colaborativo``/``nao_verificado``; se houver ponto
-    OFICIAL no raio de correspondencia, corrobora automaticamente. Reusa a
+    OFICIAL no raio de correspondencia, apenas sugere revisao. Reusa a
     MESMA normalizacao/upsert do coletor (ColetorBaseLWB sobre a mesma
     conexao). Recusa (409) o lote inteiro se alguma coordenada cair em
     BLOQUEIO_GEOGRAFICO ativo.
@@ -854,14 +864,14 @@ def submeter(conn, dados, procedencia=None):
                               detalhes=erros)
 
     # Mesma normalizacao/upsert do coletor, na MESMA conexao.
-    from coletor.fontes.base_lwb import ColetorBaseLWB
-    conector = ColetorBaseLWB(conn=conn)
+    ##-- BUNDITA DE URSO #{19} -- Escrita publica nao pode compartilhar a identidade da base autenticada. ##
+    from coletor.fontes.submissao_publica import ColetorSubmissaoPublica
+    conector = ColetorSubmissaoPublica(conn=conn)
     resumo = conector.ingerir_registros([it for _, it in validos],
                                         publicar=False)
     detalhes = resumo.get("detalhes") or []
 
-    corroborados = 0
-    corroborados_ids = []
+    sugeridos_ids = []
     for det in detalhes:
         pid = det.get("ponto_id")
         if pid is None:
@@ -885,19 +895,8 @@ def submeter(conn, dados, procedencia=None):
                                      config.RAIO_CORRESPONDENCIA_M)
         if of_id is not None:
             _inserir_correspondencia(conn, pid, of_id, dist, "corroborado")
-            conn.execute("UPDATE PONTO_FISCALIZACAO SET "
-                         "verificacao_status='verificado' WHERE id=?", (pid,))
-            registrar_alteracao(
-                conn, pid, None, "verificado",
-                motivo="corroborado por ponto oficial no raio de "
-                       "correspondencia",
-                campos={"ponto_oficial_id": of_id,
-                        "distancia_metros": round(dist, 3),
-                        "raio_correspondencia_m":
-                            config.RAIO_CORRESPONDENCIA_M},
-                ip=ip)
-            corroborados += 1
-            corroborados_ids.append(pid)
+            # Proximidade sugere revisao; nao verifica identidade ou campos.
+            sugeridos_ids.append(pid)
     conn.commit()
 
     aceitos = resumo.get("criados", 0) + resumo.get("atualizados", 0)
@@ -908,8 +907,10 @@ def submeter(conn, dados, procedencia=None):
         "aceitos": aceitos,
         "criados": resumo.get("criados", 0),
         "atualizados": resumo.get("atualizados", 0),
-        "corroborados": corroborados,
-        "corroborados_ids": corroborados_ids,
+        "corroborados": 0,
+        "corroborados_ids": [],
+        "correspondencias_sugeridas": len(sugeridos_ids),
+        "correspondencias_sugeridas_ids": sugeridos_ids,
         "rejeitados": rejeitados,
         "erros": erros,
     }
@@ -1148,6 +1149,7 @@ def remover_radar(conn, ponto_id, ctx, motivo, ip=None):
                         ip=ip)
 
 
+##-- BUNDITA DE URSO #{8} -- Substituir o oficial exige decisao de moderacao fundamentada. ##
 def resolver_correspondencia(conn, correspondencia_id, status, ctx, motivo=None):
     """Resolve o vinculo (oficial_vence|colaborativo_vence)."""
     if status not in ("oficial_vence", "colaborativo_vence"):
@@ -1160,11 +1162,16 @@ def resolver_correspondencia(conn, correspondencia_id, status, ctx, motivo=None)
         raise GovernancaError(404, "correspondencia_nao_encontrada",
                               "correspondencia %s nao encontrada"
                               % correspondencia_id)
+    if status == "colaborativo_vence" and not (motivo or "").strip():
+        raise GovernancaError(422, "motivo_obrigatorio",
+                              "fundamente a substituicao do ponto oficial", campo="motivo")
     conn.execute("UPDATE CORRESPONDENCIA_PONTO SET status=?, resolvido_por=?, "
                  "resolvido_em=?, motivo=? WHERE id=?",
                  (status, (ctx or {}).get("rotulo"), _agora(), motivo,
                   correspondencia_id))
     conn.commit()
+    if status == "colaborativo_vence":
+        verificar_radar(conn, row["ponto_colaborativo_id"], ctx, motivo=motivo)
     if status == "oficial_vence":
         remover_radar(conn, row["ponto_colaborativo_id"], ctx,
                       motivo=motivo or "oficial vence a correspondencia")
@@ -1194,6 +1201,7 @@ def criar_usuario_api(conn, dados, ctx):
 # Estado do radar na CONSULTA publica (preferir colaborativo; esconder
 # removidos/desabilitados). Usado por core.consultas.
 # ---------------------------------------------------------------------------
+##-- BUNDITA DE URSO #{8} -- Correspondencia automatica estava ocultando o ponto oficial sem revisao. ##
 def clausulas_consulta(conn):
     """Clausulas SQL que escondem removidos/desabilitados e o oficial
     'perdedor' quando ha um colaborativo ativo correspondente.
@@ -1213,7 +1221,8 @@ def clausulas_consulta(conn):
             "p.id NOT IN (SELECT cp.ponto_oficial_id FROM "
             "CORRESPONDENCIA_PONTO cp JOIN PONTO_FISCALIZACAO c ON "
             "c.id=cp.ponto_colaborativo_id WHERE "
-            "cp.status IN ('corroborado','colaborativo_vence') AND "
+            "cp.status='colaborativo_vence' AND cp.resolvido_em IS NOT NULL AND "
+            "c.verificacao_status='verificado' AND "
             "c.removido_em IS NULL AND "
             "(c.verificacao_status IS NULL OR "
             "c.verificacao_status <> 'desabilitado'))")

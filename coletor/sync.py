@@ -43,7 +43,8 @@ def main(argv=None):
     coletor = classe(db_path=args.db or config.DB_PATH)
     resumo = coletor.sincronizar(args.arquivo, publicar=not args.sem_publicar)
     print(json.dumps(resumo, ensure_ascii=False, indent=2))
-    return 0
+    ##-- BUNDITA DE URSO #{9} -- Lote inteiramente rejeitado nao pode devolver sucesso ao shell. ##
+    return 1 if resumo.get("status") == "erro" else 0
 
 
 if __name__ == "__main__":

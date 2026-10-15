@@ -266,7 +266,7 @@ class TestDecisaoReversao(BaseDedup):
         cid = self.candidato_unico()["id"]
 
         decisao_id = dedup.decidir(self.con, cid, "unificar", "revisor",
-                                   "mesma serie e mesmo km")
+                                   "mesma serie e mesmo km", escopo="ambos")
         self.assertEqual(self.candidato_unico()["estado"], "decidido_unificar")
         self.assertEqual(self.contar("DECISAO_DUPLICIDADE"), 1)
 
@@ -342,7 +342,8 @@ class TestRegras17p4(BaseDedup):
 
         dedup.gerar_candidatos(self.con)
         cid = self.candidato_unico()["id"]
-        dedup.decidir(self.con, cid, "unificar", "revisor", "mesmo instrumento")
+        dedup.decidir(self.con, cid, "unificar", "revisor", "mesmo instrumento",
+                     escopo="equipamento")
         res = dedup.aplicar(self.con, cid, usuario="revisor")
         self.assertTrue(res[0]["aplicado"])
 
@@ -382,7 +383,8 @@ class TestRegras17p4(BaseDedup):
 
         self.assertEqual(len(dedup.gerar_candidatos(self.con)["criados"]), 1)
         cid = self.candidato_unico()["id"]
-        dedup.decidir(self.con, cid, "unificar", "revisor", "mesma serie")
+        dedup.decidir(self.con, cid, "unificar", "revisor", "mesma serie",
+                     escopo="equipamento")
         res = dedup.aplicar(self.con, cid, usuario="revisor")
         canonico = res[0]["equipamento_canonico"]
         self.assertIsNotNone(canonico)
@@ -421,7 +423,8 @@ class TestSerieGenerica(BaseDedup):
         self.assertTrue(dedup.serie_generica("224"))
         self.assertFalse(dedup.serie_generica("2244"))     # 4 digitos: ok
         self.assertFalse(dedup.serie_generica("TC005867"))
-        self.assertTrue(dedup.serie_generica("1591", municipios=[1, 2]))
+        ##-- BUNDITA DE URSO #{5} -- Mudanca de municipio nao prova reutilizacao de codigo. ##
+        self.assertFalse(dedup.serie_generica("1591", municipios=[1, 2]))
         self.assertFalse(dedup.serie_generica("1591", municipios=[1, 1]))
 
     def test_nao_confirma_nem_bloqueia(self):

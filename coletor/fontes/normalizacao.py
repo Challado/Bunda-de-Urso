@@ -538,6 +538,18 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None,
         "situacao_operacional_id": situacao_id,
         "observacoes": d.get("observacoes"),
     }
+    ##-- BUNDITA DE URSO #{8} -- O DEFAULT oficial da migracao rotulava cadastros proprios como prova governamental. ##
+    colunas = {r[1] for r in conn.execute("PRAGMA table_info(PONTO_FISCALIZACAO)")}
+    if {"procedencia", "verificacao_status"} <= colunas:
+        natureza = dbmod.scalar(conn, "SELECT n.codigo FROM FONTE f "
+                                "JOIN NATUREZA_FONTE n ON n.id=f.natureza_id WHERE f.id=?",
+                                (fonte_id,))
+        campos_ponto["procedencia"] = ("oficial" if natureza == "oficial"
+                                       else d.get("procedencia") or "cadastro_proprio")
+        # Nao sobrescrever revisao/moderacao numa atualizacao do mesmo ponto.
+        if ponto_existente_id is None:
+            campos_ponto["verificacao_status"] = ("verificado" if natureza == "oficial"
+                                                  else "nao_verificado")
     if ponto_existente_id is None:
         ponto_id = dbmod.insert(conn, "PONTO_FISCALIZACAO", campos_ponto)
         ponto_criado = True

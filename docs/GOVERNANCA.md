@@ -14,7 +14,9 @@ No servidor, a rota vai no parâmetro `rota` do `.pse`. Exemplos abaixo já ness
 ## 1. Submissão pública (sem token)
 
 Publica na hora como `colaborativo`/`nao_verificado`. Se houver ponto oficial no raio de
-correspondência (default 150 m), corrobora automaticamente. Rate limit por IP → `429`.
+correspondência (default 150 m), cria uma sugestão para revisão, sem verificar o
+cadastro nem ocultar o oficial. Rate limit por IP → `429`. IDs anônimos não
+autorizam atualizar pontos existentes; a origem pública é separada da base autenticada.
 Coordenada dentro de bloqueio ativo → `409` com motivo.
 
 ```bash
@@ -152,9 +154,10 @@ curl -s 'https://servidor3.lucas.inf.br/openclaw/radar/api.pse?rota=/api/v1/rada
 Em `core.consultas` a consulta (`/api/v1/radares`, `/api/v1/radares/busca`) passa a:
 
 1. **Esconder** pontos com `removido_em` (tombstone) ou `verificacao_status='desabilitado'`.
-2. **Preferir o colaborativo**: quando um colaborativo ativo tem vínculo
-   `CORRESPONDENCIA_PONTO` com status `corroborado`/`colaborativo_vence`, o ponto
-   **oficial correspondente é omitido** da resposta (o colaborativo é o exibido).
+2. **Preservar o oficial até revisão**: proximidade gera apenas uma sugestão
+   (`corroborado`, nome histórico do status). O oficial só é omitido quando
+   um moderador decide `colaborativo_vence`, com motivo e data registrados,
+   e o colaborativo está verificado e ativo.
    Se o vínculo for resolvido como `oficial_vence`, o colaborativo é removido
    (tombstone) e o oficial volta a aparecer.
 
@@ -212,3 +215,9 @@ O valor de um token/senha temporária aparece **uma única vez** na emissão; de
 prefixo. As duas rotas de apoio (`/api/v1/gestao/eu` e
 `/api/v1/gestao/correspondencias/{id}`) vivem em `web/nucleo.py`, junto das demais de
 governança.
+
+
+O IP usado no rate limit é `REMOTE_ADDR`. Quando houver proxy reverso, configure
+`RADAR_TRUSTED_PROXIES` com seus IPs/CIDRs, separados por vírgula; só então
+`X-Forwarded-For` é considerado, da direita para a esquerda até o primeiro salto
+não confiável. O proxy deve acrescentar o IP real do cliente à cadeia.

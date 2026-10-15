@@ -60,12 +60,13 @@ def espera_s(intervalo_s, hist):
     """
     if not hist:
         return 0
-    if hist[0]["status"] == "ok":
+    ##-- BUNDITA DE URSO #{16} -- Coletas sem mudanca eram contadas como erros e acumulavam backoff. ##
+    if hist[0]["status"] in ("ok", "sem_mudanca"):
         intervalo = intervalo_s if intervalo_s and intervalo_s > 0 else 0
         return intervalo
     erros = 0
     for h in hist:
-        if h["status"] == "ok":
+        if h["status"] in ("ok", "sem_mudanca"):
             break
         erros += 1
     fator = min(2 ** max(erros - 1, 0), agenda_mod.BACKOFF_TETO)
@@ -161,14 +162,15 @@ def executar(db_path=None, agora=None, forcar=None, arquivos=None,
             try:
                 resumo = conector.sincronizar(origem)
                 resultado = {
-                    "fonte": chave, "acao": "executado",
+                    "fonte": chave, "acao": "erro" if resumo.get("status") == "erro" else "executado",
                     "motivo": diag["motivo"], "criados": resumo["criados"],
                     "rejeitados": resumo["rejeitados"],
                     "recebidos": resumo["linhas_recebidas"]}
                 # Gancho pos-coleta: so roda se a coleta deu certo. Erro no
                 # gancho NAO derruba a coleta (fica registrado no resultado).
                 spec = item.get("pos_coleta")
-                if spec:
+                ##-- BUNDITA DE URSO #{9} -- Nao executar pos-coleta sobre lote vazio ou rejeitado. ##
+                if spec and resumo.get("status", "ok") in ("ok", "sem_mudanca"):
                     try:
                         resultado["pos_coleta"] = _resolver_pos_coleta(spec)(conn)
                     except Exception as exc:               # noqa: BLE001
