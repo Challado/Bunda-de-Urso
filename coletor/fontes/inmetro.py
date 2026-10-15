@@ -193,22 +193,45 @@ class ColetorINMETRO(ColetorBase):
             url = self._url_de(origem)
             conteudo = self._baixar(url)
             ext = ".json"
-        try:
-            bruto = json.loads(conteudo.decode("utf-8-sig"))
-        except (ValueError, UnicodeDecodeError) as exc:
-            raise ValueError("resposta de dados abertos nao e JSON valido: %s"
-                             % exc)
-        if isinstance(bruto, dict):
-            for chave in ("dados", "data", "records", "items", "medidores"):
-                if isinstance(bruto.get(chave), list):
-                    bruto = bruto[chave]
-                    break
-            else:
-                bruto = [bruto]
-        if not isinstance(bruto, list):
-            raise ValueError("estrutura inesperada em medidores.json")
-        registros = self.agrupar_instrumentos(bruto)
+        ##-- BUNDITA DE URSO #{27} -- A coleta TODAS arquiva documentos JSON concatenados, mas o leitor exigia documento unico e falhava ao restaurar o bruto nacional. ##
+        registros = []
+        for bruto in self._documentos_json(conteudo):
+            if isinstance(bruto, dict):
+                for chave in ("dados", "data", "records", "items", "medidores"):
+                    if isinstance(bruto.get(chave), list):
+                        bruto = bruto[chave]
+                        break
+                else:
+                    bruto = [bruto]
+            if not isinstance(bruto, list):
+                raise ValueError("estrutura inesperada em medidores.json")
+            # A coleta nacional agrupa cada resposta estadual separadamente.
+            registros.extend(self.agrupar_instrumentos(bruto))
         return conteudo, ext, "application/json", registros
+
+    @staticmethod
+    def _documentos_json(conteudo):
+        """Le JSON unico ou fluxo nacional legado sem modificar os bytes.
+
+        Valida ate o fim: um sufixo corrompido impede importar apenas o prefixo.
+        Cada resposta pode ter BOM UTF-8, como nos arquivos estaduais isolados.
+        """
+        try:
+            texto = conteudo.decode("utf-8-sig")
+            decoder = json.JSONDecoder()
+            documentos, inicio = [], 0
+            while inicio < len(texto):
+                while inicio < len(texto) and texto[inicio] in " \t\r\n\ufeff":
+                    inicio += 1
+                if inicio == len(texto):
+                    break
+                documento, inicio = decoder.raw_decode(texto, inicio)
+                documentos.append(documento)
+            if not documentos:
+                raise ValueError("arquivo vazio")
+            return documentos
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise ValueError("resposta de dados abertos nao e JSON valido: %s" % exc) from exc
 
     def _carregar_todas(self):
         """Baixa todas as UFs (uma por vez, respeitando o host) e combina.

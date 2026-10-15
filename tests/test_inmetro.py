@@ -4,7 +4,11 @@
 Testes OFFLINE (fixture local, sem rede), conforme spec 15 e 17.1/[G01].
 """
 import os
+import json
+from pathlib import Path
+import tempfile
 import unittest
+from unittest.mock import patch
 
 from core import config
 from core import db as dbmod
@@ -171,6 +175,50 @@ class TestDatasAuxiliares(unittest.TestCase):
         self.assertIsNone(inmetro._data_br("2026-08-04"))
         self.assertIsNone(inmetro._data_br("31/02/2026"))
         self.assertIsNone(inmetro._data_br(None))
+
+
+##-- BUNDITA DE URSO #{27} -- O bruto nacional precisa ser restauravel sem perder UFs, reescrever bytes ou aceitar somente um prefixo valido. ##
+class TestReleituraNacional(unittest.TestCase):
+    @staticmethod
+    def resposta(uf):
+        return json.dumps([{"SiglaUf": uf, "Municipio": "MUNICIPIO TESTE",
+                            "Faixas": [{"NumeroInmetro": "1234", "NumeroSerie": "SERIE-TESTE"}]}]).encode()
+
+    def carregar(self, conteudo):
+        with tempfile.TemporaryDirectory() as pasta:
+            arquivo = Path(pasta, "nacional.json")
+            arquivo.write_bytes(conteudo)
+            resultado = ColetorINMETRO().carregar(str(arquivo))
+            self.assertEqual(arquivo.read_bytes(), conteudo)
+            self.assertEqual(resultado[0], conteudo)
+            return resultado[3]
+
+    def test_documentos_estaduais_concatenados_preservam_ambos_instrumentos(self):
+        registros = self.carregar(self.resposta("AC") + b"\n" + self.resposta("AL"))
+        self.assertEqual(len(registros), 2)
+        self.assertEqual([r["SiglaUf"] for r in registros], ["AC", "AL"])
+
+    def test_bom_e_espacos_entre_respostas_estaduais(self):
+        registros = self.carregar(b"\xef\xbb\xbf" + self.resposta("AC") + b"\r\n \xef\xbb\xbf" + self.resposta("AL") + b"\n")
+        self.assertEqual(len(registros), 2)
+
+    def test_saida_real_do_caminho_todas_pode_ser_relida(self):
+        coletor = ColetorINMETRO()
+        with patch.object(coletor, "UFS_TODAS", ("AC", "AL")), \
+                patch.object(coletor, "_baixar", side_effect=[self.resposta("AC"), self.resposta("AL")]), \
+                patch("time.sleep"):
+            conteudo, _, _, originais = coletor.carregar("TODAS")
+        self.assertEqual(self.carregar(conteudo), originais)
+
+    def test_sufixo_corrompido_nao_importa_prefixo(self):
+        for sufixo in (b"[", b"lixo", b"\xff"):
+            with self.subTest(sufixo=sufixo), self.assertRaises(ValueError):
+                self.carregar(self.resposta("AC") + b"\n" + sufixo)
+
+    def test_estrutura_invalida_e_arquivo_vazio_falham(self):
+        for conteudo in (b"", b"   ", b"null", b"[]\n123"):
+            with self.subTest(conteudo=conteudo), self.assertRaises(ValueError):
+                self.carregar(conteudo)
 
 
 if __name__ == "__main__":

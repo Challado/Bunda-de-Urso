@@ -34,6 +34,7 @@ Um mesmo número aparece nos pontos necessários para resolver o mesmo problema.
 | 24 | Na PRF, `ESTADO=ATIVO/INOPERANTE` encobria a UF real. A comparação valida siglas/nomes de UF, prioriza a observação original sobre o ponto mutável e não calcula distâncias com coordenadas fora da faixa. |
 | 25 | Observações históricas equivalentes do mesmo cadastro multiplicavam pares. A geração usa um representante estável por origem, entidades e atributos, mantendo todos os registros equivalentes na evidência. Observações divergentes e faixas distintas permanecem separadas. |
 | 26 | A fila misturava identidade de ponto/instrumento e tratava contraditórios como propostas de unificação. `dedup-1.2` avalia cada escopo, separa diagnóstico de revisão e aplica os bloqueadores do escopo escolhido. A fila omite trabalho já resolvido por decisões transitivas e pode ser salva numa cópia para revisão por CLI. |
+| 27 | O arquivo nacional INMETRO guardava respostas JSON estaduais concatenadas, mas o leitor exigia um documento único. Agora relê todos os documentos até o fim, preservando bytes e agrupamento por resposta, e recusa sufixos corrompidos. A auditoria do repositório de dados confere arquivos, índice, execuções, SQLite e registros relidos sem alterar a origem. |
 
 ## Decisões e compatibilidade
 

@@ -90,6 +90,18 @@ Resumindo: **nginx + fcgiwrap + Python** executando um arquivo `.pse`. Nada mais
 
 O esquema é **SQL canônico, sem ORM** — nada de SQLAlchemy por aqui. São **77 tabelas** (T01..T77) definidas uma única vez em `tools/build_schema.py`, que gera as duas DDLs gêmeas (`sql/schema.sqlite.sql` e `sql/schema.postgres.sql`), com chaves primárias/estrangeiras, `CHECK`, `UNIQUE` e índices, incluindo equipamentos, pontos, instalações, faixas, órgãos, fontes, documentos, verificações, operações, evidências e candidatos geográficos. O banco padrão é SQLite, sem PostGIS. A compatibilidade efetiva com outros SGBDs requer homologação específica.
 
+## Repositório de dados
+
+O espelho operacional fica em [Challado/Bunda-de-Urso-Dados](https://github.com/Challado/Bunda-de-Urso-Dados): arquivos brutos, índice com SHA-256, diário de execuções e backups SQLite. Mantenha o checkout ao lado deste projeto, respeitando o acesso privado do espelho.
+
+Para conferir os arquivos e seus vínculos com a base, incluindo releitura offline pelos coletores:
+
+```bash
+python3 tools/auditar_repositorio_dados.py --repositorio ../Bunda-de-Urso-Dados --testar-coletores
+```
+
+A auditoria descompacta o backup em diretório temporário e abre o SQLite somente para leitura. A API usa o caminho explícito de `RADAR_DB`; clonar ou auditar o espelho não troca o banco servido. Veja o [roteiro de uso conjunto](docs/REPOSITORIO_DE_DADOS.md).
+
 ## Como a coleta funciona
 
 - Descobrir fontes e recursos oficiais cadastrados, inclusive catálogos CKAN e publicações geográficas.
