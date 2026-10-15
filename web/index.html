@@ -429,11 +429,51 @@
       "<b>" + (meta ? meta.total_pontos : 0) + "</b> ponto(s) de fiscalização no raio";
     if (meta && meta.total_equipamentos != null) resumo += " · " + meta.total_equipamentos + " equipamento(s)";
     if (meta && meta.proximo_cursor){
-      resumo += " <span class='aviso' style='display:inline-block'>mostrando os " +
-        (meta.retornados || 0) + " mais próximos de " + (meta.total_pontos || 0) +
-        " — reduza o raio para ver todos</span>";
+      // ##-- BUNDITA DE URSO #{23} -- Uma pagina parcial nao representa todas as marcacoes do raio. ##
+      resumo += " <span class='aviso' style='display:inline-block'>Exibidos " +
+        (meta.retornados || 0) + " de " + (meta.total_pontos || 0) +
+        " pontos; consulta ainda incompleta.</span>";
     }
     elRes.innerHTML = resumo + tabela;
+  }
+
+  // ##-- BUNDITA DE URSO #{23} -- O mapa parava na primeira pagina e respostas antigas podiam substituir uma consulta nova. ##
+  var consultaAtual = null;
+  var numeroConsulta = 0;
+
+  function carregarPaginas(url, aoReceber, signal){
+    var pontos = [], ids = new Set(), cursores = new Set();
+    function pagina(cursor){
+      return fetch(url + (cursor == null ? "" : "&cursor=" + encodeURIComponent(cursor)),
+        {signal: signal}).then(function(r){
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      }).then(function(d){
+        if (signal.aborted){
+          var cancelada = new Error("Consulta substituída");
+          cancelada.name = "AbortError";
+          throw cancelada;
+        }
+        if (!d || d.sucesso === false){
+          throw new Error((d && d.erro && d.erro.mensagem) || "falha na consulta");
+        }
+        var res = Object.assign({}, d.resultado || {});
+        (res.pontos || []).forEach(function(p){
+          if (!ids.has(p.id)){ ids.add(p.id); pontos.push(p); }
+        });
+        res.retornados = pontos.length;
+        aoReceber(res, pontos.slice(), d);
+        var proximo = res.proximo_cursor;
+        if (proximo != null && proximo !== ""){
+          proximo = String(proximo);
+          if (cursores.has(proximo)) throw new Error("A consulta repetiu uma página e ficou incompleta.");
+          cursores.add(proximo);
+          return pagina(proximo);
+        }
+        return {meta: res, pontos: pontos, documento: d};
+      });
+    }
+    return pagina(null);
   }
 
   function consultar(lat, lon, raio){
@@ -441,6 +481,10 @@
       elRes.innerHTML = "<div class='err'>Informe latitude e longitude numéricas.</div>";
       return;
     }
+    if (consultaAtual) consultaAtual.abort();
+    consultaAtual = new AbortController();
+    var sinal = consultaAtual.signal;
+    var numero = ++numeroConsulta;
     elBarra.innerHTML = "Consultando " + lat + ", " + lon + " (raio " + raio + " m)…";
     camadaPts.clearLayers();
     if (marcaEu) map.removeLayer(marcaEu);
@@ -451,22 +495,20 @@
     enquadrar(lat, lon, raio);
     var url = API + "?rota=" + encodeURIComponent("/api/v1/radares") +
       "&lat=" + encodeURIComponent(lat) + "&lon=" + encodeURIComponent(lon) +
-      "&raio=" + encodeURIComponent(raio) + "&formato=json";
-    fetch(url).then(function(r){ return r.json(); }).then(function(d){
-      if (!d || d.sucesso === false){
-        var msg = (d && d.erro && d.erro.mensagem) || "falha na consulta";
-        elRes.innerHTML = "<div class='err'>" + escapeHtml(msg) + "</div>";
-        elBarra.textContent = "";
-        return;
-      }
-      var res = d.resultado || {};
-      var pontos = res.pontos || [];
+      "&raio=" + encodeURIComponent(raio) + "&formato=json&limite=1000";
+    return carregarPaginas(url, function(res, pontos){
+      if (numero !== numeroConsulta) return;
       render(res, pontos);
+      elBarra.textContent = "Carregando marcações: " + pontos.length + " de " + res.total_pontos + "…";
+    }, sinal).then(function(resultado){
+      if (numero !== numeroConsulta || sinal.aborted) return;
+      var res = resultado.meta, pontos = resultado.pontos, d = resultado.documento;
       if (pontos.length === 0) festa(raio, res.status);
       else problemaCowboy(pontos.length, raio);
       elBarra.innerHTML = "Snapshot " + escapeHtml(d.consultado_em || "") +
         (pontos.length === 0 ? " — <span class='aviso' style='display:inline-block'>nada no raio informado (isso não afirma que não exista radar: verifique cobertura da região).</span>" : "");
     }).catch(function(e){
+      if (numero !== numeroConsulta || sinal.aborted) return;
       elRes.innerHTML = "<div class='err'>Erro de rede: " + escapeHtml(e.message) + "</div>";
       elBarra.textContent = "";
     });

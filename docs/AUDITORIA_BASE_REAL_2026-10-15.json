@@ -1,0 +1,724 @@
+{
+  "backup": {
+    "arquivo": "base de dados/radar-2026-10-15_144017.sqlite3.gz",
+    "commit": "34dc34e",
+    "compactado_sha256": "89626971e28662f465dcf8b004cdf33535e1e6f99314d5437efb764be64fddb4",
+    "banco_sha256": "93d0245193cc4e87d62e5e5f6a23ab8dcbd8d415626ee2cf59f4dafd128fca6b",
+    "integridade": "ok",
+    "violacoes_chaves_estrangeiras": 0,
+    "sha256_inalterado_apos_testes": true
+  },
+  "deduplicacao": {
+    "antes": {
+      "dedup-1.0": {
+        "por_estado": {
+          "pendente": 5575
+        },
+        "por_nivel": {
+          "fraco": 1418,
+          "moderado": 4157
+        },
+        "total": 5575
+      }
+    },
+    "candidatos_criados": 48067,
+    "candidatos_existentes": 0,
+    "conservacao": {
+      "antes": {
+        "EQUIPAMENTO": {
+          "registros": 50200,
+          "sha256": "c07b572fff7412a6230135d68b42817136e8fc6226f4c16ea1e3d091bd2981b5"
+        },
+        "FAIXA_FISCALIZACAO": {
+          "registros": 46114,
+          "sha256": "cf19d115d7bbb00fcc9fc08ebf95d7c6e18c6caeda1d77fdf2710fa8d8f8538d"
+        },
+        "INSTALACAO": {
+          "registros": 50200,
+          "sha256": "f2c791ff8e80076ddce070ba1c93a3800c88bad45c0d496521b8199b7bb3998e"
+        },
+        "LIMITE_VELOCIDADE": {
+          "registros": 40058,
+          "sha256": "5592921b162b75a8d8456690ec3791b7a22e9539489b9b9c5df41498788805b0"
+        },
+        "PONTO_FISCALIZACAO": {
+          "registros": 50200,
+          "sha256": "de8315f5d40595001bfc1ab69c5caec3035525ead068db75cfcf3d434f57394d"
+        },
+        "POSICAO_GEOGRAFICA": {
+          "registros": 9876,
+          "sha256": "ac70d37f14ae5ff57867c4d0282625f64bbb0db9936dd6834d29fc165fe1241a"
+        },
+        "REGIME_FISCALIZACAO": {
+          "registros": 50200,
+          "sha256": "591150bb5c08c60dd0caf165ba0c0768ee705b81b6d4fa42e58e9e45c555e0ce"
+        },
+        "REGISTRO_FONTE": {
+          "registros": 56921,
+          "sha256": "93553885debbe9fb0b96b44cbac08c9db88263beaa49b61910c360b3d0f9e0b0"
+        },
+        "VERIFICACAO_METROLOGICA": {
+          "registros": 171669,
+          "sha256": "b9402793485163c18b27b1899b1cc5738e8934f7fb52dfd0d038a5c2fd1bb865"
+        }
+      },
+      "depois": {
+        "EQUIPAMENTO": {
+          "registros": 50200,
+          "sha256": "c07b572fff7412a6230135d68b42817136e8fc6226f4c16ea1e3d091bd2981b5"
+        },
+        "FAIXA_FISCALIZACAO": {
+          "registros": 46114,
+          "sha256": "cf19d115d7bbb00fcc9fc08ebf95d7c6e18c6caeda1d77fdf2710fa8d8f8538d"
+        },
+        "INSTALACAO": {
+          "registros": 50200,
+          "sha256": "f2c791ff8e80076ddce070ba1c93a3800c88bad45c0d496521b8199b7bb3998e"
+        },
+        "LIMITE_VELOCIDADE": {
+          "registros": 40058,
+          "sha256": "5592921b162b75a8d8456690ec3791b7a22e9539489b9b9c5df41498788805b0"
+        },
+        "PONTO_FISCALIZACAO": {
+          "registros": 50200,
+          "sha256": "de8315f5d40595001bfc1ab69c5caec3035525ead068db75cfcf3d434f57394d"
+        },
+        "POSICAO_GEOGRAFICA": {
+          "registros": 9876,
+          "sha256": "ac70d37f14ae5ff57867c4d0282625f64bbb0db9936dd6834d29fc165fe1241a"
+        },
+        "REGIME_FISCALIZACAO": {
+          "registros": 50200,
+          "sha256": "591150bb5c08c60dd0caf165ba0c0768ee705b81b6d4fa42e58e9e45c555e0ce"
+        },
+        "REGISTRO_FONTE": {
+          "registros": 56921,
+          "sha256": "93553885debbe9fb0b96b44cbac08c9db88263beaa49b61910c360b3d0f9e0b0"
+        },
+        "VERIFICACAO_METROLOGICA": {
+          "registros": 171669,
+          "sha256": "b9402793485163c18b27b1899b1cc5738e8934f7fb52dfd0d038a5c2fd1bb865"
+        }
+      },
+      "inventario_original_inalterado": true,
+      "marcacoes_com_gps_examinadas": 7463,
+      "marcacoes_nao_representadas": [],
+      "ocultacoes_explicitas_de_aliases": 0
+    },
+    "decisoes_aplicadas_nesta_auditoria": 0,
+    "depois": {
+      "dedup-1.0": {
+        "por_estado": {
+          "pendente": 5575
+        },
+        "por_nivel": {
+          "fraco": 1418,
+          "moderado": 4157
+        },
+        "total": 5575
+      },
+      "dedup-1.1": {
+        "por_estado": {
+          "pendente": 48067
+        },
+        "por_nivel": {
+          "contraditorio": 25385,
+          "fraco": 14522,
+          "moderado": 8160
+        },
+        "total": 48067
+      }
+    },
+    "fila_vigente_pendente": 33545,
+    "registros": 56921,
+    "regra": "dedup-1.1"
+  },
+  "consultas_publicas": {
+    "consultas_por_raio": 87,
+    "raios_metros": [
+      1,
+      50
+    ],
+    "ufs_amostradas": [
+      "AC",
+      "AL",
+      "AM",
+      "AP",
+      "BA",
+      "CE",
+      "DF",
+      "ES",
+      "GO",
+      "MA",
+      "MG",
+      "MS",
+      "MT",
+      "PA",
+      "PB",
+      "PE",
+      "PI",
+      "PR",
+      "RJ",
+      "RN",
+      "RO",
+      "RR",
+      "RS",
+      "SC",
+      "SE",
+      "SP",
+      "TO"
+    ],
+    "paginas_verificadas": 3,
+    "registros_nas_paginas": 7,
+    "total_cadastral": 50199,
+    "cadastro_sem_gps_consultavel": true,
+    "divergencias": [],
+    "duracao_s": 4.692
+  },
+  "simulacoes_em_copia": [
+    {
+      "caso": "mesma_posicao",
+      "candidato_id": 2,
+      "escopo": "ponto",
+      "aplicar_reverter": "ok",
+      "inventario_preservado": true,
+      "vinculos_restaurados": true,
+      "marcacoes_nao_representadas": []
+    },
+    {
+      "caso": "posicoes_divergentes",
+      "candidato_id": 4,
+      "escopo": "ponto",
+      "aplicar_reverter": "ok",
+      "inventario_preservado": true,
+      "vinculos_restaurados": true,
+      "marcacoes_nao_representadas": []
+    },
+    {
+      "caso": "um_sem_gps",
+      "candidato_id": 106856,
+      "escopo": "ponto",
+      "aplicar_reverter": "ok",
+      "inventario_preservado": true,
+      "vinculos_restaurados": true,
+      "marcacoes_nao_representadas": []
+    },
+    {
+      "caso": "ambos_sem_gps",
+      "candidato_id": 114446,
+      "escopo": "equipamento",
+      "aplicar_reverter": "ok",
+      "inventario_preservado": true,
+      "vinculos_restaurados": true,
+      "marcacoes_nao_representadas": []
+    }
+  ],
+  "recuperacao_em_copia": {
+    "recuperadas": [
+      {
+        "ponto_id": 47770,
+        "registro_id": 51519,
+        "hash_registro": "6c95e97d09703384c9c091fdc531846802f03c21c39ffd4e69d0d6a130450006",
+        "latitude": -7.158138,
+        "longitude": -48.192593,
+        "qualidade": "oficial",
+        "metodo_obtencao": "renormalizacao_legada_22; publicacao ASTT Araguaina (lista de enderecos de medidores de velocidade)"
+      },
+      {
+        "ponto_id": 47803,
+        "registro_id": 51552,
+        "hash_registro": "69210210cf346c91be5fd6533d93f5011d9714427bdda7b22123da848a05bbd7",
+        "latitude": -7.199534,
+        "longitude": -48.218441,
+        "qualidade": "oficial",
+        "metodo_obtencao": "renormalizacao_legada_22; publicacao ASTT Araguaina (lista de enderecos de medidores de velocidade)"
+      },
+      {
+        "ponto_id": 47804,
+        "registro_id": 51553,
+        "hash_registro": "d1766aea0f0c9b3f83646c9ae75db6483bb73dda7d7e70caa768a476d391fa2b",
+        "latitude": -7.198739,
+        "longitude": -48.217981,
+        "qualidade": "oficial",
+        "metodo_obtencao": "renormalizacao_legada_22; publicacao ASTT Araguaina (lista de enderecos de medidores de velocidade)"
+      },
+      {
+        "ponto_id": 47805,
+        "registro_id": 51554,
+        "hash_registro": "baa3e8d0d5818d125306bc6ed26ed1dcbf1794970b666e96d5a4496fceaa47d4",
+        "latitude": -7.163786,
+        "longitude": -48.1917,
+        "qualidade": "oficial",
+        "metodo_obtencao": "renormalizacao_legada_22; publicacao ASTT Araguaina (lista de enderecos de medidores de velocidade)"
+      }
+    ],
+    "pontos_preservados": 50200,
+    "novas_posicoes": 4,
+    "gps_visivel_antes": 7463,
+    "gps_visivel_depois": 7467,
+    "inventario_exceto_quatro_vinculos_e_quatro_posicoes_preservado": true,
+    "consultas_raio_1_metro": "ok",
+    "idempotencia": "ok",
+    "origem_sha256_inalterado": "93d0245193cc4e87d62e5e5f6a23ab8dcbd8d415626ee2cf59f4dafd128fca6b"
+  },
+  "cobertura_gps_por_fonte": [
+    {
+      "nome": "INMETRO / PSIE - Instrumentos verificados (medidores de velocidade)",
+      "pontos": 40248,
+      "com_gps": 0
+    },
+    {
+      "nome": "DNIT - Controle de velocidade (PNCV)",
+      "pontos": 1774,
+      "com_gps": 1774
+    },
+    {
+      "nome": "PRF - Radares fixos",
+      "pontos": 1574,
+      "com_gps": 1206
+    },
+    {
+      "nome": "ANTT - Dados dos radares em rodovias concedidas",
+      "pontos": 1256,
+      "com_gps": 1256
+    },
+    {
+      "nome": "DER-SP - Radares estaduais",
+      "pontos": 1176,
+      "com_gps": 1176
+    },
+    {
+      "nome": "GOINFRA - Equipamentos de monitoramento (GO)",
+      "pontos": 1047,
+      "com_gps": 1047
+    },
+    {
+      "nome": "PRF - Lista de radares portateis",
+      "pontos": 810,
+      "com_gps": 0
+    },
+    {
+      "nome": "DER-MG - Localizacao de radares fixos e portateis",
+      "pontos": 710,
+      "com_gps": 0
+    },
+    {
+      "nome": "Belo Horizonte - Fiscalizacao eletronica",
+      "pontos": 447,
+      "com_gps": 447
+    },
+    {
+      "nome": "Detran-DF - Relacao de medidores de velocidade",
+      "pontos": 407,
+      "com_gps": 0
+    },
+    {
+      "nome": "AMC Fortaleza - Equipamentos de fiscalizacao eletronica",
+      "pontos": 190,
+      "com_gps": 190
+    },
+    {
+      "nome": "DER-SE - Localizacao de radares e lombadas fixas",
+      "pontos": 129,
+      "com_gps": 85
+    },
+    {
+      "nome": "Recife - Equipamentos de fiscalizacao de transito",
+      "pontos": 87,
+      "com_gps": 87
+    },
+    {
+      "nome": "SEMTRAN Porto Velho - Fiscalizacao eletronica (radares fixos)",
+      "pontos": 85,
+      "com_gps": 0
+    },
+    {
+      "nome": "SEINFRA-BA - Radares fixos e estaticos",
+      "pontos": 79,
+      "com_gps": 79
+    },
+    {
+      "nome": "Detran-MA - Fiscalizacao eletronica de velocidade",
+      "pontos": 54,
+      "com_gps": 54
+    },
+    {
+      "nome": "ASTT Araguaina - Medidores de velocidade (lista de enderecos)",
+      "pontos": 53,
+      "com_gps": 49
+    },
+    {
+      "nome": "IMMU Manaus - Fiscalizacao eletronica (locais)",
+      "pontos": 34,
+      "com_gps": 0
+    },
+    {
+      "nome": "Cariacica - Mapa de radares de fiscalizacao eletronica",
+      "pontos": 13,
+      "com_gps": 13
+    },
+    {
+      "nome": "DER-PR - Fiscalizacao de velocidade (fixa e portatil)",
+      "pontos": 12,
+      "com_gps": 0
+    },
+    {
+      "nome": "Agetran Campo Grande - Radares de fiscalizacao eletronica",
+      "pontos": 8,
+      "com_gps": 0
+    },
+    {
+      "nome": "Semob Joao Pessoa - Medidores de velocidade (locais)",
+      "pontos": 6,
+      "com_gps": 0
+    },
+    {
+      "nome": "Bundita de Urso - A base do Bunda de urso",
+      "pontos": 1,
+      "com_gps": 1
+    }
+  ],
+  "analise_fila": {
+    "duracao_s": 83.63,
+    "distribuicao": [
+      {
+        "nivel": "contraditorio",
+        "fontes": "mesma_fonte",
+        "arquivos": "mesmo_arquivo",
+        "total": 14848
+      },
+      {
+        "nivel": "fraco",
+        "fontes": "mesma_fonte",
+        "arquivos": "mesmo_arquivo",
+        "total": 7005
+      },
+      {
+        "nivel": "contraditorio",
+        "fontes": "mesma_fonte",
+        "arquivos": "arquivos_distintos",
+        "total": 6486
+      },
+      {
+        "nivel": "fraco",
+        "fontes": "fontes_distintas",
+        "arquivos": "arquivos_distintos",
+        "total": 4928
+      },
+      {
+        "nivel": "moderado",
+        "fontes": "mesma_fonte",
+        "arquivos": "arquivos_distintos",
+        "total": 4131
+      },
+      {
+        "nivel": "contraditorio",
+        "fontes": "fontes_distintas",
+        "arquivos": "arquivos_distintos",
+        "total": 4051
+      },
+      {
+        "nivel": "moderado",
+        "fontes": "fontes_distintas",
+        "arquivos": "arquivos_distintos",
+        "total": 2940
+      },
+      {
+        "nivel": "fraco",
+        "fontes": "mesma_fonte",
+        "arquivos": "arquivos_distintos",
+        "total": 2589
+      },
+      {
+        "nivel": "moderado",
+        "fontes": "mesma_fonte",
+        "arquivos": "mesmo_arquivo",
+        "total": 1089
+      }
+    ],
+    "familias": [
+      {
+        "nivel": "contraditorio",
+        "fonte_a": "PRF - Radares fixos",
+        "fonte_b": "PRF - Radares fixos",
+        "total": 9729
+      },
+      {
+        "nivel": "contraditorio",
+        "fonte_a": "Belo Horizonte - Fiscalizacao eletronica",
+        "fonte_b": "Belo Horizonte - Fiscalizacao eletronica",
+        "total": 7115
+      },
+      {
+        "nivel": "fraco",
+        "fonte_a": "INMETRO / PSIE - Instrumentos verificados (medidores de velocidade)",
+        "fonte_b": "INMETRO / PSIE - Instrumentos verificados (medidores de velocidade)",
+        "total": 6138
+      },
+      {
+        "nivel": "moderado",
+        "fonte_a": "PRF - Radares fixos",
+        "fonte_b": "PRF - Radares fixos",
+        "total": 4386
+      },
+      {
+        "nivel": "contraditorio",
+        "fonte_a": "ANTT - Dados dos radares em rodovias concedidas",
+        "fonte_b": "PRF - Radares fixos",
+        "total": 3672
+      },
+      {
+        "nivel": "moderado",
+        "fonte_a": "ANTT - Dados dos radares em rodovias concedidas",
+        "fonte_b": "PRF - Radares fixos",
+        "total": 2865
+      },
+      {
+        "nivel": "contraditorio",
+        "fonte_a": "GOINFRA - Equipamentos de monitoramento (GO)",
+        "fonte_b": "GOINFRA - Equipamentos de monitoramento (GO)",
+        "total": 2181
+      },
+      {
+        "nivel": "fraco",
+        "fonte_a": "PRF - Radares fixos",
+        "fonte_b": "PRF - Radares fixos",
+        "total": 2091
+      },
+      {
+        "nivel": "fraco",
+        "fonte_a": "ANTT - Dados dos radares em rodovias concedidas",
+        "fonte_b": "PRF - Radares fixos",
+        "total": 1677
+      },
+      {
+        "nivel": "fraco",
+        "fonte_a": "GOINFRA - Equipamentos de monitoramento (GO)",
+        "fonte_b": "INMETRO / PSIE - Instrumentos verificados (medidores de velocidade)",
+        "total": 991
+      },
+      {
+        "nivel": "fraco",
+        "fonte_a": "INMETRO / PSIE - Instrumentos verificados (medidores de velocidade)",
+        "fonte_b": "PRF - Lista de radares portateis",
+        "total": 921
+      },
+      {
+        "nivel": "fraco",
+        "fonte_a": "PRF - Lista de radares portateis",
+        "fonte_b": "PRF - Lista de radares portateis",
+        "total": 837
+      },
+      {
+        "nivel": "fraco",
+        "fonte_a": "DER-MG - Localizacao de radares fixos e portateis",
+        "fonte_b": "INMETRO / PSIE - Instrumentos verificados (medidores de velocidade)",
+        "total": 679
+      },
+      {
+        "nivel": "contraditorio",
+        "fonte_a": "ANTT - Dados dos radares em rodovias concedidas",
+        "fonte_b": "ANTT - Dados dos radares em rodovias concedidas",
+        "total": 582
+      },
+      {
+        "nivel": "contraditorio",
+        "fonte_a": "ASTT Araguaina - Medidores de velocidade (lista de enderecos)",
+        "fonte_b": "ASTT Araguaina - Medidores de velocidade (lista de enderecos)",
+        "total": 547
+      },
+      {
+        "nivel": "contraditorio",
+        "fonte_a": "INMETRO / PSIE - Instrumentos verificados (medidores de velocidade)",
+        "fonte_b": "INMETRO / PSIE - Instrumentos verificados (medidores de velocidade)",
+        "total": 475
+      },
+      {
+        "nivel": "contraditorio",
+        "fonte_a": "Recife - Equipamentos de fiscalizacao de transito",
+        "fonte_b": "Recife - Equipamentos de fiscalizacao de transito",
+        "total": 391
+      },
+      {
+        "nivel": "fraco",
+        "fonte_a": "DNIT - Controle de velocidade (PNCV)",
+        "fonte_b": "DNIT - Controle de velocidade (PNCV)",
+        "total": 264
+      },
+      {
+        "nivel": "fraco",
+        "fonte_a": "Detran-DF - Relacao de medidores de velocidade",
+        "fonte_b": "INMETRO / PSIE - Instrumentos verificados (medidores de velocidade)",
+        "total": 201
+      },
+      {
+        "nivel": "moderado",
+        "fonte_a": "DNIT - Controle de velocidade (PNCV)",
+        "fonte_b": "DNIT - Controle de velocidade (PNCV)",
+        "total": 187
+      },
+      {
+        "nivel": "moderado",
+        "fonte_a": "GOINFRA - Equipamentos de monitoramento (GO)",
+        "fonte_b": "GOINFRA - Equipamentos de monitoramento (GO)",
+        "total": 183
+      },
+      {
+        "nivel": "fraco",
+        "fonte_a": "Belo Horizonte - Fiscalizacao eletronica",
+        "fonte_b": "INMETRO / PSIE - Instrumentos verificados (medidores de velocidade)",
+        "total": 175
+      },
+      {
+        "nivel": "moderado",
+        "fonte_a": "ANTT - Dados dos radares em rodovias concedidas",
+        "fonte_b": "ANTT - Dados dos radares em rodovias concedidas",
+        "total": 138
+      },
+      {
+        "nivel": "contraditorio",
+        "fonte_a": "DER-SP - Radares estaduais",
+        "fonte_b": "DER-SP - Radares estaduais",
+        "total": 133
+      },
+      {
+        "nivel": "contraditorio",
+        "fonte_a": "DNIT - Controle de velocidade (PNCV)",
+        "fonte_b": "PRF - Radares fixos",
+        "total": 129
+      },
+      {
+        "nivel": "contraditorio",
+        "fonte_a": "GOINFRA - Equipamentos de monitoramento (GO)",
+        "fonte_b": "INMETRO / PSIE - Instrumentos verificados (medidores de velocidade)",
+        "total": 129
+      },
+      {
+        "nivel": "moderado",
+        "fonte_a": "DER-SP - Radares estaduais",
+        "fonte_b": "DER-SP - Radares estaduais",
+        "total": 127
+      },
+      {
+        "nivel": "fraco",
+        "fonte_a": "ANTT - Dados dos radares em rodovias concedidas",
+        "fonte_b": "ANTT - Dados dos radares em rodovias concedidas",
+        "total": 112
+      },
+      {
+        "nivel": "contraditorio",
+        "fonte_a": "GOINFRA - Equipamentos de monitoramento (GO)",
+        "fonte_b": "PRF - Radares fixos",
+        "total": 90
+      },
+      {
+        "nivel": "fraco",
+        "fonte_a": "INMETRO / PSIE - Instrumentos verificados (medidores de velocidade)",
+        "fonte_b": "Recife - Equipamentos de fiscalizacao de transito",
+        "total": 87
+      }
+    ],
+    "bloqueadores": {
+      "sentido_oposto": 15192,
+      "serie_conflitante": 10249,
+      "modelo_conflitante": 1604,
+      "fabricante_conflitante": 740,
+      "km_incompativel": 448
+    },
+    "antigos_vs_novos": [
+      {
+        "nivel": "contraditorio",
+        "grupo": "novo",
+        "total": 25277
+      },
+      {
+        "nivel": "moderado",
+        "grupo": "presente_na_fila_antiga",
+        "total": 1030
+      },
+      {
+        "nivel": "moderado",
+        "grupo": "novo",
+        "total": 7130
+      },
+      {
+        "nivel": "fraco",
+        "grupo": "presente_na_fila_antiga",
+        "total": 3194
+      },
+      {
+        "nivel": "fraco",
+        "grupo": "novo",
+        "total": 11328
+      },
+      {
+        "nivel": "contraditorio",
+        "grupo": "presente_na_fila_antiga",
+        "total": 108
+      }
+    ],
+    "antigos_nao_regenerados": [
+      {
+        "nivel": "fraco",
+        "score": 0.205,
+        "total": 812
+      },
+      {
+        "nivel": "fraco",
+        "score": 0.05,
+        "total": 423
+      },
+      {
+        "nivel": "fraco",
+        "score": 0.155,
+        "total": 8
+      }
+    ]
+  },
+  "consulta_integral": {
+    "total_gps_armazenados": 7464,
+    "total_gps_publicados": 7463,
+    "coordenadas_alteradas": [],
+    "exclusoes_explicitas": [
+      {
+        "ponto_id": "P-54922",
+        "motivo": "teste de validacao - remover"
+      }
+    ],
+    "duracao_s": 94.496
+  },
+  "mapa_javascript_com_api_real": {
+    "centro": [
+      -23.55,
+      -46.63
+    ],
+    "raio_m": 500000,
+    "paginas": 3,
+    "gps_esperados": 2685,
+    "gps_carregados_pelo_javascript": 2685,
+    "perdas": [],
+    "coordenadas_alteradas": [],
+    "duracao_s": 47.242,
+    "requisicoes": [
+      {
+        "url": "/api/v1/radares?lat=-23.55&lon=-46.63&raio=500000&limite=1000&incluir_operacoes=false&formato=json",
+        "status": 200
+      },
+      {
+        "url": "/api/v1/radares?lat=-23.55&lon=-46.63&raio=500000&limite=1000&incluir_operacoes=false&formato=json&cursor=1000",
+        "status": 200
+      },
+      {
+        "url": "/api/v1/radares?lat=-23.55&lon=-46.63&raio=500000&limite=1000&incluir_operacoes=false&formato=json&cursor=2000",
+        "status": 200
+      }
+    ]
+  },
+  "suite": {
+    "executados": 681,
+    "falhas": 0,
+    "erros": 0,
+    "pulados": 0,
+    "cenarios_javascript": 7
+  }
+}

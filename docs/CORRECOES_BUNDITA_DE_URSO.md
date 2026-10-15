@@ -29,6 +29,8 @@ Um mesmo número aparece nos pontos necessários para resolver o mesmo problema.
 | 19 | IDs de submissões anônimas compartilhavam o espaço da ingestão autenticada e permitiam sobrescrever cadastros. A origem pública é separada e os IDs enviados por anônimos não autorizam upsert. |
 | 20 | A projeção canônica podia ocultar GPS válido quando o canônico não tinha GPS ou publicava outra posição/UF/via/situação. As marcações divergentes mantêm seus IDs e coordenadas originais, com identificação do ponto canônico. Ausência de informação não é contradição. A auditoria agora verifica inventário e conservação das coordenadas. |
 | 21 | A junção de regimes pontual e permanente podia retirar um ponto do filtro de fiscalização permanente. O ponto satisfaz ambos os filtros e o booleano fica indeterminado quando as modalidades são mistas. |
+| 22 | O normalizador atual recupera quatro coordenadas ASTT que continuavam ausentes nos cadastros legados. A ferramenta `recuperar_posicoes_legadas.py` reinterpreta o bruto com esse parser, recusa divergências e só escreve em uma nova cópia, preservando IDs, dados originais e GPS existentes. |
+| 23 | O mapa carregava só a primeira página, deixando pontos do raio fora da tela. Agora percorre os cursores, acumula as marcações e cancela consultas substituídas. Erros mantêm a consulta identificada como incompleta; respostas antigas não substituem a nova. |
 
 ## Decisões e compatibilidade
 
@@ -79,7 +81,7 @@ Na raiz do checkout:
 
 A ferramenta abre a origem em modo somente leitura, faz backup consistente em diretório temporário, gera candidatos na cópia e retorna contagens antes/depois por regra, estado e nível. Não aplica decisões, não substitui o banco original e remove a cópia ao terminar. A seção `conservacao` compara contagens e hashes dos registros originais e identifica marcações não representadas pela projeção da consulta. Falha nessa conservação faz o CLI terminar com código diferente de zero. Exclusões explícitas de aliases equivalentes são contadas separadamente.
 
-A ferramenta foi exercitada com fixtures. O banco dos 5.575 candidatos não está disponível neste ambiente; esta revisão não informa uma nova contagem de produção e não tomou decisões sobre os 77 casos mencionados no levantamento.
+A ferramenta foi exercitada com fixtures e, posteriormente, com o backup real dos 5.575 candidatos publicado no repositório. Os resultados estão em [AUDITORIA_BASE_REAL_2026-10-15.md](AUDITORIA_BASE_REAL_2026-10-15.md). A geração ocorreu em cópia temporária; nenhuma decisão foi aplicada no original.
 
 ## Governança e ingestão
 
@@ -117,4 +119,4 @@ Para repetir:
 /usr/bin/python3 tools/auditar_deduplicacao.py --db /caminho/para/radar.sqlite3
 ```
 
-A base de produção dos 5.575 candidatos continua indisponível neste ambiente. A comparação de 39 cenários e a conservação na base demonstrativa não substituem executar a auditoria na cópia da base real.
+O backup real de 15/10/2026 foi disponibilizado depois dessa primeira verificação. A [auditoria específica](AUDITORIA_BASE_REAL_2026-10-15.md) confirmou a conservação de todas as 7.463 marcações com GPS elegíveis, identificou quatro posições legadas recuperáveis e corrigiu o carregamento incompleto das páginas no mapa.
