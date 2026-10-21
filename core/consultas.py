@@ -688,29 +688,34 @@ _CAMPOS_PUBLICOS_CADASTRO = frozenset((
 ))
 
 
-def _dados_por_fonte(conn, pid, visao):
+def _dados_por_fonte(conn, pid, visao, registros_metrologicos=()):
     """Publicacoes originais por fonte, somente no detalhe do ponto.
 
     Nao atribui campos consolidados a todas as fontes nem reinterpreta o bruto
     com o normalizador atual. Preserva valores divergentes e coletas historicas.
     """
     grupos, registros = {}, {}
-    for membro in visao.membros("ponto", pid):
+    membros = visao.membros("ponto", pid)
+    selecionados = {r[0] for membro in membros for r in conn.execute(
+        "SELECT registro_id FROM VINCULO_REGISTRO_PONTO WHERE ponto_id=?", (membro,))}
+    registros_do_ponto = set(selecionados)
+    selecionados.update(rid for rid in registros_metrologicos if rid is not None)
+    # Consultas por PK evitam produto cartesiano entre faixas, verificacoes e fontes.
+    for rid in sorted(selecionados):
         for row in dbmod.query_all(conn, """
                 SELECT r.id AS registro_id, r.identificador_na_fonte,
                        r.payload_original, a.hash_sha256, a.baixado_em,
                        rf.nome AS recurso, rf.url_recurso,
                        fo.id AS fonte_id, fo.nome, fo.url_institucional,
                        n.codigo AS natureza, org.nome AS organizacao
-                FROM VINCULO_REGISTRO_PONTO vp
-                JOIN REGISTRO_FONTE r ON r.id=vp.registro_id
+                FROM REGISTRO_FONTE r
                 JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id
                 JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id
                 JOIN FONTE fo ON fo.id=rf.fonte_id
                 JOIN NATUREZA_FONTE n ON n.id=fo.natureza_id
                 JOIN ORGANIZACAO org ON org.id=fo.organizacao_id
-                WHERE vp.ponto_id=? ORDER BY a.baixado_em DESC, r.id DESC
-                """, (membro,)):
+                WHERE r.id=?
+                """, (rid,)):
             registros[row["registro_id"]] = row
     for row in sorted(registros.values(),
                       key=lambda r: (r["baixado_em"], r["registro_id"]), reverse=True):
@@ -734,6 +739,7 @@ def _dados_por_fonte(conn, pid, visao):
             "recurso": row["recurso"], "recurso_url": row["url_recurso"],
             "coletado_em": row["baixado_em"],
             "hash_artefato": row["hash_sha256"], "dados_publicados": dados,
+            "escopo_vinculo": "ponto" if row["registro_id"] in registros_do_ponto else "equipamento",
         })
     return sorted(grupos.values(), key=lambda grupo: (grupo["nome"].casefold(), grupo["id"]))
 
@@ -764,7 +770,10 @@ def buscar_ponto_por_id(conn, pid_str):
         # metrologico e identificacao devolvidos no endpoint do instrumento.
         registro["equipamentos"] = [buscar_equipamento_por_id(conn, e["id"], visao=visao) or e
                                     for e in registro["equipamentos"]]
-        registro["dados_por_fonte"] = _dados_por_fonte(conn, pid, visao)
+        verificacoes = [v for e in registro["equipamentos"] for v in e["verificacoes_metrologicas"]]
+        registro["dados_por_fonte"] = _dados_por_fonte(
+            conn, pid, visao, [v["fonte_registro_id"] for v in verificacoes])
+        registro["fontes"] = _unicos(registro["fontes"] + [v["fonte"] for v in verificacoes if v["fonte"]])
         # Complementos sao inferencias da base, nao publicacoes da fonte do envio.
         # O detalhe expoe a origem separadamente, sem reescrever o bruto.
         try:
@@ -1319,6 +1328,25 @@ def montar_equipamento(conn, r, visao=None):
         original = _montar_equipamento_original(conn, row)
         for campo in ("instalacoes", "verificacoes_metrologicas", "identificadores_oficiais"):
             reg[campo].extend(original[campo])
+    from .metrologia import equipamentos_relacionados
+    relacionados = {}
+    for membro in membros:
+        for outro, registros in equipamentos_relacionados(conn, membro, visao).items():
+            if outro not in membros:
+                relacionados.setdefault(outro, set()).update(registros)
+    for outro in sorted(relacionados):
+        row = dbmod.query_one(conn, _EQUIP_SQL, (outro,))
+        original = _montar_equipamento_original(conn, row)
+        # A juncao e do instrumento: nao copia GPS, limite da via ou instalacoes.
+        for v in original["verificacoes_metrologicas"]:
+            if v["fonte_registro_id"] in relacionados[outro]:
+                v["equipamento_origem_id"] = original["id"]
+                reg["verificacoes_metrologicas"].append(v)
+    if relacionados:
+        reg["juncao_metrologica"] = {
+            "criterio": "serie_exata_tipo_e_municipio",
+            "equipamentos_origem": ["E-%d" % i for i in sorted(relacionados)],
+        }
     for campo in ("instalacoes", "identificadores_oficiais"):
         reg[campo] = _unicos(reg[campo])
     for instalacao in reg["instalacoes"]:

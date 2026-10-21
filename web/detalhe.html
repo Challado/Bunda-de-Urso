@@ -171,6 +171,8 @@
     classificacao:"Classificação", numero_certificado:"Número do certificado",
     erro:"Erro", mensagem:"Mensagem", codigo_erro:"Código",
     registro_id:"Registro na base", recurso:"Publicação de origem", natureza:"Natureza da fonte",
+    juncao_metrologica:"Associação cadastral da metrologia", criterio:"Critério",
+    equipamentos_origem:"Equipamentos nos cadastros de origem", equipamento_origem_id:"Equipamento na fonte da verificação",
     complemento_proximidade:"Complemento sugerido por proximidade (não verificado)",
     ponto_origem_id:"Radar usado como referência", campos:"Campos complementados",
     SiglaUf:"UF", Estado:"Estado", Municipio:"Município", LocalVerificacao:"Local da verificação",
@@ -306,7 +308,7 @@
     var equipamentos = (p.equipamentos || []).map(function(e){return {
       id:e.id, numero_serie:e.numero_serie, registro_aprovacao_modelo:e.registro_aprovacao_modelo,
       portaria_aprovacao_modelo:e.portaria_aprovacao_modelo, identificadores_oficiais:e.identificadores_oficiais,
-      verificacoes_metrologicas:e.verificacoes_metrologicas
+      verificacoes_metrologicas:e.verificacoes_metrologicas, juncao_metrologica:e.juncao_metrologica
     };});
     var temVerificacoes = equipamentos.some(function(e){return (e.verificacoes_metrologicas || []).length;});
     var texto = temInmetro ? "Há publicação do Inmetro/PSIE vinculada a este cadastro. Os campos originais estão no bloco da fonte abaixo." :
@@ -348,6 +350,7 @@
         if (registros.length > 1) h += " · registro " + (i + 1) + " de " + registros.length;
         h += "</h4>";
         if (r.coletado_em) h += "<p class='explicacao'>Coletado em " + esc(fmtData(r.coletado_em)) + "</p>";
+        if (r.escopo_vinculo === "equipamento") h += "<p class='explicacao'>Publicação associada ao instrumento. A localização e os limites da via continuam identificados em suas fontes.</p>";
         if (r.dados_publicados != null && (!ehObjeto(r.dados_publicados) || Object.keys(r.dados_publicados).length)){
           h += renderValor(r.dados_publicados);
         } else {

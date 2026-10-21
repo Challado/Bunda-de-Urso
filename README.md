@@ -140,6 +140,11 @@ Dois registros próximos não são necessariamente o mesmo radar; duas faixas ta
 
 O banco usa chaves primárias e estrangeiras, restrições de integridade e relacionamentos normalizados. Não eliminar dados originais durante a consolidação.
 
+O detalhe do radar e do equipamento faz a [junção da metrologia entre fontes oficiais](docs/JUNCAO_METROLOGICA.md)
+pela série, tipo e município. Assim, uma instalação da GOINFRA pode mostrar o
+histórico do Inmetro mesmo quando as duas publicações têm IDs de origem distintos.
+As fontes e os valores divergentes continuam separados para conferência.
+
 ## Velocidades e fiscalização
 
 O cadastro diferencia obrigatoriamente:

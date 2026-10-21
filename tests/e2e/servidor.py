@@ -29,10 +29,29 @@ def main():
                     k not in ('REQUEST_METHOD','GATEWAY_INTERFACE','QUERY_STRING','PATH_INFO')}
         ambiente.update(RADAR_CONF=str(conf), PYTHONDONTWRITEBYTECODE='1')
         fixture = base / 'oficial.json'
-        fixture.write_text(json.dumps([{'Codigo':'E2E-OFICIAL', 'Latitude':-24.9556,
-            'Longitude':-53.4552, 'Rodovia':'BR-277', 'Km':580.5, 'VelocidadeLeves':80}]))
+        oficial = {'Codigo':'E2E-OFICIAL', 'Latitude':-24.9556,
+            'Longitude':-53.4552, 'Rodovia':'BR-277', 'Km':580.5, 'VelocidadeLeves':80}
+        if '--com-metrologia' in sys.argv:
+            oficial.update(UF='PR', Municipio='Cascavel', CodigoIBGE='4104808',
+                           NumeroSerie='E2E118690160', Tipo='Fixo')
+        fixture.write_text(json.dumps([oficial]))
         subprocess.run([sys.executable, str(API), 'sync', '--fonte','antt', '--arquivo',str(fixture),
                         '--sem-publicar'], env=ambiente, check=True, capture_output=True, timeout=15)
+        if '--com-metrologia' in sys.argv:
+            fixture_inmetro = base / 'inmetro.json'
+            fixture_inmetro.write_text(json.dumps([{'SiglaUf':'PR', 'Estado':'Paraná',
+                'Municipio':'CASCAVEL', 'LocalVerificacao':'BR-277, KM 580+500M',
+                'NumeroSerie':'E2E118690160', 'TipoMedidor':'Fixo',
+                'DataUltimaVerificacao':'25/06/2026', 'DataValidade':'24/06/2027',
+                'UltimoResultado':'Aprovado', 'Faixas':[{'NumeroFaixa':'1',
+                    'NumeroSerie':'E2E118690160', 'VelocidadeNominal':'40'}], 'Historico':[]}]))
+            for args in (
+                ['sync','--fonte','inmetro','--arquivo',str(fixture_inmetro),'--sem-publicar'],
+                ['ferramenta','inicializar_banco'],
+                ['ferramenta','carregar_verificacao_metrologica'],
+            ):
+                subprocess.run([sys.executable,str(API),*args],env=ambiente,
+                               check=True,capture_output=True,timeout=15)
 
         class Handler(SimpleHTTPRequestHandler):
             def __init__(self,*args,**kwargs):

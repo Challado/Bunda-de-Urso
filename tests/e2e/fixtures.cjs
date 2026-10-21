@@ -6,8 +6,9 @@ const {once} = require('node:events');
 
 const test = base.extend({
   processarFila: [true, {option:true}],
-  radarServer: async ({processarFila},use) => {
-    const child=spawn(process.env.RADAR_TEST_PYTHON || 'python3', [path.join(__dirname,'servidor.py'),...(processarFila?[]:['--sem-fila'])], {stdio:['ignore','pipe','pipe']});
+  comMetrologia: [false, {option:true}],
+  radarServer: async ({processarFila,comMetrologia},use) => {
+    const child=spawn(process.env.RADAR_TEST_PYTHON || 'python3', [path.join(__dirname,'servidor.py'),...(processarFila?[]:['--sem-fila']),...(comMetrologia?['--com-metrologia']:[])], {stdio:['ignore','pipe','pipe']});
     let stderr='';child.stderr.on('data',chunk=>{stderr+=chunk.toString();});
     const lines=readline.createInterface({input:child.stdout});
     let timer;

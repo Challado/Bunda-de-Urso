@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   cadastro:
-    name: Cadastro (${{ matrix.browser }})
+    name: Cadastro e detalhe (${{ matrix.browser }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -34,7 +34,7 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Instalar navegador e dependências no runner
         run: npx playwright install --with-deps ${{ matrix.browser }}
-      - name: Formulário, API CGI e banco temporário (desktop e tela estreita)
+      - name: Cadastro e detalhe, API CGI e banco temporário (desktop e tela estreita)
         run: npx playwright test --project="${{ matrix.browser }}-*"
       - name: Relatório, capturas e rastreamentos
         if: always()

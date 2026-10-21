@@ -1,4 +1,4 @@
-# Testes de navegador do cadastro
+# Testes de navegador do cadastro e detalhe
 
 O workflow [Navegadores](https://github.com/Challado/Bunda-de-Urso/actions/workflows/navegadores.yml)
 roda em cada push na `main`, pull request e execução manual. Há jobs separados
@@ -28,11 +28,15 @@ não exige chave de IA e não deixa um endpoint de teste no aplicativo.
 - API salva o envio, mas a resposta não chega: em 20 segundos a espera termina;
   repetir confirma o mesmo cadastro. Resposta atrasada não substitui o resultado
   da segunda tentativa. Há cobertura também sem `AbortController`.
-- Erros JavaScript reprovam; o formulário não deve causar rolagem horizontal.
+- Detalhe reúne metrologia oficial por série, tipo e município, com as duas fontes
+  abertas/recolhíveis. Confere histórico, fonte de origem, GPS e limite da via
+  preservados e os links de mapas. O preparo usa coleta de fixtures e carregador
+  de verificações pela API local; não insere SQL no servidor de testes.
+- Erros JavaScript reprovam; as páginas não devem causar rolagem horizontal.
 
 A interrupção da resposta e os erros de rede/HTTP são simulados pelo teste;
 os cenários de sucesso, consulta e reenvio usam o CGI, a fila JSON e o banco reais.
-O processador de teste também passa pela API local. São 44 cenários nos quatro
+O processador de teste também passa pela API local. São 48 cenários nos quatro
 perfis de navegador; nenhum exige o coletor ou portais externos disponíveis.
 O relógio do navegador é avançado no teste de prazo, evitando aguardar 20
 segundos reais. O prazo inclui a leitura do corpo da resposta.

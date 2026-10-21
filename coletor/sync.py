@@ -21,10 +21,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core import config                                   # noqa: E402
 from coletor.fontes.antt import ColetorANTT               # noqa: E402
 from coletor.fontes.recife import ColetorRecife           # noqa: E402
+from coletor.fontes.inmetro import ColetorINMETRO         # noqa: E402
 
 FONTES = {
     "antt": ColetorANTT,
     "recife": ColetorRecife,
+    "inmetro": ColetorINMETRO,
 }
 
 

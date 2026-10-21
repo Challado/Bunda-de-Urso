@@ -39,6 +39,7 @@ class VisaoCanonica:
     def __init__(self, conn):
         self.mapas = {tipo: {} for tipo in TIPOS}
         self.grupos = {tipo: {} for tipo in TIPOS}
+        self.separacoes = {tipo: set() for tipo in TIPOS}
         self.decisoes = []
         rows = db.query_all(conn, """
             SELECT d.*, c.registro_a_id, c.registro_b_id, c.estado,
@@ -127,6 +128,12 @@ class VisaoCanonica:
                         for chave in ("registro_a_id", "registro_b_id"))
                 if {self.canonico(tipo, i) for i in a} & {self.canonico(tipo, i) for i in b}:
                     raise ValueError("unificacao conflita com decisao ativa de manter separados (%s)" % row["id"])
+                self.separacoes[tipo].update(
+                    tuple(sorted((self.canonico(tipo, x), self.canonico(tipo, y))))
+                    for x in a for y in b)
+
+    def separados(self, tipo, a, b):
+        return tuple(sorted((self.canonico(tipo, a), self.canonico(tipo, b)))) in self.separacoes[tipo]
 
     def canonico(self, tipo, entidade_id):
         return self.mapas[tipo].get(entidade_id, entidade_id)
