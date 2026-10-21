@@ -1,4 +1,4 @@
-@RADAR_LOG_DIR@/*.log {
+"@RADAR_LOG_DIR@/*.log" {
     weekly
     rotate 8
     compress

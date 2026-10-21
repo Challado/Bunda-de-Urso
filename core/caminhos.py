@@ -51,11 +51,11 @@ _ENV = {
 SECOES = {
     "instalacao": ("home", "usuario", "grupo"),
     "dados": ("dir", "banco"),
-    "web": ("raiz", "url"),
+    "web": ("raiz", "url", "origem"),
     "logs": ("dir",),
     "sincronizacao": ("clone", "remoto"),
     "api": ("token_arquivo", "max_body", "proxies_confiaveis"),
-    "coleta": ("max_bytes", "timeout", "tentativas"),
+    "coleta": ("max_bytes", "timeout", "tentativas", "espera_atualizacao"),
     "geografia": ("malha",),
     "assistente": ("url", "modelo"),
     "governanca": ("raio_correspondencia_m", "raio_zona_sombra_m",
@@ -67,11 +67,13 @@ for _nome in SECOES["governanca"]:
 
 # Apenas valores de instalacao. Segredos continuam em arquivos separados.
 PADROES = {
+    ("web", "origem"): "",
     ("api", "max_body"): "8388608",
     ("api", "proxies_confiaveis"): "",
     ("coleta", "max_bytes"): "52428800",
     ("coleta", "timeout"): "30",
     ("coleta", "tentativas"): "3",
+    ("coleta", "espera_atualizacao"): "300",
     ("geografia", "malha"): "",
     ("assistente", "url"): "http://127.0.0.1:11434",
     ("assistente", "modelo"): "gemma4:26b",

@@ -37,6 +37,8 @@ raiz = /var/www/html/openclaw/radar
 
 # Prefixo publico da consulta (usado em links). Sem barra no fim e aceito.
 url = /openclaw/radar/
+# Origem HTTP(S) opcional para verificar API e pagina pelo endereco publicado.
+origem =
 
 [logs]
 # Logs do tick e do dados-sync (o logrotate le daqui).
@@ -51,6 +53,8 @@ proxies_confiaveis =
 max_bytes = 52428800
 timeout = 30
 tentativas = 3
+# Tempo maximo em segundos para o atualizador esperar uma coleta em andamento.
+espera_atualizacao = 300
 
 [governanca]
 raio_correspondencia_m = 150

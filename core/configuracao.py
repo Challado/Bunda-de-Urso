@@ -30,6 +30,7 @@ NUMEROS = {**{("governanca", k): (1, 1000000000)
            ("coleta", "max_bytes"): (1024, 1073741824),
            ("coleta", "timeout"): (1, 300),
            ("coleta", "tentativas"): (1, 10),
+           ("coleta", "espera_atualizacao"): (1, 3600),
            ("governanca", "gov_iteracoes"): (200000, 2000000)}
 EDITAVEIS_WEB = set(NUMEROS) | {("api", "proxies_confiaveis")}
 
@@ -96,7 +97,7 @@ def _validar(valores):
                     ipaddress.ip_network(rede.strip(), strict=False)
             except ValueError:
                 _erro(422, "proxy_invalido", "Informe IPs ou redes CIDR separados por virgula.")
-        if texto and par in (("web", "url"), ("sincronizacao", "remoto"), ("assistente", "url")):
+        if texto and par in (("web", "url"), ("web", "origem"), ("sincronizacao", "remoto"), ("assistente", "url")):
             url = urllib.parse.urlsplit(texto)
             if url.username or url.password or url.query or url.fragment:
                 _erro(422, "url_invalida", "URLs de configuracao nao podem conter credenciais ou parametros.")
@@ -105,6 +106,8 @@ def _validar(valores):
                     _erro(422, "url_invalida", "O prefixo web deve comecar com uma barra.")
             elif url.scheme not in ("https", "ssh", "http") or not url.netloc:
                 _erro(422, "url_invalida", "Informe uma URL https, ssh ou http valida.")
+            if par == ("web", "origem") and (url.scheme not in ("http", "https") or url.path not in ("", "/")):
+                _erro(422, "url_invalida", "A origem web deve conter somente http(s)://host[:porta].")
 
 
 def _editar(texto, alteracoes):

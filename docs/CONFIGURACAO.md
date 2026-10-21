@@ -165,7 +165,7 @@ apenas simula. Usa o `radar.conf` existente e não o substitui por um modelo.
 
 Ao aplicar, guarda código, páginas, configuração e um backup consistente do SQLite
 na pasta `backups/instalacao/` dos dados. Pausa novas chamadas do coletor e da API,
-recusa a troca se o coletor ainda estiver rodando, prepara o código, aplica migrações
+aguarda a coleta em andamento terminar, prepara o código, aplica migrações
 aditivas pela API, testa a prontidão e só então instala o wrapper novo. Em falha,
 restaura código, páginas e configuração automaticamente; preserva o banco atual.
 
@@ -184,3 +184,35 @@ o roteamento do nginx permanece uma configuração do servidor.
 
 A seção legada `[sincronizacao]`, quando já existe no arquivo do servidor, é preservada
 sem edição pelo aplicativo. O painel e o diagnóstico não configuram nem exigem o espelho privado.
+
+## Atualizador recorrente e auditoria
+
+O `.sh` privado passa a buscar a `main` pública atual em cada execução. Seleciona
+um único commit para toda a operação e registra essa revisão em `VERSAO`; não mistura
+arquivos de revisões diferentes. `--versao` permite fixar uma revisão compatível.
+
+O plano compara hashes dos arquivos instalados e mostra novas opções de configuração.
+Ao aplicar, somente acrescenta padrões ausentes; valores existentes e chaves vazias
+são preservados. `--verificar` audita a instalação, sem aplicar alterações, e retorna
+falha se existem divergências. `--relatorio` salva a auditoria em JSON; a atualização
+sempre guarda `checagem-final.json` no backup.
+
+Entradas antigas ou duplicadas do cron do coletor são reconhecidas, inclusive chamadas
+diretas antigas a `coletor/tick.py` e `api.pse tick`, e consolidadas em um tick por minuto.
+Agendamentos dos sincronizadores privados e outros projetos são preservados. Uma falha
+ao ler o crontab não é tratada como ausência de crontab.
+
+O perfil privado pode preparar dependências ausentes via apt e iniciar serviços
+inativos. A API valida nginx, serviços, arquivos, permissões, rotação de logs,
+configuração, autorização restrita do painel e consultas ao banco. Não reescreve
+configurações do nginx ou de outros sites. Pacotes instalados e serviços iniciados
+não são revertidos pela recuperação dos arquivos do aplicativo.
+
+`web.origem` é a origem HTTP(S) opcional do site, sem prefixo de caminho, por exemplo
+`https://exemplo.org`. Com `web.url`, permite conferir prontidão da API e os bytes da
+página administrativa pelo nginx. Origem vazia deixa essa checagem explicitamente
+como não realizada. A opção inicial `--origem-http` não substitui uma chave existente.
+Laboratórios usam somente os destinos temporários e não consultam produção.
+
+`coleta.espera_atualizacao` limita em segundos a espera pela coleta em andamento
+(padrão 300); ao esgotar o prazo, a atualização recupera os arquivos anteriores.

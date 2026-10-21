@@ -8,9 +8,17 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import threading
+import fcntl
+import time
 
 from core import db
 from core.instalacao import _cron_tick
+from core.instalacao import _esperar_coletor
+from core.instalacao import _preparar_servicos
+from core import auditoria_instalacao
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -79,7 +87,8 @@ class TestInstalacaoAPI(unittest.TestCase):
         self.assertIn("Status: 200 OK", cgi.stdout)
         self.assertFalse((self.web / "nucleo.py").exists())
         self.assertFalse(any(p.is_symlink() for p in self.web.rglob("*")))
-        self.assertEqual(len(list((self.dados / "backups" / "instalacao").glob("*/CONCLUIDO"))), 2)
+        self.assertEqual(len(list((self.dados / "backups" / "instalacao").glob("*/CONCLUIDO"))), 1)
+        self.assertIn("sem nova copia ou backup", resultado.stdout)
         wrapper = self.home.parent / "radar-tick.sh"
         ensaio = subprocess.run(["sh", str(wrapper), "--help"], env=self.env, capture_output=True, text=True, timeout=15)
         self.assertEqual(ensaio.returncode, 0, ensaio.stderr)
@@ -118,3 +127,111 @@ class TestInstalacaoAPI(unittest.TestCase):
         self.assertIn(externo + "\n", novo)
         self.assertIn(outro + "\n", novo)
         self.assertEqual(novo, _cron_tick(novo, wrapper))
+
+    def test_cron_corrige_versoes_antigas_duplicadas_e_nao_confunde_avisos(self):
+        wrapper = self.home.parent / "radar-tick.sh"
+        linhas = ["*/5 * * * * /antigo/bin/radar-tick.sh >> /logs/velho 2>&1",
+                  "*/3 * * * * python3 /antigo/radar/coletor/tick.py",
+                  "*/2 * * * * python3 /antigo/radar/web/api.pse tick",
+                  "*/2 * * * * python3 /antigo/radar-api.pse cron tick",
+                  "* * * * * echo /antigo/bin/radar-tick.sh",
+                  "# * * * * * /antigo/bin/radar-tick.sh"]
+        novo = _cron_tick("\n".join(linhas) + "\n", wrapper)
+        self.assertEqual(novo.splitlines(), linhas[-2:] + ["* * * * * " + str(wrapper)])
+
+    def test_atualiza_esquema_conf_sem_trocar_valor_nem_opcao_vazia(self):
+        self.conf.write_text(self.conf.read_text() + "\n[governanca]\nsubmissao_limite =\n[coleta]\ntimeout = 95\n")
+        resultado = self.instalar(True)
+        self.assertEqual(resultado.returncode, 0, resultado.stdout + resultado.stderr)
+        texto = self.conf.read_text()
+        self.assertIn("submissao_limite =\n", texto)
+        self.assertNotIn("submissao_limite = 7", texto)
+        self.assertIn("timeout = 95", texto)
+        self.assertIn("tentativas = 3", texto)
+        self.assertEqual(auditoria_instalacao.opcoes_faltantes(texto), {})
+
+    def test_verificacao_detecta_arquivo_corrompido_e_reaplicacao_conserta(self):
+        instalado = self.instalar(True)
+        self.assertEqual(instalado.returncode, 0, instalado.stdout + instalado.stderr)
+        alvo = self.web / "gestao.html"
+        alvo.write_text("corrompido")
+        cmd = [sys.executable, str(ROOT / "web" / "api.pse"), "instalacao", "--conf", str(self.conf),
+               "--laboratorio", str(self.lab), "--verificar"]
+        r = subprocess.run(cmd, env=self.env, text=True, capture_output=True, timeout=30)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn(str(alvo), r.stdout)
+        self.assertEqual(alvo.read_text(), "corrompido")
+        instalado = self.instalar(True)
+        self.assertEqual(instalado.returncode, 0, instalado.stdout + instalado.stderr)
+        r = subprocess.run(cmd, env=self.env, text=True, capture_output=True, timeout=30)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertNotEqual(alvo.read_text(), "corrompido")
+
+    def test_crontab_ilegivel_nao_e_tratado_como_crontab_vazio(self):
+        resposta = subprocess.CompletedProcess(["crontab", "-l"], 1, "", "Permission denied")
+        with patch.object(auditoria_instalacao.subprocess, "run", return_value=resposta):
+            with self.assertRaisesRegex(RuntimeError, "Nao foi possivel ler"):
+                auditoria_instalacao.ler_crontab()
+
+    def test_http_confere_api_e_detecta_pagina_antiga(self):
+        conteudo = b"pagina atual"
+        pagina = self.lab / "gestao.html"
+        pagina.write_bytes(conteudo)
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{"status":"ready"}' if self.path.startswith("/radar/api.pse?") else conteudo)
+            def log_message(self, *args):
+                pass
+        servidor = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=servidor.serve_forever, daemon=True)
+        thread.start()
+        try:
+            origem = "http://127.0.0.1:%d" % servidor.server_port
+            auditoria_instalacao.verificar_http(origem, "/radar/", pagina)
+            pagina.write_bytes(b"outra versao")
+            with self.assertRaisesRegex(RuntimeError, "pagina atualizada"):
+                auditoria_instalacao.verificar_http(origem, "/radar/", pagina)
+        finally:
+            servidor.shutdown()
+            servidor.server_close()
+            thread.join(timeout=2)
+
+    def test_atualizador_aguarda_coleta_sem_matar_processo(self):
+        lock = self.dados / "tick.lock"
+        with lock.open("a") as coleta, lock.open("a") as atualizador:
+            fcntl.flock(coleta, fcntl.LOCK_EX)
+            liberou = threading.Event()
+            def concluir():
+                time.sleep(0.05)
+                fcntl.flock(coleta, fcntl.LOCK_UN)
+                liberou.set()
+            thread = threading.Thread(target=concluir)
+            thread.start()
+            try:
+                _esperar_coletor(atualizador)
+                thread.join(timeout=2)
+                self.assertTrue(liberou.is_set())
+            finally:
+                thread.join(timeout=2)
+
+    def test_preparacao_inicia_so_servico_inativo_sem_reiniciar_os_demais(self):
+        chamadas = []
+        def executar(cmd, **kwargs):
+            chamadas.append(cmd)
+            ativo = cmd[1] == "is-active" and cmd[2] in ("nginx.service", "fcgiwrap.socket")
+            return subprocess.CompletedProcess(cmd, 0 if ativo or cmd[1] == "start" else 3)
+        with patch.object(auditoria_instalacao, "ambiente_servidor", return_value=[]), \
+                patch("core.instalacao.subprocess.run", side_effect=executar):
+            _preparar_servicos()
+        self.assertEqual([c for c in chamadas if c[1] == "start"], [["systemctl", "start", "cron.service"]])
+        self.assertFalse(any("restart" in c for c in chamadas))
+
+    def test_preparacao_nao_inicia_servicos_com_nginx_invalido(self):
+        with patch.object(auditoria_instalacao, "ambiente_servidor", return_value=[
+                {"checagem": "nginx.configuracao", "estado": "erro", "detalhe": "invalida"}]), \
+                patch("core.instalacao.subprocess.run") as executar:
+            with self.assertRaisesRegex(RuntimeError, "nginx.configuracao"):
+                _preparar_servicos()
+            executar.assert_not_called()

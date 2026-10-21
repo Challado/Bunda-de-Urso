@@ -17,9 +17,12 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 from . import caminhos, db
+from . import auditoria_instalacao as auditoria
 from .contexto_api import operacao_local
+from .governanca import GovernancaError
 
 CODIGO = ("core", "coletor", "config", "sql", "web", "deploy", "tools")
 ESTATICOS = {".html", ".json", ".png", ".ico", ".css", ".js", ".svg"}
@@ -138,9 +141,7 @@ def _cron_tick(texto, wrapper):
     linhas = []
     for linha in texto.splitlines():
         # Troca somente a linha ativa que chama exatamente este wrapper.
-        comandos = (str(wrapper),)
-        if not linha.lstrip().startswith("#") and any(re.search(
-                r"(?<!\S)" + re.escape(comando) + r"(?=\s|$)", linha) for comando in comandos):
+        if auditoria.comando_coletor(linha, wrapper):
             continue
         linhas.append(linha)
     # O wrapper nao contem caminhos variaveis de dados ou log.
@@ -148,7 +149,7 @@ def _cron_tick(texto, wrapper):
     return "\n".join(linhas) + "\n"
 
 
-def _aplicar(origem, dirs, usuario_web, laboratorio, cron):
+def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None):
     if not laboratorio and os.geteuid() != 0:
         raise RuntimeError("Execute com sudo para aplicar no servidor.")
     conta = pwd.getpwnam(usuario_web)
@@ -178,19 +179,19 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron):
             wrapper.write_text("#!/bin/sh\n# Atualizacao coordenada em andamento.\nexit 0\n")
             wrapper.chmod(0o755)
             with open(dirs["dados"] / "tick.lock", "a") as tick:
-                # Falha sem interromper um coletor em andamento. Pode repetir depois.
-                fcntl.flock(tick, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                _esperar_coletor(tick)
                 with closing(db.connect_readonly(dirs["banco"])) as fonte:
                     if fonte.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                         raise RuntimeError("Integridade do banco reprovada; nada sera atualizado.")
+                    if fonte.execute("PRAGMA foreign_key_check").fetchone() is not None:
+                        raise RuntimeError("Banco com referencias invalidas; nenhuma atualizacao foi aplicada.")
                     with closing(db.connect(backup / "radar.sqlite3")) as copia:
                         fonte.backup(copia)
                         copia.execute("PRAGMA journal_mode=DELETE")
                 (backup / "radar.sqlite3").chmod(0o600)
-                _instalar_arquivos(origem, dirs, grupo, usuario_web, backup)
+                _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http)
                 _instalar_helper(dirs, usuario_web, sudoers, laboratorio)
-                modelo = (origem / "deploy" / "openclaw-radar.logrotate").read_text()
-                logrotate.write_text(modelo.replace("@RADAR_LOG_DIR@", '"' + str(dirs["logs"]) + '"'))
+                logrotate.write_text(auditoria.render_logrotate(origem, dirs["logs"]))
                 logrotate.chmod(0o644)
                 api = dirs["web"] / "api.pse"
                 # Inicializacao/migracoes continuam passando pela mesma entrada.
@@ -215,11 +216,17 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron):
                           env=_ambiente(dirs["conf"]))
                 _cgi(dirs["web"] / "api.pse", dirs["conf"], "/health/ready", usuario=usuario_web)
             if cron and not laboratorio:
-                atual = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
-                if atual.returncode not in (0, 1):
-                    raise RuntimeError("Nao foi possivel consultar o crontab de root.")
-                (backup / "crontab-anterior.txt").write_text(atual.stdout)
-                _executar(["crontab", "-"], input=_cron_tick(atual.stdout, wrapper))
+                atual = auditoria.ler_crontab()
+                (backup / "crontab-anterior.txt").write_text(atual)
+                esperado = _cron_tick(atual, wrapper)
+                _executar(["crontab", "-"], input=esperado)
+                if auditoria.ler_crontab() != esperado:
+                    raise RuntimeError("Crontab gravado diverge do esperado.")
+            relatorio = _diagnosticar(origem, dirs, usuario_web, laboratorio, cron, final=True)
+            relatorio["backup"] = str(backup)
+            (backup / "checagem-final.json").write_text(json.dumps(relatorio, ensure_ascii=False, indent=2) + "\n")
+            if not relatorio["sucesso"]:
+                raise RuntimeError("Checagem final reprovada; consulte checagem-final.json no backup.")
             (backup / "CONCLUIDO").write_text(agora + "\n")
             print("Instalacao concluida. Backup: " + str(backup))
         except BaseException:
@@ -228,10 +235,10 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron):
                 _recuperar_cron(backup / "crontab-anterior.txt", wrapper)
             print("Falha: codigo, web, wrappers e conf restaurados. Banco preservado; backup em " + str(backup), file=sys.stderr)
             raise
-    return 0
+    return relatorio
 
 
-def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup):
+def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http=None):
     nova = Path(tempfile.mkdtemp(prefix=".radar-novo-", dir=dirs["codigo"].parent))
     try:
         for pasta in CODIGO:
@@ -259,7 +266,7 @@ def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup):
             shutil.copy2(caminhos.conf_path(), conf)
         # Migra parametros antigos de governanca sem substituir opcoes do .conf.
         antigo = backup / "item-00" / "config" / "governanca.json"
-        existentes, _ = caminhos._ler_conf()
+        existentes = auditoria.chaves_gravadas(conf.read_text())
         if antigo.is_file():
             valores = json.loads(antigo.read_text())
             faltantes = {k.lower(): str(v) for k, v in valores.items()
@@ -270,6 +277,14 @@ def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup):
                     saida.write("\n[governanca]\n")
                     for k, v in faltantes.items():
                         saida.write(k + " = " + v + "\n")
+        # Completa o esquema novo sem substituir valores ou chaves vazias do servidor.
+        from .configuracao import _editar
+        if origem_http and ("web", "origem") not in auditoria.chaves_gravadas(conf.read_text()):
+            conf.write_text(_editar(conf.read_text(), {("web", "origem"): origem_http}))
+        faltantes = auditoria.opcoes_faltantes(conf.read_text())
+        if faltantes:
+            conf.write_text(_editar(conf.read_text(), faltantes))
+        caminhos.recarregar()
         if os.geteuid() == 0:
             os.chown(conf.parent, 0, 0)
             os.chown(conf, 0, 0)
@@ -308,6 +323,23 @@ def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup):
     finally:
         if nova.exists():
             shutil.rmtree(nova)
+
+
+def _esperar_coletor(trava):
+    limite = time.monotonic() + caminhos.inteiro("coleta", "espera_atualizacao")
+    aviso = 0
+    while True:
+        try:
+            fcntl.flock(trava, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return
+        except BlockingIOError:
+            agora = time.monotonic()
+            if agora >= limite:
+                raise RuntimeError("O coletor nao terminou no prazo de coleta.espera_atualizacao; arquivos anteriores serao recuperados.")
+            if agora >= aviso:
+                print("Aguardando a coleta em andamento terminar, sem interrompe-la...", flush=True)
+                aviso = agora + 15
+            time.sleep(min(1, limite - agora))
 
 
 def _instalar_helper(dirs, usuario, sudoers, laboratorio):
@@ -350,11 +382,15 @@ def _instalar_helper(dirs, usuario, sudoers, laboratorio):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Atualiza a instalacao descrita no radar.conf; padrao: simular.")
     parser.add_argument("--conf", required=True, type=Path)
-    parser.add_argument("--aplicar", action="store_true")
+    modo = parser.add_mutually_exclusive_group()
+    modo.add_argument("--aplicar", action="store_true")
     parser.add_argument("--usuario-web", default="www-data")
     parser.add_argument("--laboratorio", type=Path, help="restringe destinos a esta pasta e nao altera cron do sistema")
     parser.add_argument("--sem-cron", action="store_true")
-    parser.add_argument("--restaurar", type=Path, help="restaura codigo/web/configuracao de um backup; nunca restaura banco automaticamente")
+    parser.add_argument("--origem-http", help="origem inicial da consulta HTTP; usada somente se web.origem ainda nao existe")
+    modo.add_argument("--verificar", action="store_true", help="audita a instalacao atual, sem copiar arquivos")
+    parser.add_argument("--relatorio", type=Path, help="salva a checagem em JSON no arquivo indicado")
+    modo.add_argument("--restaurar", type=Path, help="restaura codigo/web/configuracao de um backup; nunca restaura banco automaticamente")
     args = parser.parse_args(argv)
     try:
         origem = Path(caminhos.ROOT)
@@ -366,11 +402,34 @@ def main(argv=None):
                           "destinos": {k: str(v) for k, v in dirs.items()},
                           "usuario_web": args.usuario_web,
                           "cron_tick": not args.sem_cron and not bool(lab)}, indent=2))
+        if args.aplicar:
+            if not lab and os.geteuid() != 0:
+                raise RuntimeError("Execute com sudo para aplicar no servidor.")
+            if args.origem_http:
+                from .configuracao import _validar
+                _validar({("web", "origem"): args.origem_http})
+            if not lab:
+                _preparar_servicos()
+            plano = _diagnosticar(origem, dirs, args.usuario_web, lab, not args.sem_cron)
+            precisa = plano["atualizacao_necessaria"] or any(c["estado"] in ("erro", "atualizar") for c in plano["checagens"])
+            relatorio = None if precisa else _diagnosticar(origem, dirs, args.usuario_web, lab, not args.sem_cron, final=True)
+            if relatorio is not None and relatorio["sucesso"]:
+                relatorio["acao"] = "sem_alteracoes"
+                print("Instalacao ja atualizada; checagens aprovadas, sem nova copia ou backup.")
+            else:
+                relatorio = _aplicar(origem, dirs, args.usuario_web, lab, not args.sem_cron, args.origem_http)
+            resultado = 0
+        else:
+            relatorio = _diagnosticar(origem, dirs, args.usuario_web, lab, not args.sem_cron,
+                                     final=args.verificar)
+            resultado = 0 if not args.verificar or relatorio["sucesso"] else 1
+        print(json.dumps(relatorio, ensure_ascii=False, indent=2))
+        if args.relatorio:
+            args.relatorio.write_text(json.dumps(relatorio, ensure_ascii=False, indent=2) + "\n")
         if not args.aplicar:
-            print("Simulacao concluida. Nenhum arquivo da instalacao foi alterado.")
-            return 0
-        return _aplicar(origem, dirs, args.usuario_web, lab, not args.sem_cron)
-    except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as exc:
+            print("Checagem concluida. Nenhum arquivo da instalacao foi alterado.")
+        return resultado
+    except (OSError, ValueError, KeyError, RuntimeError, GovernancaError, subprocess.SubprocessError) as exc:
         print("Instalacao recusada: " + str(exc), file=sys.stderr)
         if isinstance(exc, subprocess.CalledProcessError):
             print(exc.stderr[:2000], file=sys.stderr)
@@ -404,10 +463,93 @@ def _recuperar(backup, dirs, laboratorio):
 
 
 def _recuperar_cron(cron_antigo, wrapper):
-    atual = _executar(["crontab", "-l"])
+    atual = auditoria.ler_crontab()
     # Recupera somente a linha do coletor, preservando outros projetos.
     def chama_tick(linha):
-        return not linha.lstrip().startswith("#") and str(wrapper) in linha.split()
+        return auditoria.comando_coletor(linha, wrapper)
     linhas = [l for l in atual.splitlines() if not chama_tick(l)]
     linhas.extend(l for l in cron_antigo.read_text().splitlines() if chama_tick(l))
     _executar(["crontab", "-"], input="\n".join(linhas) + "\n")
+
+
+def _preparar_servicos():
+    checagens = auditoria.ambiente_servidor()
+    erros = [c for c in checagens if c["estado"] == "erro" and not c["checagem"].startswith("servico.")]
+    if erros:
+        raise RuntimeError("Pre-requisitos: " + "; ".join(c["checagem"] + ": " + c["detalhe"] for c in erros))
+    for alternativas in (("cron.service", "crond.service"), ("nginx.service",),
+                          ("fcgiwrap.socket", "fcgiwrap.service")):
+        for unidade in alternativas:
+            ativo = subprocess.run(["systemctl", "is-active", unidade], capture_output=True, timeout=15)
+            if ativo.returncode == 0:
+                break
+        else:
+            for unidade in alternativas:
+                r = subprocess.run(["systemctl", "start", unidade], capture_output=True, timeout=30)
+                if r.returncode == 0:
+                    break
+            else:
+                raise RuntimeError("Nao foi possivel iniciar " + "/".join(alternativas))
+
+
+def _diagnosticar(origem, dirs, usuario_web, laboratorio, cron, final=False):
+    checagens = auditoria.ambiente_servidor(bool(laboratorio))
+    versao = _executar(["git", "-C", str(origem), "rev-parse", "HEAD"]).strip()
+    instalada = (dirs["codigo"] / "VERSAO").read_text().strip() if (dirs["codigo"] / "VERSAO").is_file() else None
+    divergencias = auditoria.arquivos_divergentes(origem, dirs, CODIGO, ESTATICOS)
+    checagens.append({"checagem": "arquivos_do_aplicativo", "estado": "ok" if not divergencias else "erro" if final else "atualizar",
+                      "detalhe": "%d arquivo(s) ausente(s) ou diferente(s)" % len(divergencias)})
+    faltantes = auditoria.opcoes_faltantes(dirs["conf"].read_text() if dirs["conf"].exists() else Path(caminhos.conf_path()).read_text())
+    checagens.append({"checagem": "radar.conf", "estado": "ok" if not faltantes else "erro" if final else "atualizar",
+                      "detalhe": "novas opcoes: " + ", ".join("%s.%s" % par for par in faltantes) if faltantes else "esquema atualizado"})
+    checagens.append({"checagem": "versao", "estado": "ok" if instalada == versao else "erro" if final else "atualizar",
+                      "detalhe": "instalada=%s; disponivel=%s" % (instalada or "sem registro", versao)})
+    if cron and not laboratorio and shutil.which("crontab"):
+        atual = auditoria.ler_crontab()
+        esperado = _cron_tick(atual, dirs["codigo"].parent / "radar-tick.sh")
+        checagens.append({"checagem": "cron.coletor", "estado": "ok" if atual == esperado else "erro" if final else "atualizar",
+                          "detalhe": "uma passada por minuto; rotinas externas preservadas"})
+    if final:
+        api = dirs["web"] / "api.pse"
+        try:
+            _cgi(api, dirs["conf"], "/health/ready", usuario=None if laboratorio else usuario_web)
+            _cgi(api, dirs["conf"], "/api/v1/status", usuario=None if laboratorio else usuario_web)
+            checagens.append({"checagem": "api_e_banco", "estado": "ok", "detalhe": "prontidao e consulta do banco pela API"})
+        except (OSError, RuntimeError, ValueError, subprocess.SubprocessError):
+            checagens.append({"checagem": "api_e_banco", "estado": "erro", "detalhe": "API instalada nao passou na checagem"})
+        origem_http = caminhos.valor("web", "origem")[0]
+        if origem_http and not laboratorio:
+            try:
+                auditoria.verificar_http(origem_http, caminhos.web_url(), dirs["web"] / "gestao.html")
+                checagens.append({"checagem": "http.publico", "estado": "ok", "detalhe": "API pronta e pagina atualizada acessiveis pelo nginx"})
+            except Exception:
+                checagens.append({"checagem": "http.publico", "estado": "erro", "detalhe": "Nao foi possivel confirmar API e pagina em web.origem + web.url; confira DNS, TLS e roteamento do nginx."})
+        else:
+            checagens.append({"checagem": "http.publico", "estado": "nao_aplicavel", "detalhe": "Laboratorio ou web.origem vazia; acesso HTTP externo nao verificado."})
+        etc = laboratorio / "etc" if laboratorio else Path("/etc")
+        logrotate = etc / "logrotate.d" / "openclaw-radar"
+        esperado = auditoria.render_logrotate(origem, dirs["logs"])
+        checagens.append({"checagem": "logrotate", "estado": "ok" if logrotate.is_file() and logrotate.read_text() == esperado else "erro",
+                          "detalhe": "rotacao dos logs conforme radar.conf"})
+        executaveis = (dirs["web"] / "api.pse", dirs["codigo"].parent / "radar-tick.sh", dirs["codigo"].parent / "radar-api.pse")
+        checagens.append({"checagem": "permissoes", "estado": "ok" if all(os.access(p, os.X_OK) for p in executaveis)
+                          and not dirs["conf"].stat().st_mode & 0o022 else "erro",
+                          "detalhe": "entradas executaveis; configuracao sem escrita por grupo/outros"})
+        if not laboratorio:
+            r = subprocess.run(["logrotate", "--debug", str(logrotate)], capture_output=True, text=True, timeout=30)
+            checagens.append({"checagem": "logrotate.sintaxe", "estado": "ok" if r.returncode == 0 else "erro",
+                              "detalhe": "validacao sem executar rotacao de arquivos"})
+            try:
+                arq = dirs["conf"]
+                comando = [sys.executable, str(dirs["codigo"] / "web" / "api.pse"),
+                           "configuracao", "salvar-web", "--conf", str(arq)]
+                _executar(["runuser", "-u", usuario_web, "--", "sudo", "-n", "--", *comando],
+                          input=json.dumps({"revisao": hashlib.sha256(arq.read_bytes()).hexdigest(), "alteracoes": {}}))
+                checagens.append({"checagem": "gravacao_do_painel", "estado": "ok", "detalhe": "usuario CGI autorizado somente para o comando restrito"})
+            except (OSError, subprocess.SubprocessError):
+                checagens.append({"checagem": "gravacao_do_painel", "estado": "erro", "detalhe": "autorizacao do painel indisponivel"})
+    return {"sucesso": not any(c["estado"] == "erro" for c in checagens),
+            "atualizacao_necessaria": bool(divergencias or faltantes or instalada != versao),
+            "modo": "verificacao" if final else "planejamento",
+            "versao_instalada": instalada, "versao_disponivel": versao,
+            "arquivos_divergentes": divergencias, "checagens": checagens}
