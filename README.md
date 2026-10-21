@@ -144,6 +144,9 @@ O detalhe do radar e do equipamento faz a [junção da metrologia entre fontes o
 pela série, tipo e município. Assim, uma instalação da GOINFRA pode mostrar o
 histórico do Inmetro mesmo quando as duas publicações têm IDs de origem distintos.
 As fontes e os valores divergentes continuam separados para conferência.
+As [consultas de complementos](docs/CONSULTAS_E_COMPLEMENTOS.md) preferem
+`LEFT JOIN`: ausência de endereço, documento, catálogo ou metadado não deve
+eliminar o registro principal.
 
 ## Velocidades e fiscalização
 

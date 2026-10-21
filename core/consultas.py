@@ -3,6 +3,7 @@
 
 Duas fases: bounding box em SQL + Haversine na aplicacao (sem PostGIS).
 LIMIT so depois do calculo de distancia (spec 9.4).
+Enriquecimentos usam LEFT JOIN: dado complementar ausente nao elimina o principal.
 """
 import datetime
 import json
@@ -21,14 +22,16 @@ SELECT p.id AS ponto_id, p.km AS km, p.tipo_pista AS tipo_pista,
        pos.longitude AS longitude, pos.precisao_metros AS precisao_metros,
        pos.metodo_obtencao AS metodo_obtencao,
        qp.codigo AS qualidade,
-       m.codigo_ibge AS codigo_ibge, m.nome AS municipio, u.sigla AS uf,
+       p.municipio_id AS codigo_ibge, m.nome AS municipio, m.uf_sigla AS uf,
        v.codigo AS via_codigo, v.nome AS via_nome, tv.codigo AS via_tipo,
-       so.codigo AS situacao_operacional
+       so.codigo AS situacao_operacional,
+       en.id AS endereco_id, en.logradouro, en.numero AS endereco_numero,
+       en.bairro, en.complemento, en.cep, en.ponto_referencia
 FROM PONTO_FISCALIZACAO p
+LEFT JOIN ENDERECO en ON en.id = p.endereco_id
 LEFT JOIN POSICAO_GEOGRAFICA pos ON pos.id = p.posicao_id
 LEFT JOIN QUALIDADE_POSICAO qp ON qp.id = pos.qualidade_posicao_id
 LEFT JOIN MUNICIPIO m ON m.codigo_ibge = p.municipio_id
-LEFT JOIN UF u ON u.sigla = m.uf_sigla
 LEFT JOIN VIA v ON v.id = p.via_id
 LEFT JOIN TIPO_VIA tv ON tv.id = v.tipo_via_id
 LEFT JOIN SITUACAO_OPERACIONAL so ON so.id = p.situacao_operacional_id
@@ -101,7 +104,7 @@ def _filtros_extra(filtros, conn=None):
     # Python com _uf_do_ponto (spec: nao inventar IBGE, mas nao descartar
     # a UF real publicada pela fonte).
     if filtros.get("municipio_ibge"):
-        clauses.append("m.codigo_ibge = ?")
+        clauses.append("p.municipio_id = ?")
         params.append(filtros["municipio_ibge"])
     if filtros.get("rodovia"):
         clauses.append("v.codigo = ?")
@@ -302,7 +305,10 @@ def _row_to_base(r, distancia_metros=None):
             "uf": r["uf"],
             "municipio": r["municipio"],
             "codigo_ibge": r["codigo_ibge"],
-            "endereco": {},
+            "endereco": ({"logradouro": r["logradouro"], "numero": r["endereco_numero"],
+                          "bairro": r["bairro"], "complemento": r["complemento"],
+                          "cep": r["cep"], "ponto_referencia": r["ponto_referencia"]}
+                         if r["endereco_id"] is not None else {}),
             "via": {"codigo": r["via_codigo"], "tipo": r["via_tipo"],
                     "nome": r["via_nome"]},
             "km": r["km"],
@@ -351,6 +357,64 @@ def _top_velocidade(resolvidos, categoria):
         if r["categoria"] == categoria and r["faixa_id"] is None:
             return r["velocidade_kmh"]
     return None
+
+
+_VINCULOS_DOCUMENTO = {
+    "ponto": ("DOCUMENTO_PONTO", "ponto_id"),
+    "equipamento": ("DOCUMENTO_EQUIPAMENTO", "equipamento_id"),
+    "verificacao": ("DOCUMENTO_VERIFICACAO", "verificacao_id"),
+    "operacao": ("DOCUMENTO_OPERACAO", "operacao_id"),
+    "trecho": ("DOCUMENTO_TRECHO", "trecho_id"),
+}
+_VINCULOS_IDENTIFICADOR = {
+    "ponto": ("IDENTIFICADOR_PONTO", "ponto_id"),
+    "equipamento": ("IDENTIFICADOR_EQUIPAMENTO", "equipamento_id"),
+    "operacao": ("IDENTIFICADOR_OPERACAO", "operacao_id"),
+}
+
+
+def _documentos(conn, tipo, entidade_id):
+    tabela, coluna = _VINCULOS_DOCUMENTO[tipo]
+    rows = dbmod.query_all(conn, """
+        SELECT v.documento_id, td.codigo AS tipo, d.codigo_documento,
+               d.titulo, d.url, d.data_emissao, d.validade_ate,
+               o.nome AS orgao_emissor, d.hash_conteudo, d.descricao
+        FROM %s v
+        LEFT JOIN DOCUMENTO d ON d.id=v.documento_id
+        LEFT JOIN TIPO_DOCUMENTO td ON td.id=d.tipo_documento_id
+        LEFT JOIN ORGANIZACAO o ON o.id=d.orgao_emissor_id
+        WHERE v.%s=? ORDER BY v.documento_id
+        """ % (tabela, coluna), (entidade_id,))
+    return [{"id": "D-%d" % d["documento_id"], "tipo_documento": d["tipo"],
+             **{k: d[k] for k in ("codigo_documento", "titulo", "url", "data_emissao",
+                                  "validade_ate", "orgao_emissor", "hash_conteudo", "descricao")}}
+            for d in rows]
+
+
+def _identificadores(conn, tipo, entidade_id):
+    tabela, coluna = _VINCULOS_IDENTIFICADOR[tipo]
+    rows = dbmod.query_all(conn, """
+        SELECT ex.valor, ti.codigo AS tipo, f.nome AS fonte,
+               v.vigencia_inicio, v.vigencia_fim
+        FROM %s v
+        LEFT JOIN IDENTIFICADOR_EXTERNO ex ON ex.id=v.identificador_id
+        LEFT JOIN TIPO_IDENTIFICADOR ti ON ti.id=ex.tipo_identificador_id
+        LEFT JOIN FONTE f ON f.id=ex.fonte_id
+        WHERE v.%s=? ORDER BY v.id
+        """ % (tabela, coluna), (entidade_id,))
+    return [{"fonte": r["fonte"], "tipo": r["tipo"], "valor": r["valor"],
+             "vigencia": {"inicio": r["vigencia_inicio"], "fim": r["vigencia_fim"]}}
+            for r in rows]
+
+
+def _primeira_url(documentos):
+    return next((d["url"] for d in documentos if d["url"]), None)
+
+
+def _url_certificado(documentos, numero):
+    urls = {d["url"] for d in documentos if d["tipo_documento"] == "certificado" and d["url"]
+            and (not numero or d["codigo_documento"] == numero)}
+    return next(iter(urls)) if len(urls) == 1 else None
 
 
 def _montar_registro_original(conn, r, distancia_metros=None, incluir_operacoes=True):
@@ -418,12 +482,12 @@ def _montar_registro_original(conn, r, distancia_metros=None, incluir_operacoes=
     equipamentos = []
     tipos = []
     for eq in dbmod.query_all(
-            conn, "SELECT e.id, e.numero_serie, e.ano_fabricacao, "
+            conn, "SELECT i.equipamento_id AS id, e.numero_serie, e.ano_fabricacao, "
             "tr.codigo AS tipo_radar, mo.nome_modelo, fa.nome AS fabricante, "
             "i.id AS instalacao_id, i.inicio_em, i.fim_em "
             "FROM INSTALACAO i "
-            "JOIN EQUIPAMENTO e ON e.id=i.equipamento_id "
-            "JOIN TIPO_RADAR tr ON tr.id=e.tipo_radar_id "
+            "LEFT JOIN EQUIPAMENTO e ON e.id=i.equipamento_id "
+            "LEFT JOIN TIPO_RADAR tr ON tr.id=e.tipo_radar_id "
             "LEFT JOIN MODELO_EQUIPAMENTO mo ON mo.id=e.modelo_id "
             "LEFT JOIN ORGANIZACAO fa ON fa.id=mo.fabricante_id "
             "WHERE i.ponto_id=?", (pid,)):
@@ -460,8 +524,8 @@ def _montar_registro_original(conn, r, distancia_metros=None, incluir_operacoes=
 
     organizacoes = []
     for org in dbmod.query_all(
-            conn, "SELECT o.id, o.nome, p.codigo AS papel, po.inicio_em, po.fim_em "
-            "FROM PONTO_ORGANIZACAO po JOIN ORGANIZACAO o ON o.id=po.organizacao_id "
+            conn, "SELECT po.organizacao_id AS id, o.nome, p.codigo AS papel, po.inicio_em, po.fim_em "
+            "FROM PONTO_ORGANIZACAO po LEFT JOIN ORGANIZACAO o ON o.id=po.organizacao_id "
             "LEFT JOIN PAPEL_ORGANIZACAO p ON p.id=po.papel_id "
             "WHERE po.ponto_id=?", (pid,)):
         organizacoes.append({"id": "O-%d" % org["id"], "nome": org["nome"],
@@ -470,20 +534,8 @@ def _montar_registro_original(conn, r, distancia_metros=None, incluir_operacoes=
                              "fim_em": org["fim_em"]})
     reg["organizacoes"] = organizacoes
 
-    documentos = []
-    for doc in dbmod.query_all(
-            conn, "SELECT d.id, td.codigo AS tipo, d.codigo_documento, "
-            "d.titulo, d.url, d.data_emissao, d.validade_ate, d.descricao "
-            "FROM DOCUMENTO_PONTO dp JOIN DOCUMENTO d ON d.id=dp.documento_id "
-            "LEFT JOIN TIPO_DOCUMENTO td ON td.id=d.tipo_documento_id "
-            "WHERE dp.ponto_id=?", (pid,)):
-        documentos.append({
-            "id": "D-%d" % doc["id"], "tipo_documento": doc["tipo"],
-            "codigo_documento": doc["codigo_documento"], "titulo": doc["titulo"],
-            "url": doc["url"], "data_emissao": doc["data_emissao"],
-            "validade_ate": doc["validade_ate"], "orgao_emissor": None,
-            "hash_conteudo": None, "descricao": doc["descricao"]})
-    reg["documentos"] = documentos
+    reg["documentos"] = _documentos(conn, "ponto", pid)
+    reg["identificadores_oficiais"] = _identificadores(conn, "ponto", pid)
 
     reg["fontes"] = _fontes_do_ponto(conn, pid)
     reg["operacoes"] = (operacoes_do_ponto(conn, pid)
@@ -554,7 +606,7 @@ def montar_registro(conn, r, distancia_metros=None, incluir_operacoes=True, visa
     reg = _montar_registro_original(conn, r, distancia_metros, incluir_operacoes)
     membros = visao.membros("ponto", pid)
     campos_lista = ("faixas", "limites_velocidade", "regimes", "equipamentos",
-                    "organizacoes", "documentos", "fontes", "operacoes")
+                    "organizacoes", "documentos", "identificadores_oficiais", "fontes", "operacoes")
     for outro in membros:
         if outro == pid:
             continue
@@ -564,6 +616,13 @@ def montar_registro(conn, r, distancia_metros=None, incluir_operacoes=True, visa
         original = _montar_registro_original(conn, row, incluir_operacoes=incluir_operacoes)
         for campo in campos_lista:
             reg[campo].extend(original[campo])
+        endereco = original["localizacao"]["endereco"]
+        if endereco and not reg["localizacao"]["endereco"]:
+            reg["localizacao"]["endereco"] = endereco
+            reg["proveniencia_campos"]["endereco"] = {"ponto_origem_id": original["id"]}
+        elif endereco and endereco != reg["localizacao"]["endereco"]:
+            reg["conflitos"].append({"campo": "endereco", "ponto_original_id": original["id"],
+                                     "valor_original": endereco})
         ##-- BUNDITA DE URSO #{20} -- Ausencia de GPS nao e uma coordenada contraditoria; preservar e comparar apenas valores publicados. ##
         comparaveis = [(original["localizacao"].get(k), reg["localizacao"].get(k))
                       for k in ("latitude", "longitude", "km", "uf", "codigo_ibge")]
@@ -622,7 +681,8 @@ def _derivar_pontual(regimes):
 
 def _fmt_fonte(f):
     return {
-        "id": "S-%d" % f["id"], "nome": f["nome"], "esfera": f["esfera"],
+        "id": "S-%d" % f["id"] if f["id"] is not None else None,
+        "nome": f["nome"], "esfera": f["esfera"],
         "organizacao": f["organizacao"], "url": f["url_institucional"],
         "recurso_url": f["url_recurso"],
         "id_registro_original": None,
@@ -638,15 +698,15 @@ def _fmt_fonte(f):
 def _fontes_do_ponto(conn, pid):
     out = []
     for f in dbmod.query_all(
-            conn, "SELECT DISTINCT fo.id, fo.nome, fo.esfera, org.nome AS organizacao, "
+            conn, "SELECT DISTINCT rf.fonte_id AS id, fo.nome, fo.esfera, org.nome AS organizacao, "
             "fo.url_institucional, rf.url_recurso, rf.status_integracao, "
             "a.hash_sha256, a.baixado_em, ac.iniciada_em "
             "FROM VINCULO_REGISTRO_PONTO vp "
-            "JOIN REGISTRO_FONTE r ON r.id=vp.registro_id "
-            "JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id "
-            "JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id "
-            "JOIN FONTE fo ON fo.id=rf.fonte_id "
-            "JOIN ORGANIZACAO org ON org.id=fo.organizacao_id "
+            "LEFT JOIN REGISTRO_FONTE r ON r.id=vp.registro_id "
+            "LEFT JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id "
+            "LEFT JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id "
+            "LEFT JOIN FONTE fo ON fo.id=rf.fonte_id "
+            "LEFT JOIN ORGANIZACAO org ON org.id=fo.organizacao_id "
             "LEFT JOIN EXECUCAO_COLETA ac ON ac.artefato_id=a.id "
             "WHERE vp.ponto_id=?", (pid,)):
         out.append(_fmt_fonte(f))
@@ -659,14 +719,14 @@ def _fontes_por_registro(conn, registro_id):
         return []
     out = []
     for f in dbmod.query_all(
-            conn, "SELECT fo.id, fo.nome, fo.esfera, org.nome AS organizacao, "
+            conn, "SELECT rf.fonte_id AS id, fo.nome, fo.esfera, org.nome AS organizacao, "
             "fo.url_institucional, rf.url_recurso, rf.status_integracao, "
             "a.hash_sha256, a.baixado_em, ac.iniciada_em "
             "FROM REGISTRO_FONTE r "
-            "JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id "
-            "JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id "
-            "JOIN FONTE fo ON fo.id=rf.fonte_id "
-            "JOIN ORGANIZACAO org ON org.id=fo.organizacao_id "
+            "LEFT JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id "
+            "LEFT JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id "
+            "LEFT JOIN FONTE fo ON fo.id=rf.fonte_id "
+            "LEFT JOIN ORGANIZACAO org ON org.id=fo.organizacao_id "
             "LEFT JOIN EXECUCAO_COLETA ac ON ac.artefato_id=a.id "
             "WHERE r.id=?", (registro_id,)):
         out.append(_fmt_fonte(f))
@@ -706,22 +766,23 @@ def _dados_por_fonte(conn, pid, visao, registros_metrologicos=()):
                 SELECT r.id AS registro_id, r.identificador_na_fonte,
                        r.payload_original, a.hash_sha256, a.baixado_em,
                        rf.nome AS recurso, rf.url_recurso,
-                       fo.id AS fonte_id, fo.nome, fo.url_institucional,
+                       rf.fonte_id, fo.nome, fo.url_institucional,
                        n.codigo AS natureza, org.nome AS organizacao
                 FROM REGISTRO_FONTE r
-                JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id
-                JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id
-                JOIN FONTE fo ON fo.id=rf.fonte_id
-                JOIN NATUREZA_FONTE n ON n.id=fo.natureza_id
-                JOIN ORGANIZACAO org ON org.id=fo.organizacao_id
+                LEFT JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id
+                LEFT JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id
+                LEFT JOIN FONTE fo ON fo.id=rf.fonte_id
+                LEFT JOIN NATUREZA_FONTE n ON n.id=fo.natureza_id
+                LEFT JOIN ORGANIZACAO org ON org.id=fo.organizacao_id
                 WHERE r.id=?
                 """, (rid,)):
             registros[row["registro_id"]] = row
     for row in sorted(registros.values(),
-                      key=lambda r: (r["baixado_em"], r["registro_id"]), reverse=True):
+                      key=lambda r: (r["baixado_em"] or "", r["registro_id"]), reverse=True):
         fid = row["fonte_id"]
-        grupo = grupos.setdefault(fid, {
-            "id": "S-%d" % fid, "nome": row["nome"],
+        chave = fid if fid is not None else ("origem_desconhecida", row["registro_id"])
+        grupo = grupos.setdefault(chave, {
+            "id": "S-%d" % fid if fid is not None else None, "nome": row["nome"],
             "organizacao": row["organizacao"], "natureza": row["natureza"],
             "url": row["url_institucional"], "registros": [],
         })
@@ -741,7 +802,7 @@ def _dados_por_fonte(conn, pid, visao, registros_metrologicos=()):
             "hash_artefato": row["hash_sha256"], "dados_publicados": dados,
             "escopo_vinculo": "ponto" if row["registro_id"] in registros_do_ponto else "equipamento",
         })
-    return sorted(grupos.values(), key=lambda grupo: (grupo["nome"].casefold(), grupo["id"]))
+    return sorted(grupos.values(), key=lambda grupo: ((grupo["nome"] or "").casefold(), grupo["id"] or ""))
 
 
 def operacoes_do_ponto(conn, pid):
@@ -771,9 +832,10 @@ def buscar_ponto_por_id(conn, pid_str):
         registro["equipamentos"] = [buscar_equipamento_por_id(conn, e["id"], visao=visao) or e
                                     for e in registro["equipamentos"]]
         verificacoes = [v for e in registro["equipamentos"] for v in e["verificacoes_metrologicas"]]
+        origens = [origem for v in verificacoes for origem in v.get("origens", [v])]
         registro["dados_por_fonte"] = _dados_por_fonte(
-            conn, pid, visao, [v["fonte_registro_id"] for v in verificacoes])
-        registro["fontes"] = _unicos(registro["fontes"] + [v["fonte"] for v in verificacoes if v["fonte"]])
+            conn, pid, visao, [v["fonte_registro_id"] for v in origens])
+        registro["fontes"] = _unicos(registro["fontes"] + [v["fonte"] for v in origens if v["fonte"]])
         # Complementos sao inferencias da base, nao publicacoes da fonte do envio.
         # O detalhe expoe a origem separadamente, sem reescrever o bruto.
         try:
@@ -799,7 +861,7 @@ def listar_fontes(conn):
             conn, "SELECT f.id, f.nome, f.esfera, f.situacao, "
             "f.url_institucional, f.periodicidade_declarada, "
             "o.nome AS organizacao, n.codigo AS natureza "
-            "FROM FONTE f JOIN ORGANIZACAO o ON o.id=f.organizacao_id "
+            "FROM FONTE f LEFT JOIN ORGANIZACAO o ON o.id=f.organizacao_id "
             "LEFT JOIN NATUREZA_FONTE n ON n.id=f.natureza_id "
             "ORDER BY f.nome"):
         recursos = []
@@ -926,8 +988,8 @@ def montar_trecho(conn, r):
     municipios = []
     uf = None
     for m in dbmod.query_all(
-            conn, "SELECT m.codigo_ibge, m.nome, m.uf_sigla "
-            "FROM TRECHO_MUNICIPIO tm JOIN MUNICIPIO m "
+            conn, "SELECT tm.municipio_id AS codigo_ibge, m.nome, m.uf_sigla "
+            "FROM TRECHO_MUNICIPIO tm LEFT JOIN MUNICIPIO m "
             "ON m.codigo_ibge=tm.municipio_id WHERE tm.trecho_id=? "
             "ORDER BY m.nome", (tid,)):
         municipios.append({"codigo_ibge": m["codigo_ibge"], "nome": m["nome"],
@@ -940,12 +1002,7 @@ def montar_trecho(conn, r):
             "WHERE tv.trecho_id=? ORDER BY tv.ordem", (tid,)):
         vertices.append({"latitude": v["latitude"],
                          "longitude": v["longitude"]})
-    documentos = []
-    for d in dbmod.query_all(
-            conn, "SELECT d.id, d.url FROM DOCUMENTO_TRECHO dt "
-            "JOIN DOCUMENTO d ON d.id=dt.documento_id WHERE dt.trecho_id=?",
-            (tid,)):
-        documentos.append({"id": "D-%d" % d["id"], "url": d["url"]})
+    documentos = _documentos(conn, "trecho", tid)
     return {
         "id": "T-%d" % tid,
         "tipo_registro": "trecho_elegivel",
@@ -962,7 +1019,7 @@ def montar_trecho(conn, r):
         "criterio_inclusao": r["criterio_inclusao"],
         "vigencia_inicio": r["vigencia_inicio"],
         "vigencia_fim": r["vigencia_fim"],
-        "documento_url": (documentos[0]["url"] if documentos else None),
+        "documento_url": _primeira_url(documentos),
         "documentos": documentos,
         "fontes": _fontes_por_registro(conn, r["registro_fonte_id"]),
         "indicador": "pode_haver_fiscalizacao",
@@ -1070,10 +1127,7 @@ def montar_operacao(conn, r):
                              "fuso": rc["fuso_horario"],
                              "inicio": rc["data_inicio"],
                              "fim": rc["data_fim"], "dias": dias})
-    docs = dbmod.query_all(
-        conn, "SELECT d.url FROM DOCUMENTO_OPERACAO do "
-        "JOIN DOCUMENTO d ON d.id=do.documento_id WHERE do.operacao_id=? "
-        "ORDER BY d.id", (oid,))
+    docs = _documentos(conn, "operacao", oid)
     if r["inicio_em"]:
         evidencia = "confirmada"
     elif r["publicado_em"]:
@@ -1104,7 +1158,9 @@ def montar_operacao(conn, r):
         "orgao_responsavel": r["orgao_responsavel"],
         "equipamentos_ids": equipamentos_ids,
         "faixas_ids": faixas_ids,
-        "documento_url": (docs[0]["url"] if docs else None),
+        "documento_url": _primeira_url(docs),
+        "documentos": docs,
+        "identificadores_oficiais": _identificadores(conn, "operacao", oid),
         "fontes": _fontes_por_registro(conn, r["registro_fonte_id"]),
         "evidencia_operacao": evidencia,
     }
@@ -1116,7 +1172,7 @@ def _filtros_operacao(filtros):
         clauses.append("m.uf_sigla = ?")
         params.append(filtros["uf"].upper())
     if filtros.get("municipio_ibge"):
-        clauses.append("m.codigo_ibge = ?")
+        clauses.append("o.municipio_id = ?")
         params.append(filtros["municipio_ibge"])
     if filtros.get("rodovia"):
         clauses.append("v.codigo = ?")
@@ -1198,7 +1254,7 @@ SELECT e.id AS equipamento_id, e.numero_serie AS numero_serie,
        tm.codigo AS tecnologia_medicao,
        fa.nome AS fabricante
 FROM EQUIPAMENTO e
-JOIN TIPO_RADAR tr ON tr.id = e.tipo_radar_id
+LEFT JOIN TIPO_RADAR tr ON tr.id = e.tipo_radar_id
 LEFT JOIN MODELO_EQUIPAMENTO mo ON mo.id = e.modelo_id
 LEFT JOIN TECNOLOGIA_MEDICAO tm ON tm.id = mo.tecnologia_id
 LEFT JOIN ORGANIZACAO fa ON fa.id = mo.fabricante_id
@@ -1254,6 +1310,7 @@ def _montar_equipamento_original(conn, r):
             "LEFT JOIN RESULTADO_VERIFICACAO rv ON rv.id=v.resultado_id "
             "LEFT JOIN ORGANIZACAO org ON org.id=v.orgao_executor_id "
             "WHERE v.equipamento_id=? ORDER BY v.id", (eid,)):
+        documentos_verificacao = _documentos(conn, "verificacao", v["id"])
         verificacoes.append({
             "id": "V-%d" % v["id"],
             "tipo_verificacao": v["tipo"],
@@ -1261,32 +1318,18 @@ def _montar_equipamento_original(conn, r):
             "validade_ate": v["validade_ate"],
             "resultado": v["resultado"],
             "numero_certificado": v["numero_certificado"],
-            "certificado_url": None,
+            "certificado_url": _url_certificado(documentos_verificacao, v["numero_certificado"]),
             "orgao_executor": v["orgao"],
             "norma_aplicada": v["norma_aplicada"],
             "situacao_metrologica_derivada": _situacao_metrologica(
                 v["validade_ate"]),
-            "documentos": [],
+            "documentos": documentos_verificacao,
             "fonte_registro_id": v["registro_fonte_id"],
             "fonte": (_fontes_por_registro(conn, v["registro_fonte_id"]) or [None])[0],
             "observacoes": v["observacoes"],
         })
 
-    identificadores = []
-    for ident in dbmod.query_all(
-            conn, "SELECT ex.valor, ti.codigo AS tipo, f.nome AS fonte, "
-            "ie.vigencia_inicio, ie.vigencia_fim "
-            "FROM IDENTIFICADOR_EQUIPAMENTO ie "
-            "JOIN IDENTIFICADOR_EXTERNO ex ON ex.id=ie.identificador_id "
-            "JOIN TIPO_IDENTIFICADOR ti ON ti.id=ex.tipo_identificador_id "
-            "JOIN FONTE f ON f.id=ex.fonte_id "
-            "WHERE ie.equipamento_id=? ORDER BY ex.id", (eid,)):
-        identificadores.append({
-            "fonte": ident["fonte"], "tipo": ident["tipo"],
-            "valor": ident["valor"],
-            "vigencia": {"inicio": ident["vigencia_inicio"],
-                         "fim": ident["vigencia_fim"]},
-        })
+    identificadores = _identificadores(conn, "equipamento", eid)
 
     observacoes = r["observacoes"] if "observacoes" in r.keys() else None
     return {
@@ -1306,6 +1349,7 @@ def _montar_equipamento_original(conn, r):
         "identificadores_oficiais": identificadores,
         "instalacoes": instalacoes,
         "verificacoes_metrologicas": verificacoes,
+        "documentos": _documentos(conn, "equipamento", eid),
         "proprietario": None,
         "mantenedor": None,
         "ultima_manutencao": None,
@@ -1326,7 +1370,7 @@ def montar_equipamento(conn, r, visao=None):
             continue
         row = dbmod.query_one(conn, _EQUIP_SQL, (outro,))
         original = _montar_equipamento_original(conn, row)
-        for campo in ("instalacoes", "verificacoes_metrologicas", "identificadores_oficiais"):
+        for campo in ("instalacoes", "verificacoes_metrologicas", "identificadores_oficiais", "documentos"):
             reg[campo].extend(original[campo])
     from .metrologia import equipamentos_relacionados
     relacionados = {}
@@ -1347,7 +1391,7 @@ def montar_equipamento(conn, r, visao=None):
             "criterio": "serie_exata_tipo_e_municipio",
             "equipamentos_origem": ["E-%d" % i for i in sorted(relacionados)],
         }
-    for campo in ("instalacoes", "identificadores_oficiais"):
+    for campo in ("instalacoes", "identificadores_oficiais", "documentos"):
         reg[campo] = _unicos(reg[campo])
     for instalacao in reg["instalacoes"]:
         if instalacao["ponto_id"]:
@@ -1361,7 +1405,13 @@ def montar_equipamento(conn, r, visao=None):
                       ("numero_certificado", "data_verificacao", "tipo_verificacao", "orgao_executor",
                        "resultado", "validade_ate", "norma_aplicada")) if certificado else verificacao["id"]
         if chave in vistos:
-            vistos[chave].setdefault("aliases", []).append(verificacao["id"])
+            anterior = vistos[chave]
+            anterior.setdefault("aliases", []).append(verificacao["id"])
+            def origem(v):
+                return {k: v[k] for k in ("id", "fonte_registro_id", "fonte")}
+            anterior.setdefault("origens", [origem(anterior)]).append(origem(verificacao))
+            anterior["documentos"] = _unicos(anterior["documentos"] + verificacao["documentos"])
+            anterior["certificado_url"] = _url_certificado(anterior["documentos"], anterior["numero_certificado"])
         else:
             vistos[chave] = verificacao
             verificacoes.append(verificacao)
@@ -1407,12 +1457,12 @@ SELECT ac.id AS execucao_id, ac.iniciada_em, ac.terminada_em, ac.status,
        ac.http_status, ac.tentativas, ac.linhas_recebidas, ac.linhas_validas,
        ac.linhas_rejeitadas, ac.registros_criados, ac.registros_alterados,
        ac.erro_codigo, ac.erro_detalhe, ac.artefato_id,
-       rf.id AS recurso_id, rf.nome AS recurso_nome, rf.url_recurso,
-       f.id AS fonte_id, f.nome AS fonte_nome, f.esfera AS fonte_esfera,
+       ac.recurso_id, rf.nome AS recurso_nome, rf.url_recurso,
+       rf.fonte_id, f.nome AS fonte_nome, f.esfera AS fonte_esfera,
        a.hash_sha256 AS artefato_hash
 FROM EXECUCAO_COLETA ac
-JOIN RECURSO_FONTE rf ON rf.id = ac.recurso_id
-JOIN FONTE f ON f.id = rf.fonte_id
+LEFT JOIN RECURSO_FONTE rf ON rf.id = ac.recurso_id
+LEFT JOIN FONTE f ON f.id = rf.fonte_id
 LEFT JOIN ARTEFATO_COLETA a ON a.id = ac.artefato_id
 """
 
@@ -1422,7 +1472,7 @@ def montar_execucao(conn, r):
         "id": "X-%d" % r["execucao_id"],
         "tipo_registro": "execucao_coleta",
         "fonte": r["fonte_nome"],
-        "fonte_id": "S-%d" % r["fonte_id"],
+        "fonte_id": "S-%d" % r["fonte_id"] if r["fonte_id"] is not None else None,
         "esfera": r["fonte_esfera"],
         "recurso": r["recurso_nome"],
         "recurso_id": "RF-%d" % r["recurso_id"],
@@ -1453,7 +1503,7 @@ def listar_atualizacoes(conn, filtros=None, limite=100, cursor=None):
         clauses.append("f.nome = ?")
         params.append(filtros["fonte"])
     if filtros.get("fonte_id"):
-        clauses.append("f.id = ?")
+        clauses.append("rf.fonte_id = ?")
         params.append(filtros["fonte_id"])
     if filtros.get("recurso"):
         clauses.append("rf.nome = ?")

@@ -146,7 +146,7 @@ def _correspondencias(conn, ponto):
 
 def _diagnostico(conn, valor):
     row = conn.execute("""SELECT e.*, r.url_recurso, f.nome AS fonte FROM EXECUCAO_COLETA e
-        JOIN RECURSO_FONTE r ON r.id=e.recurso_id JOIN FONTE f ON f.id=r.fonte_id WHERE e.id=?""", (_id(valor),)).fetchone()
+        LEFT JOIN RECURSO_FONTE r ON r.id=e.recurso_id LEFT JOIN FONTE f ON f.id=r.fonte_id WHERE e.id=?""", (_id(valor),)).fetchone()
     if row is None:
         _erro("Execucao nao encontrada.", 404)
     texto = str(row["erro_detalhe"] or "").lower()
@@ -248,8 +248,8 @@ def _ocr_local(arquivo):
 
 def _documento(conn, valor, sem_ia=False):
     row = conn.execute("""SELECT a.*, f.nome AS fonte, n.codigo AS natureza, r.url_recurso FROM ARTEFATO_COLETA a
-        JOIN RECURSO_FONTE r ON r.id=a.recurso_id JOIN FONTE f ON f.id=r.fonte_id
-        JOIN NATUREZA_FONTE n ON n.id=f.natureza_id WHERE a.id=?""", (_id(valor),)).fetchone()
+        LEFT JOIN RECURSO_FONTE r ON r.id=a.recurso_id LEFT JOIN FONTE f ON f.id=r.fonte_id
+        LEFT JOIN NATUREZA_FONTE n ON n.id=f.natureza_id WHERE a.id=?""", (_id(valor),)).fetchone()
     if row is None:
         _erro("Artefato nao encontrado.", 404)
     arquivo = Path(row["caminho_cache"]).resolve()

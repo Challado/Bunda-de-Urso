@@ -82,6 +82,7 @@ class TestInstalacaoAPI(unittest.TestCase):
         with closing(db.connect_readonly(self.banco)) as conn:
             self.assertEqual(conn.execute("SELECT valor FROM SENTINELA").fetchone()[0], "nao perder")
             self.assertIsNotNone(conn.execute("SELECT 1 FROM sqlite_master WHERE type='index' AND name='IX_EQUIPAMENTO_SERIE_TIPO'").fetchone())
+            self.assertIsNotNone(conn.execute("SELECT 1 FROM sqlite_master WHERE type='index' AND name='IX_DOCUMENTO_VERIFICACAO_ALVO'").fetchone())
         self.assertTrue((self.home / "core" / "entrada_api.py").is_file())
         ambiente_cgi = {k: v for k, v in self.env.items() if k != "RADAR_CONF"}
         ambiente_cgi.update(REQUEST_METHOD="GET", QUERY_STRING="rota=/health/ready", SCRIPT_NAME="/api.pse")

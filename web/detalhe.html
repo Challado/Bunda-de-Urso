@@ -124,7 +124,7 @@
     km:"Quilômetro", tipo_pista:"Tipo de pista",
     data_inicio_operacao:"Início da operação", data_inativacao:"Data de inativação",
     motivo_inativacao:"Motivo da inativação",
-    faixas:"Faixas", numero:"Número da faixa", sentido:"Sentido", sentido_original:"Sentido (original)",
+    faixas:"Faixas", numero:"Número", sentido:"Sentido", sentido_original:"Sentido (original)",
     limites_velocidade:"Limites de velocidade", faixa_id:"Faixa", categoria_veiculo:"Categoria de veículo",
     velocidade_kmh:"Velocidade (km/h)", vigencia_inicio:"Vigência — início", vigencia_fim:"Vigência — fim",
     fonte_registro_id:"ID do registro na fonte",
@@ -149,6 +149,9 @@
     mantenedor:"Mantenedor", ultima_manutencao:"Última manutenção", observacoes:"Observações",
     tipos_radar_presentes:"Tipos de radar presentes", organizacoes:"Organizações",
     documentos:"Documentos", fontes:"Fontes", esfera:"Esfera", organizacao:"Órgão responsável",
+    logradouro:"Logradouro", bairro:"Bairro", complemento:"Complemento",
+    cep:"CEP", ponto_referencia:"Ponto de referência", orgao_emissor:"Órgão emissor",
+    hash_conteudo:"Hash do conteúdo", data_emissao:"Data de emissão", certificado_url:"Link do certificado",
     url:"URL", recurso_url:"URL do recurso", id_registro_original:"ID na fonte",
     publicado_em:"Publicado em", coletado_em:"Coletado em", validado_em:"Validado em",
     ultima_verificacao_acesso:"Última verificação de acesso", hash_artefato:"Hash do artefato",
@@ -308,7 +311,8 @@
     var equipamentos = (p.equipamentos || []).map(function(e){return {
       id:e.id, numero_serie:e.numero_serie, registro_aprovacao_modelo:e.registro_aprovacao_modelo,
       portaria_aprovacao_modelo:e.portaria_aprovacao_modelo, identificadores_oficiais:e.identificadores_oficiais,
-      verificacoes_metrologicas:e.verificacoes_metrologicas, juncao_metrologica:e.juncao_metrologica
+      verificacoes_metrologicas:e.verificacoes_metrologicas, juncao_metrologica:e.juncao_metrologica,
+      documentos:e.documentos
     };});
     var temVerificacoes = equipamentos.some(function(e){return (e.verificacoes_metrologicas || []).length;});
     var texto = temInmetro ? "Há publicação do Inmetro/PSIE vinculada a este cadastro. Os campos originais estão no bloco da fonte abaixo." :
