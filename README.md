@@ -103,6 +103,10 @@ O esquema é **SQL canônico, sem ORM** — nada de SQLAlchemy por aqui. São **
 
 Uma falha no portal de origem não deve derrubar a API. O cache e a base local continuam disponíveis, mas o sistema informa a idade dos dados e eventuais problemas de atualização.
 
+A relação estadual da **AGETO/TO** também é coletada semanalmente, com GPS,
+rodovia/km, série e número Inmetro. A carga pode usar o PDF local quando o
+portal estiver indisponível. Veja [a fonte AGETO e os comandos pela API](docs/FONTE_AGETO_TO.md).
+
 ## Assistência opcional
 
 IA vem **desligada por padrão**. O painel administrativo oferece extração de documentos,

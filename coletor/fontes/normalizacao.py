@@ -677,6 +677,13 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None,
             "situacao_operacional_id": situacao_id,
         })
 
+    # Numero Inmetro identifica tambem o instrumento, com a fonte que o publicou.
+    # Fontes antigas guardavam essa chave apenas no ponto (mantida por compatibilidade).
+    if identificador_id is not None and d.get("tipo_identificador") == "numero_inmetro":
+        conn.execute("INSERT OR IGNORE INTO IDENTIFICADOR_EQUIPAMENTO "
+                     "(identificador_id, equipamento_id) VALUES (?,?)",
+                     (identificador_id, equipamento_id))
+
     # vinculo de proveniencia (cada registro -> o ponto canonico)
     conn.execute(
         "INSERT OR IGNORE INTO VINCULO_REGISTRO_PONTO (registro_id, ponto_id) "

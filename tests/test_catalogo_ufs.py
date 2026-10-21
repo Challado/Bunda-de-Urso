@@ -135,7 +135,7 @@ class CatalogoUFsTest(unittest.TestCase):
             "SC": "joinville_sc", "AM": "immu_am", "MS": "agetran_ms",
             "PB": "semob_pb", "AP": "ctmac_ap", "RO": "semtran_ro",
             "PA": "segbell_pa", "DF": "detran_df", "MA": "detran_ma",
-            "SE": "der_se", "TO": "araguaiana_to",
+            "SE": "der_se", "TO": "ageto_to",
         }
         for uf, modulo in esperado.items():
             self.assertEqual(por_uf[uf]["nosso_modulo"], modulo,

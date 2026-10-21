@@ -344,14 +344,15 @@
     },
     {
       "uf": "TO",
-      "nome_fonte": "Araguaina ASTT - relacao de radares 2026",
-      "orgao": "ASTT (Araguaina)",
-      "url_pagina": "https://www.araguaina.to.gov.br/servicos/medidores-de-velocidade-lista-de-enderecos",
+      "nome_fonte": "AGETO-TO - relacao estadual de radares fixos",
+      "orgao": "AGETO (Tocantins)",
+      "url_pagina": "https://www.to.gov.br/ageto/lista-de-radares/l3d43475lu1",
       "classificacao_evidencia": "lista_localizacao",
       "tipo_esperado": "cadastro_equipamento",
       "estado_integracao": "implementado",
-      "nosso_modulo": "araguaiana_to",
-      "observacao": "Pagina atualizada jan/2026 com download de enderecos; NAO cobre todas as rodovias estaduais.",
+      "nosso_modulo": "ageto_to",
+      "modulos_municipais": [{"modulo": "araguaiana_to", "municipio": "Araguaina"}],
+      "observacao": "Relacao geral AGETO com GPS, rodovia/km, serie e numero Inmetro; 58 equipamentos no PDF rev01 conferido em 21/10/2026. ASTT Araguaina permanece como complemento municipal. A lista nao comprova atividade atual nem cobertura integral.",
       "cobertura_estadual_confirmada": false
     }
   ]

@@ -44,6 +44,7 @@ from coletor.fontes.detran_df import ColetorDetranDF
 from coletor.fontes.detran_ma import ColetorDetranMA
 from coletor.fontes.der_se import ColetorDERSE
 from coletor.fontes.araguaiana_to import ColetorASTTAraguaina
+from coletor.fontes.ageto_to import ColetorAGETOTO
 from coletor.fontes.detran_ac import ColetorDetranAC
 from coletor.fontes.der_al import ColetorDerAL
 from coletor.fontes.natal_rn import ColetorNatalRN
@@ -227,6 +228,13 @@ AGENDA_PADRAO = {
     "der_se": {
         "rotulo": "DER-SE - radares e lombadas fixas",
         "conector": ColetorDERSE,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "ageto_to": {
+        "rotulo": "AGETO/TO - radares fixos nas rodovias estaduais",
+        "conector": ColetorAGETOTO,
         "intervalo_s": SEMANA,
         "url_direta": None,
         "ativo": True,

@@ -50,7 +50,7 @@ circunscricao (municipios/rodovias efetivamente inventariados).
 | SC | Joinville DETRANS - estudos tecnicos 2026 | lista_documentos | https://www.joinville.sc.gov.br/publicacoes/estudos-tecnicos-equipamentos-de-fiscalizacao-eletronica-radares-e-lombadas/ | parcial | `joinville_sc` | Estudos tecnicos nao sao equipamento instalado; nao representa todo o SC |
 | SP | DER-SP - dados abertos radar (XLSX) | conjunto_dados | https://dadosabertos.sp.gov.br/dataset/radar | implementado | `dersp` | XLSX de agosto/2026 |
 | SE | DER Sergipe - radares fixos e estudos tecnicos | lista_documentos | https://der.se.gov.br/localizacao-de-radares-fixos/ | implementado | `der_se` | Distinguir projeto/estudo de equipamento instalado. Complemento: SMTT Aracaju |
-| TO | Araguaina ASTT - relacao de radares 2026 | lista_localizacao | https://www.araguaina.to.gov.br/servicos/medidores-de-velocidade-lista-de-enderecos | implementado | `araguaiana_to` | Pagina de jan/2026; nao cobre todas as rodovias estaduais |
+| TO | AGETO - relacao estadual de radares fixos | lista_localizacao | https://www.to.gov.br/ageto/lista-de-radares/l3d43475lu1 | implementado | `ageto_to` | PDF rev01 com 58 equipamentos georreferenciados; ASTT Araguaina permanece no conector municipal `araguaiana_to`; cobertura integral e atividade atual nao comprovadas |
 
 ## UFs sem publicacao de lista (requerem LAI/contato)
 

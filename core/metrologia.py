@@ -4,6 +4,8 @@ Nao funde pontos nem reescreve instalacoes: a serie publicada, o municipio e
 o tipo delimitam a juncao. Fabricante/modelo conhecidos e decisoes explicitas
 de separacao continuam prevalecendo sobre coincidencias de serie.
 """
+import re
+
 from . import db
 from .dedup import normalizar_serie, normalizar_texto, serie_generica
 
@@ -39,11 +41,39 @@ WHERE origem.id = ?
 """
 
 
+def numeros_inmetro(conn, eid):
+    """Numero publicado: tolera apenas pontos e zeros de formatacao.
+
+    A leitura do identificador do ponto conserva compatibilidade com cargas
+    anteriores que ainda nao ligavam IDENTIFICADOR_EQUIPAMENTO.
+    """
+    rows = db.query_all(conn, """SELECT ie.valor FROM IDENTIFICADOR_EXTERNO ie
+        JOIN TIPO_IDENTIFICADOR ti ON ti.id=ie.tipo_identificador_id AND ti.codigo='numero_inmetro'
+        JOIN FONTE f ON f.id=ie.fonte_id
+        JOIN NATUREZA_FONTE n ON n.id=f.natureza_id AND n.codigo='oficial'
+        WHERE ie.id IN (
+            SELECT identificador_id FROM IDENTIFICADOR_EQUIPAMENTO WHERE equipamento_id=?
+            UNION SELECT ip.identificador_id FROM IDENTIFICADOR_PONTO ip
+            JOIN INSTALACAO i ON i.ponto_id=ip.ponto_id WHERE i.equipamento_id=?)""", (eid, eid))
+    numeros = set()
+    for row in rows:
+        texto = str(row[0] or '').strip()
+        if re.fullmatch(r'[0-9]+(?:\.[0-9]+)*', texto):
+            numero = texto.replace('.', '').lstrip('0')
+            if numero:
+                numeros.add(numero)
+    return numeros
+
+
 def equipamentos_relacionados(conn, eid, visao):
     """Equipamento -> registros de verificacao oficiais compativeis."""
     serie = db.scalar(conn, "SELECT numero_serie FROM EQUIPAMENTO WHERE id=?", (eid,))
     normalizada = normalizar_serie(serie)
-    if serie_generica(normalizada) or normalizada in ("DESCONHECIDO", "NAOINFORMADO"):
+    if not normalizada or normalizada in ("0", "DESCONHECIDO", "NAOINFORMADO"):
+        return {}
+    origem_inmetro = numeros_inmetro(conn, eid)
+    if serie_generica(normalizada) and not (
+            normalizada.isdigit() and len(origem_inmetro) == 1):
         return {}
     from . import governanca
     clausulas, params = governanca.clausulas_consulta(conn)
@@ -65,6 +95,14 @@ def equipamentos_relacionados(conn, eid, visao):
     relacionados = {}
     for row in candidatos:
         outro = row["id"]
+        destino_inmetro = numeros_inmetro(conn, outro)
+        # Serie curta so sustenta a juncao com corroboracao do numero oficial.
+        # Numeros oficiais divergentes ou ambiguos nunca sao ignorados.
+        if (len(origem_inmetro) > 1 or len(destino_inmetro) > 1
+                or (origem_inmetro and destino_inmetro and origem_inmetro != destino_inmetro)
+                or (normalizada.isdigit() and len(normalizada) <= 4 and
+                    (len(origem_inmetro) != 1 or origem_inmetro != destino_inmetro))):
+            continue
         if outro not in membros and not visao.separados("equipamento", eid, outro):
             relacionados.setdefault(outro, set()).add(row["registro_fonte_id"])
     return relacionados

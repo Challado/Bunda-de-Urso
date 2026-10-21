@@ -22,8 +22,10 @@ from core import config                                   # noqa: E402
 from coletor.fontes.antt import ColetorANTT               # noqa: E402
 from coletor.fontes.recife import ColetorRecife           # noqa: E402
 from coletor.fontes.inmetro import ColetorINMETRO         # noqa: E402
+from coletor.fontes.ageto_to import ColetorAGETOTO         # noqa: E402
 
 FONTES = {
+    "ageto_to": ColetorAGETOTO,
     "antt": ColetorANTT,
     "recife": ColetorRecife,
     "inmetro": ColetorINMETRO,
