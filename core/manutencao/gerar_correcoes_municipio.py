@@ -31,8 +31,9 @@ from core import correcoes_municipio as corr      # noqa: E402
 from core import geo_municipio as geo             # noqa: E402
 from core.contexto_api import operacao_local
 from core import db as dbmod
+from core import caminhos  # caminhos so pela porta unica
 
-DB_PADRAO = os.environ.get("RADAR_DB", "/var/lib/radar-brasil/radar.sqlite3")
+DB_PADRAO = caminhos.banco()
 SAIDA_PADRAO = corr.CAMINHO_PADRAO
 RESSALVAS_PADRAO = os.path.join(config.ROOT, "config",
                                 "municipios_ressalvas.csv")

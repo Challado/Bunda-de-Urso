@@ -39,8 +39,9 @@ import unicodedata
 
 from core import db as dbmod                          # noqa: E402
 from core.contexto_api import operacao_local
+from core import caminhos  # caminhos so pela porta unica
 
-DB_PADRAO = os.environ.get("RADAR_DB", "/var/lib/radar-brasil/radar.sqlite3")
+DB_PADRAO = caminhos.banco()
 
 SQL_INMETRO = """
 SELECT r.id            AS registro_id,

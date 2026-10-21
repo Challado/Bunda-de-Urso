@@ -1,23 +1,65 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Entry point CGI fino (padrao da casa: fcgiwrap executa este .pse).
+"""Radar Brasil — entrada do checkout (desenvolvimento e testes).
 
-Toda a logica mora FORA do webroot (pacote web.nucleo + core). Em producao,
-copie este arquivo para o webroot; ele resolve a raiz do projeto por
-RADAR_BRASIL_HOME ou por caminhos conhecidos.
+Mesmo contrato do arquivo instalado no webroot (``deploy/api.pse``): CGI entra
+pelo despachante comum ``core.entrada_api``; no terminal abre o console.
+
+Caminho do codigo: ``RADAR_BRASIL_HOME`` ou [instalacao] home em
+``/etc/radar-brasil/radar.conf``; sem configuracao, o proprio checkout.
 """
 import os
 import sys
 
+CONF_PADRAO = "/etc/radar-brasil/radar.conf"
+
+
+def _conf(secao, chave):
+    """Le uma chave do .conf sem depender de nada (o core ainda nao existe aqui)."""
+    caminho = (os.environ.get("RADAR_CONF") or "").strip() or CONF_PADRAO
+    atual = None
+    try:
+        with open(caminho, "r", encoding="utf-8") as f:
+            for linha in f:
+                texto = linha.strip()
+                if not texto or texto[0] in "#;":
+                    continue
+                if texto.startswith("[") and texto.endswith("]"):
+                    atual = texto[1:-1].strip().lower()
+                    continue
+                if atual != secao or "=" not in texto:
+                    continue
+                nome, valor = texto.split("=", 1)
+                if nome.strip().lower() == chave:
+                    return os.path.expanduser(valor.strip().strip('"').strip("'"))
+    except OSError:
+        pass
+    return ""
+
+
+# Ordem aqui e diferente da do arquivo instalado: este vive DENTRO do checkout,
+# entao o proprio checkout vem antes do .conf (teste/desenvolvimento nunca
+# importa, por acidente, o codigo de producao da maquina).
 _raiz = os.environ.get("RADAR_BRASIL_HOME")
 if not _raiz:
     _aqui = os.path.dirname(os.path.abspath(__file__))
-    for _cand in (os.path.dirname(_aqui), _aqui,
-                  "/home/openclaw/openclaw/workspace/radar-brasil"):
+    for _cand in (os.path.dirname(_aqui), _aqui):
         if os.path.isdir(os.path.join(_cand, "core")):
             _raiz = _cand
             break
-if _raiz and _raiz not in sys.path:
+if not _raiz:
+    _raiz = _conf("instalacao", "home")
+if not _raiz:
+    sys.exit("Radar Brasil: caminho do codigo nao configurado. "
+             "Defina [instalacao] home em %s ou RADAR_BRASIL_HOME." % CONF_PADRAO)
+
+for _chave, _valor in (("RADAR_BRASIL_HOME", _raiz),
+                       ("RADAR_DATA_DIR", _conf("dados", "dir")),
+                       ("RADAR_DB", _conf("dados", "banco"))):
+    if _valor:
+        os.environ.setdefault(_chave, _valor)
+
+if _raiz not in sys.path:
     sys.path.insert(0, _raiz)
 
 from core.entrada_api import main   # noqa: E402

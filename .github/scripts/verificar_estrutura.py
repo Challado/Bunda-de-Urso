@@ -20,6 +20,10 @@ OBRIGATORIOS = [
     "web/index.html",
     "web/nucleo.py",
     "core/db.py",
+    "core/caminhos.py",
+    "deploy/radar.conf.exemplo",
+    "deploy/conf_radar.py",
+    "docs/CONFIGURACAO.md",
     "sql/schema.sqlite.sql",
     "sql/schema.postgres.sql",
     "sql/migracoes/0001_governanca.sqlite.sql",
@@ -32,6 +36,7 @@ OBRIGATORIOS = [
     ".github/scripts/verificar_segredos.py",
     ".github/scripts/verificar_web.py",
     ".github/scripts/verificar_banco.py",
+    ".github/scripts/verificar_caminhos.py",
     ".github/scripts/verificar_estrutura.py",
 ]
 

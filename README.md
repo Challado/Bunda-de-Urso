@@ -241,7 +241,22 @@ python3 -m coletor.sync --fonte antt
 python3 -m coletor.sync --fonte recife --arquivo tests/fixtures/recife_equipamentos.csv
 ```
 
-Variáveis: `RADAR_DATA_DIR` (padrão `dados/`), `RADAR_DB` (padrão `dados/radar.sqlite3`), `RADAR_BRASIL_HOME`. O entry point web é `web/api.pse`; os testes rodam com:
+**Caminhos: um arquivo só.** A instalação (código, banco, dados, webroot, logs,
+espelho de dados) é declarada em **`/etc/radar-brasil/radar.conf`** e lida por
+`core/caminhos.py`. Precedência: variável de ambiente > `.conf` > padrão do
+checkout. Nenhum script decide diretório por conta própria — quem escrever
+caminho fixo é reprovado por `.github/scripts/verificar_caminhos.py`. Modelo,
+chaves e diagnóstico em [`docs/CONFIGURACAO.md`](docs/CONFIGURACAO.md):
+
+```bash
+python3 deploy/conf_radar.py            # caminhos efetivos e de onde vieram
+python3 deploy/conf_radar.py --verificar
+```
+
+Variáveis de ambiente equivalentes: `RADAR_BRASIL_HOME`, `RADAR_DATA_DIR`,
+`RADAR_DB`, `RADAR_WEB_ROOT`, `RADAR_WEB_URL`, `RADAR_LOG_DIR`,
+`RADAR_SYNC_CLONE`, `RADAR_SYNC_REMOTO` (e `RADAR_CONF` para apontar outro
+arquivo). O entry point web é `web/api.pse`; os testes rodam com:
 
 ```bash
 python3 -m unittest discover -s tests

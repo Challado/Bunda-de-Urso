@@ -45,8 +45,9 @@ from core.manutencao.preencher_municipio import (                     # noqa: E4
     SQL_PONTOS, extrair_municipio_uf, uf_da_fonte)
 from core.contexto_api import operacao_local
 from core import db as dbmod
+from core import caminhos  # caminhos so pela porta unica
 
-DB_PADRAO = os.environ.get("RADAR_DB", "/var/lib/radar-brasil/radar.sqlite3")
+DB_PADRAO = caminhos.banco()
 OLLAMA_PADRAO = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
 MODELO_PADRAO = os.environ.get("OLLAMA_MODELO", "gemma4:26b")
 CSV_PADRAO = os.path.join(config.ROOT, "dados", "calibracao",

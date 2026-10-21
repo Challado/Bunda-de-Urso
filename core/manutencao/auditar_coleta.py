@@ -28,8 +28,9 @@ import sys
 from core.config import ROOT                      # noqa: E402
 from core.contexto_api import operacao_local
 from core import db as dbmod
+from core import caminhos  # caminhos so pela porta unica
 
-DB_PADRAO = os.environ.get("RADAR_DB", "/var/lib/radar-brasil/radar.sqlite3")
+DB_PADRAO = caminhos.banco()
 BASELINE_PADRAO = os.path.join(ROOT, "config", "cobertura_fontes.json")
 MINIMO_PADRAO = os.path.join(ROOT, "config", "cobertura_minima.json")
 

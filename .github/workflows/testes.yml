@@ -69,5 +69,7 @@ jobs:
         run: python .github/scripts/verificar_web.py
       - name: Escrita no banco (só por core/db.py; painel só por API)
         run: python .github/scripts/verificar_banco.py
+      - name: Caminhos (porta única: core.caminhos + /etc/radar-brasil/radar.conf)
+        run: python .github/scripts/verificar_caminhos.py
       - name: Estrutura do repositório
         run: python .github/scripts/verificar_estrutura.py

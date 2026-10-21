@@ -4,7 +4,7 @@
 
 Feito para o cron chamar a cada minuto:
 
-    * * * * * /usr/bin/python3 /home/openclaw/bin/radar/tick.py
+    * * * * * /caminho/do/radar-tick.sh   # caminho vem do .conf
 
 Cada fonte tem o seu intervalo (coletor/agenda.py); a passada decide o que
 esta vencido e coleta apenas isso. Se nada venceu, sai sem fazer nada.

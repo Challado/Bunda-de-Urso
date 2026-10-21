@@ -1,0 +1,49 @@
+# Radar Brasil — configuracao da instalacao
+#
+# Este arquivo diz AO PROGRAMA onde estao as coisas. O codigo nao sabe (e nao
+# deve saber) caminho de producao: ele pergunta aqui.
+#
+#   LOCAL:  /etc/radar-brasil/radar.conf   (root:root, 0644)
+#   OUTRO:  RADAR_CONF=/caminho/alternativo (util para teste)
+#
+# Precedencia: variavel de ambiente > este arquivo > padrao do checkout.
+# Sem este arquivo nada quebra — o programa usa os diretorios do proprio
+# repositorio (bom para desenvolvimento e CI).
+#
+# Caminho relativo e resolvido contra a pasta DESTE arquivo.
+# Depois de editar, confira o que o programa entendeu:
+#
+#     python3 /caminho/do/codigo/tools/conf_radar.py --mostrar
+
+[instalacao]
+# Raiz do codigo instalado: onde ficam core/, coletor/, web/, sql/.
+# E o diretorio que o cron, o nginx e os scripts usam como referencia.
+home = /openclaw/bin/radar
+
+# Dono esperado dos arquivos (informativo; conf_radar.py --verificar confere).
+usuario = root
+grupo = www-data
+
+[dados]
+# Diretorio de dados: banco, arquivos brutos (raw/), staging/ e calibracao/.
+dir = /var/lib/radar-brasil
+
+# Banco SQLite de producao. Vazio = <dir>/radar.sqlite3
+banco = /var/lib/radar-brasil/radar.sqlite3
+
+[web]
+# Webroot servido pelo nginx/fcgiwrap (onde mora o api.pse instalado).
+raiz = /var/www/html/openclaw/radar
+
+# Prefixo publico da consulta (usado em links). Sem barra no fim e aceito.
+url = /openclaw/radar/
+
+[logs]
+# Logs do tick e do dados-sync (o logrotate le daqui).
+dir = /var/log/openclaw/radar
+
+[sincronizacao]
+# Clone local do repositorio PRIVADO de dados (espelho do que a coleta produz).
+# Vazio = espelho desabilitado.
+clone = /openclaw/dados/Bunda-de-Urso-Dados
+remoto = https://github.com/Challado/Bunda-de-Urso-Dados.git

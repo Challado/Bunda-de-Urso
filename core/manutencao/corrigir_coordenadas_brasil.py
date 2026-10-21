@@ -31,8 +31,9 @@ from datetime import datetime, timezone
 from coletor.fontes import normalizacao as nz    # noqa: E402
 from core.contexto_api import operacao_local
 from core import db as dbmod
+from core import caminhos  # caminhos so pela porta unica
 
-DB_PADRAO = "/var/lib/radar-brasil/radar.sqlite3"
+DB_PADRAO = caminhos.banco()
 
 
 def _iso_agora():

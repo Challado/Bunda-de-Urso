@@ -46,6 +46,7 @@ from core import config                          # noqa: E402
 from core import geo_municipio as geo            # noqa: E402
 from core.contexto_api import operacao_local
 from core import db as dbmod
+from core import caminhos  # caminhos so pela porta unica
 
 # A geometria e o resolvedor vivem em ``core.geo_municipio`` (reutilizavel
 # pelo importador).  Mantemos os nomes no namespace deste modulo para
@@ -63,7 +64,7 @@ _corpo_texto = geo._corpo_texto
 carregar_uf = geo.carregar_uf
 carregar_malhas = geo.carregar_malhas
 
-DB_PADRAO = os.environ.get("RADAR_DB", "/var/lib/radar-brasil/radar.sqlite3")
+DB_PADRAO = caminhos.banco()
 CSV_PADRAO = os.path.join(config.ROOT, "dados", "calibracao",
                           "auditoria_geografica.csv")
 

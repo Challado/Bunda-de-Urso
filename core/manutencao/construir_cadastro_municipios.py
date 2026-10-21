@@ -33,9 +33,10 @@ from core.manutencao.carregar_municipios_ibge import (      # noqa: E402
     corpo_json, extrair_municipios, URL_PADRAO)
 from core.contexto_api import operacao_local
 from core import db as dbmod
+from core import caminhos  # caminhos so pela porta unica
 
 SAIDA_PADRAO = os.path.join(config.ROOT, "config", "municipios_ibge.json")
-DB_PADRAO = os.environ.get("RADAR_DB", "/var/lib/radar-brasil/radar.sqlite3")
+DB_PADRAO = caminhos.banco()
 
 
 # ---------------------------------------------------------------------------

@@ -8,8 +8,8 @@ Este mesmo arquivo serve a DOIS mundos:
    PATH_INFO (so QUERY_STRING/REQUEST_URI), entao a rota vai no parametro
    `rota`:
 
-       /openclaw/radar/api.pse?rota=/api/v1/radares&lat=..&lon=..&raio=..&formato=txt
-       /openclaw/radar/api.pse?rota=/api/v1/ajuda
+       <prefixo>/api.pse?rota=/api/v1/radares&lat=..&lon=..&raio=..&formato=txt
+       <prefixo>/api.pse?rota=/api/v1/ajuda
 
 2) CONSOLE (linha de comando do servidor): rodando fora do CGI (sem
    GATEWAY_INTERFACE/REQUEST_METHOD) ele PERCEBE que esta no terminal e abre
@@ -21,19 +21,59 @@ Este mesmo arquivo serve a DOIS mundos:
        ./api.pse senha admin
        ./api.pse ajuda
 
-So isto mora no webroot; o aplicativo fica em /home/openclaw/bin/radar.
+So isto mora no webroot; o aplicativo fica onde o arquivo de configuracao
+disser (/etc/radar-brasil/radar.conf, secao [instalacao] home). Este arquivo
+nao sabe -- e nao deve saber -- caminho de producao: ele pergunta.
 """
 import os
 import sys
 
-os.environ.setdefault("RADAR_BRASIL_HOME", "/home/openclaw/bin/radar")
-os.environ.setdefault("RADAR_DB", "/var/lib/radar-brasil/radar.sqlite3")
-os.environ.setdefault("RADAR_DATA_DIR", "/var/lib/radar-brasil")
+CONF_PADRAO = "/etc/radar-brasil/radar.conf"
 
-_raiz = os.environ["RADAR_BRASIL_HOME"]
+
+def _conf(secao, chave):
+    """Le uma chave do .conf sem depender de nada (o core ainda nao existe aqui)."""
+    caminho = (os.environ.get("RADAR_CONF") or "").strip() or CONF_PADRAO
+    atual = None
+    try:
+        with open(caminho, "r", encoding="utf-8") as f:
+            for linha in f:
+                texto = linha.strip()
+                if not texto or texto[0] in "#;":
+                    continue
+                if texto.startswith("[") and texto.endswith("]"):
+                    atual = texto[1:-1].strip().lower()
+                    continue
+                if atual != secao or "=" not in texto:
+                    continue
+                nome, valor = texto.split("=", 1)
+                if nome.strip().lower() == chave:
+                    return os.path.expanduser(valor.strip().strip('"').strip("'"))
+    except OSError:
+        pass
+    return ""
+
+
+_raiz = os.environ.get("RADAR_BRASIL_HOME") or _conf("instalacao", "home")
+if not _raiz:
+    # Sem configuracao: o checkout desta instalacao (webroot dentro do projeto).
+    _aqui = os.path.dirname(os.path.abspath(__file__))
+    for _cand in (os.path.dirname(_aqui), _aqui):
+        if os.path.isdir(os.path.join(_cand, "core")):
+            _raiz = _cand
+            break
+if not _raiz:
+    sys.exit("Radar Brasil: caminho do codigo nao configurado. "
+             "Defina [instalacao] home em %s ou RADAR_BRASIL_HOME." % CONF_PADRAO)
+
+for _chave, _valor in (("RADAR_BRASIL_HOME", _raiz),
+                       ("RADAR_DATA_DIR", _conf("dados", "dir")),
+                       ("RADAR_DB", _conf("dados", "banco"))):
+    if _valor:
+        os.environ.setdefault(_chave, _valor)
+
 if _raiz not in sys.path:
     sys.path.insert(0, _raiz)
-
 
 from core.entrada_api import main   # noqa: E402
 

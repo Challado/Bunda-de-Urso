@@ -51,7 +51,9 @@ from core.config import ROOT                                   # noqa: E402
 from core.manutencao.preencher_municipio import (                         # noqa: E402
     extrair_municipio_uf, uf_da_fonte, SQL_PONTOS)
 
-DB_PADRAO = os.environ.get("RADAR_DB", "/var/lib/radar-brasil/radar.sqlite3")
+from core import caminhos  # caminhos so pela porta unica
+
+DB_PADRAO = caminhos.banco()
 CSV_PADRAO = os.path.join(ROOT, "dados", "calibracao",
                           "municipios_duvidosos.csv")
 
