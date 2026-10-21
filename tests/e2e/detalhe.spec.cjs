@@ -109,3 +109,32 @@ test('avisa sobre posição estimada e limites divergentes sem esconder valores 
   await expect(page.locator('details.fonte')).toHaveCount(2);
   await expect(page.locator('#principal')).not.toContainText('F-1');
 });
+
+
+test('observações antigas da Goinfra viram campos sem perder identificadores ou validade',async({page,request})=>{
+  const resposta=await (await request.get('api.pse?rota=/api/v1/radares/P-1')).json();
+  const ponto=resposta.resultado.pontos[0];
+  ponto.observacoes='Tipo: LOMBADA ELET; Faixa: 1D; KM original: 249+100; Sentido descrito: Arenópolis/Iporá; Codigo SRE: 060EGO0240; Lote: Lote 05 - 2025005; Nota de instalacao: 5; No SEI: 88653496; Estudo tecnico: ET060L5106; Data autorizacao: 07/07/2026; Data ativo: 07/07/2026; Afericao valida ate: 25/06/2027 (validade metrologica); Velocidade publicada: 40 km/h';
+  // Livre, com pontuação e HTML literal: não pode ser truncado nem executado.
+  ponto.equipamentos[0].observacoes='Inspeção: consultar https://exemplo.org/doc; manter placa <img src=x onerror="window.falhou=true">';
+  await page.route('**/api.pse?**',r=>r.fulfill({json:resposta}));
+  await page.route('https://unpkg.com/**',r=>r.abort());
+  await page.goto('detalhe.html?id=P-1');
+  const observacoes=page.locator('section.secao').filter({has:page.locator(':scope > h2',{hasText:/^Observações$/})});
+  await expect(observacoes.locator('.campo')).toHaveCount(13);
+  for(const [nome,valor] of [
+    ['Tipo de equipamento','LOMBADA ELET'],['Faixa','1D'],['Quilômetro publicado','249+100'],
+    ['Sentido descrito','Arenópolis/Iporá'],['Código SRE','060EGO0240'],['Lote','Lote 05 - 2025005'],
+    ['Nota de instalação','5'],['Número SEI','88653496'],['Estudo técnico','ET060L5106'],
+    ['Data de autorização','07/07/2026'],['Data de ativação publicada','07/07/2026'],
+    ['Aferição válida até','25/06/2027 (validade metrologica)'],['Velocidade publicada','40 km/h']
+  ]){
+    const campo=observacoes.locator('.campo').filter({has:page.locator('dt',{hasText:new RegExp('^'+nome+'$')})});
+    await expect(campo.locator('dd')).toHaveText(valor);
+  }
+  await expect(page.locator('#principal')).toContainText(ponto.equipamentos[0].observacoes);
+  expect(await page.evaluate(()=>window.falhou)).toBeUndefined();
+  await expect(page.locator('#principal img')).toHaveCount(0);
+  await expect(page.locator('dl dl')).toHaveCount(0);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});

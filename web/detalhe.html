@@ -277,6 +277,30 @@
     if (ehObjeto(v)) return Object.keys(v).some(function(k){return preenchido(v[k]);});
     return true;
   }
+  // Compatibilidade com observações antigas montadas pelos coletores.
+  // Só converte uma sequência inteira de campos conhecidos, sem adivinhar texto livre.
+  var CAMPOS_OBSERVACOES = {
+    "Tipo":"Tipo de equipamento", "Faixa":"Faixa", "KM original":"Quilômetro publicado",
+    "Sentido descrito":"Sentido descrito", "Codigo SRE":"Código SRE", "Lote":"Lote",
+    "Nota de instalacao":"Nota de instalação", "No SEI":"Número SEI",
+    "Estudo tecnico":"Estudo técnico", "Data autorizacao":"Data de autorização",
+    "Data ativo":"Data de ativação publicada", "Afericao valida ate":"Aferição válida até",
+    "Velocidade publicada":"Velocidade publicada", "QUARENTENA":"Alerta de quarentena",
+    "CONFLITO":"Conflito informado", "Ensaio":"Ensaio", "Ano":"Ano", "Tipo na fonte":"Tipo na fonte"
+  };
+  function estruturarObservacoes(texto){
+    if(typeof texto !== "string") return null;
+    var partes=texto.split(/;\s*/),campos=Object.create(null);
+    if(partes.length<2) return null;
+    for(var i=0;i<partes.length;i++){
+      var par=/^([^:;]+):\s*([\s\S]+)$/.exec(partes[i].trim());
+      if(!par || !Object.prototype.hasOwnProperty.call(CAMPOS_OBSERVACOES,par[1])) return null;
+      var chave=CAMPOS_OBSERVACOES[par[1]];
+      if(Object.prototype.hasOwnProperty.call(campos,chave)) return null;
+      campos[chave]=par[2];
+    }
+    return campos;
+  }
   function renderValor(v, publicado){
     if (Array.isArray(v)){
       if (todosEscalares(v)) return "<div class='chips'>"+v.filter(preenchido).map(function(x){return "<span class='chip'>"+fmtEscalar(x)+"</span>";}).join("")+"</div>";
@@ -286,6 +310,12 @@
   }
   function renderDict(d, publicado){
     if (!ehObjeto(d)) return "";
+    // A transformação é apenas de apresentação; a resposta da API fica intacta.
+    var exibidos=Object.assign({},d);
+    Object.keys(exibidos).forEach(function(k){
+      if(/^observa[cç][oõ]es$/i.test(k)) exibidos[k]=estruturarObservacoes(exibidos[k]) || exibidos[k];
+    });
+    d=exibidos;
     var chaves=Object.keys(d).filter(function(k){return (publicado || (!INTERNOS.has(k) && (k!=="id" || /^[EP]-/.test(String(d[k]))))) && preenchido(d[k]);});
     var simples=[],grupos=[];
     chaves.forEach(function(k){(ehObjeto(d[k])?grupos:simples).push(k);});
@@ -503,7 +533,7 @@
     h += secao("Responsáveis", {organizacoes:p.organizacoes});
     h += secao("Documentos", {documentos:p.documentos});
     h += secao("Operações", {operacoes:p.operacoes});
-    h += secao("Observações", {observacoes:p.observacoes});
+    h += secao("Observações", estruturarObservacoes(p.observacoes) || {observacoes:p.observacoes});
     h += "</div></details>";
 
     principal.innerHTML = h;
