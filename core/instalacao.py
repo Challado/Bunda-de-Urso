@@ -138,6 +138,8 @@ def _cgi(api, conf, rota, usuario=None):
 def _validar_layout(origem, conf, laboratorio):
     if sys.version_info < (3, 13):
         raise RuntimeError("Use Python 3.13 ou superior (RADAR_PYTHON).")
+    if db.sqlite3.sqlite_version_info < (3, 35, 0):
+        raise RuntimeError("Use SQLite 3.35 ou superior no Python da instalacao.")
     if caminhos.problemas():
         raise RuntimeError("Corrija os avisos do radar.conf: " + "; ".join(caminhos.problemas()))
     pares = dict(caminhos._ler_conf()[0])
@@ -315,6 +317,9 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
                 # Inicializacao/migracoes continuam passando pela mesma entrada.
                 _executar([sys.executable, str(api), "ferramenta", "inicializar_banco"],
                           env=_ambiente(dirs["conf"]))
+                reconciliacao = _executar([sys.executable, str(api), "ferramenta", "reconciliar_equipamentos", "--aplicar"],
+                                          env=_ambiente(dirs["conf"]))
+                observacoes.append("Identidade dos equipamentos: " + reconciliacao.strip())
                 _cgi(api, dirs["conf"], "/health/ready")
                 _cgi(api, dirs["conf"], "/api/v1/ajuda")
                 _executar([sys.executable, str(api), "configuracao", "mostrar"], env=_ambiente(dirs["conf"]))
@@ -352,6 +357,15 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
             (backup / "CONCLUIDO").write_text(agora + "\n")
             print("Instalacao concluida. Backup: " + str(backup))
         except BaseException as exc:
+            if not _esquema_compativel_com_backup(backup, dirs["banco"]):
+                mensagem = ("Esquema do banco migrado: codigo atualizado preservado para manter compatibilidade. "
+                            "Corrija a checagem final e reaplique o instalador. Backup: " + str(backup))
+                observacoes.append(mensagem)
+                relatorio = relatorio or {"sucesso": False, "backup": str(backup)}
+                relatorio.update(erro=str(exc), observacoes=list(observacoes), recuperacao_automatica=False)
+                (backup / "checagem-final.json").write_text(json.dumps(relatorio, ensure_ascii=False, indent=2) + "\n")
+                print(mensagem, file=sys.stderr)
+                raise
             _restaurar(indice)
             if nginx_alterado:
                 _executar(["nginx", "-t"])
@@ -585,6 +599,21 @@ def _instalar(args, observacoes):
     return resultado
 
 
+def _esquema_compativel_com_backup(backup, banco):
+    anterior = backup / "radar.sqlite3"
+    if not anterior.is_file() or not banco.is_file():
+        return True
+    with closing(db.connect_readonly(anterior)) as velho, closing(db.connect_readonly(banco)) as atual:
+        for row in velho.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"):
+            # Nomes vem do catalogo do proprio SQLite, escapados como identificadores.
+            tabela = '"' + row[0].replace('"', '""') + '"'
+            antigas = {r[1] for r in velho.execute('PRAGMA table_info(' + tabela + ')')}
+            novas = {r[1] for r in atual.execute('PRAGMA table_info(' + tabela + ')')}
+            if not antigas <= novas:
+                return False
+    return True
+
+
 def _recuperar(backup, dirs, laboratorio):
     if not laboratorio and os.geteuid() != 0:
         raise RuntimeError("Execute a recuperacao como root.")
@@ -592,6 +621,8 @@ def _recuperar(backup, dirs, laboratorio):
     raiz = (dirs["dados"] / "backups" / "instalacao").resolve()
     if backup.parent != raiz:
         raise RuntimeError("Use um backup desta instalacao, dentro de dados/backups/instalacao.")
+    if not _esquema_compativel_com_backup(backup, dirs["banco"]):
+        raise RuntimeError("O codigo deste backup exige colunas removidas pela migracao; banco e instalacao preservados.")
     indice = json.loads((backup / "restauracao.json").read_text())
     permitidos = {str(dirs[n]) for n in ("codigo", "web", "conf")}
     permitidos.update(str(dirs["codigo"].parent / n) for n in ("radar-tick.sh", "radar-api.pse"))

@@ -1,4 +1,4 @@
--- Radar Brasil - esquema canonico v1 (T01..T77) - dialeto sqlite
+-- Radar Brasil - esquema canonico (T01..T77 + EXECUCAO_ARTEFATO) - dialeto sqlite
 -- Gerado por tools/build_schema.py a partir da ESPECIFICACAO v1.1.
 -- PK/FK/UQ/CHECK/NOT NULL. Sem PostGIS/recursos proprietarios.
 -- ON DELETE RESTRICT por padrao (dados historicos nao sofrem cascata).
@@ -598,6 +598,7 @@ CREATE TABLE IF NOT EXISTS COBERTURA_FONTE (
     CHECK (tipo_abrangencia IN ('nacional','estadual','municipal','rodoviaria','desconhecida')),
     CHECK (vigencia_fim IS NULL OR vigencia_inicio IS NULL OR vigencia_fim >= vigencia_inicio),
     CHECK ((tipo_abrangencia <> 'municipal' OR municipio_id IS NOT NULL)),
+    CHECK (municipio_id IS NULL OR uf_sigla IS NULL),
     CHECK ((tipo_abrangencia <> 'estadual' OR uf_sigla IS NOT NULL)),
     CHECK ((tipo_abrangencia <> 'rodoviaria' OR via_id IS NOT NULL))
 );
@@ -606,7 +607,6 @@ CREATE TABLE IF NOT EXISTS COBERTURA_FONTE (
 CREATE TABLE IF NOT EXISTS EXECUCAO_COLETA (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     recurso_id INTEGER NOT NULL REFERENCES RECURSO_FONTE(id) ON DELETE RESTRICT,
-    artefato_id INTEGER REFERENCES ARTEFATO_COLETA(id) ON DELETE RESTRICT,
     iniciada_em TEXT NOT NULL,
     terminada_em TEXT,
     status TEXT NOT NULL,
@@ -627,6 +627,12 @@ CREATE TABLE IF NOT EXISTS EXECUCAO_COLETA (
     CHECK (linhas_rejeitadas IS NULL OR linhas_rejeitadas >= 0),
     CHECK (registros_criados IS NULL OR registros_criados >= 0),
     CHECK (registros_alterados IS NULL OR registros_alterados >= 0)
+);
+
+-- EC1 EXECUCAO_ARTEFATO
+CREATE TABLE IF NOT EXISTS EXECUCAO_ARTEFATO (
+    execucao_id INTEGER PRIMARY KEY NOT NULL REFERENCES EXECUCAO_COLETA(id) ON DELETE RESTRICT,
+    artefato_id INTEGER NOT NULL REFERENCES ARTEFATO_COLETA(id) ON DELETE RESTRICT
 );
 
 -- T60 ERRO_VALIDACAO
@@ -655,9 +661,8 @@ CREATE TABLE IF NOT EXISTS SNAPSHOT_PUBLICADO (
 -- T62 SNAPSHOT_RECURSO
 CREATE TABLE IF NOT EXISTS SNAPSHOT_RECURSO (
     snapshot_id INTEGER NOT NULL REFERENCES SNAPSHOT_PUBLICADO(id) ON DELETE RESTRICT,
-    recurso_id INTEGER NOT NULL REFERENCES RECURSO_FONTE(id) ON DELETE RESTRICT,
     artefato_id INTEGER NOT NULL REFERENCES ARTEFATO_COLETA(id) ON DELETE RESTRICT,
-    PRIMARY KEY (snapshot_id, recurso_id)
+    PRIMARY KEY (snapshot_id, artefato_id)
 );
 
 -- T68 REGRA_DEDUPLICACAO
@@ -822,3 +827,47 @@ CREATE TABLE IF NOT EXISTS RECURSO_LICENCA (
     UNIQUE (recurso_id, licenca_id, vigencia_inicio),
     CHECK (vigencia_fim IS NULL OR vigencia_inicio IS NULL OR vigencia_fim >= vigencia_inicio)
 );
+
+CREATE VIEW IF NOT EXISTS COBERTURA_FONTE_DETALHE AS
+SELECT c.id, c.fonte_id, c.tipo_abrangencia, COALESCE(m.uf_sigla,c.uf_sigla) AS uf_sigla,
+       c.municipio_id, c.via_id, c.vigencia_inicio, c.vigencia_fim, c.confirmada
+FROM COBERTURA_FONTE c LEFT JOIN MUNICIPIO m ON m.codigo_ibge=c.municipio_id;
+CREATE VIEW IF NOT EXISTS SNAPSHOT_RECURSO_DETALHE AS
+SELECT s.snapshot_id, a.recurso_id, s.artefato_id
+FROM SNAPSHOT_RECURSO s
+LEFT JOIN ARTEFATO_COLETA a ON a.id=s.artefato_id;
+CREATE VIEW IF NOT EXISTS EXECUCAO_COLETA_DETALHE AS
+SELECT e.*, ea.artefato_id
+FROM EXECUCAO_COLETA e
+LEFT JOIN EXECUCAO_ARTEFATO ea ON ea.execucao_id=e.id;
+
+CREATE TRIGGER IF NOT EXISTS CK_EXECUCAO_ARTEFATO_INSERT
+BEFORE INSERT ON EXECUCAO_ARTEFATO
+WHEN NOT EXISTS (SELECT 1 FROM EXECUCAO_COLETA e JOIN ARTEFATO_COLETA a
+                 ON a.recurso_id=e.recurso_id WHERE e.id=NEW.execucao_id AND a.id=NEW.artefato_id)
+BEGIN SELECT RAISE(ABORT, 'artefato pertence a outro recurso da execucao'); END;
+CREATE TRIGGER IF NOT EXISTS CK_SNAPSHOT_RECURSO_INSERT
+BEFORE INSERT ON SNAPSHOT_RECURSO
+WHEN EXISTS (SELECT 1 FROM SNAPSHOT_RECURSO s JOIN ARTEFATO_COLETA a ON a.id=s.artefato_id
+             JOIN ARTEFATO_COLETA novo ON novo.recurso_id=a.recurso_id
+             WHERE s.snapshot_id=NEW.snapshot_id AND novo.id=NEW.artefato_id AND s.artefato_id<>NEW.artefato_id)
+BEGIN SELECT RAISE(ABORT, 'snapshot ja contem outro artefato deste recurso'); END;
+CREATE TRIGGER IF NOT EXISTS CK_EXECUCAO_ARTEFATO_UPDATE
+BEFORE UPDATE ON EXECUCAO_ARTEFATO
+WHEN NOT EXISTS (SELECT 1 FROM EXECUCAO_COLETA e JOIN ARTEFATO_COLETA a
+                 ON a.recurso_id=e.recurso_id WHERE e.id=NEW.execucao_id AND a.id=NEW.artefato_id)
+BEGIN SELECT RAISE(ABORT, 'artefato pertence a outro recurso da execucao'); END;
+CREATE TRIGGER IF NOT EXISTS CK_SNAPSHOT_RECURSO_UPDATE
+BEFORE UPDATE ON SNAPSHOT_RECURSO
+WHEN EXISTS (SELECT 1 FROM SNAPSHOT_RECURSO s JOIN ARTEFATO_COLETA a ON a.id=s.artefato_id
+             JOIN ARTEFATO_COLETA novo ON novo.recurso_id=a.recurso_id
+             WHERE s.snapshot_id=NEW.snapshot_id AND novo.id=NEW.artefato_id AND s.artefato_id<>NEW.artefato_id)
+BEGIN SELECT RAISE(ABORT, 'snapshot ja contem outro artefato deste recurso'); END;
+CREATE TRIGGER IF NOT EXISTS CK_EXECUCAO_RECURSO_UPDATE
+BEFORE UPDATE OF recurso_id ON EXECUCAO_COLETA
+WHEN EXISTS (SELECT 1 FROM EXECUCAO_ARTEFATO ea JOIN ARTEFATO_COLETA a ON a.id=ea.artefato_id
+             WHERE ea.execucao_id=NEW.id AND a.recurso_id<>NEW.recurso_id)
+BEGIN SELECT RAISE(ABORT, 'recurso diverge do artefato da execucao'); END;
+CREATE TRIGGER IF NOT EXISTS CK_ARTEFATO_RECURSO_IMUTAVEL
+BEFORE UPDATE OF recurso_id ON ARTEFATO_COLETA WHEN OLD.recurso_id<>NEW.recurso_id
+BEGIN SELECT RAISE(ABORT, 'origem do artefato e imutavel'); END;

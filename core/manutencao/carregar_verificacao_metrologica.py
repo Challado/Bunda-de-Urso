@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Carrega a VERIFICACAO METROLOGICA do PSIE/INMETRO (tabela hoje vazia).
+"""Carrega a VERIFICACAO METROLOGICA do PSIE/INMETRO.
 
 O PSIE publica, por instrumento verificado, o resultado e a validade da
 verificacao, alem de um ``Historico`` de certificados. A camada de
@@ -21,7 +21,8 @@ Regras (nada e inventado)
 - datas convertidas para ISO (a fonte usa dd/mm/yyyy); se vierem
   incoerentes (validade < laudo) a validade vira NULL, para nao violar o
   CHECK sem inventar.
-- IDEMPOTENTE: chave (equipamento, certificado, data) — reaplicar nao duplica.
+- IDEMPOTENTE por equipamento, registro de origem e conteudo da verificacao.
+  Valores divergentes de outra publicacao nao sao descartados.
 
 Uso:
   python3 tools/carregar_verificacao_metrologica.py --dry-run
@@ -51,7 +52,7 @@ FROM REGISTRO_FONTE r
 JOIN ARTEFATO_COLETA a ON a.id = r.artefato_id
 JOIN RECURSO_FONTE rc ON rc.id = a.recurso_id
 JOIN FONTE f ON f.id = rc.fonte_id
-LEFT JOIN VINCULO_REGISTRO_EQUIPAMENTO ve ON ve.registro_id = r.id
+LEFT JOIN VINCULO_REGISTRO_EQUIPAMENTO ve ON ve.registro_id = r.id AND ve.decisao_id IS NULL
 WHERE f.nome LIKE 'INMETRO%'
 """
 
@@ -127,7 +128,9 @@ def extrair_verificacoes(payload, equipamento_id, registro_id):
         if data and val and val < data:
             val = None                      # incoerente: nao inventa, nao viola CHECK
         cert = (h.get("NumeroCertificado") or "").strip() or None
-        chave = (cert, data)
+        chave = (cert, data, val, mapear_resultado(h.get("Resultado")),
+                 mapear_tipo(h.get("TipoServico")), str(h.get("NumeroEnsaio") or ""),
+                 str(h.get("Ano") or ""))
         if chave in vistos:
             continue
         vistos.add(chave)
@@ -152,10 +155,15 @@ def extrair_verificacoes(payload, equipamento_id, registro_id):
 def carregar(conn, registros, aplicar=True):
     """Insere as verificacoes (idempotente). ``registros`` = (registro_id,
     equipamento_id, payload). -> resumo."""
-    existentes = set()
-    for r in conn.execute("SELECT equipamento_id, numero_certificado, "
-                          "data_verificacao FROM VERIFICACAO_METROLOGICA"):
-        existentes.add((r[0], (r[1] or ""), (r[2] or "")))
+    def chave_linha(eid, rid, cert, data, validade, resultado, tipo, obs):
+        return (eid, rid, cert or '', data or '', validade or '', resultado, tipo, obs or '')
+
+    existentes = {chave_linha(*row) for row in conn.execute(
+        "SELECT v.equipamento_id, v.registro_fonte_id, v.numero_certificado, "
+        "v.data_verificacao, v.validade_ate, r.codigo, t.codigo, v.observacoes "
+        "FROM VERIFICACAO_METROLOGICA v "
+        "LEFT JOIN RESULTADO_VERIFICACAO r ON r.id=v.resultado_id "
+        "LEFT JOIN TIPO_VERIFICACAO t ON t.id=v.tipo_verificacao_id")}
     res = {"registros": 0, "sem_equipamento": 0, "linhas": 0, "inseridas": 0,
            "duplicadas": 0, "por_resultado": {}}
     for registro_id, equipamento_id, payload in registros:
@@ -165,8 +173,9 @@ def carregar(conn, registros, aplicar=True):
             continue
         for linha in extrair_verificacoes(payload, equipamento_id, registro_id):
             res["linhas"] += 1
-            chave = (equipamento_id, linha["numero_certificado"] or "",
-                     linha["data_verificacao"] or "")
+            chave = chave_linha(equipamento_id, registro_id, linha["numero_certificado"],
+                                linha["data_verificacao"], linha["validade_ate"],
+                                linha["resultado"], linha["tipo"], linha["observacoes"])
             if chave in existentes:
                 res["duplicadas"] += 1
                 continue

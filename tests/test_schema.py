@@ -24,7 +24,7 @@ class TestSchema(unittest.TestCase):
                      "ARTEFATO_COLETA", "REGISTRO_FONTE", "NATUREZA_FONTE",
                      "RECURSO_LICENCA"):
             self.assertIn(nome, nomes)
-        self.assertEqual(len(nomes), 77)
+        self.assertEqual(len(nomes), 78)
 
     def test_uf_check_sigla(self):
         with self.assertRaises(sqlite3.IntegrityError):

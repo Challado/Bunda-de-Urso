@@ -1,7 +1,7 @@
 const {test,expect}=require('./fixtures.cjs');
 test.use({comMetrologia:true,processarFila:false});
 
-test('detalhe junta metrologia oficial por série e mantém os dados de cada fonte',async({page,request})=>{
+test('detalhe usa equipamento comum às fontes e preserva suas publicações',async({page,request})=>{
   const response=await request.get('api.pse?rota=/api/v1/radares/P-1&formato=json');
   expect(response.status()).toBe(200);
   const p=(await response.json()).resultado.pontos[0];
@@ -10,12 +10,14 @@ test('detalhe junta metrologia oficial por série e mantém os dados de cada fon
   expect(p.velocidade_leves_kmh).toBe(80);
   const equipamento=p.equipamentos[0];
   expect(equipamento.id).toBe('E-1');
-  expect(equipamento.instalacoes).toHaveLength(1);
-  expect(equipamento.juncao_metrologica.equipamentos_origem).toEqual(['E-2']);
+  expect(equipamento.instalacoes).toHaveLength(2);
+  expect(equipamento.juncao_metrologica).toBeUndefined();
   expect(equipamento.verificacoes_metrologicas).toHaveLength(1);
   expect(equipamento.verificacoes_metrologicas[0].validade_ate).toBe('2027-06-24');
   const original=(await (await request.get('api.pse?rota=/api/v1/radares/P-2')).json()).resultado.pontos[0];
   expect(original.localizacao.latitude).toBeNull();
+  expect(original.equipamentos[0].id).toBe(equipamento.id);
+  expect(original.equipamentos[0].verificacoes_metrologicas).toHaveLength(1);
   await page.route('https://unpkg.com/**',r=>r.abort());
   await page.goto('detalhe.html?id=P-1');
   await expect(page.locator('#metrologia')).toContainText('Há publicação do Inmetro/PSIE');

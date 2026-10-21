@@ -109,6 +109,10 @@ class VisaoCanonica:
                 self.grupos[tipo][canonico] = sorted(membros)
                 self.mapas[tipo].update({item: canonico for item in membros})
         self._validar_separacoes(conn)
+        if db.scalar(conn, "SELECT 1 FROM sqlite_master WHERE type='table' AND name='EQUIPAMENTO_ALIAS'"):
+            for alias, eid in conn.execute("SELECT alias_id, equipamento_id FROM EQUIPAMENTO_ALIAS"):
+                self.mapas["equipamento"][alias] = self.canonico("equipamento", eid)
+
 
     ##-- BUNDITA DE URSO #{3} -- Unificacoes transitivas nao podem contrariar uma decisao ativa de manter separados. ##
     def _validar_separacoes(self, conn):

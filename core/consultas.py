@@ -707,7 +707,7 @@ def _fontes_do_ponto(conn, pid):
             "LEFT JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id "
             "LEFT JOIN FONTE fo ON fo.id=rf.fonte_id "
             "LEFT JOIN ORGANIZACAO org ON org.id=fo.organizacao_id "
-            "LEFT JOIN EXECUCAO_COLETA ac ON ac.artefato_id=a.id "
+            "LEFT JOIN EXECUCAO_COLETA_DETALHE ac ON ac.artefato_id=a.id "
             "WHERE vp.ponto_id=?", (pid,)):
         out.append(_fmt_fonte(f))
     return out
@@ -727,7 +727,7 @@ def _fontes_por_registro(conn, registro_id):
             "LEFT JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id "
             "LEFT JOIN FONTE fo ON fo.id=rf.fonte_id "
             "LEFT JOIN ORGANIZACAO org ON org.id=fo.organizacao_id "
-            "LEFT JOIN EXECUCAO_COLETA ac ON ac.artefato_id=a.id "
+            "LEFT JOIN EXECUCAO_COLETA_DETALHE ac ON ac.artefato_id=a.id "
             "WHERE r.id=?", (registro_id,)):
         out.append(_fmt_fonte(f))
     return out
@@ -759,6 +759,11 @@ def _dados_por_fonte(conn, pid, visao, registros_metrologicos=()):
     selecionados = {r[0] for membro in membros for r in conn.execute(
         "SELECT registro_id FROM VINCULO_REGISTRO_PONTO WHERE ponto_id=?", (membro,))}
     registros_do_ponto = set(selecionados)
+    for membro in membros:
+        selecionados.update(r[0] for r in conn.execute("""SELECT ve.registro_id
+            FROM INSTALACAO i
+            JOIN VINCULO_REGISTRO_EQUIPAMENTO ve ON ve.equipamento_id=i.equipamento_id
+            WHERE i.ponto_id=? AND ve.decisao_id IS NULL""", (membro,)))
     selecionados.update(rid for rid in registros_metrologicos if rid is not None)
     # Consultas por PK evitam produto cartesiano entre faixas, verificacoes e fontes.
     for rid in sorted(selecionados):
@@ -1460,7 +1465,7 @@ SELECT ac.id AS execucao_id, ac.iniciada_em, ac.terminada_em, ac.status,
        ac.recurso_id, rf.nome AS recurso_nome, rf.url_recurso,
        rf.fonte_id, f.nome AS fonte_nome, f.esfera AS fonte_esfera,
        a.hash_sha256 AS artefato_hash
-FROM EXECUCAO_COLETA ac
+FROM EXECUCAO_COLETA_DETALHE ac
 LEFT JOIN RECURSO_FONTE rf ON rf.id = ac.recurso_id
 LEFT JOIN FONTE f ON f.id = rf.fonte_id
 LEFT JOIN ARTEFATO_COLETA a ON a.id = ac.artefato_id

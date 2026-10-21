@@ -454,22 +454,26 @@ def _identificador_externo_id(conn, fonte_id, d):
     return identificador_id
 
 
-def _equipamento_do_ponto(conn, ponto_id, tipo_radar_id, numero_serie):
+def _equipamento_do_ponto(conn, ponto_id, tipo_radar_id, numero_serie, modelo_id=None, ano=None):
     """Equipamento ja instalado NESTE ponto com o mesmo tipo/serie (ou None).
 
     Reaproveitar evita que o reingesto idempotente do MESMO ponto crie um
     equipamento novo a cada coleta (upsert). Compara serie com IS NULL.
     """
+    candidatos = []
     for row in dbmod.query_all(
             conn,
-            "SELECT e.id AS id, e.numero_serie AS numero_serie "
+            "SELECT e.* "
             "FROM EQUIPAMENTO e JOIN INSTALACAO i "
             "ON i.equipamento_id = e.id "
             "WHERE i.ponto_id=? AND e.tipo_radar_id=?",
             (ponto_id, tipo_radar_id)):
-        if (row["numero_serie"] or None) == (numero_serie or None):
-            return row["id"]
-    return None
+        if (str(row["numero_serie"] or "").strip().upper() == str(numero_serie or "").strip().upper()
+                and not (ano is not None and row["ano_fabricacao"] is not None and ano != row["ano_fabricacao"])):
+            from core.equipamentos import modelos_compativeis
+            if modelos_compativeis(conn, modelo_id, row["modelo_id"]):
+                candidatos.append(row["id"])
+    return candidatos[0] if len(candidatos) == 1 else None
 
 
 def inserir_normalizado(conn, registro_id, d, fonte_id=None,
@@ -643,19 +647,25 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None,
         modelo_id = dbmod.upsert_lookup(
             conn, "MODELO_EQUIPAMENTO", ["fabricante_id", "nome_modelo"],
             [fabricante_id, d.get("modelo") or "desconhecido"])
-    # upsert: reaproveita o equipamento ja instalado NESTE ponto (mesmo
-    # tipo/serie) em vez de criar um novo a cada reingestao do MESMO ponto.
+    dados_equipamento = {
+        "modelo_id": modelo_id, "tipo_radar_id": tipo_radar_id,
+        "numero_serie": d.get("numero_serie"), "ano_fabricacao": d.get("ano_fabricacao"),
+    }
     equipamento_id = None
     if not ponto_criado:
         equipamento_id = _equipamento_do_ponto(
-            conn, ponto_id, tipo_radar_id, d.get("numero_serie"))
+            conn, ponto_id, tipo_radar_id, d.get("numero_serie"), modelo_id, d.get("ano_fabricacao"))
+    if equipamento_id is None and reutilizar_identidade:
+        from core.equipamentos import resolver
+        equipamento_id = resolver(conn, fonte_id, registro_id, ponto_id, dados_equipamento)
     if equipamento_id is None:
-        equipamento_id = dbmod.insert(conn, "EQUIPAMENTO", {
-            "modelo_id": modelo_id,
-            "tipo_radar_id": tipo_radar_id,
-            "numero_serie": d.get("numero_serie"),
-            "ano_fabricacao": d.get("ano_fabricacao"),
-        })
+        equipamento_id = dbmod.insert(conn, "EQUIPAMENTO", dados_equipamento)
+    else:
+        from core.equipamentos import modelo_complementado
+        modelo = modelo_complementado(conn, dbmod.scalar(conn, "SELECT modelo_id FROM EQUIPAMENTO WHERE id=?", (equipamento_id,)), modelo_id)
+        conn.execute("UPDATE EQUIPAMENTO SET modelo_id=?, "
+                     "ano_fabricacao=COALESCE(ano_fabricacao, ?) WHERE id=?",
+                     (modelo, d.get("ano_fabricacao"), equipamento_id))
     instalacao_id = _buscar_por(conn, "INSTALACAO", {
         "ponto_id": ponto_id, "equipamento_id": equipamento_id})
     if instalacao_id is None:

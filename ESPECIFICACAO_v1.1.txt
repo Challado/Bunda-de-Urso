@@ -1773,3 +1773,20 @@ comunitária pode substituir a confirmação do órgão público competente.
 ======================================================================
 FIM DA ESPECIFICAÇÃO V1.1 — COM PESQUISA DE REFERÊNCIAS GITHUB
 ======================================================================
+
+
+ADENDO TECNICO — 21/10/2026 — NORMALIZACAO DO NUCLEO DE COLETA
+
+A exigencia 1FN/2FN/3FN da secao 3 prevalece sobre as redundancias do
+primeiro dicionario. T62 SNAPSHOT_RECURSO passa a guardar apenas
+(snapshot_id, artefato_id), PK composta. Recurso e obtido do artefato;
+um snapshot continua aceitando no maximo um artefato por recurso.
+T58 EXECUCAO_COLETA conserva o recurso solicitado e deixa de repetir
+artefato_id. A relacao EC1 EXECUCAO_ARTEFATO (execucao_id PK/FK,
+artefato_id NN FK) representa o resultado opcional. Tentativa sem
+artefato permanece valida; sucesso nao pode contradizer seu recurso.
+T55 COBERTURA_FONTE nao repete UF quando municipio_id esta informado:
+a UF municipal vem de MUNICIPIO. Cobertura estadual conserva sua UF.
+Views de detalhe derivam os campos retirados com LEFT JOIN. As novas
+relacoes, migracoes e criterios de identidade/proveniencia estao em
+docs/NORMALIZACAO_RELACIONAL.md. A exigencia nao se reduz ao uso de FKs.

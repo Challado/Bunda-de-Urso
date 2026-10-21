@@ -457,6 +457,7 @@ add(T(55, "COBERTURA_FONTE", [
     "tipo_abrangencia IN ('nacional','estadual','municipal','rodoviaria','desconhecida')",
     "vigencia_fim IS NULL OR vigencia_inicio IS NULL OR vigencia_fim >= vigencia_inicio",
     "(tipo_abrangencia <> 'municipal' OR municipio_id IS NOT NULL)",
+    "municipio_id IS NULL OR uf_sigla IS NULL",
     "(tipo_abrangencia <> 'estadual' OR uf_sigla IS NOT NULL)",
     "(tipo_abrangencia <> 'rodoviaria' OR via_id IS NOT NULL)",
 ]))
@@ -495,7 +496,6 @@ add(T(57, "ARTEFATO_COLETA", [
 add(T(58, "EXECUCAO_COLETA", [
     C("id", "ID", nn=True, pk=True),
     C("recurso_id", "ID", nn=True, fk=("RECURSO_FONTE", "id")),
-    C("artefato_id", "ID", fk=("ARTEFATO_COLETA", "id")),
     C("iniciada_em", "TS", nn=True),
     C("terminada_em", "TS"),
     C("status", "TEXT", nn=True),
@@ -518,6 +518,13 @@ add(T(58, "EXECUCAO_COLETA", [
     "registros_criados IS NULL OR registros_criados >= 0",
     "registros_alterados IS NULL OR registros_alterados >= 0",
 ]))
+
+# Relacao 1:0..1: tentativa sem resposta continua sem artefato.
+add(T(78, "EXECUCAO_ARTEFATO", [
+    C("execucao_id", "ID", nn=True, pk=True, fk=("EXECUCAO_COLETA", "id")),
+    C("artefato_id", "ID", nn=True, fk=("ARTEFATO_COLETA", "id")),
+]))
+
 
 add(T(59, "REGISTRO_FONTE", [
     C("id", "ID", nn=True, pk=True),
@@ -551,9 +558,8 @@ add(T(61, "SNAPSHOT_PUBLICADO", [
 
 add(T(62, "SNAPSHOT_RECURSO", [
     C("snapshot_id", "ID", nn=True, fk=("SNAPSHOT_PUBLICADO", "id")),
-    C("recurso_id", "ID", nn=True, fk=("RECURSO_FONTE", "id")),
     C("artefato_id", "ID", nn=True, fk=("ARTEFATO_COLETA", "id")),
-], pk=["snapshot_id", "recurso_id"]))
+], pk=["snapshot_id", "artefato_id"]))
 
 add(T(63, "VINCULO_REGISTRO_PONTO", [
     C("registro_id", "ID", nn=True, fk=("REGISTRO_FONTE", "id")),
@@ -797,7 +803,7 @@ def emit(dialect):
     defs = []
     for t in topo_order(TABLES):
         is_comp = bool(t.pk)
-        lines = ["-- T%02d %s" % (t.num, t.name)]
+        lines = ["-- EC1 EXECUCAO_ARTEFATO" if t.name == "EXECUCAO_ARTEFATO" else "-- T%02d %s" % (t.num, t.name)]
         lines.append("CREATE TABLE IF NOT EXISTS %s (" % t.name)
         body = []
         for c in t.cols:
@@ -815,13 +821,104 @@ def emit(dialect):
         defs.append("\n".join(lines))
 
     header = [
-        "-- Radar Brasil - esquema canonico v1 (T01..T77) - dialeto %s" % dialect,
+        "-- Radar Brasil - esquema canonico (T01..T77 + EXECUCAO_ARTEFATO) - dialeto %s" % dialect,
         "-- Gerado por tools/build_schema.py a partir da ESPECIFICACAO v1.1.",
         "-- PK/FK/UQ/CHECK/NOT NULL. Sem PostGIS/recursos proprietarios.",
         "-- ON DELETE RESTRICT por padrao (dados historicos nao sofrem cascata).",
         "",
     ]
-    return "\n".join(header) + "\n\n".join(defs) + "\n"
+    return "\n".join(header) + "\n\n".join(defs) + "\n" + VISOES + (RESTRICOES_SQLITE if dialect == "sqlite" else RESTRICOES_POSTGRES)
+
+
+RESTRICOES_POSTGRES = """
+
+CREATE OR REPLACE FUNCTION validar_relacoes_coleta() RETURNS trigger AS $$
+BEGIN
+ IF TG_TABLE_NAME='execucao_artefato' THEN
+  IF NOT EXISTS (SELECT 1 FROM EXECUCAO_COLETA e JOIN ARTEFATO_COLETA a ON a.recurso_id=e.recurso_id
+                 WHERE e.id=NEW.execucao_id AND a.id=NEW.artefato_id) THEN
+   RAISE EXCEPTION 'artefato pertence a outro recurso da execucao';
+  END IF;
+ ELSIF TG_TABLE_NAME='snapshot_recurso' THEN
+  IF EXISTS (SELECT 1 FROM SNAPSHOT_RECURSO s JOIN ARTEFATO_COLETA a ON a.id=s.artefato_id
+             JOIN ARTEFATO_COLETA novo ON novo.recurso_id=a.recurso_id
+             WHERE s.snapshot_id=NEW.snapshot_id AND novo.id=NEW.artefato_id AND s.artefato_id<>NEW.artefato_id) THEN
+   RAISE EXCEPTION 'snapshot ja contem outro artefato deste recurso';
+  END IF;
+ ELSIF TG_TABLE_NAME='execucao_coleta' THEN
+  IF EXISTS (SELECT 1 FROM EXECUCAO_ARTEFATO ea JOIN ARTEFATO_COLETA a ON a.id=ea.artefato_id
+             WHERE ea.execucao_id=NEW.id AND a.recurso_id<>NEW.recurso_id) THEN
+   RAISE EXCEPTION 'recurso diverge do artefato da execucao';
+  END IF;
+ ELSIF TG_TABLE_NAME='artefato_coleta' AND OLD.recurso_id<>NEW.recurso_id THEN
+  RAISE EXCEPTION 'origem do artefato e imutavel';
+ END IF;
+ RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS CK_EXECUCAO_ARTEFATO ON EXECUCAO_ARTEFATO;
+CREATE TRIGGER CK_EXECUCAO_ARTEFATO BEFORE INSERT OR UPDATE ON EXECUCAO_ARTEFATO
+FOR EACH ROW EXECUTE FUNCTION validar_relacoes_coleta();
+DROP TRIGGER IF EXISTS CK_SNAPSHOT_RECURSO ON SNAPSHOT_RECURSO;
+CREATE TRIGGER CK_SNAPSHOT_RECURSO BEFORE INSERT OR UPDATE ON SNAPSHOT_RECURSO
+FOR EACH ROW EXECUTE FUNCTION validar_relacoes_coleta();
+DROP TRIGGER IF EXISTS CK_EXECUCAO_RECURSO ON EXECUCAO_COLETA;
+CREATE TRIGGER CK_EXECUCAO_RECURSO BEFORE UPDATE OF recurso_id ON EXECUCAO_COLETA
+FOR EACH ROW EXECUTE FUNCTION validar_relacoes_coleta();
+DROP TRIGGER IF EXISTS CK_ARTEFATO_RECURSO ON ARTEFATO_COLETA;
+CREATE TRIGGER CK_ARTEFATO_RECURSO BEFORE UPDATE OF recurso_id ON ARTEFATO_COLETA
+FOR EACH ROW EXECUTE FUNCTION validar_relacoes_coleta();
+"""
+
+
+RESTRICOES_SQLITE = """
+CREATE TRIGGER IF NOT EXISTS CK_EXECUCAO_ARTEFATO_INSERT
+BEFORE INSERT ON EXECUCAO_ARTEFATO
+WHEN NOT EXISTS (SELECT 1 FROM EXECUCAO_COLETA e JOIN ARTEFATO_COLETA a
+                 ON a.recurso_id=e.recurso_id WHERE e.id=NEW.execucao_id AND a.id=NEW.artefato_id)
+BEGIN SELECT RAISE(ABORT, 'artefato pertence a outro recurso da execucao'); END;
+CREATE TRIGGER IF NOT EXISTS CK_SNAPSHOT_RECURSO_INSERT
+BEFORE INSERT ON SNAPSHOT_RECURSO
+WHEN EXISTS (SELECT 1 FROM SNAPSHOT_RECURSO s JOIN ARTEFATO_COLETA a ON a.id=s.artefato_id
+             JOIN ARTEFATO_COLETA novo ON novo.recurso_id=a.recurso_id
+             WHERE s.snapshot_id=NEW.snapshot_id AND novo.id=NEW.artefato_id AND s.artefato_id<>NEW.artefato_id)
+BEGIN SELECT RAISE(ABORT, 'snapshot ja contem outro artefato deste recurso'); END;
+CREATE TRIGGER IF NOT EXISTS CK_EXECUCAO_ARTEFATO_UPDATE
+BEFORE UPDATE ON EXECUCAO_ARTEFATO
+WHEN NOT EXISTS (SELECT 1 FROM EXECUCAO_COLETA e JOIN ARTEFATO_COLETA a
+                 ON a.recurso_id=e.recurso_id WHERE e.id=NEW.execucao_id AND a.id=NEW.artefato_id)
+BEGIN SELECT RAISE(ABORT, 'artefato pertence a outro recurso da execucao'); END;
+CREATE TRIGGER IF NOT EXISTS CK_SNAPSHOT_RECURSO_UPDATE
+BEFORE UPDATE ON SNAPSHOT_RECURSO
+WHEN EXISTS (SELECT 1 FROM SNAPSHOT_RECURSO s JOIN ARTEFATO_COLETA a ON a.id=s.artefato_id
+             JOIN ARTEFATO_COLETA novo ON novo.recurso_id=a.recurso_id
+             WHERE s.snapshot_id=NEW.snapshot_id AND novo.id=NEW.artefato_id AND s.artefato_id<>NEW.artefato_id)
+BEGIN SELECT RAISE(ABORT, 'snapshot ja contem outro artefato deste recurso'); END;
+CREATE TRIGGER IF NOT EXISTS CK_EXECUCAO_RECURSO_UPDATE
+BEFORE UPDATE OF recurso_id ON EXECUCAO_COLETA
+WHEN EXISTS (SELECT 1 FROM EXECUCAO_ARTEFATO ea JOIN ARTEFATO_COLETA a ON a.id=ea.artefato_id
+             WHERE ea.execucao_id=NEW.id AND a.recurso_id<>NEW.recurso_id)
+BEGIN SELECT RAISE(ABORT, 'recurso diverge do artefato da execucao'); END;
+CREATE TRIGGER IF NOT EXISTS CK_ARTEFATO_RECURSO_IMUTAVEL
+BEFORE UPDATE OF recurso_id ON ARTEFATO_COLETA WHEN OLD.recurso_id<>NEW.recurso_id
+BEGIN SELECT RAISE(ABORT, 'origem do artefato e imutavel'); END;
+"""
+
+
+VISOES = """
+CREATE VIEW IF NOT EXISTS COBERTURA_FONTE_DETALHE AS
+SELECT c.id, c.fonte_id, c.tipo_abrangencia, COALESCE(m.uf_sigla,c.uf_sigla) AS uf_sigla,
+       c.municipio_id, c.via_id, c.vigencia_inicio, c.vigencia_fim, c.confirmada
+FROM COBERTURA_FONTE c LEFT JOIN MUNICIPIO m ON m.codigo_ibge=c.municipio_id;
+CREATE VIEW IF NOT EXISTS SNAPSHOT_RECURSO_DETALHE AS
+SELECT s.snapshot_id, a.recurso_id, s.artefato_id
+FROM SNAPSHOT_RECURSO s
+LEFT JOIN ARTEFATO_COLETA a ON a.id=s.artefato_id;
+CREATE VIEW IF NOT EXISTS EXECUCAO_COLETA_DETALHE AS
+SELECT e.*, ea.artefato_id
+FROM EXECUCAO_COLETA e
+LEFT JOIN EXECUCAO_ARTEFATO ea ON ea.execucao_id=e.id;
+"""
 
 
 @operacao_local

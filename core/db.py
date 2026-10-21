@@ -134,7 +134,7 @@ def insert(conn, tabela, dados):
 def upsert_lookup(conn, tabela, chave_cols, chave_vals, extra=None):
     """Retorna PK existente ou insere (usado para entidades sem PK surrogate
     natural, ex.: VIA por (tipo_via_id, codigo))."""
-    where = " AND ".join("%s = ?" % c for c in chave_cols)
+    where = " AND ".join("%s IS ?" % c for c in chave_cols)
     row = conn.execute("SELECT id FROM %s WHERE %s" % (tabela, where),
                        list(chave_vals)).fetchone()
     if row is not None:

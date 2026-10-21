@@ -11,7 +11,7 @@ flowchart LR
  V --> R[Registro original + hash e provenance]
  R --> N[Normalização e vínculos PK/FK]
  N --> U[Consolidação de ponto/equipamento/limite]
- U --> DB[(Banco SQL com 77 tabelas)]
+ U --> DB[(Banco SQL com 78 tabelas base)]
  DB --> Q[Consulta: bounding box SQL + Haversine]
  Q --> W[API Python .pse / fcgiwrap]
  W --> OUT[TXT / JSON / NDJSON / XML / EDIFACT / DIF]
@@ -27,7 +27,7 @@ do schema), `core/consultas.py` (leitura), `web/nucleo.py` + `web/api.pse`
 
 ## Agregados relacionais principais
 
-O schema canônico tem **77 tabelas (T01..T77)**, definidas em
+O schema canônico tem **78 tabelas (T01..T77 + EXECUCAO_ARTEFATO)**, definidas em
 `tools/build_schema.py` e materializadas em `sql/schema.sqlite.sql` (SQLite)
 e `sql/schema.postgres.sql` (Postgres). As tabelas efetivamente existentes,
 por agregado:

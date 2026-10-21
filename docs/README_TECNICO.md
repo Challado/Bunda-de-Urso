@@ -16,7 +16,7 @@ O projeto é dividido em **duas partes independentes**:
 
 - **Linguagem:** Python 3 (só stdlib — `urllib`, `sqlite3`, `csv`, `json`,
   `xml.etree`). Sem pip, sem dependências externas.
-- **Banco:** relacional normalizado (3FN). SQLite para desenvolvimento; Postgres
+- **Banco:** relacional, com exigência de 3FN e [revisão das dependências](NORMALIZACAO_RELACIONAL.md). SQLite em produção; Postgres
   suportado pela DDL gêmea. **Sem PostGIS** — a consulta geográfica usa
   *bounding box* em SQL + distância Haversine na aplicação.
 - **Web:** **CGI** no padrão da casa — `fcgiwrap` + `nginx` executando um
@@ -180,7 +180,7 @@ valores (testado).
 
 ## Status
 
-- [x] Schema canônico T01–T77 (SQLite + Postgres), PK/FK/UQ/CHECK, 3FN
+- [x] Schema canônico T01–T77 + EXECUCAO_ARTEFATO (SQLite + Postgres), PK/FK/UQ/CHECK; dependências revisadas em NORMALIZACAO_RELACIONAL.md
 - [x] Coletor: cache imutável sha256, staging, snapshot atômico, conectores ANTT/Recife
 - [x] API: `/radares`, `/radares/{id}`, `/ajuda`, `/status`, `/fontes` (GET/POST)
 - [x] TXT 32 colunas + paridade json/ndjson/xml/txt; esqueletos edifact/dif

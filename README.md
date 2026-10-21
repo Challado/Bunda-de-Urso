@@ -88,7 +88,7 @@ https://servidor3.lucas.inf.br/openclaw/radar/api.pse?rota=/api/v1/radares&lat=-
 
 Resumindo: **nginx + fcgiwrap + Python** executando um arquivo `.pse`. Nada mais exótico que isso.
 
-O esquema é **SQL canônico, sem ORM** — nada de SQLAlchemy por aqui. São **77 tabelas** (T01..T77) definidas uma única vez em `core/manutencao/build_schema.py` (o comando `tools/build_schema.py` encaminha a geração pela API), que gera as duas DDLs gêmeas (`sql/schema.sqlite.sql` e `sql/schema.postgres.sql`), com chaves primárias/estrangeiras, `CHECK`, `UNIQUE` e índices, incluindo equipamentos, pontos, instalações, faixas, órgãos, fontes, documentos, verificações, operações, evidências e candidatos geográficos. O banco padrão é SQLite, sem PostGIS. A compatibilidade efetiva com outros SGBDs requer homologação específica.
+O esquema é **SQL canônico, sem ORM** — nada de SQLAlchemy por aqui. São **78 tabelas no esquema base** (T01..T77 + EXECUCAO_ARTEFATO) definidas uma única vez em `core/manutencao/build_schema.py` (o comando `tools/build_schema.py` encaminha a geração pela API), que gera as duas DDLs gêmeas (`sql/schema.sqlite.sql` e `sql/schema.postgres.sql`), com chaves primárias/estrangeiras, `CHECK`, `UNIQUE` e índices, incluindo equipamentos, pontos, instalações, faixas, órgãos, fontes, documentos, verificações, operações, evidências e candidatos geográficos. O banco padrão é SQLite, sem PostGIS. A compatibilidade efetiva com outros SGBDs requer homologação específica.
 
 ## Como a coleta funciona
 
@@ -139,6 +139,10 @@ Dois registros próximos não são necessariamente o mesmo radar; duas faixas ta
 - Substituição de equipamento: registrar histórico temporal da instalação.
 
 O banco usa chaves primárias e estrangeiras, restrições de integridade e relacionamentos normalizados. Não eliminar dados originais durante a consolidação.
+
+A [normalização relacional e a identidade na escrita](docs/NORMALIZACAO_RELACIONAL.md)
+foram revisadas: a atualização migra as relações redundantes e reconcilia
+equipamentos comprovados, preservando fontes, histórico e IDs antigos.
 
 O detalhe do radar e do equipamento faz a [junção da metrologia entre fontes oficiais](docs/JUNCAO_METROLOGICA.md)
 pela série, tipo e município. Assim, uma instalação da GOINFRA pode mostrar o
@@ -285,7 +289,7 @@ O ambiente web requer Nginx, fcgiwrap, Python e permissão controlada de acesso 
 
 ## Situação real do desenvolvimento
 
-O projeto implementa a **ESPECIFICACAO_v1.1.txt (10/10/2026)**: coletor/sincronizador, API `.pse`, esquema relacional de **77 tabelas**, resolvedor geográfico, serializadores em seis formatos, documentação e testes automatizados locais (stdlib `unittest`). Os testes locais não equivalem à homologação das coletas reais em todo o Brasil.
+O projeto implementa a **ESPECIFICACAO_v1.1.txt (10/10/2026)**: coletor/sincronizador, API `.pse`, esquema relacional de **78 tabelas base**, resolvedor geográfico, serializadores em seis formatos, documentação e testes automatizados locais (stdlib `unittest`). Os testes locais não equivalem à homologação das coletas reais em todo o Brasil.
 
 **Ainda precisam de trabalho e validação:** integração e importação real de todas as fontes federais, estaduais e municipais; resolução das coordenadas ausentes; homologação de cada formato e SGBD utilizado; verificação de qualidade e atualização de cada órgão; aferição da cobertura nacional; avaliação de licenças para redistribuição de cada conjunto de dados.
 

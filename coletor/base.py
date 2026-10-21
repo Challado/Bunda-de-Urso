@@ -169,14 +169,20 @@ class ColetorBase(object):
 
     def encerrar_execucao(self, exec_id, status, artefato_id=None,
                           **contadores):
-        campos = {"terminada_em": agora_utc(), "status": status,
-                  "artefato_id": artefato_id}
+        campos = {"terminada_em": agora_utc(), "status": status}
         for k in ("linhas_recebidas", "linhas_validas", "linhas_rejeitadas",
                   "registros_criados", "registros_alterados", "http_status",
                   "erro_codigo", "erro_detalhe"):
             if k in contadores:
                 campos[k] = contadores[k]
         sets = ", ".join("%s=?" % k for k in campos)
+        if artefato_id is not None:
+            recurso = dbmod.scalar(self.conn, "SELECT recurso_id FROM EXECUCAO_COLETA WHERE id=?", (exec_id,))
+            if recurso != dbmod.scalar(self.conn, "SELECT recurso_id FROM ARTEFATO_COLETA WHERE id=?", (artefato_id,)):
+                raise ValueError("artefato pertence a outro recurso")
+            self.conn.execute("INSERT INTO EXECUCAO_ARTEFATO (execucao_id, artefato_id) VALUES (?,?) "
+                              "ON CONFLICT(execucao_id) DO UPDATE SET artefato_id=excluded.artefato_id",
+                              (exec_id, artefato_id))
         self.conn.execute("UPDATE EXECUCAO_COLETA SET %s WHERE id=?" % sets,
                           list(campos.values()) + [exec_id])
         self.conn.commit()
@@ -227,7 +233,7 @@ class ColetorBase(object):
         if row is None:
             return False
         ##-- BUNDITA DE URSO #{9} -- Conteudo de uma tentativa rejeitada precisa poder ser reprocessado. ##
-        if not dbmod.scalar(self.conn, "SELECT 1 FROM EXECUCAO_COLETA "
+        if not dbmod.scalar(self.conn, "SELECT 1 FROM EXECUCAO_COLETA_DETALHE "
                             "WHERE artefato_id=? AND status='ok' LIMIT 1", (row["id"],)):
             return False
         hs = [r[0] for r in dbmod.query_all(
@@ -255,10 +261,11 @@ class ColetorBase(object):
             "identificador_versao": versao,
         })
         for recurso_id, artefato_id in pares:
+            if recurso_id != dbmod.scalar(self.conn, "SELECT recurso_id FROM ARTEFATO_COLETA WHERE id=?", (artefato_id,)):
+                raise ValueError("artefato pertence a outro recurso")
             self.conn.execute(
                 "INSERT OR IGNORE INTO SNAPSHOT_RECURSO "
-                "(snapshot_id, recurso_id, artefato_id) VALUES (?,?,?)",
-                (snap_id, recurso_id, artefato_id))
+                "(snapshot_id, artefato_id) VALUES (?,?)", (snap_id, artefato_id))
         self.conn.commit()
         return snap_id, versao
 

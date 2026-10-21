@@ -366,6 +366,8 @@ class ColetorINMETRO(ColetorBase):
         numero_serie = (raw.get("NumeroSerie") or "").strip() or None
         num_inmetro = (raw.get("NumeroInmetro") or "").strip() or None
         local = raw.get("LocalVerificacao")
+        from core.local_cadastral import extrair
+        local_estruturado = extrair(local)
         if not numero_serie and not num_inmetro and not local:
             return None   # registro vazio/irrelevante
 
@@ -405,8 +407,8 @@ class ColetorINMETRO(ColetorBase):
             "uf": raw.get("SiglaUf"),
             "municipio_nome": raw.get("Municipio"),
             "municipio_ibge": None,
-            "via_codigo": None,          # LocalVerificacao e texto livre
-            "km": None,
+            "via_codigo": local_estruturado[0] if local_estruturado else None,
+            "km": local_estruturado[1] if local_estruturado else None,
             "tipo_pista": None,
             "situacao": None,            # fonte nao publica situacao operacional
             "tipo_radar": nz.normalizar_tipo_radar(raw.get("TipoMedidor")),

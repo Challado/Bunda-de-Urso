@@ -123,6 +123,25 @@ def _aplicar_diretiva_coluna(conn, linha):
                  % (tabela, coluna, definicao))
 
 
+def preparar_migracao(conn, texto):
+    """Diretivas de coluna para bases novas e antigas; devolve SQL aplicavel."""
+    linhas_sql = []
+    incluir = True
+    for linha in texto.splitlines():
+        if linha.strip().startswith("-- +SE_COLUNA"):
+            tabela, coluna = linha.strip().split()[2:]
+            incluir = coluna in _colunas(conn, tabela)
+        elif linha.strip() == "-- +FIM":
+            incluir = True
+        elif not incluir:
+            continue
+        elif linha.strip().startswith("-- +COLUNA"):
+            _aplicar_diretiva_coluna(conn, linha.strip())
+        else:
+            linhas_sql.append(linha)
+    return "\n".join(linhas_sql)
+
+
 def aplicar_migracoes(conn):
     """Aplica as migracoes de governanca ainda nao executadas. Idempotente."""
     conn.execute(
@@ -136,13 +155,8 @@ def aplicar_migracoes(conn):
             continue
         with open(caminho, "r", encoding="utf-8") as f:
             texto = f.read()
-        linhas_sql = []
-        for linha in texto.splitlines():
-            if linha.strip().startswith("-- +COLUNA"):
-                _aplicar_diretiva_coluna(conn, linha.strip())
-            else:
-                linhas_sql.append(linha)
-        conn.executescript("BEGIN;\n" + "\n".join(linhas_sql) + "\nCOMMIT;")
+        sql = preparar_migracao(conn, texto)
+        conn.executescript("BEGIN;\n" + sql + "\nCOMMIT;")
         conn.execute(
             "INSERT INTO MIGRACAO_GOVERNANCA (versao, aplicada_em) "
             "VALUES (?, ?)", (versao, _agora()))

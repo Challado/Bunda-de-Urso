@@ -1,0 +1,10 @@
+-- IDs publicos antigos resolvem para a entidade fisica preservada.
+CREATE TABLE IF NOT EXISTS EQUIPAMENTO_ALIAS (
+    alias_id INTEGER PRIMARY KEY,
+    equipamento_id INTEGER NOT NULL REFERENCES EQUIPAMENTO(id) ON DELETE RESTRICT,
+    criterio TEXT NOT NULL,
+    criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (alias_id <> equipamento_id)
+);
+CREATE INDEX IF NOT EXISTS IX_EQUIPAMENTO_ALIAS_DESTINO ON EQUIPAMENTO_ALIAS(equipamento_id);
+CREATE INDEX IF NOT EXISTS IX_EQUIPAMENTO_SERIE_TIPO ON EQUIPAMENTO(UPPER(TRIM(numero_serie)), tipo_radar_id);

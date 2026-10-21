@@ -174,6 +174,15 @@ def ler_dialeto(sufixo):
                 tabelas.setdefault(tabela, [])
                 if col not in tabelas[tabela]:
                     tabelas[tabela].append(col)
+            m = re.match(r'DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(\w+)', comando, re.I)
+            if m:
+                tabelas.pop(m[1].lower(), None)
+            m = re.match(r'ALTER\s+TABLE\s+(\w+)\s+RENAME\s+TO\s+(\w+)', comando, re.I)
+            if m:
+                tabelas[m[2].lower()] = tabelas.pop(m[1].lower(), [])
+            m = re.match(r'ALTER\s+TABLE\s+(\w+)\s+DROP\s+COLUMN\s+(?:IF\s+EXISTS\s+)?(\w+)', comando, re.I)
+            if m and m[2].lower() in tabelas.get(m[1].lower(), []):
+                tabelas[m[1].lower()].remove(m[2].lower())
     return tabelas
 
 
@@ -204,10 +213,12 @@ def main():
             problemas.append("%s: colunas sem par no SQLite: %s" % (tabela, ", ".join(faltam_sq)))
 
     # o DDL do SQLite tem de executar de verdade
+    sys.path.insert(0, str(RAIZ))
+    from core.governanca import preparar_migracao
     con = sqlite3.connect(":memory:")
     try:
         for caminho in [SQL / "schema.sqlite.sql"] + sorted((SQL / "migracoes").glob("*.sqlite.sql")):
-            con.executescript(caminho.read_text(encoding="utf-8"))
+            con.executescript(preparar_migracao(con, caminho.read_text(encoding="utf-8")))
         con.commit()
         live = {r[0].lower() for r in con.execute(
             "SELECT name FROM sqlite_master WHERE type='table'")}

@@ -145,7 +145,7 @@ def _correspondencias(conn, ponto):
 
 
 def _diagnostico(conn, valor):
-    row = conn.execute("""SELECT e.*, r.url_recurso, f.nome AS fonte FROM EXECUCAO_COLETA e
+    row = conn.execute("""SELECT e.*, r.url_recurso, f.nome AS fonte FROM EXECUCAO_COLETA_DETALHE e
         LEFT JOIN RECURSO_FONTE r ON r.id=e.recurso_id LEFT JOIN FONTE f ON f.id=r.fonte_id WHERE e.id=?""", (_id(valor),)).fetchone()
     if row is None:
         _erro("Execucao nao encontrada.", 404)

@@ -57,3 +57,8 @@ sem alteração, origens divergentes, séries diferentes/genéricas, contexto au
 modelo/fabricante conflitantes, decisões, remoção e origem não oficial. O plano
 SQL deve usar o índice de série. O teste de navegador usa API CGI, dois coletores,
 banco temporário e carregador metrológico reais, sem produção ou IA.
+
+A [revisão da normalização e da escrita](NORMALIZACAO_RELACIONAL.md) acrescenta
+reuso e reconciliação persistente de equipamentos comprovados. A junção descrita
+aqui permanece para observações legadas ainda separadas e não comprova fusão
+da identidade física.
