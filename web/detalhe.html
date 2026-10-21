@@ -18,7 +18,7 @@
   header h1{margin:0;font-size:17px;font-weight:600}
   header .sub{opacity:.9;font-size:12.5px}
   header a{color:#fff}
-  main{padding:12px 16px 40px;max-width:1080px;margin:0 auto}
+  main{width:100%;padding:16px clamp(12px,2vw,40px) 40px}
   .resumo{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0 10px}
   .pill{display:inline-block;background:#e8eef6;color:var(--azul);border-radius:10px;padding:2px 10px;font-size:12.5px;font-weight:600}
   .pill.ok{background:#e6f6ea;color:var(--verde)}
@@ -27,11 +27,23 @@
   #mapa{height:320px;width:100%;border-radius:10px;border:1px solid var(--borda);margin:6px 0 14px}
   .secao{margin:14px 0;border:1px solid var(--borda);border-radius:10px;background:var(--cinza);overflow:hidden}
   .secao > h2{margin:0;padding:9px 12px;font-size:14px;background:rgba(18,80,143,.09);border-bottom:1px solid var(--borda)}
-  .secao .corpo{padding:10px 12px}
-  dl.campos{margin:0;display:grid;grid-template-columns:minmax(150px,240px) 1fr;gap:2px 12px}
-  dl.campos > dt{color:#6b7280;font-size:12.5px;font-weight:600;padding:3px 0;overflow-wrap:anywhere}
-  dl.campos > dd{margin:0;padding:3px 0;overflow-wrap:anywhere}
-  dl.campos dl.campos{grid-template-columns:minmax(120px,220px) 1fr;margin:2px 0}
+  .secao .corpo{padding:18px;min-width:0;background:#fff}
+  .campos{margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:16px 24px}
+  .campo{min-width:0}
+  .campo > dt{color:#606775;font-size:13px;margin-bottom:4px}
+  .campo > dd{margin:0;font-size:15px;overflow-wrap:anywhere}
+  .grupo-dados{margin-top:18px;min-width:0}
+  .grupo-dados > h4,.grupo-dados > h5{margin:0 0 10px;font-size:14px}
+  .lista-dados{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:12px;align-items:start}
+  .lista-dados > .cartao{margin:0;min-width:0}
+  .instrumento{background:var(--cinza);border-radius:8px;padding:16px;margin-top:16px;min-width:0}
+  .instrumento > h3{margin:0 0 12px;font-size:16px}
+  .verificacoes{margin-top:18px}
+  .verificacoes > h4{margin:0 0 10px;font-size:14px}
+  .verificacao > h5{margin:0 0 12px;font-size:15px}
+  .alerta-fontes{border-left:4px solid #bd770a;padding:12px 16px;background:#fff5da;margin:16px 0;color:#49350d}
+  .alerta-fontes h3{margin:0 0 8px;font-size:15px}
+  .alerta-fontes p{margin:6px 0}
   .vazio{color:#8a8a95;font-style:italic;font-size:13px}
   .ni{color:#a0a0aa;font-style:italic}
   .chips{display:flex;flex-wrap:wrap;gap:6px}
@@ -68,21 +80,23 @@
   @media (prefers-color-scheme: dark){
     body{background:#17181c;color:#eceef2}
     :root{--cinza:#212228;--borda:#34363e;--azul:#7fb2e8}
-    .cartao,details.dobrado{background:#24252b}
+    .cartao,details.dobrado,.secao .corpo{background:#24252b}
+    .campo > dt{color:#b0b5c0}
+    .alerta-fontes{background:#3c3019;color:#ffe0a0}
     .chip{background:#2a2c34}
+    header{background:#12508f}
     .explicacao{color:#b0b5c0}
   }
   @media (max-width: 620px){
     header{padding:9px 12px}
     header .logo{height:38px}
     main{padding:10px 12px 40px}
-    dl.campos{grid-template-columns:1fr;gap:0}
-    /* listas aninhadas tambem empilham (senao a coluna minima de 120px estoura) */
-    dl.campos dl.campos{grid-template-columns:1fr}
-    dl.campos > dt{padding-top:6px}
-    dl.campos > dd{padding-top:0;padding-bottom:4px}
+    .campos{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+    .secao .corpo{padding:14px}
+    .instrumento{padding:12px}
     #mapa{height:260px}
   }
+  @media (max-width:360px){.campos{grid-template-columns:1fr}}
 </style>
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" href="favicon-32.png" sizes="32x32">
@@ -114,10 +128,10 @@
 
   // ---- rotulos amigaveis para as chaves da API (fallback = chave bonitinha) ----
   var LABELS = {
-    id:"ID", tipo_registro:"Tipo de registro", situacao_operacional:"Situação operacional",
+    equipamento_id:"ID do equipamento",tipo_verificacao:"Tipo de verificação",data_verificacao:"Data da verificação",validade_ate:"Válido até",situacao_metrologica_derivada:"Situação da verificação",id:"ID", tipo_registro:"Tipo de registro", situacao_operacional:"Situação operacional",
     situacao_original:"Situação (texto original da fonte)",
     localizacao:"Localização", latitude:"Latitude", longitude:"Longitude",
-    distancia_metros:"Distância do ponto de consulta", precisao_metros:"Precisão informada",
+    distancia_metros:"Distância do ponto de consulta", precisao_metros:"Precisão da posição (m)",
     qualidade:"Qualidade da posição", metodo_obtencao:"Método de obtenção",
     uf:"UF", municipio:"Município", codigo_ibge:"Código IBGE do município", endereco:"Endereço",
     via:"Via", codigo:"Código da via", tipo:"Tipo de via", nome:"Nome",
@@ -128,7 +142,7 @@
     limites_velocidade:"Limites de velocidade", faixa_id:"Faixa", categoria_veiculo:"Categoria de veículo",
     velocidade_kmh:"Velocidade (km/h)", vigencia_inicio:"Vigência — início", vigencia_fim:"Vigência — fim",
     fonte_registro_id:"ID do registro na fonte",
-    velocidades_resolvidas:"Velocidades resolvidas", categoria:"Categoria", estado:"Estado da resolução",
+    velocidades_resolvidas:"Velocidades resolvidas", categoria:"Categoria", estado:"Situação",
     valores_publicados_kmh:"Valores publicados (km/h)",
     velocidade_leves_kmh:"Velocidade — leves (km/h)", velocidade_pesados_kmh:"Velocidade — pesados (km/h)",
     velocidade_geral_kmh:"Velocidade geral (km/h)",
@@ -178,7 +192,7 @@
     equipamentos_origem:"Equipamentos nos cadastros de origem", equipamento_origem_id:"Equipamento na fonte da verificação",
     complemento_proximidade:"Complemento sugerido por proximidade (não verificado)",
     ponto_origem_id:"Radar usado como referência", campos:"Campos complementados",
-    SiglaUf:"UF", Estado:"Estado", Municipio:"Município", LocalVerificacao:"Local da verificação",
+    km_m:"Quilômetro",velocidade_leve:"Velocidade — leves (km/h)",velocidade_pesado:"Velocidade — pesados (km/h)",link:"Documento",SiglaUf:"UF", Estado:"Estado", Municipio:"Município", LocalVerificacao:"Local da verificação",
     DataUltimaVerificacao:"Última verificação", DataValidade:"Validade", UltimoResultado:"Resultado da verificação",
     TipoMedidor:"Tipo de medidor", NumeroInmetro:"Número Inmetro", NumeroSerie:"Número de série",
     Faixas:"Faixas verificadas", Historico:"Histórico de verificações", Proprietario:"Proprietário",
@@ -189,6 +203,9 @@
   };
   function rotulo(k){
     if (LABELS[k]) return LABELS[k];
+    var equivalente=Object.keys(LABELS).find(function(chave){return chave.toLowerCase()===String(k).toLowerCase();});
+    if(equivalente) return LABELS[equivalente];
+    if (String(k)===String(k).toUpperCase()) k=String(k).toLowerCase();
     return String(k).replace(/([a-zà-ú])([A-ZÀ-Ú])/g, "$1 $2").replace(/_/g, " ").replace(/^\w/, function(c){ return c.toUpperCase(); });
   }
   function esc(s){
@@ -203,14 +220,20 @@
       return d.toLocaleString("pt-BR", {dateStyle:"short", timeStyle:"short"});
     }catch(e){ return iso; }
   }
+  var VALORES = {apos_reparo:"Após reparo",inicial:"Inicial",periodica:"Periódica",periodico:"Periódico",
+    conforme:"Aprovado",nao_conforme:"Reprovado",valida:"Válida",vencida:"Vencida",ativo:"Ativo",inativo:"Inativo",
+    desconhecido:"Não informado",desconhecida:"Não informada",federal:"Federal",fixo:"Fixo",movel:"Móvel",portatil:"Portátil",crescente:"Crescente",decrescente:"Decrescente",
+    ambos:"Ambos os sentidos",controlador:"Controlador",redutor:"Redutor",todos:"Todos",leves:"Leves",pesados:"Pesados",
+    fiscalizacao_pontual:"Fiscalização pontual",permanente:"Permanente"};
   function fmtEscalar(v){
     if (v === null || v === undefined || v === "") return "<span class='ni'>não informado</span>";
     if (v === true) return "sim";
     if (v === false) return "não";
-    if (typeof v === "number") return esc(v);
     var s = String(v);
-    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return esc(fmtData(s)) + " <span class='ni'>(" + esc(s) + ")</span>";
-    return esc(s);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return esc(s.slice(8,10)+"/"+s.slice(5,7)+"/"+s.slice(0,4));
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return esc(fmtData(s));
+    if (/^https?:\/\//i.test(s)) return linkFonte(s,"Abrir documento");
+    return esc(VALORES[s] || s);
   }
   function ehObjeto(v){ return v && typeof v === "object"; }
   function linksMapas(latitude, longitude){
@@ -243,58 +266,46 @@
     for (var i=0;i<arr.length;i++) if (ehObjeto(arr[i])) return false;
     return true;
   }
-  // Renderiza QUALQUER valor (escalar, lista, dicionario) — nada e omitido.
-  function renderValor(v){
-    if (Array.isArray(v)){
-      if (!v.length) return "<div class='vazio'>nenhum registro</div>";
-      if (todosEscalares(v)){
-        return "<div class='chips'>" + v.map(function(x){ return "<span class='chip'>" + fmtEscalar(x) + "</span>"; }).join("") + "</div>";
-      }
-      var itens = v.map(function(x, i){
-        var cab = v.length > 1 ? "<div class='cartao-num'>#" + (i+1) + "</div>" : "";
-        return "<div class='cartao'>" + cab + (ehObjeto(x) ? renderDict(x) : fmtEscalar(x)) + "</div>";
-      }).join("");
-      if (v.length > 8){
-        return "<details class='dobrado'><summary>" + v.length + " registros — clique para ver</summary><div class='dentro'>" + itens + "</div></details>";
-      }
-      return itens;
-    }
-    if (ehObjeto(v)) return renderDict(v);
-    return "<div>" + fmtEscalar(v) + "</div>";
+  // Dados publicados permanecem completos; metadados internos da API ficam fora da apresentação.
+  var INTERNOS = new Set(["fonte_registro_id","registro_id","registros_origem","registros_relacionados",
+    "identidade_fisica_confirmada","juncao_metrologica","criterio","estado","hash_artefato","hash_conteudo",
+    "proveniencia_campos","confianca","faixa_id","faixas_ids","equipamento_origem_id","snapshot_id",
+    "equipamentos_origem","complemento_proximidade","ponto_origem_id","status_integracao","sentido_original","situacao_original","tipo_radar_original","sigla_equipamento_original"]);
+  function preenchido(v){
+    if (v == null || v === "") return false;
+    if (Array.isArray(v)) return v.some(preenchido);
+    if (ehObjeto(v)) return Object.keys(v).some(function(k){return preenchido(v[k]);});
+    return true;
   }
-  function renderDict(d){
-    if (!ehObjeto(d)) return "";
-    var chaves = Object.keys(d);
-    if (!chaves.length) return "<div class='vazio'>sem campos</div>";
-    // Cada par usa apenas coordenadas do mesmo objeto/fonte, nunca do resumo.
-    var chaveLat = chaves.find(function(k){return /^(latitude|lat)$/i.test(k);});
-    var chaveLon = chaves.find(function(k){return /^(longitude|lon|lng)$/i.test(k);});
-    var mapas = linksMapas(d[chaveLat], d[chaveLon]);
-    var depoisCoordenadas = Math.max(chaves.indexOf(chaveLat), chaves.indexOf(chaveLon));
-    var h = "<dl class='campos'>";
-    for (var i=0;i<chaves.length;i++){
-      var k = chaves[i], val = d[k];
-      var dd;
-      if ((k === "distancia_metros" || k === "precisao_metros") && typeof val === "number"){
-        dd = "<div>" + fmtDist(val) + " <span class='ni'>(" + esc(val) + " m)</span></div>";
-      } else {
-        dd = renderValor(val);
-      }
-      h += "<dt>" + esc(rotulo(k)) + "</dt><dd>" + dd + "</dd>";
-      if (mapas && i === depoisCoordenadas) h += "<dt>Abrir coordenadas</dt><dd>" + mapas + "</dd>";
+  function renderValor(v, publicado){
+    if (Array.isArray(v)){
+      if (todosEscalares(v)) return "<div class='chips'>"+v.filter(preenchido).map(function(x){return "<span class='chip'>"+fmtEscalar(x)+"</span>";}).join("")+"</div>";
+      return "<div class='lista-dados'>"+v.filter(preenchido).map(function(x){return "<div class='cartao'>"+(ehObjeto(x)?renderDict(x,publicado):fmtEscalar(x))+"</div>";}).join("")+"</div>";
     }
-    return h + "</dl>";
+    return ehObjeto(v)?renderDict(v,publicado):fmtEscalar(v);
+  }
+  function renderDict(d, publicado){
+    if (!ehObjeto(d)) return "";
+    var chaves=Object.keys(d).filter(function(k){return (publicado || (!INTERNOS.has(k) && (k!=="id" || /^[EP]-/.test(String(d[k]))))) && preenchido(d[k]);});
+    var simples=[],grupos=[];
+    chaves.forEach(function(k){(ehObjeto(d[k])?grupos:simples).push(k);});
+    var h=simples.length?"<dl class='campos'>":"";
+    simples.forEach(function(k){h+="<div class='campo'><dt>"+esc(k==="id" && !publicado?(/^E-/.test(d[k])?"ID do equipamento":"Ponto"):rotulo(k))+"</dt><dd>"+fmtEscalar(d[k])+"</dd></div>";});
+    if(simples.length) h+="</dl>";
+    var chaveLat=chaves.find(function(k){return /^(latitude|lat)$/i.test(k);});
+    var chaveLon=chaves.find(function(k){return /^(longitude|lon|lng)$/i.test(k);});
+    var mapas=linksMapas(d[chaveLat],d[chaveLon]);
+    if(mapas) h+="<div class='mapas-campo'>"+mapas+"</div>";
+    grupos.forEach(function(k){
+      var conteudo=renderValor(d[k],publicado);
+      if(conteudo) h+="<section class='grupo-dados'><h4>"+esc(rotulo(k))+"</h4>"+conteudo+"</section>";
+    });
+    return h;
   }
   function secao(titulo, obj){
-    if (!ehObjeto(obj) || !Object.keys(obj).length) return "";
+    if (!ehObjeto(obj) || !preenchido(obj)) return "";
     return "<section class='secao'><h2>" + esc(titulo) + "</h2><div class='corpo'>" + renderDict(obj) + "</div></section>";
   }
-  function secaoDobrada(titulo, obj, aberto){
-    if (!ehObjeto(obj) || !Object.keys(obj).length) return "";
-    return "<details class='secao' " + (aberto ? "open" : "") + "><summary>" + esc(titulo) + "</summary>" +
-      "<div class='corpo'>" + renderDict(obj) + "</div></details>";
-  }
-
   function linkFonte(url, texto){
     if (/[{}]/.test(String(url))) return "";
     try{
@@ -305,28 +316,73 @@
     }catch(e){}
     return "";
   }
+  function escolher(obj, chaves){
+    var saida={};
+    chaves.forEach(function(k){if(preenchido(obj[k])) saida[k]=obj[k];});
+    return saida;
+  }
+  function renderVerificacoes(verificacoes){
+    if(!verificacoes.length) return "";
+    return "<div class='verificacoes'><h4>Verificações metrológicas</h4><div class='lista-dados'>"+verificacoes.map(function(v){
+      var h="<article class='cartao verificacao'><h5>"+esc(v.numero_certificado?"Certificado "+v.numero_certificado:"Verificação")+"</h5>";
+      h+=renderDict(escolher(v,["tipo_verificacao","data_verificacao","validade_ate","resultado","situacao_metrologica_derivada","orgao_executor","norma_aplicada","observacoes"]));
+      var certificado=linkFonte(v.certificado_url,"Abrir certificado");
+      if(certificado) h+="<p>"+certificado+"</p>";
+      if(v.fonte) h+="<p class='explicacao'>Fonte: "+(linkFonte(v.fonte.url,v.fonte.nome || "Consultar fonte") || esc(v.fonte.nome))+"</p>";
+      if(preenchido(v.documentos)) h+=renderValor(v.documentos);
+      return h+"</article>";
+    }).join("")+"</div></div>";
+  }
   function renderMetrologia(p){
-    var fontes = p.dados_por_fonte || p.fontes || [];
-    var correspondencia = p.correspondencia_metrologica || {};
-    var temInmetro = fontes.some(function(f){return /inmetro|psie|rbmlq/i.test(f.nome || "");});
-    var equipamentos = (p.equipamentos || []).map(function(e){return {
-      id:e.id, numero_serie:e.numero_serie, registro_aprovacao_modelo:e.registro_aprovacao_modelo,
-      portaria_aprovacao_modelo:e.portaria_aprovacao_modelo, identificadores_oficiais:e.identificadores_oficiais,
-      verificacoes_metrologicas:e.verificacoes_metrologicas, juncao_metrologica:e.juncao_metrologica,
-      documentos:e.documentos
-    };});
-    var temVerificacoes = equipamentos.some(function(e){return (e.verificacoes_metrologicas || []).length;});
-    var texto = temInmetro ? "Há publicação do Inmetro/PSIE vinculada a este cadastro. Os campos originais estão no bloco da fonte abaixo." :
-      "Não foi possível relacionar uma publicação do Inmetro/PSIE com os dados disponíveis deste cadastro. Isso não significa que o radar não tenha registro no Inmetro.";
-    if (correspondencia.estado === "compativel") texto = "Foi encontrada uma correspondência cadastral no Inmetro por município, rodovia, quilômetro, sentido e velocidade. A série do instrumento está na publicação correspondente; sua identidade física ainda precisa de confirmação. Os registros originais foram preservados.";
-    if (correspondencia.estado === "ambigua") texto = "Foram encontrados vários instrumentos compatíveis no Inmetro. A correspondência é ambígua e precisa de revisão; nenhum deles foi escolhido automaticamente.";
-    if (temVerificacoes) texto += " As verificações disponíveis estão abaixo, com resultado, datas e fonte quando informados. Confira a identificação do instrumento e a data de cada verificação.";
-    else if (!(correspondencia.candidatos || []).length) texto += " Nenhuma verificação metrológica estruturada está vinculada ao equipamento nesta resposta. Não é possível confirmar sua situação metrológica com esses dados.";
-    var h = "<details class='secao' id='metrologia' open><summary>Inmetro e verificações metrológicas</summary><div class='corpo'><p class='explicacao'>" + esc(texto) + "</p>";
-    if ((correspondencia.candidatos || []).length) h += renderDict({correspondencia_cadastral:correspondencia});
-    if ((correspondencia.divergencias || []).length) h += "<p class='explicacao'>Há divergência entre fontes sobre o funcionamento do radar. Aprovação metrológica não confirma que ele esteja operando hoje.</p>";
-    if (equipamentos.length) h += renderDict({equipamentos:equipamentos});
-    return h + "</div></details>";
+    var fontes=(p.dados_por_fonte || []).concat(p.fontes || []), c=p.correspondencia_metrologica || {};
+    var candidatos=c.candidatos || [];
+    var temInmetro=fontes.some(function(f){return /inmetro|psie|rbmlq/i.test(f.nome || "");});
+    var texto=temInmetro?"Há publicação do Inmetro/PSIE para este radar.":"Não foi possível relacionar uma publicação do Inmetro com este radar. Isso não significa que ele não tenha registro.";
+    if(c.estado === "compativel") texto="Foi encontrado um registro compatível no Inmetro. A identificação do aparelho neste local ainda precisa de confirmação.";
+    if(c.estado === "ambigua") texto="Há mais de um aparelho compatível no Inmetro. Confira a identificação de cada um; a correspondência ainda não foi confirmada.";
+    var h="<details class='secao' id='metrologia' open><summary>Inmetro e verificações metrológicas</summary><div class='corpo'><p class='explicacao'>"+esc(texto)+"</p>";
+    var instrumentos=(p.equipamentos || []).filter(function(e){return preenchido(e.verificacoes_metrologicas) || e.numero_serie;});
+    instrumentos=instrumentos.concat(candidatos);
+    instrumentos.forEach(function(e){
+      var dados=escolher(e,["numero_serie","fabricante","modelo","registro_aprovacao_modelo","portaria_aprovacao_modelo","identificadores_oficiais"]);
+      dados.equipamento_id=e.equipamento_id || e.id;
+      dados.ponto_id=e.ponto_id || p.id;
+      h+="<article class='instrumento'><h3>"+(e.numero_serie?"Aparelho · série "+esc(e.numero_serie):"Aparelho "+esc(dados.equipamento_id))+"</h3>";
+      h+=renderDict(dados)+renderVerificacoes(e.verificacoes_metrologicas || [])+"</article>";
+    });
+    if(!instrumentos.some(function(e){return (e.verificacoes_metrologicas || []).length;})) h+="<p>Não há verificações disponíveis para confirmar a situação metrológica.</p>";
+    return h+"</div></details>";
+  }
+  function renderDivergencias(p){
+    var vistos=new Set(),c=p.correspondencia_metrologica || {};
+    var divergencias=(p.conflitos || []).concat(c.divergencias || []).filter(function(v){
+      var chave=JSON.stringify(assinatura(escolher(v,["campo","categoria","faixa_id","valor_original","valor_principal","valor_correspondente","valor_publicado","valores_kmh","fonte"])));
+      if(vistos.has(chave)) return false;vistos.add(chave);return true;
+    });
+    if(!divergencias.length) return "";
+    var h="<aside class='alerta-fontes'><h3>As fontes divergem sobre este radar</h3>";
+    divergencias.forEach(function(v){
+      if(v.valores_kmh) h+="<p>Limites de velocidade diferentes para "+fmtEscalar(v.categoria || "veículos")+": <strong>"+esc(v.valores_kmh.join(" e "))+" km/h</strong>. Confira os valores publicados em cada fonte.</p>";
+      else if(preenchido(v.valor_original)) h+="<section class='grupo-dados'><h4>"+esc(rotulo(v.campo))+" diferente no ponto "+esc(v.ponto_original_id || "relacionado")+"</h4>"+renderValor(v.valor_original)+"</section>";
+      else h+="<p>"+esc(rotulo(v.campo))+": <strong>"+fmtEscalar(v.valor_principal)+"</strong> no cadastro deste ponto; <strong>"+fmtEscalar(v.valor_publicado || v.valor_correspondente)+"</strong> segundo "+esc(v.fonte || "outra fonte")+".</p>";
+    });
+    if(divergencias.some(function(v){return v.campo==="situacao_operacional";})) h+="<p>A aprovação no Inmetro não confirma que o radar esteja funcionando hoje.</p>";
+    return h+"</aside>";
+  }
+  function assinatura(v){
+    if(Array.isArray(v)) return v.map(assinatura);
+    if(!ehObjeto(v)) return v;
+    var o={};Object.keys(v).sort().forEach(function(k){o[k]=assinatura(v[k]);});return o;
+  }
+  function agruparPublicacoes(registros){
+    var grupos=new Map();
+    registros.forEach(function(r){
+      // Só agrupa o mesmo conteúdo da mesma publicação e identificação oficial.
+      var chave=JSON.stringify(assinatura([r.recurso_url,r.recurso,r.id_registro_original,r.escopo_vinculo,r.dados_publicados]));
+      if(!grupos.has(chave)) grupos.set(chave,{registro:r,datas:[]});
+      if(r.coletado_em) grupos.get(chave).datas.push(r.coletado_em);
+    });
+    return Array.from(grupos.values()).map(function(g){return Object.assign({},g.registro,{datas_consultas:g.datas.sort()});});
   }
   function renderFontes(p){
     var fontes = (p.dados_por_fonte || []).slice();
@@ -343,7 +399,7 @@
     h += "</div><p class='explicacao'>Cada bloco mostra os dados publicados por aquela fonte. Valores e datas podem divergir entre as fontes. Os blocos começam abertos e podem ser recolhidos individualmente.</p>";
     if (!fontes.length) return h + "<p class='vazio'>A origem dos dados não foi informada nesta resposta.</p>";
     fontes.forEach(function(f){
-      var registros = f.registros || [];
+      var registros = agruparPublicacoes(f.registros || []);
       var natureza = {oficial:"Fonte oficial", comunitaria:"Contribuição pública", outra:"Cadastro próprio"}[f.natureza];
       h += "<details class='secao fonte' open><summary><h3>" + esc(f.nome || f.organizacao || "Fonte não identificada") + "</h3>";
       if (natureza) h += "<span class='pill'>" + esc(natureza) + "</span>";
@@ -352,17 +408,18 @@
       var institucional = linkFonte(f.url, "Consultar a fonte");
       if (institucional) h += "<p>" + institucional + "</p>";
       if (!registros.length){
-        h += "<p class='vazio'>Os dados desta fonte ainda não estão discriminados nesta resposta.</p>" + renderDict(f);
+        h += "<p class='vazio'>Os dados desta fonte ainda não estão disponíveis.</p>";
       }
       registros.forEach(function(r, i){
-        h += "<article class='publicacao'><h4>" + esc(r.recurso || "Dados publicados");
+        h += "<article class='publicacao'><h4>" + esc(r.id_registro_original?"Cadastro "+r.id_registro_original:"Dados publicados");
         if (registros.length > 1) h += " · registro " + (i + 1) + " de " + registros.length;
         h += "</h4>";
-        if (r.coletado_em) h += "<p class='explicacao'>Coletado em " + esc(fmtData(r.coletado_em)) + "</p>";
-        if (r.escopo_vinculo === "correspondencia_cadastral") h += "<p class='explicacao'>Publicação com correspondência cadastral. A identidade física ainda não foi consolidada; confira os dados e divergências de cada fonte.</p>";
-        if (r.escopo_vinculo === "equipamento") h += "<p class='explicacao'>Publicação associada ao instrumento. A localização e os limites da via continuam identificados em suas fontes.</p>";
+        var datas=r.datas_consultas || [];
+        if(datas.length) h+="<p class='explicacao'>Consultado em "+esc(fmtData(datas[datas.length-1]))+(datas.length>1?" · Também consultado em "+esc(fmtData(datas[0])):"")+"</p>";
+        if (r.escopo_vinculo === "correspondencia_cadastral") h += "<p class='explicacao'>Registro compatível com este local. A identificação do aparelho ainda precisa de confirmação.</p>";
+        if (r.escopo_vinculo === "equipamento") h += "<p class='explicacao'>Dados publicados para este aparelho.</p>";
         if (r.dados_publicados != null && (!ehObjeto(r.dados_publicados) || Object.keys(r.dados_publicados).length)){
-          h += renderValor(r.dados_publicados);
+          h += renderValor(r.dados_publicados, true);
         } else {
           h += "<p class='vazio'>Os campos publicados não estão disponíveis para este registro.</p>";
         }
@@ -371,7 +428,7 @@
         if (typeof ufFonte === "string" && /^[A-Z]{2}$/.test(ufFonte)) urlRecurso = urlRecurso.replace("{uf}", ufFonte);
         var recurso = linkFonte(urlRecurso, "Abrir a publicação original");
         if (recurso) h += "<p>" + recurso + "</p>";
-        h += "<details class='origem-publicacao'><summary>Identificação e rastreabilidade da publicação</summary>" + renderDict({registro_id:r.registro_id, id_registro_original:r.id_registro_original, coletado_em:r.coletado_em, hash_artefato:r.hash_artefato}) + "</details></article>";
+        h += "</article>";
       });
       h += "</div></details>";
     });
@@ -401,12 +458,12 @@
     var res = d.resultado || {};
     var pontos = res.pontos || [];
     if (!pontos.length){ semId("Nenhum registro encontrado para <code>" + esc(id) + "</code>."); return; }
-    desenhar(pontos[0], d, res);
+    desenhar(pontos[0]);
   }).catch(function(e){
     semId("Erro de rede: " + esc(e.message));
   });
 
-  function desenhar(p, d, res){
+  function desenhar(p){
     var loc = p.localizacao || {};
     var via = loc.via || {};
     var lat = loc.latitude, lon = loc.longitude;
@@ -421,43 +478,33 @@
     h += "<div class='resumo'>";
     h += "<span class='pill'>" + esc(p.id) + "</span>";
     if (nosso) h += "<span class='pill nosso'>Bundita de Urso</span>";
-    if (p.situacao_operacional) h += "<span class='pill " + (p.situacao_operacional === "ativo" ? "ok" : "ruim") + "'>" + esc(p.situacao_operacional) + "</span>";
+    if (p.situacao_operacional) h += "<span class='pill " + (p.situacao_operacional === "ativo" ? "ok" : "ruim") + "'>" + fmtEscalar(p.situacao_operacional) + "</span>";
     var lugar = [loc.municipio, loc.uf].filter(Boolean).join("/");
     if (lugar) h += "<span class='pill'>" + esc(lugar) + "</span>";
     if (viaTxt) h += "<span class='pill'>" + esc(viaTxt) + (loc.km != null ? " · km " + esc(loc.km) : "") + "</span>";
-    if (vel != null) h += "<span class='pill ruim'>" + esc(vel) + " km/h</span>";
+    if ((p.conflitos || []).some(function(c){return c.campo === "limite_velocidade";})) h += "<span class='pill ruim'>Limites de velocidade divergentes</span>";
+    else if (vel != null) h += "<span class='pill ruim'>" + esc(vel) + " km/h</span>";
     h += "</div>";
     h += "<div id='mapa'></div>";
     var mapas = linksMapas(lat, lon);
     if (mapas) h += "<div class='mapas-principais'>" + mapas + "</div>";
 
+    if(/inferida|estimada|aproximada/.test(loc.qualidade || "")) h+="<p class='alerta-fontes'>Localização aproximada: esta posição é uma estimativa. Confira o endereço e a referência da via nas fontes.</p>";
+    h += renderDivergencias(p);
     h += renderMetrologia(p);
     h += renderFontes(p);
-    if (p.explicacao) h += secao("Resumo com fontes e divergências", {resumo:p.explicacao.texto});
-    h += "<details class='secao consolidado' open><summary>Visão consolidada do radar</summary><div class='corpo'><p class='explicacao'>Resumo organizado pela base a partir dos registros associados. Para conferir o que cada fonte publicou, consulte os blocos acima. Posições inferidas são estimativas, não GPS oficial.</p>";
-    h += secao("Localização", {localizacao: p.localizacao});
-    h += secao("Identificação e situação", {id:p.id, tipo_registro:p.tipo_registro, tipos_radar_presentes:p.tipos_radar_presentes, situacao_operacional:p.situacao_operacional, situacao_original:p.situacao_original, data_inicio_operacao:p.data_inicio_operacao, data_inativacao:p.data_inativacao, motivo_inativacao:p.motivo_inativacao});
-    h += secao("Velocidade e faixas", {velocidade_leves_kmh:p.velocidade_leves_kmh, velocidade_pesados_kmh:p.velocidade_pesados_kmh, velocidade_geral_kmh:p.velocidade_geral_kmh, velocidades_resolvidas:p.velocidades_resolvidas, limites_velocidade:p.limites_velocidade, faixas:p.faixas, quantidade_faixas_declarada:p.quantidade_faixas_declarada, conflitos:p.conflitos});
-    h += secao("Regimes de fiscalização", {regimes:p.regimes});
-    h += secao("Equipamentos e instalações", {equipamentos:p.equipamentos});
-    h += secao("Organizações", {organizacoes:p.organizacoes});
+    h += "<details class='secao consolidado' open><summary>Localização e características do radar</summary><div class='corpo'>";
+    h += secao("Localização", escolher(loc,["latitude","longitude","municipio","uf","endereco","via","km","tipo_pista","precisao_metros"]));
+    h += secao("Identificação e funcionamento", escolher(p,["id","identificadores_oficiais","tipos_radar_presentes","situacao_operacional","situacao_original","data_inicio_operacao","data_inativacao","motivo_inativacao"]));
+    h += secao("Velocidade e faixas", escolher(p,["velocidade_leves_kmh","velocidade_pesados_kmh","velocidade_geral_kmh","limites_velocidade","faixas","quantidade_faixas_declarada"]));
+    h += secao("Fiscalização", {regimes:p.regimes});
+    var equipamentos=(p.equipamentos || []).map(function(e){return escolher(e,["id","numero_serie","tipo_radar","funcao_equipamento","fabricante","modelo","tecnologia_medicao","ano_fabricacao","identificadores_oficiais","registro_aprovacao_modelo","portaria_aprovacao_modelo","instalacoes","proprietario","mantenedor","ultima_manutencao","documentos","observacoes"]);});
+    h += secao("Equipamentos e instalações", {equipamentos:equipamentos});
+    h += secao("Responsáveis", {organizacoes:p.organizacoes});
     h += secao("Documentos", {documentos:p.documentos});
     h += secao("Operações", {operacoes:p.operacoes});
-    h += secao("Rastreabilidade e datas", {primeira_observacao:p.primeira_observacao, ultima_confirmacao:p.ultima_confirmacao, ultima_coleta:p.ultima_coleta, confianca:p.confianca, observacoes:p.observacoes, proveniencia_campos:p.proveniencia_campos});
-
-    // tudo o que sobrou (garante que NENHUM campo fique de fora)
-    var usados = {correspondencia_metrologica:1,explicacao:1,localizacao:1,tipo_registro:1,situacao_operacional:1,situacao_original:1,data_inicio_operacao:1,data_inativacao:1,motivo_inativacao:1,velocidade_leves_kmh:1,velocidade_pesados_kmh:1,velocidade_geral_kmh:1,velocidades_resolvidas:1,limites_velocidade:1,faixas:1,quantidade_faixas_declarada:1,conflitos:1,regimes:1,equipamentos:1,organizacoes:1,documentos:1,operacoes:1,primeira_observacao:1,ultima_confirmacao:1,ultima_coleta:1,confianca:1,observacoes:1,proveniencia_campos:1,fontes:1,dados_por_fonte:1,id:1,tipos_radar_presentes:1,total_pontos:1,total_equipamentos:1,retornados:1,proximo_cursor:1,status:1,total_operacoes:1};
-    var resto = {};
-    Object.keys(p).forEach(function(k){ if (!usados[k]) resto[k] = p[k]; });
-    h += secao("Outros campos", resto);
-
+    h += secao("Observações", {observacoes:p.observacoes});
     h += "</div></details>";
-
-    h += secaoDobrada("Procedência da resposta (API)", {consultado_em:d.consultado_em, versao_api:d.versao_api, versao_esquema:d.versao_esquema, consulta:d.consulta, total_pontos:res.total_pontos, total_equipamentos:res.total_equipamentos, total_operacoes:res.total_operacoes, status:res.status}, true);
-    h += secaoDobrada("Cobertura da base", d.cobertura, true);
-    h += secaoDobrada("Estado da base (snapshot)", d.base, true);
-
-    h += "<div class='rodape'>Consulta: API Radar Brasil <code>/api/v1/radares/" + esc(id) + "</code>. As fontes dos dados estão identificadas em seus próprios blocos. Campo ausente significa <i>não informado</i>, não zero.</div>";
 
     principal.innerHTML = h;
     function abrirFontes(aberto){
