@@ -129,6 +129,9 @@ for(const temAbort of [true,false]){
     const primeiro=await gravado;
     expect(primeiro.resultado.protocolo).toMatch(/^[a-f0-9]{32}$/);
     await expect(page.locator('#bt')).toHaveText('Enviando…');
+    // O cenario e a resposta perdida de um cadastro ja processado. A entrega
+    // segue presa no navegador; aguardamos o worker real antes do reenvio.
+    await expect.poll(async()=> (await envio(request,primeiro.resultado.protocolo)).estado).toBe('processado');
     await page.clock.fastForward(20001);
     await expect(page.locator('#res')).toContainText('não confirmou o envio em 20 segundos');
     await expect(page.locator('#bt')).toBeEnabled();
