@@ -1,0 +1,100 @@
+{
+  "antt": {
+    "concessionaria": "EPR IGUAÇU",
+    "ano_do_pnv_snv": "2019",
+    "tipo_de_radar": "Controlador",
+    "rodovia": "BR-277",
+    "uf": "PR",
+    "km_m": "597,42",
+    "municipio": "Cascavel",
+    "tipo_de_pista": "Principal",
+    "sentido": "Decrescente",
+    "situacao": "Ativo",
+    "data_da_inativacao": "",
+    "latitude": "-24,982289",
+    "longitude": "-53,501882",
+    "velocidade_leve": "60",
+    "velocidade_pesado": "60"
+  },
+  "inmetro": {
+    "SiglaUf": "PR",
+    "Estado": "Paraná",
+    "Municipio": "CASCAVEL",
+    "LocalVerificacao": "BR-277 KM 597+420",
+    "DataUltimaVerificacao": "04/05/2026",
+    "DataValidade": "03/05/2027",
+    "UltimoResultado": "Aprovado",
+    "TipoMedidor": "Fixo",
+    "NumeroInmetro": "16176985",
+    "NumeroSerie": "FSC110-0811",
+    "Faixas": [
+      {
+        "NumeroFaixa": "2",
+        "NumeroInmetro": "16176985",
+        "NumeroSerie": "FSC110-0811",
+        "Sentido": "DECRESCENTE",
+        "VelocidadeNominal": "60"
+      },
+      {
+        "NumeroFaixa": "1",
+        "NumeroInmetro": "16176985",
+        "NumeroSerie": "FSC110-0811",
+        "Sentido": "DECRESCENTE",
+        "VelocidadeNominal": "60"
+      },
+      {
+        "NumeroFaixa": "3",
+        "NumeroInmetro": "16176985",
+        "NumeroSerie": "FSC110-0811",
+        "Sentido": "DECRESCENTE",
+        "VelocidadeNominal": "60"
+      }
+    ],
+    "Historico": [
+      {
+        "NumeroCertificado": "16415173",
+        "NumeroEnsaio": "447",
+        "Ano": "2026",
+        "DataLaudo": "04/05/2026",
+        "DataValidade": "03/05/2027",
+        "TipoServico": "Após Reparo",
+        "Resultado": "Aprovado"
+      }
+    ],
+    "Proprietario": {
+      "Nome": "FISCAL TECNOLOGIA E AUTOMACAO LTDA",
+      "Municipio": "CURITIBA",
+      "Estado": "PR"
+    },
+    "LocaisVerificacao": [
+      "BR-277 KM 597+420"
+    ]
+  },
+  "prf": {
+    "CONCESSIONÁRIA": "EPR IGUAÇU",
+    "ESTADO": "INOPERANTE",
+    "IMAGENS": "NÃO GERANDO",
+    "IDENTIFICADOR": "EPI016",
+    "EQUIPAMENTO": "FSC110-0811",
+    "MARCA": "FISCAL TECNOLOGIA",
+    "MODELO": "FSC110",
+    "UF": "PR",
+    "MUNICÍPIO": "Cascavel",
+    "BR": 277,
+    "LOCAL": 597.42,
+    "SENTIDO": "DECRESCENTE",
+    "FAIXAS": 3,
+    "VALIDADE DO CERTIFICADO": null,
+    "VALIDADE DO DOCUMENTO": null,
+    "DATA DO DOCUMENTO": null,
+    "E/L ATUAL": null,
+    "TIPO EQUIPAMENTO": "CONTROLADOR",
+    "LATITUDE": null,
+    "LONGITUDE": null,
+    "VELOCIDADE LEVE": null,
+    "VELOCIDADE PESADO": null,
+    "link": null,
+    "OBSERVAÇÃO": null,
+    "DIAS SEM IMAGENS": null
+  }
+}

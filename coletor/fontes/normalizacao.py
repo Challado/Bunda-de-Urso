@@ -33,6 +33,8 @@ def normalizar_tipo_radar(v):
 
 def normalizar_situacao(v):
     t = _txt(v)
+    if "inoperante" in t:
+        return "inativo"
     if "manut" in t:
         return "manutencao"
     if "suspens" in t:

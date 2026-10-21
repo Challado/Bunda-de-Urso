@@ -36,7 +36,10 @@ def main(argv=None):
             governanca.garantir_esquema(conn)
         conn.execute('BEGIN IMMEDIATE')
         try:
+            from core.reparo_mapeamentos import reparar
+            mapeamentos = reparar(conn)
             resumo = reconciliar(conn)
+            resumo["mapeamentos"] = mapeamentos
             if conn.execute('PRAGMA foreign_key_check').fetchone() is not None:
                 raise RuntimeError('Reconciliacao produziu referencia invalida.')
             if args.aplicar:

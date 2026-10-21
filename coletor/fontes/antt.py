@@ -141,12 +141,11 @@ class ColetorANTT(ColetorBase):
             "municipio_ibge": nz.pick(raw, "CodigoIBGE", "codigo_ibge",
                                       "ibge", "CodIBGE"),
             "via_codigo": rodovia,
-            "km": nz.to_float(nz.pick(raw, "Km", "KM", "km", "Quilometro")),
-            "tipo_pista": nz.pick(raw, "Pista", "pista", "Faixa"),
+            "km": nz.to_float(nz.pick(raw, "Km", "KM", "km", "Quilometro", "km_m")),
+            "tipo_pista": nz.pick(raw, "Pista", "pista", "Faixa", "tipo_de_pista"),
             "situacao": nz.normalizar_situacao(
                 nz.pick(raw, "Situacao", "Situação", "situacao", "status")),
-            "tipo_radar": nz.normalizar_tipo_radar(
-                nz.pick(raw, "Tipo", "tipo", "TipoRadar", "Equipamento")),
+            "tipo_radar": self._tipo(nz.pick(raw, "Tipo", "tipo", "TipoRadar", "Equipamento", "tipo_de_radar")),
             "numero_serie": nz.pick(raw, "NumeroSerie", "numero_serie",
                                     "Serie", "serie"),
             "fabricante": nz.pick(raw, "Fabricante", "fabricante", "Marca"),
@@ -164,3 +163,10 @@ class ColetorANTT(ColetorBase):
                                    "Concessionaria", "concessionaria"),
         }
         return d
+
+    @staticmethod
+    def _tipo(valor):
+        # Nesta publicacao, controlador/redutor designam equipamentos fixos.
+        if str(valor or '').strip().lower() in ('controlador', 'redutor', 'lombada eletronica', 'lombada eletrônica'):
+            return 'fixo'
+        return nz.normalizar_tipo_radar(valor)

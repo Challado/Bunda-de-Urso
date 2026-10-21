@@ -126,3 +126,11 @@ proveniência, aliases, decisões humanas, backup e simulação. Esses testes en
 na suíte obrigatória do GitHub Actions. Não se usa comparação de nomes de
 colunas como prova geral de 3FN; as regras de negócio e dependências acima
 fazem parte do contrato revisado.
+
+### Reparo de mapeamentos após a revisão inicial
+
+O instalador também completa campos desconhecidos usando os registros arquivados
+de ANTT/Inmetro/PRF, dentro da transação e do backup da reconciliação. Não recria
+as tabelas nem altera os originais. A [correspondência cadastral sem série](JUNCAO_METROLOGICA.md#correspondência-cadastral-quando-a-fonte-não-publica-série)
+é derivada na leitura, com origem e ambiguidades explícitas; não cria identidade
+física nem substitui os relacionamentos normalizados por cópias de atributos.

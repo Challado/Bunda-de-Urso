@@ -307,6 +307,7 @@
   }
   function renderMetrologia(p){
     var fontes = p.dados_por_fonte || p.fontes || [];
+    var correspondencia = p.correspondencia_metrologica || {};
     var temInmetro = fontes.some(function(f){return /inmetro|psie|rbmlq/i.test(f.nome || "");});
     var equipamentos = (p.equipamentos || []).map(function(e){return {
       id:e.id, numero_serie:e.numero_serie, registro_aprovacao_modelo:e.registro_aprovacao_modelo,
@@ -316,10 +317,14 @@
     };});
     var temVerificacoes = equipamentos.some(function(e){return (e.verificacoes_metrologicas || []).length;});
     var texto = temInmetro ? "Há publicação do Inmetro/PSIE vinculada a este cadastro. Os campos originais estão no bloco da fonte abaixo." :
-      "Não há publicação do Inmetro/PSIE vinculada a este cadastro na base. Isso não comprova ausência de registro no Inmetro nem irregularidade do equipamento.";
+      "Não foi possível relacionar uma publicação do Inmetro/PSIE com os dados disponíveis deste cadastro. Isso não significa que o radar não tenha registro no Inmetro.";
+    if (correspondencia.estado === "compativel") texto = "Foi encontrada uma correspondência cadastral no Inmetro por município, rodovia, quilômetro, sentido e velocidade. A série do instrumento está na publicação correspondente; sua identidade física ainda precisa de confirmação. Os registros originais foram preservados.";
+    if (correspondencia.estado === "ambigua") texto = "Foram encontrados vários instrumentos compatíveis no Inmetro. A correspondência é ambígua e precisa de revisão; nenhum deles foi escolhido automaticamente.";
     if (temVerificacoes) texto += " As verificações disponíveis estão abaixo, com resultado, datas e fonte quando informados. Confira a identificação do instrumento e a data de cada verificação.";
-    else texto += " Nenhuma verificação metrológica estruturada está vinculada ao equipamento nesta resposta. Não é possível confirmar sua situação metrológica com esses dados.";
+    else if (!(correspondencia.candidatos || []).length) texto += " Nenhuma verificação metrológica estruturada está vinculada ao equipamento nesta resposta. Não é possível confirmar sua situação metrológica com esses dados.";
     var h = "<details class='secao' id='metrologia' open><summary>Inmetro e verificações metrológicas</summary><div class='corpo'><p class='explicacao'>" + esc(texto) + "</p>";
+    if ((correspondencia.candidatos || []).length) h += renderDict({correspondencia_cadastral:correspondencia});
+    if ((correspondencia.divergencias || []).length) h += "<p class='explicacao'>Há divergência entre fontes sobre o funcionamento do radar. Aprovação metrológica não confirma que ele esteja operando hoje.</p>";
     if (equipamentos.length) h += renderDict({equipamentos:equipamentos});
     return h + "</div></details>";
   }
@@ -354,6 +359,7 @@
         if (registros.length > 1) h += " · registro " + (i + 1) + " de " + registros.length;
         h += "</h4>";
         if (r.coletado_em) h += "<p class='explicacao'>Coletado em " + esc(fmtData(r.coletado_em)) + "</p>";
+        if (r.escopo_vinculo === "correspondencia_cadastral") h += "<p class='explicacao'>Publicação com correspondência cadastral. A identidade física ainda não foi consolidada; confira os dados e divergências de cada fonte.</p>";
         if (r.escopo_vinculo === "equipamento") h += "<p class='explicacao'>Publicação associada ao instrumento. A localização e os limites da via continuam identificados em suas fontes.</p>";
         if (r.dados_publicados != null && (!ehObjeto(r.dados_publicados) || Object.keys(r.dados_publicados).length)){
           h += renderValor(r.dados_publicados);
@@ -440,7 +446,7 @@
     h += secao("Rastreabilidade e datas", {primeira_observacao:p.primeira_observacao, ultima_confirmacao:p.ultima_confirmacao, ultima_coleta:p.ultima_coleta, confianca:p.confianca, observacoes:p.observacoes, proveniencia_campos:p.proveniencia_campos});
 
     // tudo o que sobrou (garante que NENHUM campo fique de fora)
-    var usados = {explicacao:1,localizacao:1,tipo_registro:1,situacao_operacional:1,situacao_original:1,data_inicio_operacao:1,data_inativacao:1,motivo_inativacao:1,velocidade_leves_kmh:1,velocidade_pesados_kmh:1,velocidade_geral_kmh:1,velocidades_resolvidas:1,limites_velocidade:1,faixas:1,quantidade_faixas_declarada:1,conflitos:1,regimes:1,equipamentos:1,organizacoes:1,documentos:1,operacoes:1,primeira_observacao:1,ultima_confirmacao:1,ultima_coleta:1,confianca:1,observacoes:1,proveniencia_campos:1,fontes:1,dados_por_fonte:1,id:1,tipos_radar_presentes:1,total_pontos:1,total_equipamentos:1,retornados:1,proximo_cursor:1,status:1,total_operacoes:1};
+    var usados = {correspondencia_metrologica:1,explicacao:1,localizacao:1,tipo_registro:1,situacao_operacional:1,situacao_original:1,data_inicio_operacao:1,data_inativacao:1,motivo_inativacao:1,velocidade_leves_kmh:1,velocidade_pesados_kmh:1,velocidade_geral_kmh:1,velocidades_resolvidas:1,limites_velocidade:1,faixas:1,quantidade_faixas_declarada:1,conflitos:1,regimes:1,equipamentos:1,organizacoes:1,documentos:1,operacoes:1,primeira_observacao:1,ultima_confirmacao:1,ultima_coleta:1,confianca:1,observacoes:1,proveniencia_campos:1,fontes:1,dados_por_fonte:1,id:1,tipos_radar_presentes:1,total_pontos:1,total_equipamentos:1,retornados:1,proximo_cursor:1,status:1,total_operacoes:1};
     var resto = {};
     Object.keys(p).forEach(function(k){ if (!usados[k]) resto[k] = p[k]; });
     h += secao("Outros campos", resto);

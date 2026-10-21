@@ -31,7 +31,10 @@ def main():
         fixture = base / 'oficial.json'
         oficial = {'Codigo':'E2E-OFICIAL', 'Latitude':-24.9556,
             'Longitude':-53.4552, 'Rodovia':'BR-277', 'Km':580.5, 'VelocidadeLeves':80}
-        if '--com-metrologia' in sys.argv:
+        if '--correspondencia-cadastral' in sys.argv:
+            dados_reais=json.loads((ROOT/'tests'/'fixtures'/'novos'/'correspondencia_e604.json').read_text())
+            oficial=dict(dados_reais['antt'], CodigoIBGE='4104808')
+        elif '--com-metrologia' in sys.argv:
             oficial.update(UF='PR', Municipio='Cascavel', CodigoIBGE='4104808',
                            NumeroSerie='E2E118690160', Tipo='Fixo')
         fixture.write_text(json.dumps([oficial]))
@@ -45,6 +48,8 @@ def main():
                 'DataUltimaVerificacao':'25/06/2026', 'DataValidade':'24/06/2027',
                 'UltimoResultado':'Aprovado', 'Faixas':[{'NumeroFaixa':'1',
                     'NumeroSerie':'E2E118690160', 'VelocidadeNominal':'40'}], 'Historico':[]}]))
+            if '--correspondencia-cadastral' in sys.argv:
+                fixture_inmetro.write_text(json.dumps([dados_reais['inmetro']]))
             for args in (
                 ['sync','--fonte','inmetro','--arquivo',str(fixture_inmetro),'--sem-publicar'],
                 ['ferramenta','inicializar_banco'],

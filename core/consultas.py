@@ -748,7 +748,7 @@ _CAMPOS_PUBLICOS_CADASTRO = frozenset((
 ))
 
 
-def _dados_por_fonte(conn, pid, visao, registros_metrologicos=()):
+def _dados_por_fonte(conn, pid, visao, registros_metrologicos=(), registros_cadastrais=()):
     """Publicacoes originais por fonte, somente no detalhe do ponto.
 
     Nao atribui campos consolidados a todas as fontes nem reinterpreta o bruto
@@ -765,6 +765,7 @@ def _dados_por_fonte(conn, pid, visao, registros_metrologicos=()):
             JOIN VINCULO_REGISTRO_EQUIPAMENTO ve ON ve.equipamento_id=i.equipamento_id
             WHERE i.ponto_id=? AND ve.decisao_id IS NULL""", (membro,)))
     selecionados.update(rid for rid in registros_metrologicos if rid is not None)
+    selecionados.update(registros_cadastrais)
     # Consultas por PK evitam produto cartesiano entre faixas, verificacoes e fontes.
     for rid in sorted(selecionados):
         for row in dbmod.query_all(conn, """
@@ -805,7 +806,8 @@ def _dados_por_fonte(conn, pid, visao, registros_metrologicos=()):
             "recurso": row["recurso"], "recurso_url": row["url_recurso"],
             "coletado_em": row["baixado_em"],
             "hash_artefato": row["hash_sha256"], "dados_publicados": dados,
-            "escopo_vinculo": "ponto" if row["registro_id"] in registros_do_ponto else "equipamento",
+            "escopo_vinculo": ("ponto" if row["registro_id"] in registros_do_ponto else
+                              "correspondencia_cadastral" if row["registro_id"] in registros_cadastrais else "equipamento"),
         })
     return sorted(grupos.values(), key=lambda grupo: ((grupo["nome"] or "").casefold(), grupo["id"] or ""))
 
@@ -838,8 +840,18 @@ def buscar_ponto_por_id(conn, pid_str):
                                     for e in registro["equipamentos"]]
         verificacoes = [v for e in registro["equipamentos"] for v in e["verificacoes_metrologicas"]]
         origens = [origem for v in verificacoes for origem in v.get("origens", [v])]
+        from .metrologia import correspondencias_por_local
+        correspondencia = correspondencias_por_local(conn,pid,visao)
+        for candidato in correspondencia["candidatos"]:
+            instrumento = buscar_equipamento_por_id(conn,candidato["equipamento_id"],visao=visao)
+            candidato["verificacoes_metrologicas"] = [v for v in instrumento["verificacoes_metrologicas"]
+                if v["fonte_registro_id"] in candidato["registros_origem"]] if instrumento else []
+        registro["correspondencia_metrologica"] = correspondencia
+        registro["conflitos"] = _unicos(registro["conflitos"] + correspondencia["divergencias"])
+        if correspondencia["divergencias"]:
+            registro["confianca"] = "conflitante"
         registro["dados_por_fonte"] = _dados_por_fonte(
-            conn, pid, visao, [v["fonte_registro_id"] for v in origens])
+            conn, pid, visao, [v["fonte_registro_id"] for v in origens], correspondencia["registros_relacionados"])
         registro["fontes"] = _unicos(registro["fontes"] + [v["fonte"] for v in origens if v["fonte"]])
         # Complementos sao inferencias da base, nao publicacoes da fonte do envio.
         # O detalhe expoe a origem separadamente, sem reescrever o bruto.
