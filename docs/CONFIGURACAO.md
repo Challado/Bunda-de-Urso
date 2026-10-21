@@ -197,6 +197,14 @@ são preservados. `--verificar` audita a instalação, sem aplicar alterações,
 falha se existem divergências. `--relatorio` salva a auditoria em JSON; a atualização
 sempre guarda `checagem-final.json` no backup.
 
+A regra do logrotate informa `su` com `instalacao.usuario` e `instalacao.grupo`
+do `radar.conf`, permitindo rotacionar a pasta de logs gravável pelo grupo do CGI.
+A validação usa `logrotate --debug`, sem girar os arquivos. Em falha, o relatório
+registra o comando, código de saída e mensagens de erro (saída limitada a 16 KiB por
+canal). A recuperação também restaura a regra anterior: se ela não existia antes da
+tentativa, ficará ausente após a recuperação. O relatório no backup descreve a
+checagem antes dessa recuperação, não o estado posterior do servidor.
+
 Entradas antigas ou duplicadas do cron do coletor são reconhecidas, inclusive chamadas
 diretas antigas a `coletor/tick.py` e `api.pse tick`, e consolidadas em um tick por minuto.
 Agendamentos dos sincronizadores privados e outros projetos são preservados. Uma falha

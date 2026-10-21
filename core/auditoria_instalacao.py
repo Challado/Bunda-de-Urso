@@ -2,6 +2,8 @@
 import hashlib
 import json
 import os
+import grp
+import pwd
 from pathlib import Path
 import shlex
 import shutil
@@ -85,7 +87,36 @@ def bootstrap(texto, conf):
 
 def render_logrotate(origem, logs):
     diretorio = str(logs).replace("\\", "\\\\").replace('"', '\\"')
-    return (origem / "deploy" / "openclaw-radar.logrotate").read_text().replace("@RADAR_LOG_DIR@", diretorio)
+    conta = pwd.getpwuid(os.geteuid())
+    gid = Path(logs).stat().st_gid if Path(logs).exists() else conta.pw_gid
+    usuario = caminhos.valor("instalacao", "usuario", conta.pw_name)[0]
+    grupo = caminhos.valor("instalacao", "grupo", grp.getgrgid(gid).gr_name)[0]
+    # Alem de conferir as contas, impede injetar diretivas no modelo.
+    pwd.getpwnam(usuario)
+    grp.getgrnam(grupo)
+    return ((origem / "deploy" / "openclaw-radar.logrotate").read_text()
+            .replace("@RADAR_LOG_DIR@", diretorio)
+            .replace("@RADAR_LOG_USUARIO@", usuario)
+            .replace("@RADAR_LOG_GRUPO@", grupo))
+
+
+def validar_logrotate(arquivo):
+    comando = ["logrotate", "--debug", str(arquivo)]
+    try:
+        r = subprocess.run(comando, capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {"checagem": "logrotate.sintaxe", "estado": "erro", "comando": comando,
+                "detalhe": "Nao foi possivel concluir a verificacao do logrotate: " + str(exc)}
+    resultado = {"checagem": "logrotate.sintaxe", "estado": "ok" if r.returncode == 0 else "erro",
+                 "codigo_saida": r.returncode,
+                 "detalhe": "configuracao e permissoes aceitas, sem executar rotacao"}
+    if r.returncode:
+        linhas = (r.stderr + "\n" + r.stdout).splitlines()
+        erros = [linha for linha in linhas if linha.strip().lower().startswith("error:")]
+        resultado.update(comando=comando, stdout=r.stdout[:16384], stderr=r.stderr[:16384],
+                         saida_truncada=len(r.stdout) > 16384 or len(r.stderr) > 16384,
+                         detalhe="Logrotate reprovou: " + "\n".join(erros or linhas[-20:])[:4096])
+    return resultado
 
 
 def artefatos(origem, dirs, codigo, estaticos):

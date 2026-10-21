@@ -20,7 +20,7 @@
 # E o diretorio que o cron, o nginx e os scripts usam como referencia.
 home = /openclaw/bin/radar
 
-# Dono esperado dos arquivos (informativo; conf_radar.py --verificar confere).
+# Dono esperado do codigo e contas da rotacao de logs (diretiva su do logrotate).
 usuario = root
 grupo = www-data
 

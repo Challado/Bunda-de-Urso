@@ -151,7 +151,7 @@ def _cron_tick(texto, wrapper):
 
 def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None):
     if not laboratorio and os.geteuid() != 0:
-        raise RuntimeError("Execute com sudo para aplicar no servidor.")
+        raise RuntimeError("Execute como root para aplicar no servidor.")
     conta = pwd.getpwnam(usuario_web)
     grupo = conta.pw_gid
     agora = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
@@ -438,7 +438,7 @@ def main(argv=None):
 
 def _recuperar(backup, dirs, laboratorio):
     if not laboratorio and os.geteuid() != 0:
-        raise RuntimeError("Execute a recuperacao com sudo.")
+        raise RuntimeError("Execute a recuperacao como root.")
     backup = backup.resolve(strict=True)
     raiz = (dirs["dados"] / "backups" / "instalacao").resolve()
     if backup.parent != raiz:
@@ -536,9 +536,7 @@ def _diagnosticar(origem, dirs, usuario_web, laboratorio, cron, final=False):
                           and not dirs["conf"].stat().st_mode & 0o022 else "erro",
                           "detalhe": "entradas executaveis; configuracao sem escrita por grupo/outros"})
         if not laboratorio:
-            r = subprocess.run(["logrotate", "--debug", str(logrotate)], capture_output=True, text=True, timeout=30)
-            checagens.append({"checagem": "logrotate.sintaxe", "estado": "ok" if r.returncode == 0 else "erro",
-                              "detalhe": "validacao sem executar rotacao de arquivos"})
+            checagens.append(auditoria.validar_logrotate(logrotate))
             try:
                 arq = dirs["conf"]
                 comando = [sys.executable, str(dirs["codigo"] / "web" / "api.pse"),
