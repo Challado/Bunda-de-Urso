@@ -200,6 +200,27 @@ if (geoSup && navigator.permissions && navigator.permissions.query){
   } catch (e) { /* navegador sem essa consulta: segue sem o preenchimento automatico */ }
 }
 
+// Inclui o tempo de leitura do corpo. Interrompe a espera mesmo em navegadores
+// sem AbortController; uma resposta atrasada nao pode substituir outra tentativa.
+var PRAZO_ENVIO_MS = 20000;
+function enviarCadastro(body){
+  var controle = typeof AbortController !== "undefined" ? new AbortController() : null;
+  var opcoes = {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)};
+  if (controle) opcoes.signal = controle.signal;
+  var timer;
+  var requisicao = new Promise(function(resolve,reject){
+    timer = setTimeout(function(){
+      var erro = new Error("prazo de envio excedido");erro.codigo="prazo_envio";
+      reject(erro);
+      if (controle) controle.abort();
+    }, PRAZO_ENVIO_MS);
+    Promise.resolve().then(function(){return fetch(API,opcoes);})
+      .then(function(r){return r.json().catch(function(){return {};}).then(function(j){return {status:r.status,body:j};});})
+      .then(resolve,reject);
+  });
+  return requisicao.then(function(r){clearTimeout(timer);return r;},function(erro){clearTimeout(timer);throw erro;});
+}
+
 form.addEventListener("submit", function(ev){
   ev.preventDefault();
   if (document.getElementById("bt").disabled) return;
@@ -223,8 +244,7 @@ form.addEventListener("submit", function(ev){
   var bt = document.getElementById("bt");
   bt.disabled = true; bt.textContent = "Enviando…";
   document.getElementById("res").innerHTML = "";
-  fetch(API, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)})
-    .then(function(r){ return r.json().catch(function(){return {};}).then(function(j){ return {status:r.status, body:j}; }); })
+  enviarCadastro(body)
     .then(function(o){
       var j = o.body || {};
       var res = j.resultado || j;
@@ -250,7 +270,7 @@ form.addEventListener("submit", function(ev){
         diz("<b>Não foi possível cadastrar</b> (HTTP " + o.status + ")." + (erro.mensagem ? "<br>" + esc(erro.mensagem) : "") + (erros ? "<br>" + erros : ""), "err");
       }
     })
-    .catch(function(){ diz("Não foi possível confirmar o envio. Confira a conexão e tente novamente; um envio idêntico não cria outro cadastro.", "err"); })
+    .catch(function(erro){ diz(erro && erro.codigo === "prazo_envio" ? "O servidor não confirmou o envio em 20 segundos. Os campos foram mantidos. Tente novamente; um envio idêntico não cria outro cadastro." : "Não foi possível confirmar o envio. Confira a conexão e tente novamente; um envio idêntico não cria outro cadastro.", "err"); })
     .then(function(){ bt.disabled = false; bt.textContent = "Enviar cadastro"; });
 });
 </script>

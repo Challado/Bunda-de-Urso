@@ -1,0 +1,48 @@
+name: Navegadores
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: navegadores-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cadastro:
+    name: Cadastro (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [firefox, chromium]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Instalar navegador e dependências no runner
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Formulário, API CGI e banco temporário (desktop e tela estreita)
+        run: npx playwright test --project="${{ matrix.browser }}-*"
+      - name: Relatório, capturas e rastreamentos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: navegador-${{ matrix.browser }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: warn

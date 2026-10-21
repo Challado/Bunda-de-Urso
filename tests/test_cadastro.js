@@ -12,7 +12,7 @@ function pagina(resposta) {
   for (const name of ['identificador','tipo_radar','modelo','latitude','longitude','uf','municipio','via','km','velocidade_geral','sentido','observacoes','contato']) elements[name] = {value:'',required:false};
   const radios = [{addEventListener(event,fn){eventos.modo=fn;}},{addEventListener(){}}];
   nodes.form = {elements,querySelectorAll:()=>radios,addEventListener(event,fn){eventos[event]=fn;}};
-  const ctx = {document:{getElementById:id=>nodes[id]},navigator:{},Number,encodeURIComponent,
+  const ctx = {document:{getElementById:id=>nodes[id]},navigator:{},Number,encodeURIComponent,setTimeout,clearTimeout,
     fetch:async(url,options)=>{chamadas.push({url,body:JSON.parse(options.body)});return typeof resposta==='function'?resposta():{status:201,json:async()=>resposta};}};
   vm.runInNewContext(script,ctx);
   const preencher = values => Object.entries(values).forEach(([key,value])=>elements[key].value=value);

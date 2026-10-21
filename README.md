@@ -282,6 +282,11 @@ O projeto não deve divulgar percentuais de cobertura, contagens nacionais ou pr
 
 ## Validação automática (CI)
 
+O workflow **Navegadores** testa o cadastro em Firefox e Chromium, com desktop
+e tela estreita/toque, CGI e SQLite reais. Inclui rede indisponível, prazo de
+resposta, reenvio e preservação do oficial. Veja [como executar e limites da
+cobertura Android](docs/TESTES_NAVEGADOR.md).
+
 Todo push no `main`, todo pull request e um disparo manual rodam a validação
 rígida no GitHub Actions (`.github/workflows/testes.yml`). Nada passa por
 "parece que está bom": cada checagem reprova o build.

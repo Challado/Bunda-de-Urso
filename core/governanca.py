@@ -704,13 +704,15 @@ def _oficiais_proximos(conn, lat, lon, raio):
         "AND (p.procedencia IS NULL OR p.procedencia <> 'colaborativo') "
         "AND p.removido_em IS NULL "
         "AND (p.verificacao_status IS NULL OR p.verificacao_status <> 'desabilitado') "
-        "AND EXISTS (SELECT 1 FROM VINCULO_REGISTRO_PONTO vp "
+        # Calcula a origem oficial uma vez. EXISTS correlacionado sem indice
+        # por ponto varria os vinculos para cada ponto, travando bases grandes.
+        "AND p.id IN (SELECT vp.ponto_id FROM VINCULO_REGISTRO_PONTO vp "
         "JOIN REGISTRO_FONTE r ON r.id=vp.registro_id "
         "JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id "
         "JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id "
         "JOIN FONTE f ON f.id=rf.fonte_id "
         "JOIN NATUREZA_FONTE nf ON nf.id=f.natureza_id "
-        "WHERE vp.ponto_id=p.id AND vp.decisao_id IS NULL AND nf.codigo='oficial')",
+        "WHERE vp.decisao_id IS NULL AND nf.codigo='oficial')",
         (bb["lat_min"], bb["lat_max"], bb["lon_min"], bb["lon_max"])).fetchall()
     candidatos = []
     for r in rows:

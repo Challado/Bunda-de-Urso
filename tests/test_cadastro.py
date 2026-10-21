@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import unittest
 
-from core import config, consultas, db
+from core import config, consultas, db, governanca
 from coletor.fontes.antt import ColetorANTT
 from tests.test_governanca import BaseGov
 from web import nucleo
@@ -87,6 +87,38 @@ class TestCadastro(BaseGov):
         self.assertEqual(cadastro["proximidade"]["campos_complementados"], {})
         with db.connect(config.DB_PATH) as con:
             self.assertIsNone(consultas.buscar_ponto_por_id(con, cadastro["id"])["localizacao"]["via"]["codigo"])
+
+    def test_busca_de_proximidade_nao_revarre_toda_a_origem_para_cada_ponto(self):
+        oficial = self.oficial()
+        with db.connect(config.DB_PATH) as con:
+            registro = db.scalar(con, "SELECT registro_id FROM VINCULO_REGISTRO_PONTO WHERE ponto_id=?", (oficial,))
+            artefato = db.scalar(con, "SELECT artefato_id FROM REGISTRO_FONTE WHERE id=?", (registro,))
+            qualidade = db.domain_id(con, "QUALIDADE_POSICAO", "oficial")
+            # Muitos pontos oficiais fora do raio. A busca deve percorrer a
+            # origem em lote, sem trabalho quadratico conforme a base cresce.
+            for i in range(3000):
+                origem = db.insert(con, "REGISTRO_FONTE", {
+                    "artefato_id": artefato, "numero_ordem": i + 100,
+                    "payload_original": json.dumps({"Codigo": "CARGA-%d" % i}),
+                    "hash_registro": "%064x" % i, "status_validacao": "ok"})
+                pos = db.insert(con, "POSICAO_GEOGRAFICA", {
+                    "latitude": -23, "longitude": -46 - i / 100000,
+                    "qualidade_posicao_id": qualidade})
+                ponto = db.insert(con, "PONTO_FISCALIZACAO", {"posicao_id": pos})
+                con.execute("INSERT INTO VINCULO_REGISTRO_PONTO(registro_id,ponto_id) VALUES (?,?)", (origem, ponto))
+            con.commit()
+            passos = 0
+            def limite_operacoes():
+                nonlocal passos
+                passos += 1
+                return passos > 2000
+            # Orcamento de instrucoes SQLite, independente da velocidade da CI.
+            con.set_progress_handler(limite_operacoes, 1000)
+            try:
+                candidatos = governanca._oficiais_proximos(con, -24.9555, -53.4552, 150)
+            finally:
+                con.set_progress_handler(None, 0)
+            self.assertEqual([c["ponto_id"] for c in candidatos], [oficial])
 
     def test_expert_nao_sobrescreve_via_informada(self):
         self.oficial()
