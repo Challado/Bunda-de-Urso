@@ -35,6 +35,11 @@ def connect(path=None, *, uri=False):
     return con
 
 
+def connect_existing(path):
+    """Escrita no banco existente; nunca cria uma base vazia por engano."""
+    return connect(Path(path).resolve(strict=True).as_uri() + "?mode=rw", uri=True)
+
+
 def connect_readonly(path):
     """Leitura sem criar arquivos, alterar journal ou aceitar fallback de escrita."""
     return connect(Path(path).resolve(strict=True).as_uri() + "?mode=ro", uri=True)

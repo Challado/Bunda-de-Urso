@@ -217,3 +217,25 @@ def verificar_http(origem, prefixo, pagina, configuracao_privada=False):
         except urllib.error.HTTPError as exc:
             if exc.code not in (403, 404):
                 raise RuntimeError("Nao foi confirmado o bloqueio HTTP de radar.conf.") from exc
+
+
+def comando_fila(linha):
+    """Somente cron fila da API; nao reconhece echo nem sincronizadores externos."""
+    if not linha.strip() or linha.lstrip().startswith('#'):
+        return False
+    try:
+        partes = shlex.split(linha, comments=True)
+    except ValueError:
+        return False
+    comando = partes[1:] if partes[0].startswith('@') else partes[5:]
+    if comando[:1] == ['root']:
+        comando = comando[1:]
+    if not comando:
+        return False
+    nome = Path(comando[0]).name
+    if nome not in ('api.pse', 'radar-api.pse', 'env', 'flock', 'timeout', 'nice') and not nome.startswith('python'):
+        return False
+    if any(Path(p).name in ('radar-dados-sync.py','radar-base-sync.py') for p in comando):
+        return False
+    return any(Path(p).name in ('api.pse','radar-api.pse') and comando[i+1:i+3] == ['cron','fila']
+               for i,p in enumerate(comando))

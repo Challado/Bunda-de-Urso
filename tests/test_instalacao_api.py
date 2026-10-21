@@ -147,7 +147,28 @@ class TestInstalacaoAPI(unittest.TestCase):
                   "* * * * * echo /antigo/bin/radar-tick.sh",
                   "# * * * * * /antigo/bin/radar-tick.sh"]
         novo = _cron_tick("\n".join(linhas) + "\n", wrapper)
-        self.assertEqual(novo.splitlines(), linhas[-2:] + ["* * * * * " + str(wrapper)])
+        self.assertEqual(novo.splitlines(), linhas[-2:] + ["* * * * * " + str(wrapper), "* * * * * " + str(wrapper.with_name("radar-api.pse")) + " cron fila"])
+
+    def test_cron_fila_independente_e_diretorio_preservado_ao_atualizar(self):
+        wrapper = self.home.parent / "radar-tick.sh"
+        externo = "*/10 * * * * python3 /servidor/radar-dados-sync.py\n"
+        antigo = "*/5 * * * * /velho/radar-api.pse cron fila\n"
+        aviso = "* * * * * echo /velho/radar-api.pse cron fila\n"
+        novo = _cron_tick(externo + antigo + aviso,wrapper)
+        self.assertIn(externo,novo)
+        self.assertIn(aviso,novo)
+        self.assertNotIn(antigo,novo)
+        self.assertEqual(novo,_cron_tick(novo,wrapper))
+        self.assertIn("* * * * * " + str(wrapper.with_name("radar-api.pse")) + " cron fila",novo)
+        r = self.instalar(True)
+        self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+        fila = self.dados / "fila-cadastros"
+        pedido = fila / "pendentes" / "preservar.json"
+        pedido.write_text('{"origem":"nao perder"}')
+        r = self.instalar(True)
+        self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+        self.assertEqual(pedido.read_text(),'{"origem":"nao perder"}')
+        self.assertEqual(fila.stat().st_mode & 0o7777,0o2770)
 
     def test_atualiza_esquema_conf_sem_trocar_valor_nem_opcao_vazia(self):
         self.conf.write_text(self.conf.read_text() + "\n[governanca]\nsubmissao_limite =\n[coleta]\ntimeout = 95\n")

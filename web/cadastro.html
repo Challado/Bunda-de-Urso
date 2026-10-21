@@ -62,7 +62,7 @@
   </div>
 </header>
 <main>
-  <p class="aviso" id="aviso">Informe a localização do radar e a velocidade indicada na placa. O cadastro entra como <b>não verificado</b>. Depois do envio, a base procura radares próximos para complementar dados e sugerir correspondências.</p>
+  <p class="aviso" id="aviso">Informe a localização do radar e a velocidade indicada na placa. O envio é salvo e recebe um protocolo. Depois ele é processado, entra como <b>não verificado</b> e a base procura radares próximos para complementar dados e sugerir correspondências.</p>
 
   <form id="form" novalidate>
     <fieldset class="modos">
@@ -200,12 +200,38 @@ if (geoSup && navigator.permissions && navigator.permissions.query){
   } catch (e) { /* navegador sem essa consulta: segue sem o preenchimento automatico */ }
 }
 
+function mostrarProcessamento(o,reenvio){
+      var j = o.body || {};
+      var res = j.resultado || j;
+      if (o.status >= 200 && o.status < 300 && j.sucesso !== false && res.ok !== false && ((res.aceitos||0) + (res.criados||0) + (res.atualizados||0) + (res.ja_cadastrados||0)) > 0){
+        var msg = (reenvio || (res.ja_cadastrados && !res.criados && !res.atualizados)) ? "Este envio já estava cadastrado; nenhuma duplicata foi criada." : "Cadastro recebido! Ele já pode ser consultado no mapa como <b>não verificado</b>.";
+        (res.cadastros || []).forEach(function(c){
+          msg += "<div class='resultado-cadastro'><a href='detalhe.html?id=" + encodeURIComponent(c.id) + "'>Ver radar " + esc(c.id) + "</a>";
+          var proximidade = c.proximidade || {}, candidatos = proximidade.candidatos || [];
+          if (Object.keys(proximidade.campos_complementados || {}).length) msg += "<p>Dados complementados por proximidade: " + Object.keys(proximidade.campos_complementados).map(esc).join(", ") + ". A origem fica registrada no histórico.</p>";
+          if (candidatos.length){
+            msg += "<p>" + candidatos.length + " possível(is) correspondência(s) em até " + esc(proximidade.raio_metros) + " m. Os registros oficiais foram preservados.</p><ul>";
+            candidatos.forEach(function(p){msg += "<li><a href='detalhe.html?id=" + encodeURIComponent(p.id) + "'>" + esc(p.id) + "</a> · " + esc(p.distancia_metros) + " m" + (p.via ? " · " + esc(p.via) : "") + "</li>";});
+            msg += "</ul>";
+            if (proximidade.status === "ambiguo") msg += "<p>Há mais de um candidato; nenhum dado foi copiado automaticamente.</p>";
+          } else msg += "<p>" + (proximidade.status === "sem_coordenadas" ? "Sem coordenadas para procurar correspondências próximas." : "Nenhum radar oficial próximo foi encontrado na base local.") + "</p>";
+          msg += "</div>";
+        });
+        if (res.rejeitados) msg += "<p>" + esc(res.rejeitados) + " registro(s) rejeitado(s).</p>";
+        if (protocoloAtual) msg += reciboHTML(protocoloAtual);
+        diz(msg, "ok");
+      } else {
+        var erro = j.erro || {};
+        var erros = (erro.detalhes || res.erros || []).map(function(e){ return esc((e.campo ? e.campo + ": " : "") + (e.mensagem || e.descricao || "")); }).join("<br>");
+        diz("<b>Não foi possível cadastrar</b> (HTTP " + o.status + ")." + (erro.mensagem ? "<br>" + esc(erro.mensagem) : "") + (erros ? "<br>" + erros : ""), "err");
+      }
+}
+
 // Inclui o tempo de leitura do corpo. Interrompe a espera mesmo em navegadores
 // sem AbortController; uma resposta atrasada nao pode substituir outra tentativa.
 var PRAZO_ENVIO_MS = 20000;
-function enviarCadastro(body){
+function pedirJSON(url,opcoes,prazo){
   var controle = typeof AbortController !== "undefined" ? new AbortController() : null;
-  var opcoes = {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)};
   if (controle) opcoes.signal = controle.signal;
   var timer;
   var requisicao = new Promise(function(resolve,reject){
@@ -213,17 +239,61 @@ function enviarCadastro(body){
       var erro = new Error("prazo de envio excedido");erro.codigo="prazo_envio";
       reject(erro);
       if (controle) controle.abort();
-    }, PRAZO_ENVIO_MS);
-    Promise.resolve().then(function(){return fetch(API,opcoes);})
+    }, prazo);
+    Promise.resolve().then(function(){return fetch(url,opcoes);})
       .then(function(r){return r.json().catch(function(){return {};}).then(function(j){return {status:r.status,body:j};});})
       .then(resolve,reject);
   });
   return requisicao.then(function(r){clearTimeout(timer);return r;},function(erro){clearTimeout(timer);throw erro;});
 }
 
+function enviarCadastro(body){
+  return pedirJSON(API,{method:"POST",headers:{"Content-Type":"application/json","Prefer":"respond-async"},body:JSON.stringify(body)},PRAZO_ENVIO_MS);
+}
+var protocoloAtual=null,envioRepetido=false,envioConfirmado=false,geracaoEnvio=0,consultaSeq=0,timerConsulta=null;
+function reciboHTML(protocolo){
+  return "<p>Protocolo: <b>"+esc(protocolo)+"</b>. <a href='cadastro.html?envio="+encodeURIComponent(protocolo)+"'>Consultar este envio depois</a></p>";
+}
+function mostrarEnvio(r,mensagem){
+  if(r.estado==="processado" && r.resultado){
+    mostrarProcessamento({status:201,body:{sucesso:true,resultado:r.resultado}},envioRepetido);return;
+  }
+  var falha=r.estado==="rejeitado"||r.estado==="falhou";
+  var texto=falha?(r.estado==="rejeitado"?"O envio foi rejeitado. ":"Não foi possível confirmar o processamento. ")+ esc(r.erro && r.erro.mensagem || "Guarde o protocolo para conferência."):
+    "<b>Envio recebido e salvo.</b> "+(r.estado==="processando"?"Processamento em andamento.":"Aguardando processamento. O radar aparecerá na base depois dessa etapa.");
+  if(envioRepetido && !falha)texto+=" Este envio já tinha sido recebido; nenhum novo pedido foi criado.";
+  texto+=reciboHTML(r.protocolo);
+  if(mensagem)texto+="<p>"+esc(mensagem)+"</p>";
+  texto+="<button type='button' id='btConsultarEnvio'>Consultar andamento</button>";
+  diz(texto,falha?"err":"ok");
+  var botao=document.getElementById("btConsultarEnvio");
+  if(botao)botao.onclick=function(){clearTimeout(timerConsulta);acompanharEnvio(r.protocolo,geracaoEnvio,0);};
+}
+function acompanharEnvio(protocolo,geracao,vez){
+  if(geracao!==geracaoEnvio)return;
+  var seq=++consultaSeq;
+  var rota="api.pse?rota=/api/v1/radares/envios/"+encodeURIComponent(protocolo);
+  pedirJSON(rota,{method:"GET",cache:"no-store"},5000).then(function(o){
+    if(geracao!==geracaoEnvio || seq!==consultaSeq)return;
+    if(o.status===200 && o.body.sucesso){
+      envioConfirmado=true;var r=o.body.resultado;mostrarEnvio(r);
+      if(["processado","rejeitado","falhou"].indexOf(r.estado)<0 && vez<10){
+        timerConsulta=setTimeout(function(){acompanharEnvio(protocolo,geracao,vez+1);},3000);
+      }
+    }else if(o.status===404)diz("Protocolo não encontrado ou expirado. Confira o link.","err");
+    else if(envioConfirmado)mostrarEnvio({protocolo:protocolo,estado:"recebido"},"Não foi possível consultar agora. Guarde o protocolo e tente consultar mais tarde.");
+    else diz("Não foi possível consultar este protocolo agora. Confira o link e tente mais tarde."+reciboHTML(protocolo),"err");
+  }).catch(function(){
+    if(geracao!==geracaoEnvio || seq!==consultaSeq)return;
+    if(envioConfirmado)mostrarEnvio({protocolo:protocolo,estado:"recebido"},"A consulta demorou ou falhou. Seu envio permanece salvo; consulte novamente mais tarde.");
+    else diz("Não foi possível consultar este protocolo agora. Confira o link e tente mais tarde."+reciboHTML(protocolo),"err");
+  });
+}
+
 form.addEventListener("submit", function(ev){
   ev.preventDefault();
   if (document.getElementById("bt").disabled) return;
+  clearTimeout(timerConsulta);geracaoEnvio++;protocoloAtual=null;envioRepetido=false;envioConfirmado=false;
   var body = {};
   (simplificado() ? ["latitude","longitude","velocidade_geral"] : CAMPOS).forEach(function(k){ var v = val(k); if (v) body[k] = v; });
   if (simplificado() && (!val("latitude") || !val("longitude") || !val("velocidade_geral"))){
@@ -246,33 +316,25 @@ form.addEventListener("submit", function(ev){
   document.getElementById("res").innerHTML = "";
   enviarCadastro(body)
     .then(function(o){
-      var j = o.body || {};
-      var res = j.resultado || j;
-      if (o.status >= 200 && o.status < 300 && j.sucesso !== false && res.ok !== false && ((res.aceitos||0) + (res.criados||0) + (res.atualizados||0) + (res.ja_cadastrados||0)) > 0){
-        var msg = res.ja_cadastrados && !res.criados && !res.atualizados ? "Este envio já estava cadastrado; nenhuma duplicata foi criada." : "Cadastro recebido! Ele já pode ser consultado no mapa como <b>não verificado</b>.";
-        (res.cadastros || []).forEach(function(c){
-          msg += "<div class='resultado-cadastro'><a href='detalhe.html?id=" + encodeURIComponent(c.id) + "'>Ver radar " + esc(c.id) + "</a>";
-          var proximidade = c.proximidade || {}, candidatos = proximidade.candidatos || [];
-          if (Object.keys(proximidade.campos_complementados || {}).length) msg += "<p>Dados complementados por proximidade: " + Object.keys(proximidade.campos_complementados).map(esc).join(", ") + ". A origem fica registrada no histórico.</p>";
-          if (candidatos.length){
-            msg += "<p>" + candidatos.length + " possível(is) correspondência(s) em até " + esc(proximidade.raio_metros) + " m. Os registros oficiais foram preservados.</p><ul>";
-            candidatos.forEach(function(p){msg += "<li><a href='detalhe.html?id=" + encodeURIComponent(p.id) + "'>" + esc(p.id) + "</a> · " + esc(p.distancia_metros) + " m" + (p.via ? " · " + esc(p.via) : "") + "</li>";});
-            msg += "</ul>";
-            if (proximidade.status === "ambiguo") msg += "<p>Há mais de um candidato; nenhum dado foi copiado automaticamente.</p>";
-          } else msg += "<p>" + (proximidade.status === "sem_coordenadas" ? "Sem coordenadas para procurar correspondências próximas." : "Nenhum radar oficial próximo foi encontrado na base local.") + "</p>";
-          msg += "</div>";
-        });
-        if (res.rejeitados) msg += "<p>" + esc(res.rejeitados) + " registro(s) rejeitado(s).</p>";
-        diz(msg, "ok");
-      } else {
-        var erro = j.erro || {};
-        var erros = (erro.detalhes || res.erros || []).map(function(e){ return esc((e.campo ? e.campo + ": " : "") + (e.mensagem || e.descricao || "")); }).join("<br>");
-        diz("<b>Não foi possível cadastrar</b> (HTTP " + o.status + ")." + (erro.mensagem ? "<br>" + esc(erro.mensagem) : "") + (erros ? "<br>" + erros : ""), "err");
-      }
+      var r=o.body && o.body.resultado;
+      if(o.status===202 && o.body.sucesso && r && /^[a-f0-9]{32}$/.test(r.protocolo)){
+        protocoloAtual=r.protocolo;envioRepetido=!!r.reenvio;envioConfirmado=true;
+        try{localStorage.setItem("radar.envio",JSON.stringify({protocolo:r.protocolo,em:Date.now()}));}catch(e){}
+        mostrarEnvio(r);acompanharEnvio(r.protocolo,geracaoEnvio,0);
+      }else mostrarProcessamento(o,false);
     })
     .catch(function(erro){ diz(erro && erro.codigo === "prazo_envio" ? "O servidor não confirmou o envio em 20 segundos. Os campos foram mantidos. Tente novamente; um envio idêntico não cria outro cadastro." : "Não foi possível confirmar o envio. Confira a conexão e tente novamente; um envio idêntico não cria outro cadastro.", "err"); })
     .then(function(){ bt.disabled = false; bt.textContent = "Enviar cadastro"; });
 });
+if(typeof window!=="undefined" && window.location){
+  var salvo=null,retomar=null;
+  try{salvo=JSON.parse(localStorage.getItem("radar.envio")||"null");}catch(e){}
+  try{retomar=new URLSearchParams(window.location.search).get("envio");}catch(e){}
+  if(!retomar && salvo && Date.now()-salvo.em<30*86400000)retomar=salvo.protocolo;
+  if(retomar && /^[a-f0-9]{32}$/.test(retomar)){
+    protocoloAtual=retomar;diz("Consultando envio…"+reciboHTML(retomar),"");acompanharEnvio(retomar,geracaoEnvio,0);
+  }
+}
 </script>
 </body>
 </html>

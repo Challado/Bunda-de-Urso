@@ -868,7 +868,7 @@ def _checar_rate_limit(conn, ip):
 # Submissao PUBLICA
 # ---------------------------------------------------------------------------
 ##-- BUNDITA DE URSO #{8} -- Proximidade de contribuicao publica nao comprova identidade nem verifica seus campos. ##
-def submeter(conn, dados, procedencia=None):
+def submeter(conn, dados, procedencia=None, *, checar_limite=True):
     """POST /api/v1/radares/submeter — criacao aberta (sem token).
 
     Publica NA HORA como ``colaborativo``/``nao_verificado``; se houver ponto
@@ -881,7 +881,8 @@ def submeter(conn, dados, procedencia=None):
     garantir_esquema(conn)
     procedencia = procedencia or {}
     ip = procedencia.get("ip")
-    _checar_rate_limit(conn, ip)
+    if checar_limite:
+        _checar_rate_limit(conn, ip)
 
     if isinstance(dados, dict):
         itens = [dados]

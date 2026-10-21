@@ -27,7 +27,7 @@ from core.serializers import campos, txt_ser, json_ser, xml_ser, edifact_ser, di
 _cls_txt = txt_ser
 
 STATUS_REASON = {
-    200: "OK", 201: "Created", 400: "Bad Request", 401: "Unauthorized",
+    200: "OK", 201: "Created", 202: "Accepted", 400: "Bad Request", 401: "Unauthorized",
     403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed",
     409: "Conflict", 413: "Payload Too Large", 422: "Unprocessable Entity",
     429: "Too Many Requests", 503: "Service Unavailable",
@@ -71,6 +71,7 @@ PARAMS = [
 ENDPOINTS_AJUDA = {
     "/api/v1/radares": ["GET", "POST"],
     "/api/v1/radares/submeter": ["POST"],
+    "/api/v1/radares/envios/{protocolo}": ["GET"],
     "/api/v1/radares/busca": ["GET", "POST"],
     "/api/v1/radares/{id}": ["GET"],
     "/api/v1/radares/{id}/historico": ["GET"],
@@ -118,7 +119,8 @@ ENDPOINTS_DESC = {
     "/api/v1/radares": "Pontos de fiscalizacao (radar instalado) num raio.",
     "/api/v1/radares/submeter": ("Submissao PUBLICA de radar (sem token): "
                                   "entra como colaborativo/nao verificado e "
-                                  "publica na hora (rate limit + procedencia)."),
+                                  "publica na hora; Prefer: respond-async recebe em fila duravel e retorna 202 com protocolo."),
+    "/api/v1/radares/envios/{protocolo}": "Andamento do envio em fila; nao expoe payload, contato ou IP.",
     "/api/v1/radares/{id}/historico": ("Historico/auditoria PUBLICO de um "
                                         "ponto: quem, quando, tipo, motivo."),
     "/api/v1/login": "Login do painel -> sessao (cookie httpOnly).",
@@ -1068,6 +1070,26 @@ def _gestao(conn, p, metodo, environ, stdin_bytes):
 def handle_request(environ, stdin_bytes=b""):
     metodo = environ.get("REQUEST_METHOD", "GET").upper()
     caminho = _rota(environ)
+    # Recebimento rapido e andamento nao dependem de SQLite, nem quando ha lock.
+    envio = re.fullmatch(r"/api/v1/radares/envios/(.*)", caminho)
+    assincrono = caminho == "/api/v1/radares/submeter" and "respond-async" in environ.get("HTTP_PREFER", "").lower()
+    if envio or assincrono:
+        from core import fila_cadastros
+        if metodo != ("GET" if envio else "POST"):
+            return _erro(405, "metodo_nao_permitido", "Metodo nao permitido para este envio.")
+        try:
+            if envio:
+                resultado = fila_cadastros.consultar(envio.group(1))
+                return _resp({"sucesso": True, "resultado": resultado}, extra_headers={"Cache-Control":"no-store"})
+            if (environ.get("CONTENT_TYPE", "").split(";")[0].strip() != "application/json" or
+                    environ.get("HTTP_SEC_FETCH_SITE") == "cross-site"):
+                return _erro(403, "origem_invalida", "Envie JSON pelo formulario de cadastro.")
+            resultado = fila_cadastros.receber(_corpo_json(stdin_bytes), {
+                "ip": _ip_requisicao(environ), "user_agent": environ.get("HTTP_USER_AGENT"), "quando": _agora()})
+            return _resp({"sucesso": True, "resultado": resultado}, 202, {
+                "Cache-Control":"no-store", "Preference-Applied":"respond-async", "Location":resultado["consulta_url"]})
+        except governanca.GovernancaError as exc:
+            return _gov_erro(exc)
     # escrita autenticada ANTES do parsing de consulta (corpo pode ser array)
     if _eh_ingestao(caminho, metodo, environ, stdin_bytes):
         return _ingestao_radares(environ, stdin_bytes)

@@ -58,6 +58,7 @@ SECOES = {
     "api": ("token_arquivo", "max_body", "proxies_confiaveis"),
     "coleta": ("max_bytes", "timeout", "tentativas", "espera_atualizacao"),
     "geografia": ("malha",),
+    "cadastro": ("max_itens", "max_bytes", "max_pendentes", "lote", "tentativas", "retencao_dias"),
     "assistente": ("habilitado", "provedor", "url", "modelo", "chave_arquivo",
                    "timeout", "max_entrada", "max_saida_tokens", "max_chamadas",
                    "documentos", "correspondencias", "auditoria", "diagnostico", "explicacoes", "municipios"),
@@ -78,6 +79,12 @@ PADROES = {
     ("coleta", "tentativas"): "3",
     ("coleta", "espera_atualizacao"): "300",
     ("geografia", "malha"): "",
+    ("cadastro", "max_itens"): "100",
+    ("cadastro", "max_bytes"): "262144",
+    ("cadastro", "max_pendentes"): "10000",
+    ("cadastro", "lote"): "20",
+    ("cadastro", "tentativas"): "5",
+    ("cadastro", "retencao_dias"): "30",
     ("assistente", "url"): "http://127.0.0.1:11434",
     ("assistente", "modelo"): "gemma4:26b",
     ("assistente", "habilitado"): "0",
@@ -320,3 +327,8 @@ def ensure_dirs():
     """Cria os diretorios de dados necessarios (idempotente)."""
     for caminho_dir in (data_dir(), bruto(), staging(), calibracao()):
         os.makedirs(caminho_dir, exist_ok=True)
+
+
+def fila_cadastros(dados_dir=None):
+    """Fila fora do webroot, no diretorio de dados definido pelo radar.conf."""
+    return os.path.join(dados_dir or data_dir(), "fila-cadastros")

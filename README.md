@@ -189,9 +189,12 @@ Toda escrita passa pela **API**; nenhuma tela nem ferramenta toca o banco por fo
 app. As camadas de confiança são:
 
 - **Leitura aberta** (site + API), sem cadastro.
-- **Criação aberta** por `POST /api/v1/radares/submeter` (sem token): o cadastro entra
-  como `colaborativo` **não verificado** e **publica na hora**, com selo, procedência
-  (IP, user-agent, data/hora, contato) e *rate limit* por IP.
+- **Criação aberta** por `POST /api/v1/radares/submeter` (sem token): o formulário
+  usa `Prefer: respond-async`, salva um JSON durável e recebe **202 com protocolo**.
+  O processamento posterior valida, procura correspondências e publica como
+  `colaborativo` **não verificado**, com selo, procedência e limite por IP.
+  Recebido não significa publicado. Clientes antigos sem esse cabeçalho continuam
+  recebendo 201 após processamento síncrono. Veja [fila de cadastros](docs/FILA_CADASTROS.md).
 - **Verificação / edição / remoção** exigem **sessão do painel** ou **`X-Api-Token`**.
   Escopos: `contribuidor` (lê) < `moderador` (verifica/edita/remove) < `admin`
   (usuários, tokens, bloqueios). A remoção é **tombstone** (soft delete com motivo

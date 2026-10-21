@@ -10,6 +10,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
@@ -79,6 +80,18 @@ def main():
                     return self.send_error(404)
                 return self.api()
 
+        parar = threading.Event()
+        def consumir_fila():
+            while not parar.wait(0.2):
+                try:
+                    subprocess.run([sys.executable,str(API),'fila','processar'],env=ambiente,
+                                   capture_output=True,check=True,timeout=10)
+                except subprocess.SubprocessError as erro:
+                    print('Erro no processador de teste: '+str(erro),file=sys.stderr,flush=True)
+        worker = threading.Thread(target=consumir_fila,daemon=True)
+        if '--sem-fila' not in sys.argv:
+            worker.start()
+
         def interromper(*_):
             raise KeyboardInterrupt
         signal.signal(signal.SIGTERM,interromper)
@@ -88,6 +101,10 @@ def main():
                 servidor.serve_forever(poll_interval=0.05)
             except KeyboardInterrupt:
                 pass
+            finally:
+                parar.set()
+                if worker.is_alive():
+                    worker.join(timeout=12)
 
 
 if __name__=='__main__':

@@ -90,3 +90,13 @@ auditoria = 1
 diagnostico = 1
 explicacoes = 1
 municipios = 1
+
+# Recebimento rapido do formulario: JSON duravel em <dados.dir>/fila-cadastros.
+# Cron da fila separado do coletor, pela api.pse. Nenhuma IA e necessaria.
+[cadastro]
+max_itens = 100
+max_bytes = 262144
+max_pendentes = 10000
+lote = 20
+tentativas = 5
+retencao_dias = 30

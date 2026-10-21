@@ -59,6 +59,9 @@
   .origem-publicacao{margin-top:10px;font-size:13px}
   .origem-publicacao > summary{cursor:pointer;color:var(--azul);padding:6px 0}
   .corpo a{color:var(--azul);overflow-wrap:anywhere}
+  .links-mapas{display:flex;flex-wrap:wrap;gap:8px 14px}
+  .links-mapas a{color:var(--azul)}
+  .mapas-principais{margin:6px 0 14px}
   .consolidado > .corpo > .explicacao{margin-top:0}
   .rodape{margin-top:18px;font-size:12.5px;color:#6b7280}
   .rodape code{background:rgba(127,127,127,.15);padding:1px 5px;border-radius:4px}
@@ -205,6 +208,25 @@
     return esc(s);
   }
   function ehObjeto(v){ return v && typeof v === "object"; }
+  function linksMapas(latitude, longitude){
+    function coordenada(v){
+      if (typeof v === "number") return v;
+      if (typeof v !== "string") return NaN;
+      var s = v.trim().replace(",", ".");
+      return /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(s) ? Number(s) : NaN;
+    }
+    var lat = coordenada(latitude), lon = coordenada(longitude);
+    if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return "";
+    var posicao = encodeURIComponent(lat + "," + lon);
+    var links = [
+      ["https://www.openstreetmap.org/?mlat=" + lat + "&mlon=" + lon + "#map=18/" + lat + "/" + lon, "OpenStreetMap"],
+      ["https://www.google.com/maps/search/?api=1&query=" + posicao, "Google Maps"],
+      ["https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=" + posicao, "Street View"]
+    ];
+    return "<span class='links-mapas'>" + links.map(function(link){
+      return "<a href='" + esc(link[0]) + "' target='_blank' rel='noopener noreferrer'>" + link[1] + "</a>";
+    }).join("") + "</span>";
+  }
   // Distancias legiveis: abaixo de 1 km em metros; de 1 km pra cima em km.
   function fmtDist(m){
     m = Number(m);
@@ -239,6 +261,11 @@
     if (!ehObjeto(d)) return "";
     var chaves = Object.keys(d);
     if (!chaves.length) return "<div class='vazio'>sem campos</div>";
+    // Cada par usa apenas coordenadas do mesmo objeto/fonte, nunca do resumo.
+    var chaveLat = chaves.find(function(k){return /^(latitude|lat)$/i.test(k);});
+    var chaveLon = chaves.find(function(k){return /^(longitude|lon|lng)$/i.test(k);});
+    var mapas = linksMapas(d[chaveLat], d[chaveLon]);
+    var depoisCoordenadas = Math.max(chaves.indexOf(chaveLat), chaves.indexOf(chaveLon));
     var h = "<dl class='campos'>";
     for (var i=0;i<chaves.length;i++){
       var k = chaves[i], val = d[k];
@@ -249,6 +276,7 @@
         dd = renderValor(val);
       }
       h += "<dt>" + esc(rotulo(k)) + "</dt><dd>" + dd + "</dd>";
+      if (mapas && i === depoisCoordenadas) h += "<dt>Abrir coordenadas</dt><dd>" + mapas + "</dd>";
     }
     return h + "</dl>";
   }
@@ -387,6 +415,8 @@
     if (vel != null) h += "<span class='pill ruim'>" + esc(vel) + " km/h</span>";
     h += "</div>";
     h += "<div id='mapa'></div>";
+    var mapas = linksMapas(lat, lon);
+    if (mapas) h += "<div class='mapas-principais'>" + mapas + "</div>";
 
     h += renderMetrologia(p);
     h += renderFontes(p);

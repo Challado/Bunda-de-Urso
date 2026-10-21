@@ -5,7 +5,7 @@ nao restaura o banco automaticamente e nao executa material de referencia/.
 """
 import argparse
 import configparser
-from contextlib import closing, contextmanager
+from contextlib import closing, contextmanager, ExitStack
 import datetime
 import fcntl
 import json
@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import pwd
 import shutil
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -96,7 +97,9 @@ def _diretorio(pasta, observacoes, modo=None, grupo=None):
 
 
 def _pastas_operacionais(dirs):
-    return tuple(dict.fromkeys((dirs["dados"], dirs["logs"], dirs["dados"] / "raw",
+    from .fila_cadastros import PASTAS
+    fila = Path(caminhos.fila_cadastros(dirs["dados"]))
+    return tuple(dict.fromkeys((fila, *(fila / n for n in PASTAS), dirs["dados"], dirs["logs"], dirs["dados"] / "raw",
                                 dirs["dados"] / "staging", dirs["dados"] / "calibracao", dirs["banco"].parent)))
 
 
@@ -223,11 +226,12 @@ def _cron_tick(texto, wrapper):
     linhas = []
     for linha in texto.splitlines():
         # Troca somente a linha ativa que chama exatamente este wrapper.
-        if auditoria.comando_coletor(linha, wrapper):
+        if auditoria.comando_coletor(linha, wrapper) or auditoria.comando_fila(linha):
             continue
         linhas.append(linha)
     # O wrapper nao contem caminhos variaveis de dados ou log.
-    linhas.append("* * * * * " + str(wrapper))
+    linhas.append("* * * * * " + shlex.quote(str(wrapper)))
+    linhas.append("* * * * * " + shlex.quote(str(wrapper.with_name("radar-api.pse"))) + " cron fila")
     return "\n".join(linhas) + "\n"
 
 
@@ -281,8 +285,12 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
             (dirs["web"] / "api.pse").chmod(0o755)
             wrapper.write_text("#!/bin/sh\n# Atualizacao coordenada em andamento.\nexit 0\n")
             wrapper.chmod(0o755)
-            with open(dirs["dados"] / "tick.lock", "a") as tick:
+            with ExitStack() as locks:
+                tick = locks.enter_context(open(dirs["dados"] / "tick.lock", "a"))
                 _esperar_coletor(tick)
+                fila = locks.enter_context(open(Path(caminhos.fila_cadastros(dirs["dados"])) / "processador.lock", "a"))
+                os.fchmod(fila.fileno(), 0o660)
+                _esperar_coletor(fila)
                 with closing(db.connect_readonly(dirs["banco"])) as fonte:
                     if fonte.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                         raise RuntimeError("Integridade do banco reprovada; nada sera atualizado.")
@@ -334,7 +342,7 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
                 if auditoria.ler_crontab() != esperado:
                     raise RuntimeError("Crontab gravado diverge do esperado.")
                 if atual != esperado:
-                    observacoes.append("Cron do coletor ajustado para uma passada por minuto; outras rotinas preservadas.")
+                    observacoes.append("Cron do coletor e da fila ajustado para uma passada independente por minuto; outras rotinas preservadas.")
             relatorio = _diagnosticar(origem, dirs, usuario_web, laboratorio, cron, final=True)
             relatorio["backup"] = str(backup)
             relatorio["observacoes"] = list(observacoes)
@@ -427,6 +435,7 @@ def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http=Non
         # Permissoes para salvamento direto pelo CGI sao preparadas em seguida.
         for pasta in _pastas_operacionais(dirs):
             _diretorio(pasta, observacoes, modo=0o2770, grupo=grupo)
+        _permissoes(Path(caminhos.fila_cadastros(dirs["dados"])), grupo, gravavel=True)
         for arquivo in [dirs["banco"], *dirs["banco"].parent.glob(dirs["banco"].name + "-*")]:
             if os.geteuid() == 0:
                 os.chown(arquivo, -1, grupo)
@@ -540,7 +549,8 @@ def _instalar(args, observacoes):
     print(json.dumps({"acao": "aplicar" if args.aplicar else "simular",
                       "destinos": {k: str(v) for k, v in dirs.items()},
                       "usuario_web": args.usuario_web,
-                      "cron_tick": not args.sem_cron and not bool(lab)}, indent=2))
+                      "cron_tick": not args.sem_cron and not bool(lab),
+                      "cron_fila": not args.sem_cron and not bool(lab)}, indent=2))
     if args.aplicar:
         if not lab and os.geteuid() != 0:
             raise RuntimeError("Execute como root para aplicar no servidor.")
@@ -612,7 +622,7 @@ def _recuperar_cron(cron_antigo, wrapper):
     atual = auditoria.ler_crontab()
     # Recupera somente a linha do coletor, preservando outros projetos.
     def chama_tick(linha):
-        return auditoria.comando_coletor(linha, wrapper)
+        return auditoria.comando_coletor(linha, wrapper) or auditoria.comando_fila(linha)
     linhas = [l for l in atual.splitlines() if not chama_tick(l)]
     linhas.extend(l for l in cron_antigo.read_text().splitlines() if chama_tick(l))
     _executar(["crontab", "-"], input="\n".join(linhas) + "\n")
@@ -666,9 +676,19 @@ def _diagnosticar(origem, dirs, usuario_web, laboratorio, cron, final=False):
         atual = auditoria.ler_crontab()
         esperado = _cron_tick(atual, dirs["codigo"].parent / "radar-tick.sh")
         checagens.append({"checagem": "cron.coletor", "estado": "ok" if atual == esperado else "erro" if final else "atualizar",
-                          "detalhe": "uma passada por minuto; rotinas externas preservadas"})
+                          "detalhe": "coletor e fila independentes, uma passada por minuto; rotinas externas preservadas"})
+        fila_esperada = "* * * * * " + shlex.quote(str(dirs["codigo"].parent / "radar-api.pse")) + " cron fila"
+        linhas_fila = [l for l in atual.splitlines() if auditoria.comando_fila(l)]
+        checagens.append({"checagem":"cron.fila", "estado":"ok" if linhas_fila == [fila_esperada] else "erro" if final else "atualizar",
+                          "detalhe":"processamento de cadastros independente da coleta, uma passada por minuto"})
     if final:
         api = dirs["web"] / "api.pse"
+        try:
+            cmd = ([] if laboratorio else ["runuser", "-u", usuario_web, "--"]) + [sys.executable,str(api),"fila","verificar"]
+            _executar(cmd,env=_ambiente(dirs["conf"]))
+            checagens.append({"checagem":"fila.recebimento", "estado":"ok", "detalhe":"gravacao duravel da fila pelo usuario CGI, sem SQLite"})
+        except (OSError, subprocess.SubprocessError):
+            checagens.append({"checagem":"fila.recebimento", "estado":"erro", "detalhe":"o usuario CGI nao conseguiu gravar na fila; reaplique o instalador"})
         try:
             _cgi(api, dirs["conf"], "/health/ready", usuario=None if laboratorio else usuario_web)
             _cgi(api, dirs["conf"], "/api/v1/status", usuario=None if laboratorio else usuario_web)
@@ -715,7 +735,7 @@ def _diagnosticar(origem, dirs, usuario_web, laboratorio, cron, final=False):
     return {"sucesso": not any(c["estado"] == "erro" for c in checagens),
             "atualizacao_necessaria": bool(divergencias or faltantes or pastas or instalada != versao or any(
                 c["estado"] in ("erro", "atualizar") and c["checagem"] in
-                ("cron.coletor", "logrotate", "logrotate.sintaxe", "permissoes", "gravacao_do_painel", "configuracao.link", "nginx.configuracao_privada") for c in checagens)),
+                ("cron.coletor", "cron.fila", "fila.recebimento", "logrotate", "logrotate.sintaxe", "permissoes", "gravacao_do_painel", "configuracao.link", "nginx.configuracao_privada") for c in checagens)),
             "modo": "verificacao" if final else "planejamento",
             "versao_instalada": instalada, "versao_disponivel": versao,
             "arquivos_divergentes": divergencias, "checagens": checagens}

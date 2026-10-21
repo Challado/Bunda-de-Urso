@@ -35,6 +35,10 @@ NUMEROS.update({("assistente", k): limites for k, limites in {
     "max_saida_tokens": (128, 4096), "max_chamadas": (1, 100),
     **{k: (0, 1) for k in ("documentos", "correspondencias", "auditoria", "diagnostico", "explicacoes", "municipios")},
 }.items()})
+NUMEROS.update({("cadastro", k): limites for k, limites in {
+    "max_itens": (1, 1000), "max_bytes": (1024, 1048576), "max_pendentes": (1, 100000),
+    "lote": (1, 1000), "tentativas": (1, 20), "retencao_dias": (1, 365),
+}.items()})
 EDITAVEIS_WEB = set(NUMEROS) | {("api", "proxies_confiaveis"),
                               ("assistente", "provedor"), ("assistente", "url"), ("assistente", "modelo")}
 

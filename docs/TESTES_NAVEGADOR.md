@@ -17,17 +17,23 @@ não exige chave de IA e não deixa um endpoint de teste no aplicativo.
 - Confirmação do cadastro pela leitura da API, complemento por proximidade e
   preservação da velocidade/coordenada do oficial.
 - Reenvio idêntico retorna o mesmo cadastro e não cria duplicata.
+- Recebimento 202 com protocolo e consulta posterior pela API. Com o processador
+  parado, confirma somente o JSON salvo e não mostra um radar inexistente.
+- Retomada pelo link do protocolo, inclusive com armazenamento do navegador
+  bloqueado; protocolo desconhecido não gera confirmação falsa.
 - Expert sem GPS e retorno ao simples sem enviar campos escondidos.
 - Campos obrigatórios/inválidos não geram requisição.
 - GPS negado permite preencher e enviar manualmente.
 - Falha de rede e HTTP 503 liberam o botão e mantêm os campos.
-- API grava, mas a resposta não chega: em 20 segundos a espera termina;
+- API salva o envio, mas a resposta não chega: em 20 segundos a espera termina;
   repetir confirma o mesmo cadastro. Resposta atrasada não substitui o resultado
   da segunda tentativa. Há cobertura também sem `AbortController`.
 - Erros JavaScript reprovam; o formulário não deve causar rolagem horizontal.
 
 A interrupção da resposta e os erros de rede/HTTP são simulados pelo teste;
-os cenários de sucesso, consulta e reenvio usam o CGI e o banco reais.
+os cenários de sucesso, consulta e reenvio usam o CGI, a fila JSON e o banco reais.
+O processador de teste também passa pela API local. São 44 cenários nos quatro
+perfis de navegador; nenhum exige o coletor ou portais externos disponíveis.
 O relógio do navegador é avançado no teste de prazo, evitando aguardar 20
 segundos reais. O prazo inclui a leitura do corpo da resposta.
 

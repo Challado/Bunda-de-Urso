@@ -23,6 +23,9 @@ def main(argv=None):
         return cgi()
     argumentos = list(sys.argv[1:] if argv is None else argv)
     with atendimento_local():
+        if argumentos[:1] == ["fila"]:
+            from .fila_cadastros import main as fila
+            return fila(argumentos[1:])
         if argumentos[:1] == ["assistente"]:
             from .assistencia import main as assistir
             return assistir(argumentos[1:])
@@ -33,7 +36,7 @@ def main(argv=None):
             from .configuracao import main as configurar
             return configurar(argumentos[1:])
         if argumentos[:1] == ["cron"]:
-            if argumentos[1:2] != ["tick"]:
+            if argumentos[1:2] not in (["tick"], ["fila"]):
                 print("Operacao de cron desconhecida.", file=sys.stderr)
                 return 2
             from . import caminhos
@@ -43,7 +46,10 @@ def main(argv=None):
                 sys.stderr.flush()
                 os.dup2(log.fileno(), 1)
                 os.dup2(log.fileno(), 2)
-                argumentos = argumentos[1:]
+                argumentos = (["fila", "processar"] if argumentos[1] == "fila" else argumentos[1:])
+        if argumentos[:1] == ["fila"]:
+            from .fila_cadastros import main as fila
+            return fila(argumentos[1:])
         if argumentos and argumentos[0] in ("sync", "tick"):
             modulo = importlib.import_module("coletor." + argumentos[0])
             return modulo._main_servico(argumentos[1:])
