@@ -137,7 +137,7 @@ AGENDA_PADRAO = {
         "ativo": True,
         # Pos-coleta: le o payload recem-coletado e grava a VERIFICACAO_
         # METROLOGICA (idempotente) -> instrumento novo ja entra com o atestado.
-        "pos_coleta": "tools.carregar_verificacao_metrologica:carregar_do_banco",
+        "pos_coleta": "core.manutencao.carregar_verificacao_metrologica:carregar_do_banco",
     },
     # -- 27 UFs, ondas 1-3: conectores com cadastro real (dados) --------
     "goinfra": {

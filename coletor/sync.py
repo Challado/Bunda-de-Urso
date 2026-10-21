@@ -28,7 +28,11 @@ FONTES = {
 }
 
 
-def main(argv=None):
+from core.contexto_api import operacao_local
+
+
+@operacao_local
+def _main_servico(argv=None):
     parser = argparse.ArgumentParser(description="Radar Brasil - sincronizador")
     parser.add_argument("--fonte", required=True, choices=sorted(FONTES),
                         help="conector a executar")
@@ -45,6 +49,11 @@ def main(argv=None):
     print(json.dumps(resumo, ensure_ascii=False, indent=2))
     ##-- BUNDITA DE URSO #{9} -- Lote inteiramente rejeitado nao pode devolver sucesso ao shell. ##
     return 1 if resumo.get("status") == "erro" else 0
+
+
+def main(argv=None):
+    from core.cliente_api import executar
+    return executar(["sync"], argv)
 
 
 if __name__ == "__main__":

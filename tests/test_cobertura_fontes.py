@@ -14,7 +14,7 @@ import os
 import unittest
 
 from core.config import ROOT
-from tools import auditar_coleta as ac
+from core.manutencao import auditar_coleta as ac
 
 DB = os.environ.get("RADAR_DB", "/var/lib/radar-brasil/radar.sqlite3")
 MINIMOS = os.path.join(ROOT, "config", "cobertura_minima.json")

@@ -9,4 +9,4 @@ RADAR_DATA_DIR=/var/lib/radar-brasil
 RADAR_DB=/var/lib/radar-brasil/radar.sqlite3
 export RADAR_DATA_DIR RADAR_DB
 
-exec /usr/bin/python3 /home/openclaw/bin/radar/coletor/tick.py "$@"
+exec /usr/bin/python3 /home/openclaw/bin/radar/web/api.pse tick "$@"

@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from coletor.fontes.araguaiana_to import ColetorASTTAraguaina
 from core import config, consultas, governanca
-from tools import recuperar_posicoes_legadas as recuperacao
+from core.manutencao import recuperar_posicoes_legadas as recuperacao
 
 
 ##-- BUNDITA DE URSO #{22} -- A recuperacao de legados deve conservar a origem, respeitar conflitos e nunca substituir GPS existente. ##

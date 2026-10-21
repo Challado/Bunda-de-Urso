@@ -196,7 +196,11 @@ def _travar(caminho):
     return f   # mantem o fd aberto enquanto o processo viver
 
 
-def main(argv=None):
+from core.contexto_api import operacao_local
+
+
+@operacao_local
+def _main_servico(argv=None):
     p = argparse.ArgumentParser(description="Radar Brasil - tick do coletor")
     p.add_argument("--db", default=None)
     p.add_argument("--forcar", action="append", default=[],
@@ -233,6 +237,11 @@ def main(argv=None):
                           "resultados": res}, ensure_ascii=False),
               flush=True)
     return 0
+
+
+def main(argv=None):
+    from core.cliente_api import executar
+    return executar(["tick"], argv)
 
 
 if __name__ == "__main__":

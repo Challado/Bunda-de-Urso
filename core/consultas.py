@@ -673,6 +673,71 @@ def _fontes_por_registro(conn, registro_id):
     return out
 
 
+# O cadastro proprio pode guardar contato e metadados privados no bruto.
+# Apenas campos de radar ja aceitos pelo normalizador entram no detalhe publico.
+_CAMPOS_PUBLICOS_CADASTRO = frozenset((
+    "identificador", "id_orgao", "codigo", "id", "ID", "tipo_identificador",
+    "latitude", "lat", "longitude", "lon", "lng", "precisao_metros", "precisao",
+    "qualidade", "qualidade_posicao", "metodo_obtencao", "municipio",
+    "municipio_nome", "cidade", "municipio_ibge", "codigo_ibge", "ibge",
+    "uf", "UF", "estado", "via", "via_codigo", "rodovia", "br", "km",
+    "quilometro", "tipo_pista", "pista", "faixa", "situacao", "status",
+    "tipo_radar", "tipo", "modalidade", "numero_serie", "serie", "fabricante",
+    "marca", "modelo", "ano_fabricacao", "velocidade_leves", "velocidade_pesados",
+    "velocidade_geral", "velocidade", "sentido", "observacoes",
+))
+
+
+def _dados_por_fonte(conn, pid, visao):
+    """Publicacoes originais por fonte, somente no detalhe do ponto.
+
+    Nao atribui campos consolidados a todas as fontes nem reinterpreta o bruto
+    com o normalizador atual. Preserva valores divergentes e coletas historicas.
+    """
+    grupos, registros = {}, {}
+    for membro in visao.membros("ponto", pid):
+        for row in dbmod.query_all(conn, """
+                SELECT r.id AS registro_id, r.identificador_na_fonte,
+                       r.payload_original, a.hash_sha256, a.baixado_em,
+                       rf.nome AS recurso, rf.url_recurso,
+                       fo.id AS fonte_id, fo.nome, fo.url_institucional,
+                       n.codigo AS natureza, org.nome AS organizacao
+                FROM VINCULO_REGISTRO_PONTO vp
+                JOIN REGISTRO_FONTE r ON r.id=vp.registro_id
+                JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id
+                JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id
+                JOIN FONTE fo ON fo.id=rf.fonte_id
+                JOIN NATUREZA_FONTE n ON n.id=fo.natureza_id
+                JOIN ORGANIZACAO org ON org.id=fo.organizacao_id
+                WHERE vp.ponto_id=? ORDER BY a.baixado_em DESC, r.id DESC
+                """, (membro,)):
+            registros[row["registro_id"]] = row
+    for row in sorted(registros.values(),
+                      key=lambda r: (r["baixado_em"], r["registro_id"]), reverse=True):
+        fid = row["fonte_id"]
+        grupo = grupos.setdefault(fid, {
+            "id": "S-%d" % fid, "nome": row["nome"],
+            "organizacao": row["organizacao"], "natureza": row["natureza"],
+            "url": row["url_institucional"], "registros": [],
+        })
+        try:
+            dados = json.loads(row["payload_original"])
+        except (ValueError, TypeError):
+            dados = None
+        if row["natureza"] != "oficial":
+            dados = {k: v for k, v in dados.items()
+                     if k in _CAMPOS_PUBLICOS_CADASTRO
+                     and not isinstance(v, (dict, list))} if isinstance(dados, dict) else {}
+        grupo["registros"].append({
+            "registro_id": row["registro_id"],
+            "id_registro_original": row["identificador_na_fonte"],
+            "recurso": row["recurso"], "recurso_url": row["url_recurso"],
+            "coletado_em": row["baixado_em"],
+            "hash_artefato": row["hash_sha256"], "dados_publicados": dados,
+        })
+    return sorted(grupos.values(), key=lambda grupo: (grupo["nome"].casefold(), grupo["id"]))
+
+
 def operacoes_do_ponto(conn, pid):
     """Operacoes publicadas vinculadas a UM ponto (spec 11.4)."""
     out = []
@@ -693,7 +758,26 @@ def buscar_ponto_por_id(conn, pid_str):
     r = dbmod.query_one(conn, _PONTO_SQL + " WHERE p.id = ?", (pid,))
     if r is None:
         return None
-    return montar_registro(conn, r, visao=visao)
+    registro = montar_registro(conn, r, visao=visao)
+    if registro is not None:
+        registro["dados_por_fonte"] = _dados_por_fonte(conn, pid, visao)
+        # Complementos sao inferencias da base, nao publicacoes da fonte do envio.
+        # O detalhe expoe a origem separadamente, sem reescrever o bruto.
+        try:
+            alteracoes = dbmod.query_all(
+                conn, "SELECT campos_json FROM RADAR_ALTERACAO WHERE ponto_id=? "
+                "AND tipo='editado' ORDER BY id DESC", (int(registro["id"][2:]),))
+        except sqlite3.OperationalError:
+            alteracoes = []
+        for alteracao in alteracoes:
+            try:
+                complemento = json.loads(alteracao["campos_json"] or "{}").get("complemento_proximidade")
+            except (ValueError, TypeError, AttributeError):
+                continue
+            if complemento:
+                registro["proveniencia_campos"]["complemento_proximidade"] = complemento
+                break
+    return registro
 
 
 def listar_fontes(conn):

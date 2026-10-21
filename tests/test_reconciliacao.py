@@ -72,6 +72,18 @@ class TestReconciliacao(BaseDedup):
         self.assertEqual(meta["total_equipamentos"], 1)
         self.assertEqual([p["equipamentos"][0]["id"] for p in pontos], ["E-1", "E-1"])
 
+    def test_detalhe_do_alias_preserva_publicacoes_por_fonte_sem_duplicar_vinculos(self):
+        self.preparar()
+        self.unificar()
+        detalhe = consultas.buscar_ponto_por_id(self.con, "P-2")
+        fontes = {f["nome"]: f for f in detalhe["dados_por_fonte"]}
+        self.assertEqual(set(fontes), {"fonte-0", "fonte-1"})
+        for i in range(2):
+            registros = fontes["fonte-%d" % i]["registros"]
+            self.assertEqual(len(registros), 1)
+            self.assertEqual(registros[0]["registro_id"], self.registros[i])
+            self.assertEqual(registros[0]["dados_publicados"]["contexto"], i)
+
     def test_identidade_de_ponto_nao_funde_equipamentos(self):
         self.preparar()
         self.unificar(escopo="ponto")

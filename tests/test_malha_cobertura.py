@@ -14,7 +14,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tools import construir_malha as cm               # noqa: E402
+from core.manutencao import construir_malha as cm               # noqa: E402
 
 
 class TestMunicipiosAusentes(unittest.TestCase):

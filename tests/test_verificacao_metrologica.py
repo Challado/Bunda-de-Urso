@@ -9,7 +9,7 @@ import unittest
 
 from core import db as dbmod
 from tests.common import banco_memoria
-from tools import carregar_verificacao_metrologica as vm
+from core.manutencao import carregar_verificacao_metrologica as vm
 
 PAYLOAD = {
     "SiglaUf": "AC", "Municipio": "RIO BRANCO",

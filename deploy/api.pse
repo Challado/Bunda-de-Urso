@@ -25,7 +25,6 @@ So isto mora no webroot; o aplicativo fica em /home/openclaw/bin/radar.
 """
 import os
 import sys
-import urllib.parse
 
 os.environ.setdefault("RADAR_BRASIL_HOME", "/home/openclaw/bin/radar")
 os.environ.setdefault("RADAR_DB", "/var/lib/radar-brasil/radar.sqlite3")
@@ -36,23 +35,7 @@ if _raiz not in sys.path:
     sys.path.insert(0, _raiz)
 
 
-def _sob_cgi(environ=None):
-    """True se estiver rodando sob o servidor web (CGI/FastCGI)."""
-    environ = environ if environ is not None else os.environ
-    return bool(environ.get("GATEWAY_INTERFACE") or environ.get("REQUEST_METHOD"))
-
-
-if not _sob_cgi():
-    # Rodando no console do servidor: modo terminal.
-    from web import terminal  # noqa: E402
-    sys.exit(terminal.main(sys.argv[1:]))
-
-if not os.environ.get("PATH_INFO"):
-    _qs = urllib.parse.parse_qs(os.environ.get("QUERY_STRING", ""))
-    _rota = (_qs.get("rota") or _qs.get("path") or [""])[0]
-    os.environ["PATH_INFO"] = _rota or "/api/v1/ajuda"
-
-from web.nucleo import main   # noqa: E402
+from core.entrada_api import main   # noqa: E402
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

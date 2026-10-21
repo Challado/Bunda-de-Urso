@@ -7,9 +7,9 @@ import tempfile
 
 from core import consultas, db, dedup
 from tests.test_dedup import BaseDedup
-from tools.auditar_deduplicacao import _inventario
-from tools.auditar_deduplicacao import auditar
-from tools.listar_duplicidades import listar
+from core.manutencao.auditar_deduplicacao import _inventario
+from core.manutencao.auditar_deduplicacao import auditar
+from core.manutencao.listar_duplicidades import listar
 
 
 class TestFilaDedup(BaseDedup):

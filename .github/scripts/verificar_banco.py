@@ -1,45 +1,91 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Regra do dono: nada escreve direto no banco por fora do app.
+"""Verifica api.pse e o acesso unico a conexoes em core/db.py.
 
-  * O painel (web/) fala com a API, NUNCA com o SQLite -- nenhuma tela abre
-    conexao nem menciona sqlite;
-  * No nucleo do servico (core/, coletor/) quem abre conexao e so core/db.py;
-  * tools/ e isento: roda a mao, fora do servico (manutencao offline).
-
-    python3 .github/scripts/verificar_banco.py
+Inclui ferramentas, console, deploy e arquivos novos no checkout. Operacoes
+de manutencao sao servicos internos; tools/ contem apenas clientes da API.
 """
+import ast
 import re
 import sys
 
-from comum import RAIZ, terminar, versionados
+from comum import RAIZ, terminar
 
-CONEXAO = re.compile(r"sqlite3\.connect\s*\(")
-MENCIONA_SQLITE = re.compile(r"\bsqlite3\b")
+PASTAS = ("core", "coletor", "web", "tools", "deploy")
+ENTRADAS = {"web/api.pse", "deploy/api.pse"}
+
+
+def verificar_arquivo(rel, texto):
+    problemas = []
+    if rel.endswith(".html"):
+        if re.search(r"\bsqlite3\b|\bsqlite3?\.connect\s*\(", texto):
+            problemas.append(f"{rel}: a tela deve usar api.pse, sem acesso direto ao banco")
+        return problemas
+    if rel.endswith(".sh"):
+        if re.search(r"coletor/(?:tick|sync)\.py|(?:^|\s)sqlite3\s", texto):
+            problemas.append(f"{rel}: deploy deve executar api.pse")
+        return problemas
+    try:
+        arvore = ast.parse(texto, filename=rel)
+    except SyntaxError as exc:
+        return [f"{rel}: sintaxe invalida: {exc}"]
+    sqlite, conectar, clientes = {"sqlite3"}, set(), set()
+    e_cliente = rel.startswith("tools/") or rel == "web/terminal.py"
+    for node in ast.walk(arvore):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "sqlite3":
+                    sqlite.add(alias.asname or alias.name)
+                if e_cliente and alias.name.split(".")[0] in ("core", "coletor", "sqlite3"):
+                    problemas.append(f"{rel}: cliente nao pode importar camada de dados ({alias.name})")
+        if isinstance(node, ast.ImportFrom):
+            if node.module == "sqlite3":
+                conectar.update(alias.asname or alias.name for alias in node.names
+                                if alias.name in ("connect", "Connection"))
+            if node.module == "core.cliente_api":
+                clientes.update(alias.asname or alias.name for alias in node.names if alias.name == "executar")
+            elif e_cliente and (node.module or "").split(".")[0] in ("core", "coletor", "sqlite3"):
+                problemas.append(f"{rel}: cliente nao pode importar servico interno ({node.module})")
+    for node in ast.walk(arvore):
+        if not isinstance(node, ast.Call):
+            continue
+        fn = node.func
+        fisica = (isinstance(fn, ast.Name) and fn.id in conectar) or (
+            isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name)
+            and fn.value.id in sqlite and fn.attr in ("connect", "Connection"))
+        if fisica and rel != "core/db.py":
+            problemas.append(f"{rel}:{node.lineno}: conexao fisica permitida somente em core/db.py")
+        if e_cliente and isinstance(fn, ast.Attribute) and fn.attr in ("execute", "executemany", "executescript"):
+            problemas.append(f"{rel}:{node.lineno}: cliente nao pode executar SQL")
+    if e_cliente and not any(isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                             and node.func.id in clientes for node in ast.walk(arvore)):
+        problemas.append(f"{rel}: comando deve encaminhar a core.cliente_api.executar")
+    if rel.startswith("core/manutencao/") or rel in ("core/console_api.py", "coletor/tick.py", "coletor/sync.py"):
+        for node in arvore.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in ("main", "_main_servico"):
+                if rel.startswith("coletor/") and node.name == "main":
+                    continue  # cliente de compatibilidade
+                if not any(isinstance(d, ast.Name) and d.id == "operacao_local" for d in node.decorator_list):
+                    problemas.append(f"{rel}: servico local precisa do contexto de api.pse")
+    if rel in ENTRADAS and not any(isinstance(n, ast.ImportFrom) and n.module == "core.entrada_api"
+                                   for n in ast.walk(arvore)):
+        problemas.append(f"{rel}: entrada deve usar o despachante comum core.entrada_api")
+    return problemas
+
+
+def arquivos(raiz):
+    # Examina o checkout atual, inclusive implementacoes novas ainda nao adicionadas ao Git.
+    for pasta in PASTAS:
+        for path in sorted((raiz / pasta).rglob("*")):
+            if path.is_file() and path.suffix in (".py", ".pse", ".html", ".sh"):
+                yield path
 
 
 def main():
     problemas = []
-    for rel in versionados():
-        if not rel.endswith((".py", ".pse", ".html")):
-            continue
-        try:
-            texto = (RAIZ / rel).read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
-            continue
-
-        if rel.startswith("web/"):
-            if MENCIONA_SQLITE.search(texto):
-                problemas.append("%s: o painel nao pode falar com o SQLite (so API)" % rel)
-            continue
-
-        if rel.startswith(("core/", "coletor/")) and rel != "core/db.py":
-            if CONEXAO.search(texto):
-                problemas.append("%s: abre conexao propria (o unico caminho e core/db.py)" % rel)
-
-    return terminar(
-        problemas,
-        "Nada escreve direto no banco fora do caminho unico (core/db.py); o painel so usa a API.")
+    for path in arquivos(RAIZ):
+        problemas.extend(verificar_arquivo(path.relative_to(RAIZ).as_posix(), path.read_text(encoding="utf-8")))
+    return terminar(problemas, "Entradas e clientes passam por api.pse; conexoes fisicas somente em core/db.py.")
 
 
 if __name__ == "__main__":

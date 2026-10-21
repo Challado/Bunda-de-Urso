@@ -44,6 +44,22 @@
   details.dobrado > summary{cursor:pointer;padding:8px 10px;font-weight:600;font-size:13.5px}
   details.dobrado > .dentro{padding:0 10px 10px}
   details.secao > summary{cursor:pointer;padding:9px 12px;font-size:14px;font-weight:600;background:rgba(18,80,143,.09);border-bottom:1px solid var(--borda)}
+  details.secao:not([open]) > summary{border-bottom:0}
+  summary:hover{background:rgba(18,80,143,.15)}
+  summary:focus-visible,button:focus-visible{outline:3px solid var(--azul);outline-offset:3px}
+  .fontes-cabecalho{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-top:20px}
+  .fontes-cabecalho h2{font-size:18px;margin:0}
+  .acoes-fontes{display:flex;flex-wrap:wrap;gap:8px}
+  .acoes-fontes button{font:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--borda);border-radius:6px;background:var(--cinza);color:inherit;cursor:pointer}
+  .explicacao{color:#606775;font-size:13px;margin:6px 0 12px}
+  .fonte > summary h3{display:inline;font-size:15px;margin:0;overflow-wrap:anywhere}
+  .fonte > summary .pill{margin:4px 0 0 8px}
+  .publicacao + .publicacao{border-top:1px solid var(--borda);margin-top:16px;padding-top:12px}
+  .publicacao h4{margin:0 0 8px;font-size:14px;overflow-wrap:anywhere}
+  .origem-publicacao{margin-top:10px;font-size:13px}
+  .origem-publicacao > summary{cursor:pointer;color:var(--azul);padding:6px 0}
+  .corpo a{color:var(--azul);overflow-wrap:anywhere}
+  .consolidado > .corpo > .explicacao{margin-top:0}
   .rodape{margin-top:18px;font-size:12.5px;color:#6b7280}
   .rodape code{background:rgba(127,127,127,.15);padding:1px 5px;border-radius:4px}
   @media (prefers-color-scheme: dark){
@@ -51,6 +67,7 @@
     :root{--cinza:#212228;--borda:#34363e;--azul:#7fb2e8}
     .cartao,details.dobrado{background:#24252b}
     .chip{background:#2a2c34}
+    .explicacao{color:#b0b5c0}
   }
   @media (max-width: 620px){
     header{padding:9px 12px}
@@ -74,7 +91,7 @@
   <img class="logo" src="bunda-de-urso.png" alt="Bundita de Urso — a base do Bunda de urso">
   <div class="cabTxt">
     <h1 id="titulo">Radar — detalhes</h1>
-    <div class="sub">Todos os campos publicados pela API oficial. Campo sem fonte aparece como “não informado” (não é zero). &nbsp;·&nbsp; <a href="index.html">&larr; voltar à consulta por localização</a></div>
+    <div class="sub">Dados do radar separados por fonte. Clique no nome de uma fonte para recolher ou expandir seus dados. &nbsp;·&nbsp; <a href="index.html">&larr; voltar à consulta por localização</a></div>
     <nav class="nav">
       <a href="cadastro.html">Cadastrar radar</a>
       <a href="gestao.html">Administração</a>
@@ -149,11 +166,22 @@
     total_operacoes:"Total de operações", pontos:"Pontos",
     certificado:"Certificado", data:"Data", validade:"Validade", orgao_executor:"Órgão executor",
     classificacao:"Classificação", numero_certificado:"Número do certificado",
-    erro:"Erro", mensagem:"Mensagem", codigo_erro:"Código"
+    erro:"Erro", mensagem:"Mensagem", codigo_erro:"Código",
+    registro_id:"Registro na base", recurso:"Publicação de origem", natureza:"Natureza da fonte",
+    complemento_proximidade:"Complemento sugerido por proximidade (não verificado)",
+    ponto_origem_id:"Radar usado como referência", campos:"Campos complementados",
+    SiglaUf:"UF", Estado:"Estado", Municipio:"Município", LocalVerificacao:"Local da verificação",
+    DataUltimaVerificacao:"Última verificação", DataValidade:"Validade", UltimoResultado:"Resultado da verificação",
+    TipoMedidor:"Tipo de medidor", NumeroInmetro:"Número Inmetro", NumeroSerie:"Número de série",
+    Faixas:"Faixas verificadas", Historico:"Histórico de verificações", Proprietario:"Proprietário",
+    LocaisVerificacao:"Locais de verificação", NumeroFaixa:"Número da faixa", Sentido:"Sentido",
+    VelocidadeNominal:"Velocidade nominal (km/h)", NumeroCertificado:"Número do certificado",
+    NumeroEnsaio:"Número do ensaio", Ano:"Ano", DataLaudo:"Data do laudo",
+    TipoServico:"Tipo de serviço", Resultado:"Resultado", Nome:"Nome"
   };
   function rotulo(k){
     if (LABELS[k]) return LABELS[k];
-    return String(k).replace(/_/g, " ").replace(/^\w/, function(c){ return c.toUpperCase(); });
+    return String(k).replace(/([a-zà-ú])([A-ZÀ-Ú])/g, "$1 $2").replace(/_/g, " ").replace(/^\w/, function(c){ return c.toUpperCase(); });
   }
   function esc(s){
     return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
@@ -197,7 +225,7 @@
       }
       var itens = v.map(function(x, i){
         var cab = v.length > 1 ? "<div class='cartao-num'>#" + (i+1) + "</div>" : "";
-        return "<div class='cartao'>" + cab + renderDict(x) + "</div>";
+        return "<div class='cartao'>" + cab + (ehObjeto(x) ? renderDict(x) : fmtEscalar(x)) + "</div>";
       }).join("");
       if (v.length > 8){
         return "<details class='dobrado'><summary>" + v.length + " registros — clique para ver</summary><div class='dentro'>" + itens + "</div></details>";
@@ -232,6 +260,64 @@
     if (!ehObjeto(obj) || !Object.keys(obj).length) return "";
     return "<details class='secao' " + (aberto ? "open" : "") + "><summary>" + esc(titulo) + "</summary>" +
       "<div class='corpo'>" + renderDict(obj) + "</div></details>";
+  }
+
+  function linkFonte(url, texto){
+    if (/[{}]/.test(String(url))) return "";
+    try{
+      var destino = new URL(url);
+      if (destino.protocol === "https:" || destino.protocol === "http:"){
+        return "<a href='" + esc(destino.href).replace(/'/g, "&#39;") + "' target='_blank' rel='noopener noreferrer'>" + esc(texto) + "</a>";
+      }
+    }catch(e){}
+    return "";
+  }
+  function renderFontes(p){
+    var fontes = (p.dados_por_fonte || []).slice();
+    // Compatibilidade com respostas anteriores, sem atribuir o resumo a uma fonte.
+    if (!fontes.length){
+      var porId = Object.create(null);
+      (p.fontes || []).forEach(function(f){
+        var chave = f.id || f.nome;
+        if (!porId[chave]){ porId[chave] = true; fontes.push(f); }
+      });
+    }
+    var h = "<div class='fontes-cabecalho'><h2>Dados por fonte</h2>";
+    if (fontes.length) h += "<div class='acoes-fontes'><button type='button' id='expandir-fontes'>Expandir fontes</button><button type='button' id='recolher-fontes'>Recolher fontes</button></div>";
+    h += "</div><p class='explicacao'>Cada bloco mostra os dados publicados por aquela fonte. Valores e datas podem divergir entre as fontes. Os blocos começam abertos e podem ser recolhidos individualmente.</p>";
+    if (!fontes.length) return h + "<p class='vazio'>A origem dos dados não foi informada nesta resposta.</p>";
+    fontes.forEach(function(f){
+      var registros = f.registros || [];
+      var natureza = {oficial:"Fonte oficial", comunitaria:"Contribuição pública", outra:"Cadastro próprio"}[f.natureza];
+      h += "<details class='secao fonte' open><summary><h3>" + esc(f.nome || f.organizacao || "Fonte não identificada") + "</h3>";
+      if (natureza) h += "<span class='pill'>" + esc(natureza) + "</span>";
+      h += "</summary><div class='corpo'>";
+      if (f.organizacao) h += "<p class='explicacao'>Órgão ou responsável: " + esc(f.organizacao) + "</p>";
+      var institucional = linkFonte(f.url, "Consultar a fonte");
+      if (institucional) h += "<p>" + institucional + "</p>";
+      if (!registros.length){
+        h += "<p class='vazio'>Os dados desta fonte ainda não estão discriminados nesta resposta.</p>" + renderDict(f);
+      }
+      registros.forEach(function(r, i){
+        h += "<article class='publicacao'><h4>" + esc(r.recurso || "Dados publicados");
+        if (registros.length > 1) h += " · registro " + (i + 1) + " de " + registros.length;
+        h += "</h4>";
+        if (r.coletado_em) h += "<p class='explicacao'>Coletado em " + esc(fmtData(r.coletado_em)) + "</p>";
+        if (r.dados_publicados != null && (!ehObjeto(r.dados_publicados) || Object.keys(r.dados_publicados).length)){
+          h += renderValor(r.dados_publicados);
+        } else {
+          h += "<p class='vazio'>Os campos publicados não estão disponíveis para este registro.</p>";
+        }
+        var urlRecurso = r.recurso_url || "";
+        var ufFonte = r.dados_publicados && r.dados_publicados.SiglaUf;
+        if (typeof ufFonte === "string" && /^[A-Z]{2}$/.test(ufFonte)) urlRecurso = urlRecurso.replace("{uf}", ufFonte);
+        var recurso = linkFonte(urlRecurso, "Abrir a publicação original");
+        if (recurso) h += "<p>" + recurso + "</p>";
+        h += "<details class='origem-publicacao'><summary>Identificação e rastreabilidade da publicação</summary>" + renderDict({registro_id:r.registro_id, id_registro_original:r.id_registro_original, coletado_em:r.coletado_em, hash_artefato:r.hash_artefato}) + "</details></article>";
+      });
+      h += "</div></details>";
+    });
+    return h;
   }
 
   var principal = document.getElementById("principal");
@@ -285,8 +371,10 @@
     h += "</div>";
     h += "<div id='mapa'></div>";
 
+    h += renderFontes(p);
+    h += "<details class='secao consolidado' open><summary>Visão consolidada do radar</summary><div class='corpo'><p class='explicacao'>Resumo organizado pela base a partir dos registros associados. Para conferir o que cada fonte publicou, consulte os blocos acima. Posições inferidas são estimativas, não GPS oficial.</p>";
     h += secao("Localização", {localizacao: p.localizacao});
-    h += secao("Identificação e situação", {id:p.id, tipo_registro:p.tipo_registro, situacao_operacional:p.situacao_operacional, situacao_original:p.situacao_original, data_inicio_operacao:p.data_inicio_operacao, data_inativacao:p.data_inativacao, motivo_inativacao:p.motivo_inativacao});
+    h += secao("Identificação e situação", {id:p.id, tipo_registro:p.tipo_registro, tipos_radar_presentes:p.tipos_radar_presentes, situacao_operacional:p.situacao_operacional, situacao_original:p.situacao_original, data_inicio_operacao:p.data_inicio_operacao, data_inativacao:p.data_inativacao, motivo_inativacao:p.motivo_inativacao});
     h += secao("Velocidade e faixas", {velocidade_leves_kmh:p.velocidade_leves_kmh, velocidade_pesados_kmh:p.velocidade_pesados_kmh, velocidade_geral_kmh:p.velocidade_geral_kmh, velocidades_resolvidas:p.velocidades_resolvidas, limites_velocidade:p.limites_velocidade, faixas:p.faixas, quantidade_faixas_declarada:p.quantidade_faixas_declarada, conflitos:p.conflitos});
     h += secao("Regimes de fiscalização", {regimes:p.regimes});
     h += secao("Equipamentos e instalações", {equipamentos:p.equipamentos});
@@ -296,22 +384,26 @@
     h += secao("Rastreabilidade e datas", {primeira_observacao:p.primeira_observacao, ultima_confirmacao:p.ultima_confirmacao, ultima_coleta:p.ultima_coleta, confianca:p.confianca, observacoes:p.observacoes, proveniencia_campos:p.proveniencia_campos});
 
     // tudo o que sobrou (garante que NENHUM campo fique de fora)
-    var usados = {localizacao:1,tipo_registro:1,situacao_operacional:1,situacao_original:1,data_inicio_operacao:1,data_inativacao:1,motivo_inativacao:1,velocidade_leves_kmh:1,velocidade_pesados_kmh:1,velocidade_geral_kmh:1,velocidades_resolvidas:1,limites_velocidade:1,faixas:1,quantidade_faixas_declarada:1,conflitos:1,regimes:1,equipamentos:1,organizacoes:1,documentos:1,operacoes:1,primeira_observacao:1,ultima_confirmacao:1,ultima_coleta:1,confianca:1,observacoes:1,proveniencia_campos:1,fontes:1,id:1,tipos_radar_presentes:1,total_pontos:1,total_equipamentos:1,retornados:1,proximo_cursor:1,status:1,total_operacoes:1};
+    var usados = {localizacao:1,tipo_registro:1,situacao_operacional:1,situacao_original:1,data_inicio_operacao:1,data_inativacao:1,motivo_inativacao:1,velocidade_leves_kmh:1,velocidade_pesados_kmh:1,velocidade_geral_kmh:1,velocidades_resolvidas:1,limites_velocidade:1,faixas:1,quantidade_faixas_declarada:1,conflitos:1,regimes:1,equipamentos:1,organizacoes:1,documentos:1,operacoes:1,primeira_observacao:1,ultima_confirmacao:1,ultima_coleta:1,confianca:1,observacoes:1,proveniencia_campos:1,fontes:1,dados_por_fonte:1,id:1,tipos_radar_presentes:1,total_pontos:1,total_equipamentos:1,retornados:1,proximo_cursor:1,status:1,total_operacoes:1};
     var resto = {};
     Object.keys(p).forEach(function(k){ if (!usados[k]) resto[k] = p[k]; });
     h += secao("Outros campos", resto);
 
-    if (p.fontes && p.fontes.length){
-      h += "<details class='secao'><summary>Fontes do registro (" + p.fontes.length + ")</summary><div class='corpo'>" + renderValor(p.fontes) + "</div></details>";
-    }
+    h += "</div></details>";
 
     h += secaoDobrada("Procedência da resposta (API)", {consultado_em:d.consultado_em, versao_api:d.versao_api, versao_esquema:d.versao_esquema, consulta:d.consulta, total_pontos:res.total_pontos, total_equipamentos:res.total_equipamentos, total_operacoes:res.total_operacoes, status:res.status}, true);
     h += secaoDobrada("Cobertura da base", d.cobertura, true);
     h += secaoDobrada("Estado da base (snapshot)", d.base, true);
 
-    h += "<div class='rodape'>Fonte: API Radar Brasil <code>/api/v1/radares/" + esc(id) + "</code>. Campo sem fonte oficial aparece como <i>não informado</i>. Coordenada marcada como <i>inferida</i> foi derivada por km, não é GPS oficial.</div>";
+    h += "<div class='rodape'>Consulta: API Radar Brasil <code>/api/v1/radares/" + esc(id) + "</code>. As fontes dos dados estão identificadas em seus próprios blocos. Campo ausente significa <i>não informado</i>, não zero.</div>";
 
     principal.innerHTML = h;
+    function abrirFontes(aberto){
+      principal.querySelectorAll("details.fonte").forEach(function(fonte){ fonte.open = aberto; });
+    }
+    var expandir = document.getElementById("expandir-fontes"), recolher = document.getElementById("recolher-fontes");
+    if (expandir) expandir.addEventListener("click", function(){ abrirFontes(true); });
+    if (recolher) recolher.addEventListener("click", function(){ abrirFontes(false); });
 
     try{
       if (lat != null && lon != null && window.L){
@@ -322,7 +414,10 @@
         setTimeout(function(){ map.invalidateSize(); }, 200);
       } else {
         var m = document.getElementById("mapa");
-        if (m) m.outerHTML = "<div class='aviso' style='padding:10px;border:1px solid var(--borda);border-radius:8px'>Este registro não tem coordenada geográfica publicada (posição não informada pela fonte).</div>";
+        if (m){
+          var aviso = lat != null && lon != null ? "Mapa indisponível. Coordenadas do radar: " + esc(lat) + ", " + esc(lon) + "." : "Este registro não tem coordenada geográfica publicada (posição não informada pela fonte).";
+          m.outerHTML = "<div class='aviso' style='padding:10px;border:1px solid var(--borda);border-radius:8px'>" + aviso + "</div>";
+        }
       }
     }catch(e){}
   }

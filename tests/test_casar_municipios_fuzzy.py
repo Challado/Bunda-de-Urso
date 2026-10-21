@@ -13,7 +13,7 @@ import unittest
 
 from core import db as dbmod
 from tests.common import banco_memoria
-from tools import casar_municipios_fuzzy as fz
+from core.manutencao import casar_municipios_fuzzy as fz
 
 
 def _mun(con, codigo, uf, nome):

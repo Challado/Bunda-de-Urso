@@ -88,7 +88,7 @@ https://servidor3.lucas.inf.br/openclaw/radar/api.pse?rota=/api/v1/radares&lat=-
 
 Resumindo: **nginx + fcgiwrap + Python** executando um arquivo `.pse`. Nada mais exótico que isso.
 
-O esquema é **SQL canônico, sem ORM** — nada de SQLAlchemy por aqui. São **77 tabelas** (T01..T77) definidas uma única vez em `tools/build_schema.py`, que gera as duas DDLs gêmeas (`sql/schema.sqlite.sql` e `sql/schema.postgres.sql`), com chaves primárias/estrangeiras, `CHECK`, `UNIQUE` e índices, incluindo equipamentos, pontos, instalações, faixas, órgãos, fontes, documentos, verificações, operações, evidências e candidatos geográficos. O banco padrão é SQLite, sem PostGIS. A compatibilidade efetiva com outros SGBDs requer homologação específica.
+O esquema é **SQL canônico, sem ORM** — nada de SQLAlchemy por aqui. São **77 tabelas** (T01..T77) definidas uma única vez em `core/manutencao/build_schema.py` (o comando `tools/build_schema.py` encaminha a geração pela API), que gera as duas DDLs gêmeas (`sql/schema.sqlite.sql` e `sql/schema.postgres.sql`), com chaves primárias/estrangeiras, `CHECK`, `UNIQUE` e índices, incluindo equipamentos, pontos, instalações, faixas, órgãos, fontes, documentos, verificações, operações, evidências e candidatos geográficos. O banco padrão é SQLite, sem PostGIS. A compatibilidade efetiva com outros SGBDs requer homologação específica.
 
 ## Como a coleta funciona
 
@@ -280,8 +280,9 @@ repetida.
 - **Front** (`verificar_web.py`): todo `href`/`src` local existe, toda página
 tem `viewport` (celular/tablet/PC) e as rotas que o front chama são atendidas
 pela API (`web/nucleo.py`).
-- **Escrita no banco** (`verificar_banco.py`): o painel (`web/`) só fala com a
-API — nunca com o SQLite; no núcleo (`core/`, `coletor/`) a única conexão é
+- **Escrita no banco** (`verificar_banco.py`): telas, console, cron e ferramentas
+entram por `api.pse`; `tools/` contém clientes, sem isenção de acesso direto.
+As operações locais de manutenção não são rotas HTTP. A única conexão física fica em
 `core/db.py`.
 - **Estrutura** (`verificar_estrutura.py`): arquivos obrigatórios presentes e
 nenhum artefato de build/execução versionado (`__pycache__`, `.pyc`, bancos,

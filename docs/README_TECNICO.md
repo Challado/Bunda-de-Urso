@@ -54,10 +54,37 @@ tests/                   unittest (stdlib)
 
 ## Como rodar
 
+### Entrada única da aplicação
+
+As operações da aplicação entram por `api.pse`: requisições CGI, console,
+coleta agendada e manutenção. `web/api.pse` e o wrapper `deploy/api.pse`
+usam o mesmo despachante em `core/entrada_api.py`.
+
+No próprio servidor, os comandos são locais:
+
+```bash
+python3 web/api.pse ferramenta inicializar_banco
+python3 web/api.pse ferramenta radar_admin listar-usuarios
+python3 web/api.pse sync --fonte antt --arquivo tests/fixtures/antt_radares_fixture.json
+python3 web/api.pse tick --help
+```
+
+Os caminhos antigos em `tools/` e `coletor/sync.py`/`tick.py` permanecem como
+clientes que chamam `api.pse`, preservando argumentos e código de saída.
+As implementações de manutenção ficam em `core/manutencao/`, o console em
+`core/console_api.py`, e todas as conexões físicas passam por `core/db.py`.
+O modo local exige acesso de operador ao servidor e não é exposto por rotas
+HTTP. A autenticação das rotas administrativas web continua obrigatória.
+
+`verificar_banco.py` fiscaliza também ferramentas, deploy e arquivos novos,
+incluindo aliases de importação de conexões. Testes podem montar e inspecionar
+bases temporárias para verificar os resultados da API.
+
 ### 1. Schema
 
-As DDLs já estão geradas em `sql/`. Para regenerá-las (fonte única em
-`tools/build_schema.py`) e conferir que as 77 tabelas carregam no SQLite:
+As DDLs já estão geradas em `sql/`. A definição única fica em
+`core/manutencao/build_schema.py`; o cliente `tools/build_schema.py` chama
+essa operação pela API. Para regenerá-las e conferir as tabelas no SQLite:
 
 ```bash
 python3 tools/build_schema.py     # gera sql/schema.sqlite.sql e sql/schema.postgres.sql
@@ -67,7 +94,7 @@ O schema é carregado automaticamente pelo coletor (`core.db.init_db`) e pelos
 testes. Para um banco novo:
 
 ```bash
-python3 -c "from core import db, config; db.init_db(db.connect(config.DB_PATH))"
+python3 web/api.pse ferramenta inicializar_banco
 ```
 
 ### 2. Coletor / sincronização
@@ -118,6 +145,30 @@ Endpoints: `/api/v1/radares`, `/api/v1/radares/{id}`, `/api/v1/ajuda`,
 ```bash
 python3 -m unittest discover -s tests
 ```
+
+### Cadastro público
+
+`web/cadastro.html` abre no modo **simplificado**, com apenas latitude,
+longitude e velocidade. O modo **expert** acrescenta identificação, tipo,
+município, via, km, sentido, observações e contato; permite município + via
+quando as coordenadas não são conhecidas. Campos ocultos não são enviados.
+
+O formulário envia `POST /api/v1/radares/submeter`. A resposta de sucesso é
+HTTP 201, com os contadores e IDs dentro de `resultado`. Reenvios idênticos
+retornam o cadastro existente em `cadastros` e `ja_cadastrados`, sem duplicá-lo.
+
+Após salvar, a base procura candidatos oficiais no raio configurado em
+`RAIO_CORRESPONDENCIA_M` (150 m por padrão). Com um único candidato e sem
+divergência de município/via, preenche apenas lacunas de município, via, km
+e pista. Coordenadas, velocidade informada, identidade e situação do radar
+não são copiadas. A origem do complemento fica na auditoria e na proveniência
+do detalhe; o novo ponto continua não verificado. Vários candidatos geram
+sugestões de correspondência, sem complementação automática.
+
+O cadastro próprio Bundita e as contribuições públicas são fontes distintas
+na mesma base SQLite, definida por `RADAR_DB` (padrão `dados/radar.sqlite3`).
+O wrapper de produção em `deploy/api.pse` usa por padrão
+`/var/lib/radar-brasil/radar.sqlite3`.
 
 ### 5. Serialização
 

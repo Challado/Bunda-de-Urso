@@ -13,7 +13,7 @@ from coletor import tick
 from core import config, consultas, db, governanca
 from tests.common import ANTT_FIXTURE
 from web import nucleo
-from tools.auditar_deduplicacao import auditar
+from core.manutencao.auditar_deduplicacao import auditar
 
 
 class TestOperacao(unittest.TestCase):

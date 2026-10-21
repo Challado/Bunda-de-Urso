@@ -20,7 +20,7 @@ if not _raiz:
 if _raiz and _raiz not in sys.path:
     sys.path.insert(0, _raiz)
 
-from web.nucleo import main   # noqa: E402
+from core.entrada_api import main   # noqa: E402
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

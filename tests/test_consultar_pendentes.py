@@ -10,7 +10,7 @@ from unittest import mock
 
 from core import db as dbmod
 from tests.common import banco_memoria
-from tools import consultar_nomes_pendentes as cp
+from core.manutencao import consultar_nomes_pendentes as cp
 
 
 def _mun(con, codigo, uf, nome):

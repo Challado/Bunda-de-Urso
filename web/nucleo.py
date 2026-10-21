@@ -510,6 +510,9 @@ def _rota(environ):
     """Deriva o caminho do endpoint tolerando variacoes de CGI/fcgiwrap."""
     caminho = environ.get("PATH_INFO") or ""
     if not caminho:
+        query = urllib.parse.parse_qs(environ.get("QUERY_STRING", ""))
+        caminho = (query.get("rota") or query.get("path") or [""])[0]
+    if not caminho:
         uri = environ.get("REQUEST_URI", "").split("?", 1)[0]
         script = environ.get("SCRIPT_NAME", "")
         if uri.startswith(script):
@@ -1622,4 +1625,5 @@ def main(environ=None):
 
 
 if __name__ == "__main__":
-    main()
+    from core.cliente_api import executar
+    raise SystemExit(executar([], sys.argv[1:]))

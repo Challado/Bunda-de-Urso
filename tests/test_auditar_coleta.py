@@ -7,7 +7,7 @@ smoke test de ``medir`` num banco vazio.
 import unittest
 
 from tests.common import banco_memoria
-from tools import auditar_coleta as ac
+from core.manutencao import auditar_coleta as ac
 
 
 class TestComparar(unittest.TestCase):

@@ -39,7 +39,8 @@ Um mesmo número aparece nos pontos necessários para resolver o mesmo problema.
 
 O schema SQL não foi alterado. O escopo, as entidades de origem e o marco de aplicação ficam nos metadados auditáveis de `DECISAO_DUPLICIDADE`. Os dados originais e IDs continuam armazenados; a visão pública resolve os aliases sem excluir entidades.
 
-Exemplo da API Python existente:
+Exemplo do serviço Python interno, executado no contexto da API.
+Comandos externos de manutenção usam `api.pse ferramenta <nome>`:
 
 ```python
 from core import dedup

@@ -10,7 +10,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tools import auditar_geografia_municipios as ag   # noqa: E402
+from core.manutencao import auditar_geografia_municipios as ag   # noqa: E402
 
 
 QUADRADO = [[(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0), (0.0, 0.0)]]

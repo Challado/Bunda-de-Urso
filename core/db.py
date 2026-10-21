@@ -7,27 +7,37 @@ parametrizado.
 """
 import os
 import sqlite3
+from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 from . import config
 from . import domains as _domains
 
 
-def connect(path=None):
+def connect(path=None, *, uri=False):
     """Abre conexao SQLite com foreign_keys=ON e Row factory."""
     path = path or config.DB_PATH
-    if path != ":memory:":
+    path = os.fspath(path)
+    readonly = uri and parse_qs(urlsplit(path).query).get("mode") == ["ro"]
+    if path != ":memory:" and not uri:
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    con = sqlite3.connect(path)
+    con = sqlite3.connect(path, uri=uri)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA foreign_keys = ON")
     # Leitor (web) e escritor (coletor) ao mesmo tempo: WAL deixa a leitura
     # nao travar na escrita e o busy_timeout evita "database is locked".
-    try:
-        con.execute("PRAGMA journal_mode = WAL")
-        con.execute("PRAGMA busy_timeout = 5000")
-    except sqlite3.Error:                                  # pragma: no cover
-        pass
+    if not readonly:
+        try:
+            con.execute("PRAGMA journal_mode = WAL")
+        except sqlite3.Error:                              # pragma: no cover
+            pass
+    con.execute("PRAGMA busy_timeout = 5000")
     return con
+
+
+def connect_readonly(path):
+    """Leitura sem criar arquivos, alterar journal ou aceitar fallback de escrita."""
+    return connect(Path(path).resolve(strict=True).as_uri() + "?mode=ro", uri=True)
 
 
 def esquema_carregado(conn):

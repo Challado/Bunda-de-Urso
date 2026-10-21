@@ -27,13 +27,22 @@
   /* font-size:16px evita o zoom automatico dos campos no iOS */
   input,select,textarea{font:inherit;font-size:16px;padding:8px 10px;border:1px solid var(--borda);border-radius:7px;background:#fff;color:#1d1d22;width:100%}
   textarea{min-height:64px;resize:vertical}
-  button{margin-top:12px;padding:11px 16px;min-height:44px;border:0;border-radius:7px;background:var(--azul);color:#fff;font:600 15px/1 inherit;cursor:pointer}
+  button{margin-top:12px;padding:11px 16px;min-height:44px;border:0;border-radius:7px;background:var(--azul);color:#fff;font:inherit;font-weight:600;cursor:pointer}
   button:disabled{opacity:.6;cursor:default}
   .dica{color:#6b7280;font-size:12.5px;margin-top:8px}
   .dica.ok{color:var(--verde)}
   .dica.erro{color:#7a1f1f}
   .geoBox{margin-top:10px;display:flex;flex-direction:column;gap:4px}
   .geoBox button{background:var(--verde);margin-top:0}
+  [hidden]{display:none!important}
+  .modos{border:0;margin:0 0 16px;padding:0;display:flex;flex-wrap:wrap;gap:10px}
+  .modos legend{font-weight:600;margin-bottom:8px}
+  .modos label{flex-direction:row;align-items:center;gap:7px;font-size:14px;background:#eef3fa;padding:9px 12px;border-radius:7px}
+  .modos input{width:auto;margin:0}
+  .resultado-cadastro{margin-top:10px;padding-top:10px;border-top:1px solid currentColor}
+  .resultado-cadastro a{color:inherit;font-weight:600}
+  .resultado-cadastro ul{padding-left:20px}
+  :focus-visible{outline:3px solid var(--azul);outline-offset:3px}
   @media (max-width:560px){.grade{grid-template-columns:1fr}header .logo{height:40px}.geoBox button{width:100%}}
 </style>
 <link rel="icon" href="favicon.ico" sizes="any">
@@ -53,44 +62,48 @@
   </div>
 </header>
 <main>
-  <p class="aviso" id="aviso">Cadastro <b>colaborativo e aberto</b>. O radar entra <b>na hora</b>, marcado como “não verificado”, e pode ser verificado depois. Informe as coordenadas <b>ou</b>, no mínimo, município + via.</p>
+  <p class="aviso" id="aviso">Informe a localização do radar e a velocidade indicada na placa. O cadastro entra como <b>não verificado</b>. Depois do envio, a base procura radares próximos para complementar dados e sugerir correspondências.</p>
 
   <form id="form" novalidate>
-    <h2>Identificação</h2>
+    <fieldset class="modos">
+      <legend>Modo de cadastro</legend>
+      <label><input type="radio" name="modo" value="simplificado" checked> Simplificado</label>
+      <label><input type="radio" name="modo" value="expert"> Expert</label>
+    </fieldset>
+    <h2>Dados do radar</h2>
     <div class="grade">
-      <label>Código/identificador do órgão (opcional)<input name="identificador" placeholder="ex.: R-1234" autocomplete="off"></label>
-      <label>Tipo<select name="tipo_radar"><option value="">—</option><option>fixo</option><option>portatil</option><option>movel</option></select></label>
-      <label class="wide">Fabricante / modelo (opcional)<input name="modelo" placeholder="ex.: Trafipax / …" autocomplete="off"></label>
-    </div>
-
-    <h2>Localização</h2>
-    <div class="grade">
-      <label>Latitude<input name="latitude" inputmode="decimal" placeholder="-23.288997" autocomplete="off"></label>
-      <label>Longitude<input name="longitude" inputmode="decimal" placeholder="-46.587841" autocomplete="off"></label>
-      <label>UF<input name="uf" maxlength="2" placeholder="SP" autocomplete="off"></label>
-      <label>Município<input name="municipio" placeholder="Mairiporã" autocomplete="off"></label>
-      <label>Via / rodovia<input name="via" placeholder="BR-381" autocomplete="off"></label>
-      <label>km<input name="km" inputmode="decimal" placeholder="27.3" autocomplete="off"></label>
+      <label>Latitude<input name="latitude" inputmode="decimal" placeholder="-23.288997" autocomplete="off" required></label>
+      <label>Longitude<input name="longitude" inputmode="decimal" placeholder="-46.587841" autocomplete="off" required></label>
+      <label class="wide">Velocidade (km/h)<input name="velocidade_geral" inputmode="decimal" placeholder="80" autocomplete="off" required></label>
     </div>
 
     <div class="geoBox">
       <button type="button" id="btGeo" class="geo">📍 Usar minha localização atual</button>
       <div id="geoInfo" class="dica" role="status" aria-live="polite"></div>
-      <div class="dica">A localização vem do GPS do aparelho: funciona melhor <b>a céu aberto</b> e com o <b>GPS ligado</b>. O navegador só fornece a posição em páginas <b>HTTPS</b> — e esta página já é segura.</div>
+      <div class="dica">Use o GPS quando estiver no local do radar e confira a posição antes de enviar. A localização exige permissão do navegador e uma conexão segura.</div>
     </div>
 
-    <h2>Fiscalização</h2>
+    <fieldset id="camposExpert" hidden disabled style="border:0;margin:0;padding:0">
+    <legend><h2>Dados adicionais — modo expert</h2></legend>
     <div class="grade">
-      <label>Velocidade (km/h)<input name="velocidade_geral" inputmode="numeric" placeholder="80" autocomplete="off"></label>
+      <label>Código/identificador do órgão (opcional)<input name="identificador" placeholder="ex.: R-1234" autocomplete="off"></label>
+      <label>Tipo<select name="tipo_radar"><option value="">—</option><option>fixo</option><option>portatil</option><option>movel</option></select></label>
+      <label class="wide">Fabricante / modelo (opcional)<input name="modelo" placeholder="ex.: Trafipax / …" autocomplete="off"></label>
+      <label>UF<input name="uf" maxlength="2" placeholder="SP" autocomplete="off"></label>
+      <label>Município<input name="municipio" placeholder="Mairiporã" autocomplete="off"></label>
+      <label>Via / rodovia<input name="via" placeholder="BR-381" autocomplete="off"></label>
+      <label>km<input name="km" inputmode="decimal" placeholder="27.3" autocomplete="off"></label>
       <label>Sentido<select name="sentido"><option value="">—</option><option>crescente</option><option>decrescente</option><option>ambos</option><option>desconhecido</option></select></label>
       <label class="wide">Observações<textarea name="observacoes" placeholder="Referências do ponto exato, placa, situação…"></textarea></label>
       <label class="wide">Seu contato (opcional, para conferência)<input name="contato" placeholder="nome / e-mail" autocomplete="off"></label>
     </div>
+    <p class="dica">Sem coordenadas, informe município e via. Os demais campos são opcionais.</p>
+    </fieldset>
 
     <button type="submit" id="bt">Enviar cadastro</button>
-    <div class="dica">Só a localização mínima é obrigatória. Campo em branco fica como “não informado” — nada é inventado.</div>
+    <div class="dica" id="dicaModo">Preencha os três campos. Os dados oficiais serão preservados; proximidade sugere uma correspondência e não comprova que é o mesmo radar.</div>
   </form>
-  <div id="res" style="margin-top:14px"></div>
+  <div id="res" style="margin-top:14px" role="status" aria-live="polite" aria-atomic="true"></div>
 </main>
 <script>
 var API = "api.pse?rota=/api/v1/radares/submeter&formato=json";
@@ -98,6 +111,17 @@ var CAMPOS = ["identificador","tipo_radar","modelo","latitude","longitude","uf",
 var form = document.getElementById("form");
 function val(n){ var el = form.elements[n]; return el ? el.value.trim() : ""; }
 function diz(html, cls){ document.getElementById("res").innerHTML = "<div class='aviso " + (cls||"") + "'>" + html + "</div>"; }
+function esc(s){return String(s == null ? "" : s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+function numero(v){return v === "" ? null : Number(v.replace(",","."));}
+function simplificado(){return form.elements["modo"].value === "simplificado";}
+function mudarModo(){
+  var simples = simplificado(), expert = document.getElementById("camposExpert");
+  expert.hidden = simples; expert.disabled = simples;
+  ["latitude","longitude","velocidade_geral"].forEach(function(k){form.elements[k].required = simples;});
+  document.getElementById("dicaModo").textContent = simples ? "Preencha os três campos. Os dados oficiais serão preservados; proximidade sugere uma correspondência e não comprova que é o mesmo radar." : "Informe as coordenadas ou município + via. Só preencha os dados que você conhece.";
+}
+form.querySelectorAll('[name="modo"]').forEach(function(el){el.addEventListener("change",mudarModo);});
+mudarModo();
 
 // ---------------- Localização atual (GPS do aparelho) ----------------
 // A pessoa pode estar NA ESTRADA cadastrando o radar: um toque preenche lat/lon.
@@ -133,7 +157,7 @@ function geoErro(err){
   if (code === 1) msg = "Permissão de localização <b>negada</b>. Libere o acesso à localização no navegador (ícone do cadeado) e tente de novo — ou informe as coordenadas à mão.";
   else if (code === 2) msg = "Localização <b>indisponível</b> agora. Confira se o GPS está ligado e tente a céu aberto — ou informe as coordenadas à mão.";
   else if (code === 3) msg = "A localização <b>demorou demais</b> para responder. Vá para um local aberto e tente novamente (ou informe as coordenadas à mão).";
-  else msg = "Não foi possível obter a sua localização" + (err && err.message ? ": " + err.message : ".") + " Tente a céu aberto ou informe as coordenadas à mão.";
+  else msg = "Não foi possível obter a sua localização" + (err && err.message ? ": " + esc(err.message) : ".") + " Tente a céu aberto ou informe as coordenadas à mão.";
   geoMsg(msg, "erro");
 }
 function geoBuscar(){
@@ -178,11 +202,24 @@ if (geoSup && navigator.permissions && navigator.permissions.query){
 
 form.addEventListener("submit", function(ev){
   ev.preventDefault();
+  if (document.getElementById("bt").disabled) return;
   var body = {};
-  CAMPOS.forEach(function(k){ var v = val(k); if (v) body[k] = v; });
-  if (!body.latitude && !body.longitude && !(body.municipio && body.via)){
+  (simplificado() ? ["latitude","longitude","velocidade_geral"] : CAMPOS).forEach(function(k){ var v = val(k); if (v) body[k] = v; });
+  if (simplificado() && (!val("latitude") || !val("longitude") || !val("velocidade_geral"))){
+    diz("Informe latitude, longitude e velocidade.", "err"); return;
+  }
+  if ((body.latitude != null || body.longitude != null) &&
+      (!val("latitude") || !val("longitude") || !Number.isFinite(numero(val("latitude"))) || !Number.isFinite(numero(val("longitude"))) || Math.abs(numero(val("latitude"))) > 90 || Math.abs(numero(val("longitude"))) > 180 || (numero(val("latitude")) === 0 && numero(val("longitude")) === 0))){
+    diz("Informe latitude e longitude válidas, juntas, em graus decimais.", "err"); return;
+  }
+  if (body.velocidade_geral != null && (!Number.isFinite(numero(val("velocidade_geral"))) || numero(val("velocidade_geral")) <= 0 || numero(val("velocidade_geral")) > 350)){
+    diz("Informe uma velocidade maior que zero e de até 350 km/h.", "err"); return;
+  }
+  if (body.latitude == null && body.longitude == null && !(body.municipio && body.via)){
     diz("Informe as coordenadas ou, no mínimo, município + via.", "err"); return;
   }
+  ["latitude","longitude","velocidade_geral","km"].forEach(function(k){if(body[k] != null) body[k] = numero(val(k));});
+  if (body.km != null && (!Number.isFinite(body.km) || body.km < 0)){diz("Informe um quilômetro válido, maior ou igual a zero.","err");return;}
   var bt = document.getElementById("bt");
   bt.disabled = true; bt.textContent = "Enviando…";
   document.getElementById("res").innerHTML = "";
@@ -190,16 +227,30 @@ form.addEventListener("submit", function(ev){
     .then(function(r){ return r.json().catch(function(){return {};}).then(function(j){ return {status:r.status, body:j}; }); })
     .then(function(o){
       var j = o.body || {};
-      if (o.status === 200 && ((j.criados||0) + (j.atualizados||0)) > 0){
-        diz("Recebido! Criados: <b>" + (j.criados||0) + "</b>, atualizados: <b>" + (j.atualizados||0) + "</b>. Obrigado — ele já aparece no mapa.", "ok");
-      } else if (o.status === 404 || o.status === 501 || o.status === 401){
-        diz("O cadastro pela página ainda está <b>em ativação</b>. Tente novamente mais tarde.");
+      var res = j.resultado || j;
+      if (o.status >= 200 && o.status < 300 && j.sucesso !== false && res.ok !== false && ((res.aceitos||0) + (res.criados||0) + (res.atualizados||0) + (res.ja_cadastrados||0)) > 0){
+        var msg = res.ja_cadastrados && !res.criados && !res.atualizados ? "Este envio já estava cadastrado; nenhuma duplicata foi criada." : "Cadastro recebido! Ele já pode ser consultado no mapa como <b>não verificado</b>.";
+        (res.cadastros || []).forEach(function(c){
+          msg += "<div class='resultado-cadastro'><a href='detalhe.html?id=" + encodeURIComponent(c.id) + "'>Ver radar " + esc(c.id) + "</a>";
+          var proximidade = c.proximidade || {}, candidatos = proximidade.candidatos || [];
+          if (Object.keys(proximidade.campos_complementados || {}).length) msg += "<p>Dados complementados por proximidade: " + Object.keys(proximidade.campos_complementados).map(esc).join(", ") + ". A origem fica registrada no histórico.</p>";
+          if (candidatos.length){
+            msg += "<p>" + candidatos.length + " possível(is) correspondência(s) em até " + esc(proximidade.raio_metros) + " m. Os registros oficiais foram preservados.</p><ul>";
+            candidatos.forEach(function(p){msg += "<li><a href='detalhe.html?id=" + encodeURIComponent(p.id) + "'>" + esc(p.id) + "</a> · " + esc(p.distancia_metros) + " m" + (p.via ? " · " + esc(p.via) : "") + "</li>";});
+            msg += "</ul>";
+            if (proximidade.status === "ambiguo") msg += "<p>Há mais de um candidato; nenhum dado foi copiado automaticamente.</p>";
+          } else msg += "<p>" + (proximidade.status === "sem_coordenadas" ? "Sem coordenadas para procurar correspondências próximas." : "Nenhum radar oficial próximo foi encontrado na base local.") + "</p>";
+          msg += "</div>";
+        });
+        if (res.rejeitados) msg += "<p>" + esc(res.rejeitados) + " registro(s) rejeitado(s).</p>";
+        diz(msg, "ok");
       } else {
-        var erros = (j.erros||[]).map(function(e){ return (e.campo ? e.campo + ": " : "") + e.mensagem; }).join("<br>");
-        diz("<b>Não foi possível cadastrar</b> (HTTP " + o.status + ")." + (erros ? "<br>" + erros : ""), "err");
+        var erro = j.erro || {};
+        var erros = (erro.detalhes || res.erros || []).map(function(e){ return esc((e.campo ? e.campo + ": " : "") + (e.mensagem || e.descricao || "")); }).join("<br>");
+        diz("<b>Não foi possível cadastrar</b> (HTTP " + o.status + ")." + (erro.mensagem ? "<br>" + esc(erro.mensagem) : "") + (erros ? "<br>" + erros : ""), "err");
       }
     })
-    .catch(function(){ diz("O cadastro pela página ainda está <b>em ativação</b>. Tente novamente mais tarde."); })
+    .catch(function(){ diz("Não foi possível confirmar o envio. Confira a conexão e tente novamente; um envio idêntico não cria outro cadastro.", "err"); })
     .then(function(){ bt.disabled = false; bt.textContent = "Enviar cadastro"; });
 });
 </script>

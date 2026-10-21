@@ -7,7 +7,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core import georesolver  # noqa: E402
-from tools import limpar_calibracao as limpar  # noqa: E402
+from core.manutencao import limpar_calibracao as limpar  # noqa: E402
 
 
 def anc(km, lat, lon, pid=None, segmento=None):

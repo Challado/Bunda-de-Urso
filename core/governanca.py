@@ -23,6 +23,7 @@ import datetime
 import hashlib
 import hmac
 import json
+import math
 import os
 import secrets
 import sqlite3
@@ -686,14 +687,20 @@ def _coordenada_ponto(conn, ponto_id):
 
 
 ##-- BUNDITA DE URSO #{8} -- Rotulo padrao de procedencia nao comprova origem oficial; verificar a cadeia documental. ##
-def _oficial_perto(conn, lat, lon, raio):
-    """Ponto OFICIAL mais proximo dentro do raio, ou (None, None)."""
+def _oficiais_proximos(conn, lat, lon, raio):
+    """Candidatos oficiais, ordenados por distancia; proximidade nao e identidade."""
     bb = geo.bounding_box(lat, lon, raio)
+    longitude = ("(pos.longitude >= ? OR pos.longitude <= ?)"
+                 if bb["cruza_antimeridiano"] else "pos.longitude BETWEEN ? AND ?")
     rows = conn.execute(
         "SELECT p.id AS ponto_id, pos.latitude AS latitude, "
-        "pos.longitude AS longitude FROM PONTO_FISCALIZACAO p "
+        "pos.longitude AS longitude, p.municipio_id, p.via_id, p.km, p.tipo_pista, "
+        "m.nome AS municipio, m.uf_sigla AS uf, v.codigo AS via "
+        "FROM PONTO_FISCALIZACAO p "
         "JOIN POSICAO_GEOGRAFICA pos ON pos.id=p.posicao_id "
-        "WHERE pos.latitude BETWEEN ? AND ? AND pos.longitude BETWEEN ? AND ? "
+        "LEFT JOIN MUNICIPIO m ON m.codigo_ibge=p.municipio_id "
+        "LEFT JOIN VIA v ON v.id=p.via_id "
+        "WHERE pos.latitude BETWEEN ? AND ? AND " + longitude + " "
         "AND (p.procedencia IS NULL OR p.procedencia <> 'colaborativo') "
         "AND p.removido_em IS NULL "
         "AND (p.verificacao_status IS NULL OR p.verificacao_status <> 'desabilitado') "
@@ -705,12 +712,54 @@ def _oficial_perto(conn, lat, lon, raio):
         "JOIN NATUREZA_FONTE nf ON nf.id=f.natureza_id "
         "WHERE vp.ponto_id=p.id AND vp.decisao_id IS NULL AND nf.codigo='oficial')",
         (bb["lat_min"], bb["lat_max"], bb["lon_min"], bb["lon_max"])).fetchall()
-    melhor = (None, None)
+    candidatos = []
     for r in rows:
         d = geo.haversine_m(lat, lon, r["latitude"], r["longitude"])
-        if d <= raio and (melhor[0] is None or d < melhor[1]):
-            melhor = (r["ponto_id"], d)
-    return melhor
+        if d <= raio:
+            candidatos.append({**dict(r), "distancia_metros": round(d, 3)})
+    return sorted(candidatos, key=lambda r: (r["distancia_metros"], r["ponto_id"]))
+
+
+def _oficial_perto(conn, lat, lon, raio):
+    candidatos = _oficiais_proximos(conn, lat, lon, raio)
+    return ((candidatos[0]["ponto_id"], candidatos[0]["distancia_metros"])
+            if candidatos else (None, None))
+
+
+def _complementar_por_proximidade(conn, ponto_id, candidatos):
+    """Preenche somente lacunas do NOVO colaborativo com origem auditavel.
+
+    Nao copia coordenada, velocidade, identidade, situacao ou verificacao.
+    Mais de um candidato ou divergencia de municipio/via exige revisao.
+    """
+    if len(candidatos) != 1:
+        return {}
+    origem = candidatos[0]
+    atual = conn.execute("SELECT municipio_id, via_id, km, tipo_pista FROM "
+                         "PONTO_FISCALIZACAO WHERE id=?", (ponto_id,)).fetchone()
+    if any(atual[campo] is not None and origem[campo] is not None
+           and atual[campo] != origem[campo] for campo in ("municipio_id", "via_id")):
+        return {}
+    campos = {campo: origem[campo] for campo in ("municipio_id", "via_id", "tipo_pista")
+              if atual[campo] is None and origem[campo] is not None}
+    if atual["km"] is None and origem["via_id"] is not None and origem["km"] is not None:
+        campos["km"] = origem["km"]
+    if not campos:
+        return {}
+    conn.execute("UPDATE PONTO_FISCALIZACAO SET " +
+                 ", ".join(campo + "=?" for campo in campos) + " WHERE id=?",
+                 [*campos.values(), ponto_id])
+    publicos = {"municipio": origem["municipio"], "via": origem["via"],
+                "km": origem["km"], "tipo_pista": origem["tipo_pista"]}
+    preenchidos = {campo.removesuffix("_id"): publicos[campo.removesuffix("_id")]
+                   for campo in campos}
+    registrar_alteracao(conn, ponto_id, None, "editado",
+                        motivo="Complemento sugerido por proximidade; identidade nao verificada",
+                        campos={"complemento_proximidade": {
+                            "ponto_origem_id": "P-%d" % origem["ponto_id"],
+                            "distancia_metros": origem["distancia_metros"],
+                            "campos": preenchidos}})
+    return preenchidos
 
 
 def _inserir_correspondencia(conn, colaborativo_id, oficial_id, distancia,
@@ -744,15 +793,30 @@ def validar_minimo(item):
     if not isinstance(item, dict):
         return None, "cada item deve ser um objeto JSON"
     from coletor.fontes import normalizacao as nz
-    lat = nz.to_float(nz.pick(item, "latitude", "lat"))
-    lon = nz.to_float(nz.pick(item, "longitude", "lon", "lng"))
-    if lat is not None or lon is not None:
-        if lat is None or lon is None:
+    for campo, aliases in (("velocidade_geral", ("velocidade_geral", "velocidade")),
+                           ("velocidade_leves", ("velocidade_leves",)),
+                           ("velocidade_pesados", ("velocidade_pesados",)),
+                           ("km", ("km", "quilometro"))):
+        valor = nz.pick(item, *aliases)
+        if valor is not None:
+            numero = nz.to_float(valor)
+            valido = (numero is not None and math.isfinite(numero)
+                      and (numero >= 0 if campo == "km" else 0 < numero <= 350))
+            if isinstance(valor, bool) or not valido:
+                return campo, ("informe um quilometro valido, maior ou igual a zero"
+                               if campo == "km" else "informe uma velocidade maior que zero e ate 350 km/h")
+    lat_raw = nz.pick(item, "latitude", "lat")
+    lon_raw = nz.pick(item, "longitude", "lon", "lng")
+    lat, lon = nz.to_float(lat_raw), nz.to_float(lon_raw)
+    if lat_raw is not None or lon_raw is not None:
+        if lat is None or lon is None or isinstance(lat_raw, bool) or isinstance(lon_raw, bool):
             return "latitude", "informe latitude E longitude juntas"
         if not (-90 <= lat <= 90):
             return "latitude", "latitude fora de -90..90"
         if not (-180 <= lon <= 180):
             return "longitude", "longitude fora de -180..180"
+        if lat == 0 and lon == 0:
+            return "latitude", "a coordenada 0,0 nao identifica um radar"
         return None
     municipio = nz.pick(item, "municipio", "municipio_nome", "cidade",
                         "municipio_ibge", "codigo_ibge", "ibge")
@@ -806,7 +870,8 @@ def submeter(conn, dados, procedencia=None):
     """POST /api/v1/radares/submeter — criacao aberta (sem token).
 
     Publica NA HORA como ``colaborativo``/``nao_verificado``; se houver ponto
-    OFICIAL no raio de correspondencia, apenas sugere revisao. Reusa a
+    OFICIAL no raio de correspondencia, sugere revisao e, com candidato unico
+    sem divergencia de municipio/via, complementa lacunas com auditoria. Reusa a
     MESMA normalizacao/upsert do coletor (ColetorBaseLWB sobre a mesma
     conexao). Recusa (409) o lote inteiro se alguma coordenada cair em
     BLOQUEIO_GEOGRAFICO ativo.
@@ -871,42 +936,78 @@ def submeter(conn, dados, procedencia=None):
                                         publicar=False)
     detalhes = resumo.get("detalhes") or []
 
-    sugeridos_ids = []
-    for det in detalhes:
+    # O pipeline ignora corretamente um artefato ja ingerido. Reconstroi os
+    # IDs para confirmar o reenvio sem apresentar erro ou criar duplicatas.
+    detalhes_por_indice = {det["indice"]: det for det in detalhes}
+    for det in conn.execute(
+            "SELECT r.numero_ordem AS indice, r.id AS registro_id, vp.ponto_id "
+            "FROM REGISTRO_FONTE r JOIN VINCULO_REGISTRO_PONTO vp "
+            "ON vp.registro_id=r.id AND vp.decisao_id IS NULL "
+            "WHERE r.artefato_id=?", (resumo["artefato_id"],)):
+        detalhes_por_indice.setdefault(det["indice"], dict(det))
+    sugeridos_ids, cadastros = [], []
+    for erro in conn.execute(
+            "SELECT r.numero_ordem AS indice, e.descricao FROM ERRO_VALIDACAO e "
+            "JOIN REGISTRO_FONTE r ON r.id=e.registro_id WHERE e.execucao_id=?",
+            (resumo["execucao_id"],)):
+        erros.append({"indice": validos[erro["indice"]][0],
+                      "mensagem": erro["descricao"]})
+    for indice, det in sorted(detalhes_por_indice.items()):
         pid = det.get("ponto_id")
         if pid is None:
             continue
-        conn.execute(
-            "UPDATE PONTO_FISCALIZACAO SET procedencia='colaborativo', "
-            "verificacao_status='nao_verificado' WHERE id=?", (pid,))
-        registrar_alteracao(conn, pid, None, "criado",
-                            campos={"origem": "submissao_publica",
-                                    "procedencia": {
-                                        "ip": ip,
-                                        "user_agent": procedencia.get(
-                                            "user_agent"),
-                                        "quando": procedencia.get("quando"),
-                                        "contato": procedencia.get("contato")}},
-                            ip=ip)
+        novo = det.get("ponto_criado", False)
+        if novo:
+            conn.execute(
+                "UPDATE PONTO_FISCALIZACAO SET procedencia='colaborativo', "
+                "verificacao_status='nao_verificado' WHERE id=?", (pid,))
+            registrar_alteracao(conn, pid, None, "criado",
+                                campos={"origem": "submissao_publica",
+                                        "procedencia": {
+                                            "ip": ip,
+                                            "user_agent": procedencia.get("user_agent"),
+                                            "quando": procedencia.get("quando"),
+                                            "contato": procedencia.get("contato")}},
+                                ip=ip)
+        proximidade = {"raio_metros": config.RAIO_CORRESPONDENCIA_M,
+                       "candidatos": [], "campos_complementados": {},
+                       "status": "sem_coordenadas"}
+        cadastros.append({"indice": validos[indice][0], "id": "P-%d" % pid,
+                          "proximidade": proximidade})
         lat, lon = _coordenada_ponto(conn, pid)
         if lat is None:
             continue
-        of_id, dist = _oficial_perto(conn, lat, lon,
-                                     config.RAIO_CORRESPONDENCIA_M)
-        if of_id is not None:
-            _inserir_correspondencia(conn, pid, of_id, dist, "corroborado")
+        candidatos = _oficiais_proximos(conn, lat, lon, config.RAIO_CORRESPONDENCIA_M)
+        proximidade["status"] = ("sem_candidatos" if not candidatos else
+                                  "candidato" if len(candidatos) == 1 else "ambiguo")
+        proximidade["candidatos"] = [{"id": "P-%d" % p["ponto_id"],
+                                      "distancia_metros": p["distancia_metros"],
+                                      "via": p["via"], "municipio": p["municipio"],
+                                      "uf": p["uf"]} for p in candidatos]
+        if novo:
+            proximidade["campos_complementados"] = _complementar_por_proximidade(conn, pid, candidatos)
+        if candidatos:
+            for candidato in candidatos:
+                _inserir_correspondencia(conn, pid, candidato["ponto_id"],
+                                        candidato["distancia_metros"], "corroborado")
             # Proximidade sugere revisao; nao verifica identidade ou campos.
             sugeridos_ids.append(pid)
     conn.commit()
 
-    aceitos = resumo.get("criados", 0) + resumo.get("atualizados", 0)
-    rejeitados = resumo.get("rejeitados", 0) + len(erros)
+    ignorados = resumo.get("ignorados", 0)
+    aceitos = resumo.get("criados", 0) + resumo.get("atualizados", 0) + ignorados
+    rejeitados = len(itens) - aceitos
     _registrar_submissao(conn, procedencia, len(itens), aceitos, rejeitados)
+    if not aceitos:
+        raise GovernancaError(422, "payload_invalido", "nenhum registro valido no envio",
+                              detalhes=erros)
     return {
         "ok": aceitos > 0,
         "aceitos": aceitos,
         "criados": resumo.get("criados", 0),
         "atualizados": resumo.get("atualizados", 0),
+        "ja_cadastrados": ignorados,
+        "cadastros": cadastros,
         "corroborados": 0,
         "corroborados_ids": [],
         "correspondencias_sugeridas": len(sugeridos_ids),
