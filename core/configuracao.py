@@ -10,12 +10,9 @@ import ipaddress
 import json
 import os
 from pathlib import Path
-import re
 import stat
 import tempfile
 import urllib.parse
-import subprocess
-import sys
 
 from . import caminhos
 from .governanca import GovernancaError
@@ -39,13 +36,26 @@ def _erro(status, codigo, mensagem):
     raise GovernancaError(status, codigo, mensagem)
 
 
-def _arquivo():
+def link_aponta_configuracao(link, arquivo):
+    try:
+        return link.is_symlink() and link.resolve(strict=True) == arquivo.resolve(strict=True)
+    except (OSError, RuntimeError):
+        return False
+
+
+def _arquivo(web=False):
     arq = Path(caminhos.conf_path()).absolute()
     if arq.is_symlink() or not arq.is_file():
         _erro(503, "configuracao_indisponivel",
               "Instale um radar.conf regular antes de configurar pelo painel.")
     if arq.stat().st_size > 65536:
         _erro(503, "configuracao_invalida", "radar.conf excede 64 KiB.")
+    if web:
+        link = Path(caminhos.web_raiz()) / "radar.conf"
+        if not link_aponta_configuracao(link, arq):
+            _erro(503, "configuracao_indisponivel", "Execute o instalador para preparar o link radar.conf do painel.")
+        # A escrita atomica substitui o destino em /etc, preservando o link.
+        arq = link.resolve(strict=True)
     return arq
 
 
@@ -53,8 +63,16 @@ def _revisao(conteudo):
     return hashlib.sha256(conteudo).hexdigest()
 
 
+def _permissao_auxiliar(fd, grupo):
+    # O shell de root pode usar umask 077. Lock, backup e auditoria precisam
+    # continuar gravaveis pelo CGI depois de uma edicao local.
+    if os.geteuid() == 0 or os.fstat(fd).st_uid == os.geteuid():
+        os.fchown(fd, -1, grupo)
+        os.fchmod(fd, 0o660)
+
+
 def consultar(web=False):
-    arq = _arquivo()
+    arq = _arquivo(web)
     conteudo = arq.read_bytes()
     valores, _ = caminhos._ler_conf()
     efetivos = {(i["secao"], i["chave"]): i["valor"] for i in caminhos.resumo()}
@@ -74,7 +92,7 @@ def consultar(web=False):
                           "tipo": "numero" if par in NUMEROS else "texto"})
     return {"sucesso": True, "arquivo": str(arq),
             "revisao": _revisao(conteudo), "itens": itens,
-            "gravavel": (Path(str(arq) + ".painel").is_file() if web else os.access(arq.parent, os.W_OK)),
+            "gravavel": os.access(arq, os.R_OK | os.W_OK) and os.access(arq.parent, os.W_OK | os.X_OK),
             "problemas": caminhos.problemas()}
 
 
@@ -171,7 +189,7 @@ def _validar_destinos(alteracoes):
         _erro(422, "destino_invalido", "O caminho do codigo nao pode ser apagado pelo painel.")
 
 
-def salvar(dados, autor="local", web=False, helper=True):
+def salvar(dados, autor="local", web=False):
     if not isinstance(dados, dict) or set(dados) != {"revisao", "alteracoes"}:
         _erro(422, "configuracao_invalida", "Informe revisao e alteracoes.")
     if not isinstance(dados["revisao"], str) or not isinstance(dados["alteracoes"], dict):
@@ -189,13 +207,12 @@ def salvar(dados, autor="local", web=False, helper=True):
             _erro(403, "configuracao_local", "Caminhos, destinos e credenciais so podem ser alterados pela API local do servidor.")
         alteracoes[(secao, chave)] = valor
     _validar(alteracoes)
-    if web and helper:
-        return _salvar_pelo_helper(dados)
-    arq = _arquivo()
+    arq = _arquivo(web)
     try:
         # Lock persistente: jamais remover, pois isso criaria travas independentes.
         fd = os.open(str(arq) + ".lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o660)
         with os.fdopen(fd, "a") as trava:
+            _permissao_auxiliar(trava.fileno(), arq.stat().st_gid)
             fcntl.flock(trava, fcntl.LOCK_EX)
             anterior = arq.read_bytes()
             if _revisao(anterior) != dados["revisao"]:
@@ -209,7 +226,7 @@ def salvar(dados, autor="local", web=False, helper=True):
             _validar_destinos(alteracoes)
             novo = _editar(anterior.decode("utf-8"), alteracoes).encode("utf-8")
             if novo == anterior:
-                return consultar()
+                return consultar(web)
             info = arq.stat()
             fd, temporario = tempfile.mkstemp(prefix=".radar-", dir=arq.parent)
             try:
@@ -225,6 +242,7 @@ def salvar(dados, autor="local", web=False, helper=True):
                 # Backup e metadados da alteracao nao ficam no webroot.
                 fd_b = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o660)
                 with os.fdopen(fd_b, "wb") as b:
+                    _permissao_auxiliar(b.fileno(), info.st_gid)
                     b.write(anterior)
                     b.flush()
                     os.fsync(b.fileno())
@@ -234,6 +252,7 @@ def salvar(dados, autor="local", web=False, helper=True):
                              "chaves": sorted(dados["alteracoes"])}
                 fd_a = os.open(str(arq) + ".auditoria.jsonl", os.O_CREAT | os.O_APPEND | os.O_WRONLY | os.O_NOFOLLOW, 0o660)
                 with os.fdopen(fd_a, "a", encoding="utf-8") as registro:
+                    _permissao_auxiliar(registro.fileno(), info.st_gid)
                     registro.write(json.dumps(auditoria, ensure_ascii=False) + "\n")
                     registro.flush()
                     os.fsync(registro.fileno())
@@ -249,33 +268,23 @@ def salvar(dados, autor="local", web=False, helper=True):
     except PermissionError:
         _erro(503, "configuracao_sem_permissao", "Execute o instalador para habilitar a gravacao da configuracao pelo painel.")
     caminhos.recarregar()
-    resultado = consultar()
+    resultado = consultar(web)
     resultado["mensagem"] = "Configuracao salva. Vale nas proximas chamadas da API e do cron; caminhos nao movem arquivos."
     return resultado
 
 
-def comando_helper():
-    return [sys.executable, str(Path(caminhos.ROOT) / "web" / "api.pse"),
-            "configuracao", "salvar-web", "--conf", str(Path(caminhos.conf_path()).absolute())]
-
-
-def _salvar_pelo_helper(dados):
+def verificar_gravacao_web():
+    arq = _arquivo(web=True)
+    if not os.access(arq, os.R_OK | os.W_OK):
+        _erro(503, "configuracao_sem_permissao", "O usuario do CGI precisa ler e gravar radar.conf.")
     try:
-        resultado = subprocess.run(["sudo", "-n", "--", *comando_helper()],
-                                   input=json.dumps(dados), capture_output=True,
-                                   text=True, timeout=15)
-    except (OSError, subprocess.TimeoutExpired):
-        _erro(503, "configuracao_sem_permissao", "Execute o instalador para habilitar a gravacao pelo painel.")
-    try:
-        corpo = json.loads(resultado.stdout)
-    except ValueError:
-        _erro(503, "configuracao_sem_permissao", "Helper de configuracao indisponivel; confira a instalacao no servidor.")
-    if resultado.returncode:
-        _erro(corpo.get("status", 503), corpo.get("codigo", "configuracao_indisponivel"),
-              corpo.get("mensagem", "Nao foi possivel gravar a configuracao."))
-    res = consultar(web=True)
-    res["mensagem"] = corpo.get("mensagem", "Configuracao salva.")
-    return res
+        with tempfile.NamedTemporaryFile(prefix=".radar-teste-", dir=arq.parent) as teste:
+            teste.write(b"verificacao de gravacao\n")
+            teste.flush()
+            os.fsync(teste.fileno())
+    except PermissionError:
+        _erro(503, "configuracao_sem_permissao", "O usuario do CGI precisa criar arquivos na pasta da configuracao.")
+    return {"sucesso": True, "arquivo": str(arq), "gravavel": True}
 
 
 @operacao_local
@@ -283,8 +292,8 @@ def main(argv):
     import argparse
     import sys
     parser = argparse.ArgumentParser(description="Configuracao pela entrada unica api.pse")
-    parser.add_argument("acao", choices=("mostrar", "salvar", "salvar-web", "verificar", "instalar", "exemplo"), nargs="?", default="mostrar")
-    parser.add_argument("--conf", help="arquivo fixado no comando autorizado do helper")
+    parser.add_argument("acao", choices=("mostrar", "salvar", "salvar-web", "verificar-web", "verificar", "instalar", "exemplo"), nargs="?", default="mostrar")
+    parser.add_argument("--conf", help="arquivo de configuracao local")
     args = parser.parse_args(argv)
     if args.conf:
         os.environ["RADAR_CONF"] = args.conf
@@ -299,8 +308,11 @@ def main(argv):
         if args.acao == "verificar":
             from deploy.conf_radar import verificar
             return verificar()
-        res = (salvar(json.load(sys.stdin), web=args.acao == "salvar-web", helper=False,
-                      autor="painel via helper" if args.acao == "salvar-web" else "local")
+        if args.acao == "verificar-web":
+            print(json.dumps(verificar_gravacao_web(), ensure_ascii=False))
+            return 0
+        res = (salvar(json.load(sys.stdin), web=args.acao == "salvar-web",
+                      autor="painel" if args.acao == "salvar-web" else "local")
                if args.acao in ("salvar", "salvar-web") else consultar())
         print(json.dumps(res, ensure_ascii=False, indent=2))
         return 0

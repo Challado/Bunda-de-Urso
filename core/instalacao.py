@@ -8,12 +8,10 @@ import configparser
 from contextlib import closing, contextmanager
 import datetime
 import fcntl
-import hashlib
 import json
 import os
 from pathlib import Path
 import pwd
-import re
 import shutil
 import subprocess
 import sys
@@ -175,10 +173,10 @@ def _validar_layout(origem, conf, laboratorio):
             raise RuntimeError("Destino do codigo ocupado por outra aplicacao.")
     if not dirs["banco"].is_file():
         raise RuntimeError("O banco configurado nao existe. Este instalador atualiza o servidor existente e nao cria base vazia.")
-    # Nao permite montar uma arvore de configuracao publica por link.
+    # Somente o link gerenciado da configuracao e permitido no webroot.
     if dirs["web"].is_dir():
         for item in dirs["web"].rglob("*"):
-            if item.is_symlink():
+            if item.is_symlink() and item != dirs["web"] / "radar.conf":
                 raise RuntimeError("Revise o link existente no webroot antes de instalar: " + str(item))
     return dirs
 
@@ -209,9 +207,11 @@ def _restaurar(indice):
                 shutil.copy2(copia, alvo)
 
 
-def _permissoes(arvore, gid, gravavel=False):
+def _permissoes(arvore, gid, gravavel=False, link_configuracao=False):
     for item in [arvore, *arvore.rglob("*")]:
         if item.is_symlink():
+            if link_configuracao and item == arvore / "radar.conf":
+                continue
             raise RuntimeError("Symlink inesperado: " + str(item))
         if os.geteuid() == 0:
             os.chown(item, 0, gid)
@@ -248,15 +248,32 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
     wrapper = dirs["codigo"].parent / "radar-tick.sh"
     entrada_cron = wrapper.with_name("radar-api.pse")
     logrotate = (laboratorio / "etc" if laboratorio else Path("/etc")) / "logrotate.d" / "openclaw-radar"
-    sudoers = (laboratorio / "etc" if laboratorio else Path("/etc")) / "sudoers.d" / "radar-configuracao"
+    sudoers_antigo = (laboratorio / "etc" if laboratorio else Path("/etc")) / "sudoers.d" / "radar-configuracao"
+    nginx_alterado = False
     with open(dirs["dados"] / "instalacao.lock", "a") as trava:
         fcntl.flock(trava, fcntl.LOCK_EX | fcntl.LOCK_NB)
         try:
             for alvo in (dirs["codigo"], dirs["web"], dirs["conf"], wrapper, entrada_cron,
-                         logrotate, sudoers, Path(str(dirs["conf"]) + ".painel")):
+                         logrotate, Path(str(dirs["conf"]) + ".painel")):
                 _diretorio(alvo.parent, observacoes)
                 _guardar(alvo, backup, indice)
+            if sudoers_antigo.exists():
+                _guardar(sudoers_antigo, backup, indice)
+            if not laboratorio:
+                from .protecao_configuracao import planejar
+                plano_nginx = planejar(caminhos.web_url(), dirs["web"], caminhos.valor("web", "origem")[0])
+                for arquivo, anterior, novo in plano_nginx:
+                    if arquivo.read_text() != anterior:
+                        raise RuntimeError("A configuracao do nginx mudou durante a preparacao.")
+                    _guardar(arquivo, backup, indice)
+                    indice[-1]["tipo"] = "nginx"
+                    arquivo.write_text(novo)
+                    nginx_alterado = True
+                    observacoes.append("Nginx: acesso HTTP direto a radar.conf bloqueado em " + str(arquivo))
             (backup / "restauracao.json").write_text(json.dumps(indice, indent=2))
+            if nginx_alterado:
+                _executar(["nginx", "-t"])
+                _executar(["systemctl", "reload", "nginx"])
             # Pausa novas chamadas CGI e tick durante a troca coordenada.
             dirs["web"].mkdir(parents=True, exist_ok=True)
             (dirs["web"] / "api.pse").write_text(
@@ -276,9 +293,11 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
                         copia.execute("PRAGMA journal_mode=DELETE")
                 (backup / "radar.sqlite3").chmod(0o600)
                 _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http, observacoes)
-                helper_existia = sudoers.is_file()
-                _instalar_helper(dirs, usuario_web, sudoers, laboratorio)
-                observacoes.append("Regra do painel %s: %s" % ("atualizada" if helper_existia else "criada", sudoers))
+                _instalar_configuracao_web(dirs, grupo, observacoes)
+                if sudoers_antigo.exists():
+                    sudoers_antigo.unlink()
+                    observacoes.append("Regra sudoers antiga removida: " + str(sudoers_antigo))
+                Path(str(dirs["conf"]) + ".painel").unlink(missing_ok=True)
                 conteudo = auditoria.render_logrotate(origem, dirs["logs"])
                 if not logrotate.is_file() or logrotate.read_text() != conteudo:
                     observacoes.append("Regra do logrotate %s: %s" % ("atualizada" if logrotate.is_file() else "criada", logrotate))
@@ -326,6 +345,9 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
             print("Instalacao concluida. Backup: " + str(backup))
         except BaseException as exc:
             _restaurar(indice)
+            if nginx_alterado:
+                _executar(["nginx", "-t"])
+                _executar(["systemctl", "reload", "nginx"])
             if not laboratorio and (backup / "crontab-anterior.txt").is_file():
                 _recuperar_cron(backup / "crontab-anterior.txt", wrapper)
             observacoes.append("Falha: arquivos anteriores recuperados; banco preservado. Pastas preparadas podem permanecer.")
@@ -402,8 +424,7 @@ def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http=Non
         if os.geteuid() == 0:
             os.chown(conf.parent, 0, 0)
             os.chown(conf, 0, 0)
-        conf.parent.chmod(0o755)
-        conf.chmod(0o644)
+        # Permissoes para salvamento direto pelo CGI sao preparadas em seguida.
         for pasta in _pastas_operacionais(dirs):
             _diretorio(pasta, observacoes, modo=0o2770, grupo=grupo)
         for arquivo in [dirs["banco"], *dirs["banco"].parent.glob(dirs["banco"].name + "-*")]:
@@ -425,7 +446,7 @@ def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http=Non
         for arquivo in dirs["web"].iterdir():
             if arquivo.is_file() and arquivo.suffix in (".py", ".pyc"):
                 raise RuntimeError("Remova fontes Python antigos do webroot antes de instalar: " + arquivo.name)
-        _permissoes(dirs["web"], grupo)
+        _permissoes(dirs["web"], grupo, link_configuracao=True)
         api.chmod(0o755)
         observacoes.append("Codigo e paginas instalados na revisao " + versao + ".")
     finally:
@@ -450,40 +471,35 @@ def _esperar_coletor(trava):
             time.sleep(min(1, limite - agora))
 
 
-def _instalar_helper(dirs, usuario, sudoers, laboratorio):
-    # O CGI nao ganha escrita na pasta /etc nem permissao geral de root.
-    # O comando autorizado so salva as chaves operacionais validadas pela API.
-    comando = [sys.executable, str(dirs["codigo"] / "web" / "api.pse"),
-               "configuracao", "salvar-web", "--conf", str(dirs["conf"])]
-    if any(not re.fullmatch(r"[A-Za-z0-9_./-]+", parte) for parte in [usuario, *comando]):
-        raise RuntimeError("Caminho ou usuario incompativel com a regra restrita do sudoers.")
-    conteudo = usuario + " ALL=(root) NOPASSWD: NOSETENV: " + " ".join(comando) + "\n"
-    if not laboratorio:
-        if not shutil.which("sudo") or not shutil.which("visudo"):
-            raise RuntimeError("Instale sudo/visudo para habilitar o salvamento seguro pelo painel.")
-        if os.stat(sys.executable).st_uid != 0 or os.stat(sys.executable).st_mode & 0o022:
-            raise RuntimeError("O interpretador do helper deve pertencer a root e nao permitir escrita por terceiros.")
-        with tempfile.NamedTemporaryFile(mode="w", dir=sudoers.parent, delete=False) as arquivo:
-            arquivo.write(conteudo)
-            candidato = Path(arquivo.name)
-        try:
-            candidato.chmod(0o440)
-            _executar(["visudo", "-cf", str(candidato)])
-            candidato.replace(sudoers)
-        finally:
-            candidato.unlink(missing_ok=True)
-    else:
-        # Laboratorio nao configura sudo nem anuncia o painel como habilitado.
-        sudoers.unlink(missing_ok=True)
-        sudoers.write_text("# Simulacao da regra de producao:\n# " + conteudo)
-    sudoers.chmod(0o440)
-    if not laboratorio:
-        arq = dirs["conf"]
-        revisao = hashlib.sha256(arq.read_bytes()).hexdigest()
-        _executar(["runuser", "-u", usuario, "--", "sudo", "-n", "--", *comando],
-                  input=json.dumps({"revisao": revisao, "alteracoes": {}}))
-        Path(str(arq) + ".painel").write_text("Gravacao restrita pela API administrativa.\n")
-        Path(str(arq) + ".painel").chmod(0o644)
+def _instalar_configuracao_web(dirs, grupo, observacoes):
+    from .configuracao import link_aponta_configuracao
+    conf = dirs["conf"]
+    _diretorio(conf.parent, observacoes, modo=0o2770, grupo=grupo)
+    if os.geteuid() == 0:
+        os.chown(conf, 0, grupo)
+    conf.chmod(0o660)
+    for sufixo in (".lock", ".anterior", ".auditoria.jsonl"):
+        arquivo = Path(str(conf) + sufixo)
+        if arquivo.is_symlink():
+            raise RuntimeError("Arquivo auxiliar de configuracao nao pode ser symlink: " + str(arquivo))
+        if arquivo.exists():
+            if os.geteuid() == 0:
+                os.chown(arquivo, -1, grupo)
+            arquivo.chmod(0o660)
+    link = dirs["web"] / "radar.conf"
+    if not link_aponta_configuracao(link, conf):
+        link.unlink(missing_ok=True)
+        link.symlink_to(conf)
+        observacoes.append("Link da configuracao criado/corrigido: %s -> %s" % (link, conf))
+    observacoes.append("Configuracao gravavel pelo grupo do CGI: pasta 2770; radar.conf 0660.")
+
+
+def _verificar_gravacao(dirs, usuario=None):
+    comando = (["runuser", "-u", usuario, "--"] if usuario else []) + [
+        sys.executable, str(dirs["web"] / "api.pse"), "configuracao", "verificar-web"]
+    resultado = json.loads(_executar(comando, env=_ambiente(dirs["conf"])))
+    if not resultado.get("sucesso"):
+        raise RuntimeError("O usuario do CGI nao conseguiu preparar a gravacao da configuracao.")
 
 
 @operacao_local
@@ -572,12 +588,19 @@ def _recuperar(backup, dirs, laboratorio):
     etc = laboratorio / "etc" if laboratorio else Path("/etc")
     permitidos.update((str(etc / "logrotate.d" / "openclaw-radar"),
                        str(etc / "sudoers.d" / "radar-configuracao"), str(dirs["conf"]) + ".painel"))
+    if not laboratorio:
+        permitidos.update(item["alvo"] for item in indice if item.get("tipo") == "nginx"
+                          and Path(item["alvo"]).is_relative_to(Path("/etc/nginx"))
+                          and Path(item["alvo"]).resolve() == Path(item["alvo"]))
     if any(item["alvo"] not in permitidos or Path(item["copia"]).parent != backup for item in indice):
         raise RuntimeError("Manifesto de recuperacao invalido.")
     with open(dirs["dados"] / "instalacao.lock", "a") as trava, open(dirs["dados"] / "tick.lock", "a") as tick:
         fcntl.flock(trava, fcntl.LOCK_EX | fcntl.LOCK_NB)
         fcntl.flock(tick, fcntl.LOCK_EX | fcntl.LOCK_NB)
         _restaurar(indice)
+        if not laboratorio and any(item.get("tipo") == "nginx" for item in indice):
+            _executar(["nginx", "-t"])
+            _executar(["systemctl", "reload", "nginx"])
         cron_antigo = backup / "crontab-anterior.txt"
         if not laboratorio and cron_antigo.is_file():
             _recuperar_cron(cron_antigo, dirs["codigo"].parent / "radar-tick.sh")
@@ -655,10 +678,10 @@ def _diagnosticar(origem, dirs, usuario_web, laboratorio, cron, final=False):
         origem_http = caminhos.valor("web", "origem")[0]
         if origem_http and not laboratorio:
             try:
-                auditoria.verificar_http(origem_http, caminhos.web_url(), dirs["web"] / "gestao.html")
-                checagens.append({"checagem": "http.publico", "estado": "ok", "detalhe": "API pronta e pagina atualizada acessiveis pelo nginx"})
-            except Exception:
-                checagens.append({"checagem": "http.publico", "estado": "erro", "detalhe": "Nao foi possivel confirmar API e pagina em web.origem + web.url; confira DNS, TLS e roteamento do nginx."})
+                auditoria.verificar_http(origem_http, caminhos.web_url(), dirs["web"] / "gestao.html", configuracao_privada=True)
+                checagens.append({"checagem": "http.publico", "estado": "ok", "detalhe": "API e pagina acessiveis; download direto de radar.conf bloqueado"})
+            except Exception as exc:
+                checagens.append({"checagem": "http.publico", "estado": "erro", "detalhe": "Checagem HTTP de API, pagina e configuracao: " + str(exc)[:1000]})
         else:
             checagens.append({"checagem": "http.publico", "estado": "nao_aplicavel", "detalhe": "Laboratorio ou web.origem vazia; acesso HTTP externo nao verificado."})
         etc = laboratorio / "etc" if laboratorio else Path("/etc")
@@ -668,23 +691,31 @@ def _diagnosticar(origem, dirs, usuario_web, laboratorio, cron, final=False):
                           "detalhe": "rotacao dos logs conforme radar.conf"})
         executaveis = (dirs["web"] / "api.pse", dirs["codigo"].parent / "radar-tick.sh", dirs["codigo"].parent / "radar-api.pse")
         checagens.append({"checagem": "permissoes", "estado": "ok" if all(os.access(p, os.X_OK) for p in executaveis)
-                          and not dirs["conf"].stat().st_mode & 0o022 else "erro",
-                          "detalhe": "entradas executaveis; configuracao sem escrita por grupo/outros"})
+                          and dirs["conf"].stat().st_mode & 0o777 == 0o660
+                          and dirs["conf"].parent.stat().st_mode & 0o7777 == 0o2770 else "erro",
+                          "detalhe": "entradas executaveis; configuracao 0660 e pasta 2770 para o CGI"})
+        link = dirs["web"] / "radar.conf"
+        from .configuracao import link_aponta_configuracao
+        checagens.append({"checagem": "configuracao.link", "estado": "ok" if link_aponta_configuracao(link, dirs["conf"]) else "erro",
+                          "detalhe": str(link) + " -> " + str(dirs["conf"])})
+        try:
+            _verificar_gravacao(dirs, usuario=None if laboratorio else usuario_web)
+            checagens.append({"checagem": "gravacao_do_painel", "estado": "ok", "detalhe": "CGI le o link e cria arquivo na pasta da configuracao sem elevacao"})
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+            checagens.append({"checagem": "gravacao_do_painel", "estado": "erro", "detalhe": "O CGI nao conseguiu ler/gravar a configuracao pelo link"})
         if not laboratorio:
             checagens.append(auditoria.validar_logrotate(logrotate))
             try:
-                arq = dirs["conf"]
-                comando = [sys.executable, str(dirs["codigo"] / "web" / "api.pse"),
-                           "configuracao", "salvar-web", "--conf", str(arq)]
-                _executar(["runuser", "-u", usuario_web, "--", "sudo", "-n", "--", *comando],
-                          input=json.dumps({"revisao": hashlib.sha256(arq.read_bytes()).hexdigest(), "alteracoes": {}}))
-                checagens.append({"checagem": "gravacao_do_painel", "estado": "ok", "detalhe": "usuario CGI autorizado somente para o comando restrito"})
-            except (OSError, subprocess.SubprocessError):
-                checagens.append({"checagem": "gravacao_do_painel", "estado": "erro", "detalhe": "autorizacao do painel indisponivel"})
+                from .protecao_configuracao import planejar
+                pendencias = planejar(caminhos.web_url(), dirs["web"], origem_http)
+                checagens.append({"checagem": "nginx.configuracao_privada", "estado": "erro" if pendencias else "ok",
+                                  "detalhe": "link radar.conf bloqueado para acesso HTTP direto" if not pendencias else "Reaplique para proteger o link da configuracao no nginx"})
+            except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+                checagens.append({"checagem": "nginx.configuracao_privada", "estado": "erro", "detalhe": str(exc)})
     return {"sucesso": not any(c["estado"] == "erro" for c in checagens),
             "atualizacao_necessaria": bool(divergencias or faltantes or pastas or instalada != versao or any(
                 c["estado"] in ("erro", "atualizar") and c["checagem"] in
-                ("cron.coletor", "logrotate", "logrotate.sintaxe", "permissoes", "gravacao_do_painel") for c in checagens)),
+                ("cron.coletor", "logrotate", "logrotate.sintaxe", "permissoes", "gravacao_do_painel", "configuracao.link", "nginx.configuracao_privada") for c in checagens)),
             "modo": "verificacao" if final else "planejamento",
             "versao_instalada": instalada, "versao_disponivel": versao,
             "arquivos_divergentes": divergencias, "checagens": checagens}

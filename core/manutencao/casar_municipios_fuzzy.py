@@ -32,7 +32,7 @@ Saida (para conferencia humana):
 
 Uso:
   python3 tools/casar_municipios_fuzzy.py --dry-run     # so mede e reporta
-  sudo python3 tools/casar_municipios_fuzzy.py          # aplica (backup antes)
+  python3 tools/casar_municipios_fuzzy.py          # aplica (backup antes)
 """
 import argparse
 import csv

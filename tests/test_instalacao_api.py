@@ -1,6 +1,7 @@
 """Instalacao em laboratorio: preservacao, repeticao, falha e cron alheio."""
 from contextlib import closing
 import getpass
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -87,7 +88,10 @@ class TestInstalacaoAPI(unittest.TestCase):
                              capture_output=True, text=True, timeout=15)
         self.assertIn("Status: 200 OK", cgi.stdout)
         self.assertFalse((self.web / "nucleo.py").exists())
-        self.assertFalse(any(p.is_symlink() for p in self.web.rglob("*")))
+        self.assertEqual([p for p in self.web.rglob("*") if p.is_symlink()], [self.web / "radar.conf"])
+        self.assertEqual((self.web / "radar.conf").resolve(), self.conf)
+        self.assertEqual(self.conf.stat().st_mode & 0o777, 0o660)
+        self.assertEqual(self.conf.parent.stat().st_mode & 0o7777, 0o2770)
         self.assertEqual(len(list((self.dados / "backups" / "instalacao").glob("*/CONCLUIDO"))), 1)
         self.assertIn("sem nova copia ou backup", resultado.stdout)
         wrapper = self.home.parent / "radar-tick.sh"
@@ -181,6 +185,27 @@ class TestInstalacaoAPI(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("sem nova copia ou backup", r.stdout)
 
+    def test_migra_regra_antiga_e_corrige_link_sem_dependencia_de_sudo(self):
+        legado = self.lab / "etc" / "sudoers.d" / "radar-configuracao"
+        legado.parent.mkdir(parents=True)
+        legado.write_text("regra antiga")
+        outro = self.lab / "outro.conf"
+        outro.write_text("preservar")
+        (self.web / "radar.conf").symlink_to(outro)
+        r = self.instalar(True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertFalse(legado.exists())
+        self.assertEqual(outro.read_text(), "preservar")
+        self.assertEqual((self.web / "radar.conf").resolve(), self.conf)
+        self.assertIn("Regra sudoers antiga removida", r.stdout)
+        antes = self.conf.read_bytes()
+        cmd = [sys.executable, str(self.web / "api.pse"), "configuracao", "salvar-web"]
+        payload = {"revisao": hashlib.sha256(antes).hexdigest(), "alteracoes": {"coleta.timeout": "44"}}
+        salvo = subprocess.run(cmd, env=self.env, input=json.dumps(payload), capture_output=True, text=True, timeout=30)
+        self.assertEqual(salvo.returncode, 0, salvo.stdout + salvo.stderr)
+        self.assertIn("timeout = 44", self.conf.read_text())
+        self.assertTrue((self.web / "radar.conf").is_symlink())
+
     def test_perfil_completa_config_parcial_sem_mudar_valores_existentes(self):
         logs = self.lab / "novos" / "pais" / "logs"
         perfil = self.lab / "perfil.conf"
@@ -264,7 +289,11 @@ class TestInstalacaoAPI(unittest.TestCase):
         pagina = self.lab / "gestao.html"
         pagina.write_bytes(conteudo)
         class Handler(BaseHTTPRequestHandler):
+            configuracao_privada = True
             def do_GET(self):
+                if self.path == "/radar/radar.conf" and self.configuracao_privada:
+                    self.send_error(404)
+                    return
                 self.send_response(200)
                 self.end_headers()
                 self.wfile.write(b'{"status":"ready"}' if self.path.startswith("/radar/api.pse?") else conteudo)
@@ -275,7 +304,10 @@ class TestInstalacaoAPI(unittest.TestCase):
         thread.start()
         try:
             origem = "http://127.0.0.1:%d" % servidor.server_port
-            auditoria_instalacao.verificar_http(origem, "/radar/", pagina)
+            auditoria_instalacao.verificar_http(origem, "/radar/", pagina, configuracao_privada=True)
+            Handler.configuracao_privada = False
+            with self.assertRaisesRegex(RuntimeError, "baixar a configuracao"):
+                auditoria_instalacao.verificar_http(origem, "/radar/", pagina, configuracao_privada=True)
             pagina.write_bytes(b"outra versao")
             with self.assertRaisesRegex(RuntimeError, "pagina atualizada"):
                 auditoria_instalacao.verificar_http(origem, "/radar/", pagina)

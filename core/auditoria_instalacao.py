@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import urllib.parse
+import urllib.error
 import urllib.request
 
 from . import caminhos
@@ -167,7 +168,7 @@ def ambiente_servidor(laboratorio=False):
         return [{"checagem": "servicos_do_servidor", "estado": "nao_aplicavel",
                  "detalhe": "Laboratorio: nenhum servico ou cron do sistema e alterado."}]
     resultados = []
-    for comando in ("git", "sh", "sudo", "visudo", "crontab", "runuser", "pdftotext", "nginx", "logrotate", "systemctl"):
+    for comando in ("git", "sh", "crontab", "runuser", "pdftotext", "nginx", "logrotate", "systemctl"):
         resultados.append({"checagem": "comando." + comando,
                            "estado": "ok" if shutil.which(comando) else "erro",
                            "detalhe": "disponivel" if shutil.which(comando) else "comando ausente; instale antes de aplicar"})
@@ -190,7 +191,7 @@ def ambiente_servidor(laboratorio=False):
     return resultados
 
 
-def verificar_http(origem, prefixo, pagina):
+def verificar_http(origem, prefixo, pagina, configuracao_privada=False):
     url = urllib.parse.urlsplit(origem)
     if url.scheme not in ("http", "https") or not url.netloc or url.username or url.password or url.query or url.fragment or url.path not in ("", "/"):
         raise RuntimeError("web.origem invalida: use somente http(s)://host[:porta].")
@@ -209,3 +210,10 @@ def verificar_http(origem, prefixo, pagina):
         raise RuntimeError("A URL publica nao retornou a prontidao da API.")
     if baixar("/gestao.html") != pagina.read_bytes():
         raise RuntimeError("O nginx nao esta servindo a pagina atualizada neste endereco.")
+    if configuracao_privada:
+        try:
+            with urllib.request.urlopen(base + "/radar.conf", timeout=15):
+                raise RuntimeError("O nginx permitiu baixar a configuracao diretamente; reaplique a protecao do link.")
+        except urllib.error.HTTPError as exc:
+            if exc.code not in (403, 404):
+                raise RuntimeError("Nao foi confirmado o bloqueio HTTP de radar.conf.") from exc

@@ -25,7 +25,7 @@ Regras (nada e inventado)
 
 Uso:
   python3 tools/carregar_verificacao_metrologica.py --dry-run
-  sudo python3 tools/carregar_verificacao_metrologica.py --backup
+  python3 tools/carregar_verificacao_metrologica.py --backup
 """
 import argparse
 import datetime

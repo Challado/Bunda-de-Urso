@@ -22,9 +22,9 @@ O verificador `.github/scripts/verificar_caminhos.py` reprova quem tentar.
 Modelo pronto: `deploy/radar.conf.exemplo`. Instalação:
 
 ```bash
-sudo install -d -m 0755 /etc/radar-brasil
-sudo install -m 0644 deploy/radar.conf.exemplo /etc/radar-brasil/radar.conf
-sudo editor /etc/radar-brasil/radar.conf
+install -d -m 0755 /etc/radar-brasil
+install -m 0644 deploy/radar.conf.exemplo /etc/radar-brasil/radar.conf
+editor /etc/radar-brasil/radar.conf
 python3 deploy/conf_radar.py --verificar
 ```
 
@@ -94,7 +94,7 @@ Com o `.conf`, caminho deixa de ser opinião de cada script: é configuração.
 ## Trocar de servidor
 
 1. `git clone` do código no novo destino;
-2. `sudo install -d /etc/radar-brasil && sudo install -m 0644 deploy/radar.conf.exemplo /etc/radar-brasil/radar.conf`;
+2. `install -d /etc/radar-brasil && install -m 0644 deploy/radar.conf.exemplo /etc/radar-brasil/radar.conf`;
 3. ajustar `home`, `dados.dir`, `dados.banco`, `web.raiz`, `logs.dir`;
 4. `python3 <home>/deploy/conf_radar.py --verificar`;
 5. copiar o `api.pse` para o webroot e o `radar-tick.sh` para o diretório do cron.
@@ -113,14 +113,20 @@ O painel pode salvar parâmetros operacionais: limites de requisição/download,
 proxies confiáveis e parâmetros de governança. Caminhos, usuários,
 destinos de instalação e credenciais são exibidos, com alteração somente pela API
 local. Isso impede que a conta do painel troque o código que o cron executa como root.
-A configuração **não** é um diretório público nem um symlink no webroot.
+O instalador cria `<web.raiz>/radar.conf` como link simbólico para o arquivo
+configurado em `/etc`. A API verifica o destino do link antes de ler ou salvar.
+A pasta da configuração fica em `2770`, grupo do CGI (`www-data` no servidor3),
+e `radar.conf` em `0660`. O processo CGI grava diretamente, sem elevação de
+privilégios nem subprocesso de salvamento. A substituição atômica ocorre no destino
+em `/etc`, preservando o link. A regra antiga `sudoers.d/radar-configuracao` é removida;
+o aplicativo não exige nem executa sudo/visudo.
 
-O instalador mantém a pasta da configuração em `0755` e o arquivo em `0644`, de root.
-Autoriza no sudoers um único comando, sem argumentos extras ou SETENV:
-`python <home>/web/api.pse configuracao salvar-web --conf <arquivo>`.
-O próprio serviço valida a lista restrita de chaves, tipos e limites. O CGI não recebe
-escrita em `/etc`. Requer `sudo`/`visudo`. A aplicação só anuncia a gravação no painel
-depois de verificar o comando como o usuário real do CGI.
+Antes de criar o link, o instalador identifica o server do radar na configuração
+ativa do nginx por `web.origem` ou pela raiz que contém `web.raiz`, e acrescenta um
+bloqueio HTTP exato para `<web.url>/radar.conf`. Guarda os arquivos alterados no
+backup, valida `nginx -t` e recarrega nginx. O conteúdo continua acessível ao processo
+CGI, mas o download direto retorna 404. A checagem externa confirma também esse
+bloqueio. A configuração do nginx é recuperada se a instalação falhar.
 
 O salvamento usa trava entre processos, revisão SHA-256 contra edição concorrente,
 arquivo temporário e substituição atômica. Guarda `radar.conf.anterior` e os metadados
@@ -176,7 +182,7 @@ e não são migrados nem alterados pelo instalador.
 Reaplicar preserva a configuração e os dados. Backups de instalação não são podados.
 `--restaurar <backup>` recupera arquivos da instalação, preservando o banco e os outros
 agendamentos. `--laboratorio <pasta>` restringe todos os destinos à pasta indicada e
-não configura cron ou sudo no sistema.
+não configura cron nem altera o nginx do sistema.
 
 O descritor estático `projeto.json` é gerado pelo instalador com `web.url` do `.conf`.
 Ao mudar o prefixo público pela API local, reaplique o instalador para atualizar o descritor;
@@ -204,7 +210,7 @@ temporária; o arquivo definitivo só é gravado ao aplicar, depois do backup. S
 
 Ao aplicar, diretórios operacionais ausentes são criados e recebem grupo e
 permissões adequados, inclusive os pais novos para permitir acesso pelo CGI.
-São recriados também a regra do logrotate, autorização do painel, páginas e entradas
+São recriados também a regra do logrotate, link de configuração do painel, páginas e entradas
 da API/coletor. Pastas ausentes ou com permissões divergentes impedem o resultado
 de "já atualizado", mesmo quando a revisão não mudou. Um destino vazio do código
 pode ser preenchido; arquivos e pastas de outros aplicativos continuam protegidos.
@@ -231,8 +237,9 @@ ao ler o crontab não é tratada como ausência de crontab.
 
 O perfil privado pode preparar dependências ausentes via apt e iniciar serviços
 inativos. A API valida nginx, serviços, arquivos, permissões, rotação de logs,
-configuração, autorização restrita do painel e consultas ao banco. Não reescreve
-configurações do nginx ou de outros sites. Pacotes instalados e serviços iniciados
+configuração, gravação do painel como o usuário real do CGI e consultas ao banco.
+No nginx acrescenta somente o bloqueio HTTP do link de configuração; preserva as
+demais rotas e configurações dos sites. Pacotes instalados e serviços iniciados
 não são revertidos pela recuperação dos arquivos do aplicativo.
 
 `web.origem` é a origem HTTP(S) opcional do site, sem prefixo de caminho, por exemplo

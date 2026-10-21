@@ -23,7 +23,7 @@ Fluxo, por (uf, nome) distinto pendente
 
 Uso:
   python3 tools/consultar_nomes_pendentes.py            # so reporta
-  sudo python3 tools/consultar_nomes_pendentes.py --aplicar
+  python3 tools/consultar_nomes_pendentes.py --aplicar
   --modelo gemma4:26b --ollama http://127.0.0.1:11434 --limite 200
 """
 import argparse

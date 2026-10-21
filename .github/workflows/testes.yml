@@ -38,10 +38,10 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Versão do Python
         run: python -V
-      - name: Dependências do sistema (poppler e logrotate)
+      - name: Dependências do sistema (poppler, logrotate e nginx)
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq poppler-utils logrotate
+          sudo apt-get install -y -qq poppler-utils logrotate nginx
           pdftotext -v 2>&1 | head -1
       - name: Sintaxe (compileall)
         run: python -m compileall -q core coletor tools web tests .github/scripts
