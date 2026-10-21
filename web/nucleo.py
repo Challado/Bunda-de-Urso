@@ -91,6 +91,7 @@ ENDPOINTS_AJUDA = {
 }
 
 ENDPOINTS_ADMINISTRATIVOS = {
+    "/api/v1/gestao/configuracao": ["GET", "PUT"],
     "/api/v1/admin/sincronizar": ["POST"],
     "/api/v1/admin/rollback": ["POST"],
     "/api/v1/gestao/pendentes": ["GET"],
@@ -837,6 +838,20 @@ def _gestao(conn, p, metodo, environ, stdin_bytes):
     resto = p[len("/api/v1/gestao"):].strip("/")
     partes = resto.split("/") if resto else []
     try:
+        if partes == ["configuracao"]:
+            governanca.exigir(ctx, "admin")
+            from core import configuracao
+            if metodo == "GET":
+                return _resp(configuracao.consultar(web=True), extra_headers={"Cache-Control": "no-store"})
+            if metodo == "PUT":
+                # Cabecalho nao simples impede envio por formulario/site externo.
+                if (environ.get("HTTP_X_RADAR_CONFIGURACAO") != "1" or
+                        environ.get("HTTP_SEC_FETCH_SITE") == "cross-site" or
+                        environ.get("CONTENT_TYPE", "").split(";")[0] != "application/json"):
+                    return _erro(403, "origem_invalida", "Salve a configuracao pelo painel administrativo.")
+                resultado = configuracao.salvar(_corpo_json(stdin_bytes), autor=ctx.get("rotulo"), web=True)
+                return _resp(resultado, extra_headers={"Cache-Control": "no-store"})
+            return _erro(405, "metodo_nao_permitido", "Use GET ou PUT.")
         # -- quem sou eu (contexto da sessao/token) -----------------------
         if partes[:1] == ["eu"]:
             if metodo != "GET":

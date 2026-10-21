@@ -29,6 +29,7 @@ import os
 import sys
 
 CONF_PADRAO = "/etc/radar-brasil/radar.conf"
+os.environ.setdefault("RADAR_CONF", CONF_PADRAO)
 
 
 def _conf(secao, chave):
@@ -66,11 +67,10 @@ if not _raiz:
     sys.exit("Radar Brasil: caminho do codigo nao configurado. "
              "Defina [instalacao] home em %s ou RADAR_BRASIL_HOME." % CONF_PADRAO)
 
-for _chave, _valor in (("RADAR_BRASIL_HOME", _raiz),
-                       ("RADAR_DATA_DIR", _conf("dados", "dir")),
-                       ("RADAR_DB", _conf("dados", "banco"))):
-    if _valor:
-        os.environ.setdefault(_chave, _valor)
+# Bootstrap resolve somente o codigo. Dados e demais opcoes pertencem ao core.
+if not os.path.isabs(_raiz):
+    _raiz = os.path.join(os.path.dirname(os.path.abspath(
+        os.environ.get("RADAR_CONF") or CONF_PADRAO)), _raiz)
 
 if _raiz not in sys.path:
     sys.path.insert(0, _raiz)

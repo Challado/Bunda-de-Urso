@@ -38,6 +38,13 @@ _ENV = {
     ("logs", "dir"): "RADAR_LOG_DIR",
     ("sincronizacao", "clone"): "RADAR_SYNC_CLONE",
     ("sincronizacao", "remoto"): "RADAR_SYNC_REMOTO",
+    ("api", "token_arquivo"): "RADAR_API_TOKEN_FILE",
+    ("api", "max_body"): "RADAR_API_MAX_BODY",
+    ("api", "proxies_confiaveis"): "RADAR_TRUSTED_PROXIES",
+    ("coleta", "max_bytes"): "RADAR_MAX_BYTES",
+    ("geografia", "malha"): "RADAR_MALHA",
+    ("assistente", "url"): "OLLAMA_URL",
+    ("assistente", "modelo"): "OLLAMA_MODELO",
 }
 
 # Secoes/chaves conhecidas -- usado pelo exemplo, pelo verificador e pelo help.
@@ -47,6 +54,33 @@ SECOES = {
     "web": ("raiz", "url"),
     "logs": ("dir",),
     "sincronizacao": ("clone", "remoto"),
+    "api": ("token_arquivo", "max_body", "proxies_confiaveis"),
+    "coleta": ("max_bytes", "timeout", "tentativas"),
+    "geografia": ("malha",),
+    "assistente": ("url", "modelo"),
+    "governanca": ("raio_correspondencia_m", "raio_zona_sombra_m",
+                   "submissao_limite", "submissao_janela_segundos",
+                   "sessao_ttl_segundos", "gov_iteracoes"),
+}
+for _nome in SECOES["governanca"]:
+    _ENV[("governanca", _nome)] = "RADAR_GOV_" + _nome.upper()
+
+# Apenas valores de instalacao. Segredos continuam em arquivos separados.
+PADROES = {
+    ("api", "max_body"): "8388608",
+    ("api", "proxies_confiaveis"): "",
+    ("coleta", "max_bytes"): "52428800",
+    ("coleta", "timeout"): "30",
+    ("coleta", "tentativas"): "3",
+    ("geografia", "malha"): "",
+    ("assistente", "url"): "http://127.0.0.1:11434",
+    ("assistente", "modelo"): "gemma4:26b",
+    ("governanca", "raio_correspondencia_m"): "150",
+    ("governanca", "raio_zona_sombra_m"): "1000",
+    ("governanca", "submissao_limite"): "20",
+    ("governanca", "submissao_janela_segundos"): "3600",
+    ("governanca", "sessao_ttl_segundos"): "28800",
+    ("governanca", "gov_iteracoes"): "200000",
 }
 
 _CACHE = {"chave": None, "valores": {}, "problemas": []}
@@ -114,6 +148,9 @@ def _ler_conf():
                             % (caminho, numero, secao, nome))
                     if not valor:
                         continue
+                    if (secao, nome) in valores:
+                        problemas.append("%s:%d: chave repetida [%s] %s"
+                                         % (caminho, numero, secao, nome))
                     valores[(secao, nome)] = valor
         except OSError as exc:
             problemas.append("%s: nao foi possivel ler (%s)" % (caminho, exc))
@@ -160,7 +197,19 @@ def valor(secao, chave, padrao="", env=None):
     do_arquivo = conf.get((secao, chave))
     if do_arquivo:
         return do_arquivo, conf_path()
-    return padrao, "padrao"
+    return PADROES.get((secao, chave), padrao), "padrao"
+
+
+def inteiro(secao, chave):
+    try:
+        return int(valor(secao, chave)[0])
+    except (TypeError, ValueError):
+        return int(PADROES[(secao, chave)])
+
+
+def token_arquivo():
+    return caminho("api", "token_arquivo",
+                   os.path.join(_base_conf(), "api_token"))
 
 
 def caminho(secao, chave, padrao="", env=None):
@@ -217,7 +266,7 @@ def web_raiz():
 
 def web_url():
     """Prefixo publico da consulta (usado por links e projeto.json)."""
-    return valor("web", "url", "/openclaw/radar/")[0]
+    return valor("web", "url", "/")[0]
 
 
 def sync_clone():

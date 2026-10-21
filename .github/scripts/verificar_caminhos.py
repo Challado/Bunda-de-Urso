@@ -16,11 +16,12 @@ Ignorados de proposito:
 import re
 import sys
 
-from comum import RAIZ, terminar, versionados
+from comum import RAIZ, terminar
 
 PASTAS = ("core/", "coletor/", "web/", "tools/", "deploy/", ".github/scripts/")
-SUFIXOS = (".py", ".pse", ".sh", ".html", ".json", ".service", ".conf")
+SUFIXOS = (".py", ".pse", ".sh", ".html", ".json", ".service", ".conf", ".logrotate")
 EXCECOES = {
+    ".github/scripts/verificar_caminhos.py": "padroes de deteccao, nao caminhos usados pelo aplicativo",
     "deploy/radar.conf.exemplo": "modelo da configuracao: mostra os caminhos reais",
     "web/projeto.json": "URL publica da consulta (nao e caminho de arquivo)",
 }
@@ -57,7 +58,9 @@ def analisar(rel, texto):
 
 def main():
     problemas = []
-    for rel in versionados():
+    arquivos = {p.relative_to(RAIZ).as_posix() for pasta in PASTAS
+                for p in (RAIZ / pasta).rglob("*") if p.is_file()}
+    for rel in sorted(arquivos):
         if rel in EXCECOES:
             continue
         if not rel.startswith(PASTAS) or not rel.endswith(SUFIXOS):

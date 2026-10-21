@@ -48,8 +48,8 @@ from core import db as dbmod
 from core import caminhos  # caminhos so pela porta unica
 
 DB_PADRAO = caminhos.banco()
-OLLAMA_PADRAO = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
-MODELO_PADRAO = os.environ.get("OLLAMA_MODELO", "gemma4:26b")
+OLLAMA_PADRAO = caminhos.valor("assistente", "url")[0]
+MODELO_PADRAO = caminhos.valor("assistente", "modelo")[0]
 CSV_PADRAO = os.path.join(config.ROOT, "dados", "calibracao",
                           "nomes_pendentes.csv")
 

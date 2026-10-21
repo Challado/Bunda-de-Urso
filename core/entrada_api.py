@@ -23,6 +23,24 @@ def main(argv=None):
         return cgi()
     argumentos = list(sys.argv[1:] if argv is None else argv)
     with atendimento_local():
+        if argumentos[:1] == ["instalacao"]:
+            from .instalacao import main as instalar
+            return instalar(argumentos[1:])
+        if argumentos[:1] == ["configuracao"]:
+            from .configuracao import main as configurar
+            return configurar(argumentos[1:])
+        if argumentos[:1] == ["cron"]:
+            if argumentos[1:2] != ["tick"]:
+                print("Operacao de cron desconhecida.", file=sys.stderr)
+                return 2
+            from . import caminhos
+            os.makedirs(caminhos.log_dir(), exist_ok=True)
+            with open(os.path.join(caminhos.log_dir(), argumentos[1] + ".log"), "a") as log:
+                sys.stdout.flush()
+                sys.stderr.flush()
+                os.dup2(log.fileno(), 1)
+                os.dup2(log.fileno(), 2)
+                argumentos = argumentos[1:]
         if argumentos and argumentos[0] in ("sync", "tick"):
             modulo = importlib.import_module("coletor." + argumentos[0])
             return modulo._main_servico(argumentos[1:])

@@ -202,7 +202,7 @@ Submissões públicas possuem fonte própria e não podem atualizar a base auten
 por meio de IDs enviados pelo usuário. As correções de reconciliação e operação
 estão descritas em `docs/CORRECOES_BUNDITA_DE_URSO.md`.
 
-A configuração versionada mora em `config/governanca.json`; o esquema aditivo da
+A configuração operacional mora em `[governanca]` do `radar.conf`, fora do checkout; o esquema aditivo da
 camada em `sql/migracoes/`. Detalhes e exemplos `curl` em `docs/GOVERNANCA.md`.
 
 O **painel HTML** mora em `web/gestao.html` (login, fila de pendentes, detalhe/verificar/
@@ -349,3 +349,8 @@ Para qualquer outro uso, peça autorização pelo GitHub ([Challado](https://git
 - **Como foi feito:** em colaboração direta com o mantenedor, no dia a dia, a partir da especificação do projeto e de material de referência. O código é Python 3 puro (só stdlib), sem dependências externas.
 - **Onde está no ar:** a consulta pública roda em <https://servidor3.lucas.inf.br/openclaw/radar/> e a API em <https://servidor3.lucas.inf.br/openclaw/radar/api.pse> (rotas em `/api/v1/*`).
 - **O que não é nosso:** a pasta `referencia/` reúne material de referência de terceiros, guardado apenas para estudo e comparação; não é de autoria deste projeto nem do Jarvis.
+
+A configuração da instalação pode ser consultada no painel **Administração →
+Configuração** ou em `api.pse configuracao mostrar`. O painel salva os parâmetros
+operacionais pela API; caminhos e credenciais são administrados pela mesma API no
+terminal. Atualizações preservam o arquivo do servidor. Veja `docs/CONFIGURACAO.md`.

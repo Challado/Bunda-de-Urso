@@ -4,7 +4,7 @@ Camada de confiança do **Bunda de Urso**: leitura aberta, criação aberta (com
 verificação/edição/remoção só com chave de gestão. **Regra dura: nada escreve direto no
 banco — tudo passa pela API** (inclusive o painel).
 
-- Config versionada: `config/governanca.json`
+- Configuração operacional: `[governanca]` em `radar.conf` (fora do checkout)
 - Esquema aditivo (migração 0001): `sql/migracoes/0001_governanca.sqlite.sql` (+ `.postgres.sql`)
 - Lógica/escrita: `core/governanca.py`; rotas: `web/nucleo.py`; CLI: `tools/radar_admin.py`
 - Testes: `tests/test_governanca.py`
@@ -167,12 +167,16 @@ colunas canônicas). Bases antigas (sem a camada) continuam respondendo normalme
 
 ## 6. Configuração e migração
 
-`config/governanca.json`:
+`radar.conf` (também editável pela API administrativa):
 
-```json
-{"RAIO_CORRESPONDENCIA_M":150,"RAIO_ZONA_SOMBRA_M":1000,
- "SUBMISSAO_LIMITE":20,"SUBMISSAO_JANELA_SEGUNDOS":3600,
- "SESSAO_TTL_SEGUNDOS":28800,"GOV_ITERACOES":200000}
+```ini
+[governanca]
+raio_correspondencia_m = 150
+raio_zona_sombra_m = 1000
+submissao_limite = 20
+submissao_janela_segundos = 3600
+sessao_ttl_segundos = 28800
+gov_iteracoes = 200000
 ```
 
 Override por ambiente: `RADAR_GOV_<CHAVE>` (ex.: `RADAR_GOV_SUBMISSAO_LIMITE=5`).

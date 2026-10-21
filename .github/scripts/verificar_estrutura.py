@@ -21,6 +21,8 @@ OBRIGATORIOS = [
     "web/nucleo.py",
     "core/db.py",
     "core/caminhos.py",
+    "core/configuracao.py",
+    "core/instalacao.py",
     "deploy/radar.conf.exemplo",
     "deploy/conf_radar.py",
     "docs/CONFIGURACAO.md",

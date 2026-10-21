@@ -48,11 +48,7 @@ __all__ = ("ErroFonte", "NaoModificado", "ErroRetentavel", "url_checada",
            "baixar")
 
 # Teto de download (equivale a RADAR_MAX_BYTES da spec de coleta).
-MAX_BYTES_PADRAO = 50 * 1024 * 1024
-try:
-    MAX_BYTES_PADRAO = int(os.environ.get("RADAR_MAX_BYTES", MAX_BYTES_PADRAO))
-except (TypeError, ValueError):
-    pass
+MAX_BYTES_PADRAO = config.caminhos.inteiro("coleta", "max_bytes")
 
 # Numero de saltos de redirect permitidos (mais o request final).
 _MAX_SALTOS = 5

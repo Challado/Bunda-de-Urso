@@ -304,7 +304,7 @@ def carregar_malha(ufs=None, forcar=False, cache_dir=None, timeout=None,
     ufs = tuple(ufs) if ufs else UFS
     if cache_dir is None:
         cache_dir = config.RAW_DIR
-    env = os.environ.get("RADAR_MALHA")
+    env = config.caminhos.caminho("geografia", "malha")
     if env and os.path.exists(env) and not forcar:
         return carregar_malha_geo(env)
     if (not forcar and not env and os.path.exists(MALHA_VERSIONADA)

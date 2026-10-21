@@ -60,7 +60,7 @@ def verificar_arquivo(rel, texto):
     if e_cliente and not any(isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
                              and node.func.id in clientes for node in ast.walk(arvore)):
         problemas.append(f"{rel}: comando deve encaminhar a core.cliente_api.executar")
-    if rel.startswith("core/manutencao/") or rel in ("core/console_api.py", "coletor/tick.py", "coletor/sync.py"):
+    if rel.startswith("core/manutencao/") or rel in ("core/console_api.py", "core/configuracao.py", "core/instalacao.py", "coletor/tick.py", "coletor/sync.py"):
         for node in arvore.body:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in ("main", "_main_servico"):
                 if rel.startswith("coletor/") and node.name == "main":

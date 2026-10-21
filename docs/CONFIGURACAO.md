@@ -6,7 +6,7 @@ Ele pergunta — sempre — a um único lugar:
 | Ordem | Fonte | Uso |
 |---|---|---|
 | 1 | variável de ambiente | emergência, teste, CI, execução pontual |
-| 2 | `/etc/radar-brasil/radar.conf` | instalação no servidor (editável) |
+| 2 | `/etc/radar-brasil/radar.conf` | instalação no servidor (editável pela API) |
 | 3 | padrão do checkout | desenvolvimento e CI, sem configurar nada |
 
 Quem responde no código é `core/caminhos.py`. Nenhum módulo, conector, script de
@@ -41,8 +41,6 @@ se já existir, grava `radar.conf.novo` ao lado para revisão.
 | `web.raiz` | webroot servido pelo nginx/fcgiwrap | `RADAR_WEB_ROOT` |
 | `web.url` | prefixo público da consulta | `RADAR_WEB_URL` |
 | `logs.dir` | logs do tick e do dados-sync | `RADAR_LOG_DIR` |
-| `sincronizacao.clone` | clone local do repositório privado de dados | `RADAR_SYNC_CLONE` |
-| `sincronizacao.remoto` | URL do repositório privado de dados | `RADAR_SYNC_REMOTO` |
 | `instalacao.usuario` / `.grupo` | dono esperado (informativo; o verificador confere) | — |
 
 Extras:
@@ -59,14 +57,14 @@ Extras:
 * `core/config.py` — reexporta `DATA_DIR`, `RAW_DIR`, `STAGING_DIR`, `DB_PATH`
   vindos da porta. Nada de caminho novo ali.
 * `core/manutencao/*.py` — `DB_PADRAO = caminhos.banco()`; `--db` continua mandando.
-* `deploy/radar-tick.sh` — lê o `.conf` em `sh` (sem `python` antes do `python`) e
-  executa `api.pse tick`; sem `.conf`, usa o checkout ao lado do script.
+* `deploy/radar-tick.sh` — chama o `radar-api.pse` instalado ao lado, com
+  `cron tick`. A API resolve a configuração e abre o log; o shell não tem outro parser.
 * `deploy/api.pse` e `web/api.pse` — descobrem a raiz do código pelo `.conf`;
   o do webroot tenta `RADAR_BRASIL_HOME` → `.conf` → vizinhança; o do checkout
   tenta `RADAR_BRASIL_HOME` → o próprio checkout → `.conf` (teste nunca importa
   código de produção por acidente).
 * `deploy/conf_radar.py` — `--mostrar` (efetivo + origem de cada chave),
-  `--verificar` (existência, escrita, dono, `core/`, `api.pse`, clone),
+  `--verificar` (existência, escrita, dono, `core/`, `api.pse`),
   `--instalar`, `--exemplo`.
 
 ## Diagnóstico
@@ -102,3 +100,87 @@ Com o `.conf`, caminho deixa de ser opinião de cada script: é configuração.
 5. copiar o `api.pse` para o webroot e o `radar-tick.sh` para o diretório do cron.
 
 Nada no código muda entre servidores.
+
+## Leitura e salvamento pela API
+
+A tela **Administração → Configuração** usa exclusivamente
+`api.pse?rota=/api/v1/gestao/configuracao` (GET/PUT). Exige sessão ou token **admin**;
+moderador e contribuidor não acessam configurações. Cada seção é recolhível e começa
+aberta. Mostra o valor gravado, o valor em uso e sua origem. Variáveis de ambiente
+continuam tendo precedência explícita e impedem salvar um valor que ficaria oculto.
+
+O painel pode salvar parâmetros operacionais: limites de requisição/download,
+proxies confiáveis e parâmetros de governança. Caminhos, usuários,
+destinos de instalação e credenciais são exibidos, com alteração somente pela API
+local. Isso impede que a conta do painel troque o código que o cron executa como root.
+A configuração **não** é um diretório público nem um symlink no webroot.
+
+O instalador mantém a pasta da configuração em `0755` e o arquivo em `0644`, de root.
+Autoriza no sudoers um único comando, sem argumentos extras ou SETENV:
+`python <home>/web/api.pse configuracao salvar-web --conf <arquivo>`.
+O próprio serviço valida a lista restrita de chaves, tipos e limites. O CGI não recebe
+escrita em `/etc`. Requer `sudo`/`visudo`. A aplicação só anuncia a gravação no painel
+depois de verificar o comando como o usuário real do CGI.
+
+O salvamento usa trava entre processos, revisão SHA-256 contra edição concorrente,
+arquivo temporário e substituição atômica. Guarda `radar.conf.anterior` e os metadados
+em `radar.conf.auditoria.jsonl` ao lado do arquivo; nenhum valor de token é retornado.
+Novos processos CGI e novas passadas do cron leem a configuração atualizada.
+Caminhos são configuração: **alterá-los não move arquivos**.
+
+No terminal:
+
+```bash
+python3 web/api.pse configuracao mostrar
+python3 web/api.pse configuracao verificar
+# JSON com revisao e alteracoes, por exemplo {"governanca.submissao_limite":"10"}:
+python3 web/api.pse configuracao salvar < alteracao.json
+```
+
+`deploy/conf_radar.py` permanece como cliente de compatibilidade da mesma API.
+Os parâmetros operacionais antes distribuídos em `config/governanca.json` agora
+pertencem a `[governanca]` do `radar.conf`. O instalador importa os valores do código
+antigo somente quando a respectiva chave ainda não existe no arquivo do servidor.
+O JSON antigo deixa de ser fonte de configuração e não é mais distribuído.
+
+Seções adicionais no modelo `deploy/radar.conf.exemplo`:
+
+| Seção | Configuração |
+|---|---|
+| `api` | `token_arquivo` (caminho, nunca o token), `max_body`, `proxies_confiaveis` |
+| `coleta` | `max_bytes`, `timeout`, `tentativas` |
+| `governanca` | correspondência por proximidade, bloqueios, submissões, sessão e PBKDF2 |
+| `geografia` | `malha` opcional |
+| `assistente` | URL e modelo do assistente usado em manutenção local |
+
+Senhas, `RADAR_API_TOKEN` e a senha inicial de administração continuam credenciais
+separadas. Catálogos de fontes, malhas e tabelas de calibração distribuídos com o código
+são dados de referência, não configurações particulares do servidor.
+
+## Atualização coordenada
+
+O instalador `.sh` e o perfil do servidor3 ficam no repositório privado de dados.
+Ele baixa uma revisão validada do código e chama `api.pse instalacao`; por padrão
+apenas simula. Usa o `radar.conf` existente e não o substitui por um modelo.
+
+Ao aplicar, guarda código, páginas, configuração e um backup consistente do SQLite
+na pasta `backups/instalacao/` dos dados. Pausa novas chamadas do coletor e da API,
+recusa a troca se o coletor ainda estiver rodando, prepara o código, aplica migrações
+aditivas pela API, testa a prontidão e só então instala o wrapper novo. Em falha,
+restaura código, páginas e configuração automaticamente; preserva o banco atual.
+
+A operação modifica somente a linha do coletor no crontab de root. O envio ao
+repositório privado e seus scripts pertencem ao servidor3, ficam fora do aplicativo
+e não são migrados nem alterados pelo instalador.
+
+Reaplicar preserva a configuração e os dados. Backups de instalação não são podados.
+`--restaurar <backup>` recupera arquivos da instalação, preservando o banco e os outros
+agendamentos. `--laboratorio <pasta>` restringe todos os destinos à pasta indicada e
+não configura cron ou sudo no sistema.
+
+O descritor estático `projeto.json` é gerado pelo instalador com `web.url` do `.conf`.
+Ao mudar o prefixo público pela API local, reaplique o instalador para atualizar o descritor;
+o roteamento do nginx permanece uma configuração do servidor.
+
+A seção legada `[sincronizacao]`, quando já existe no arquivo do servidor, é preservada
+sem edição pelo aplicativo. O painel e o diagnóstico não configuram nem exigem o espelho privado.

@@ -6,7 +6,6 @@ Caminhos NAO sao decididos aqui: vem da porta unica ``core.caminhos``
 apenas reexporta o que o resto do codigo ja conhece e guarda os parametros que
 nao sao caminho. Nada depende de rede em tempo de requisicao da API.
 """
-import json
 import os
 
 from core import caminhos
@@ -42,7 +41,7 @@ MAX_LIMITE = 1000
 # Sem token configurado a escrita fica DESABILITADA e a API responde 401.
 API_TOKEN_ENV = "RADAR_API_TOKEN"
 API_TOKEN_FILE_ENV = "RADAR_API_TOKEN_FILE"
-API_TOKEN_FILE_PADRAO = "/etc/radar-brasil/api_token"
+API_TOKEN_FILE_PADRAO = caminhos.token_arquivo()
 
 
 def token_ingestao():
@@ -50,12 +49,7 @@ def token_ingestao():
     tok = (os.environ.get(API_TOKEN_ENV) or "").strip()
     if tok:
         return tok
-    caminhos = []
-    indicado = (os.environ.get(API_TOKEN_FILE_ENV) or "").strip()
-    if indicado:
-        caminhos.append(indicado)
-    caminhos.append(API_TOKEN_FILE_PADRAO)
-    for caminho in caminhos:
+    for caminho in [caminhos.token_arquivo()]:
         try:
             with open(caminho, "r", encoding="utf-8") as f:
                 texto = f.read().strip()
@@ -67,49 +61,17 @@ def token_ingestao():
 
 
 # Ingestao via API: tamanho maximo do corpo aceito (protege o CGI).
-API_MAX_BODY = int(os.environ.get("RADAR_API_MAX_BODY", 8 * 1024 * 1024))
+API_MAX_BODY = caminhos.inteiro("api", "max_body")
 
 # ---------------------------------------------------------------------------
-# Governanca da ingestao (camada colaborativa). Valores versionados em
-# config/governanca.json; sobrescritos por variaveis RADAR_GOV_*. A senha
-# padrao inicial NAO mora aqui nem no repo: entra pelo CLI no deploy.
+# Governanca da ingestao: parametros operacionais no radar.conf.
+# A senha inicial entra pelo CLI; nao pertence ao arquivo de configuracao.
 # ---------------------------------------------------------------------------
-GOVERNANCA_CONFIG_PATH = os.path.join(ROOT, "config", "governanca.json")
-
-_GOV_PADRAO = {
-    "RAIO_CORRESPONDENCIA_M": 150,     # raio p/ casar colaborativo x oficial
-    "RAIO_ZONA_SOMBRA_M": 1000,        # raio sugerido p/ zona sombra (anti-sabotagem)
-    "SUBMISSAO_LIMITE": 20,            # submissoes publicas por IP na janela
-    "SUBMISSAO_JANELA_SEGUNDOS": 3600,  # janela do rate limit (1 h)
-    "SESSAO_TTL_SEGUNDOS": 28800,      # validade da sessao do painel (8 h)
-    "GOV_ITERACOES": 200000,           # PBKDF2-HMAC-SHA256 (minimo da spec)
-}
-
 
 def _carregar_governanca():
-    """Le config/governanca.json (ou o padrao) e aplica override por ambiente."""
-    valores = dict(_GOV_PADRAO)
-    try:
-        with open(GOVERNANCA_CONFIG_PATH, "r", encoding="utf-8") as f:
-            dados = json.load(f)
-        if isinstance(dados, dict):
-            for chave in valores:
-                valor = dados.get(chave)
-                if isinstance(valor, bool):
-                    continue
-                if isinstance(valor, (int, float)):
-                    valores[chave] = int(valor)
-    except (OSError, ValueError):
-        pass
-    for chave in list(valores):
-        env = os.environ.get("RADAR_GOV_" + chave)
-        if env is None or env == "":
-            continue
-        try:
-            valores[chave] = int(env)
-        except ValueError:
-            continue
-    return valores
+    """Valores operacionais pertencem ao radar.conf, nao ao checkout."""
+    return {chave: caminhos.inteiro("governanca", chave.lower())
+            for chave in (k.upper() for k in caminhos.SECOES["governanca"])}
 
 
 _GOV = _carregar_governanca()
@@ -124,12 +86,13 @@ GOV_ITERACOES = max(200000, _GOV["GOV_ITERACOES"])
 EARTH_RADIUS_M = 6371008.8   # raio medio WGS84 (spec 9.2)
 
 # Coletor
-DEFAULT_TIMEOUT = 30          # segundos
-DEFAULT_TENTATIVAS = 3
+DEFAULT_TIMEOUT = caminhos.inteiro("coleta", "timeout")
+DEFAULT_TENTATIVAS = caminhos.inteiro("coleta", "tentativas")
 USER_AGENT = "RadarBrasil/1.0 (+https://github.com/Challado/Bunda-de-Urso)"
 
 ##-- BUNDITA DE URSO #{12} -- Cabecalhos de cliente so podem identificar IP quando enviados por proxy confiavel. ##
-TRUSTED_PROXIES = tuple(p.strip() for p in os.environ.get("RADAR_TRUSTED_PROXIES", "").split(",") if p.strip())
+TRUSTED_PROXIES = tuple(p.strip() for p in caminhos.valor(
+    "api", "proxies_confiaveis")[0].split(",") if p.strip())
 
 # Descricao curta do limite de raio, para mensagens/ajuda (mantidas em sincronia).
 RAIO_FAIXA_TXT = "%d..%d" % (MIN_RAIO, MAX_RAIO)
@@ -137,4 +100,5 @@ RAIO_FAIXA_TXT = "%d..%d" % (MIN_RAIO, MAX_RAIO)
 
 def ensure_dirs():
     """Cria (idempotente) os diretorios de dados resolvidos pela porta unica."""
-    caminhos.ensure_dirs()
+    for diretorio in (DATA_DIR, RAW_DIR, STAGING_DIR):
+        os.makedirs(diretorio, exist_ok=True)

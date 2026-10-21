@@ -3,7 +3,7 @@
 # Este arquivo diz AO PROGRAMA onde estao as coisas. O codigo nao sabe (e nao
 # deve saber) caminho de producao: ele pergunta aqui.
 #
-#   LOCAL:  /etc/radar-brasil/radar.conf   (root:root, 0644)
+#   LOCAL:  /etc/radar-brasil/radar.conf   (root:root, 0644; pasta 0755)
 #   OUTRO:  RADAR_CONF=/caminho/alternativo (util para teste)
 #
 # Precedencia: variavel de ambiente > este arquivo > padrao do checkout.
@@ -13,7 +13,7 @@
 # Caminho relativo e resolvido contra a pasta DESTE arquivo.
 # Depois de editar, confira o que o programa entendeu:
 #
-#     python3 /caminho/do/codigo/tools/conf_radar.py --mostrar
+#     python3 /caminho/do/codigo/web/api.pse configuracao mostrar
 
 [instalacao]
 # Raiz do codigo instalado: onde ficam core/, coletor/, web/, sql/.
@@ -42,8 +42,28 @@ url = /openclaw/radar/
 # Logs do tick e do dados-sync (o logrotate le daqui).
 dir = /var/log/openclaw/radar
 
-[sincronizacao]
-# Clone local do repositorio PRIVADO de dados (espelho do que a coleta produz).
-# Vazio = espelho desabilitado.
-clone = /openclaw/dados/Bunda-de-Urso-Dados
-remoto = https://github.com/Challado/Bunda-de-Urso-Dados.git
+[api]
+token_arquivo = /etc/radar-brasil/api_token
+max_body = 8388608
+proxies_confiaveis =
+
+[coleta]
+max_bytes = 52428800
+timeout = 30
+tentativas = 3
+
+[governanca]
+raio_correspondencia_m = 150
+raio_zona_sombra_m = 1000
+submissao_limite = 20
+submissao_janela_segundos = 3600
+sessao_ttl_segundos = 28800
+gov_iteracoes = 200000
+
+[geografia]
+# Vazio usa a malha distribuida com o codigo/cache. Pode indicar outra malha.
+malha =
+
+[assistente]
+url = http://127.0.0.1:11434
+modelo = gemma4:26b

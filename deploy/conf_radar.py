@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Diagnostico e instalacao do /etc/radar-brasil/radar.conf.
 
-Nao e cliente da API e nao abre banco: so le a configuracao e o sistema de
+Cliente da API local, sem abrir banco: o servico le a configuracao e o sistema de
 arquivos. Serve para responder "onde este programa acha que estao as coisas?"
 
     python3 deploy/conf_radar.py                 # mostra os caminhos efetivos
@@ -24,6 +24,7 @@ if RAIZ not in sys.path:
     sys.path.insert(0, RAIZ)
 
 from core import caminhos  # noqa: E402
+from core.contexto_api import operacao_local
 
 EXEMPLO = os.path.join(RAIZ, "deploy", "radar.conf.exemplo")
 
@@ -76,10 +77,6 @@ def verificar():
                     os.path.join(caminhos.web_raiz(), "api.pse"), tipo="arq")
     _checar_caminho(problemas, "logs.dir", caminhos.log_dir(), escrita=True)
 
-    clone = caminhos.sync_clone()
-    if clone and not os.path.isdir(clone):
-        problemas.append("sincronizacao.clone nao existe (%s)" % clone)
-
     _, origem = caminhos.valor("instalacao", "usuario")
     esperado = caminhos.valor("instalacao", "usuario")[0]
     if esperado:
@@ -104,6 +101,7 @@ def verificar():
     return 1
 
 
+@operacao_local
 def instalar():
     destino = caminhos.conf_path()
     if not os.path.isfile(EXEMPLO):
@@ -130,16 +128,10 @@ def main(argv=None):
     ap.add_argument("--instalar", action="store_true", help="cria o .conf a partir do exemplo")
     ap.add_argument("--exemplo", action="store_true", help="imprime o exemplo na tela")
     args = ap.parse_args(argv)
-
-    if args.exemplo:
-        with open(EXEMPLO, "r", encoding="utf-8") as f:
-            sys.stdout.write(f.read())
-        return 0
-    if args.instalar:
-        return instalar()
-    if args.verificar:
-        return verificar()
-    return mostrar()
+    from core.cliente_api import executar
+    acao = ("exemplo" if args.exemplo else "instalar" if args.instalar else
+            "verificar" if args.verificar else "mostrar")
+    return executar(["configuracao", acao], [])
 
 
 if __name__ == "__main__":
