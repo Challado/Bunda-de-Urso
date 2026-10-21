@@ -372,6 +372,7 @@
     h += "<div id='mapa'></div>";
 
     h += renderFontes(p);
+    if (p.explicacao) h += secao("Resumo com fontes e divergências", {resumo:p.explicacao.texto});
     h += "<details class='secao consolidado' open><summary>Visão consolidada do radar</summary><div class='corpo'><p class='explicacao'>Resumo organizado pela base a partir dos registros associados. Para conferir o que cada fonte publicou, consulte os blocos acima. Posições inferidas são estimativas, não GPS oficial.</p>";
     h += secao("Localização", {localizacao: p.localizacao});
     h += secao("Identificação e situação", {id:p.id, tipo_registro:p.tipo_registro, tipos_radar_presentes:p.tipos_radar_presentes, situacao_operacional:p.situacao_operacional, situacao_original:p.situacao_original, data_inicio_operacao:p.data_inicio_operacao, data_inativacao:p.data_inativacao, motivo_inativacao:p.motivo_inativacao});
@@ -384,7 +385,7 @@
     h += secao("Rastreabilidade e datas", {primeira_observacao:p.primeira_observacao, ultima_confirmacao:p.ultima_confirmacao, ultima_coleta:p.ultima_coleta, confianca:p.confianca, observacoes:p.observacoes, proveniencia_campos:p.proveniencia_campos});
 
     // tudo o que sobrou (garante que NENHUM campo fique de fora)
-    var usados = {localizacao:1,tipo_registro:1,situacao_operacional:1,situacao_original:1,data_inicio_operacao:1,data_inativacao:1,motivo_inativacao:1,velocidade_leves_kmh:1,velocidade_pesados_kmh:1,velocidade_geral_kmh:1,velocidades_resolvidas:1,limites_velocidade:1,faixas:1,quantidade_faixas_declarada:1,conflitos:1,regimes:1,equipamentos:1,organizacoes:1,documentos:1,operacoes:1,primeira_observacao:1,ultima_confirmacao:1,ultima_coleta:1,confianca:1,observacoes:1,proveniencia_campos:1,fontes:1,dados_por_fonte:1,id:1,tipos_radar_presentes:1,total_pontos:1,total_equipamentos:1,retornados:1,proximo_cursor:1,status:1,total_operacoes:1};
+    var usados = {explicacao:1,localizacao:1,tipo_registro:1,situacao_operacional:1,situacao_original:1,data_inicio_operacao:1,data_inativacao:1,motivo_inativacao:1,velocidade_leves_kmh:1,velocidade_pesados_kmh:1,velocidade_geral_kmh:1,velocidades_resolvidas:1,limites_velocidade:1,faixas:1,quantidade_faixas_declarada:1,conflitos:1,regimes:1,equipamentos:1,organizacoes:1,documentos:1,operacoes:1,primeira_observacao:1,ultima_confirmacao:1,ultima_coleta:1,confianca:1,observacoes:1,proveniencia_campos:1,fontes:1,dados_por_fonte:1,id:1,tipos_radar_presentes:1,total_pontos:1,total_equipamentos:1,retornados:1,proximo_cursor:1,status:1,total_operacoes:1};
     var resto = {};
     Object.keys(p).forEach(function(k){ if (!usados[k]) resto[k] = p[k]; });
     h += secao("Outros campos", resto);

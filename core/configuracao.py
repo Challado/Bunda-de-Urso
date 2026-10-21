@@ -21,6 +21,7 @@ from .contexto_api import operacao_local
 CAMINHOS = {("instalacao", "home"), ("dados", "dir"), ("dados", "banco"),
             ("web", "raiz"), ("logs", "dir"), ("sincronizacao", "clone"),
             ("api", "token_arquivo"), ("geografia", "malha")}
+CAMINHOS.add(("assistente", "chave_arquivo"))
 NUMEROS = {**{("governanca", k): (1, 1000000000)
               for k in caminhos.SECOES["governanca"]},
            ("api", "max_body"): (1024, 67108864),
@@ -29,7 +30,13 @@ NUMEROS = {**{("governanca", k): (1, 1000000000)
            ("coleta", "tentativas"): (1, 10),
            ("coleta", "espera_atualizacao"): (1, 3600),
            ("governanca", "gov_iteracoes"): (200000, 2000000)}
-EDITAVEIS_WEB = set(NUMEROS) | {("api", "proxies_confiaveis")}
+NUMEROS.update({("assistente", k): limites for k, limites in {
+    "habilitado": (0, 1), "timeout": (1, 60), "max_entrada": (1000, 60000),
+    "max_saida_tokens": (128, 4096), "max_chamadas": (1, 100),
+    **{k: (0, 1) for k in ("documentos", "correspondencias", "auditoria", "diagnostico", "explicacoes", "municipios")},
+}.items()})
+EDITAVEIS_WEB = set(NUMEROS) | {("api", "proxies_confiaveis"),
+                              ("assistente", "provedor"), ("assistente", "url"), ("assistente", "modelo")}
 
 
 def _erro(status, codigo, mensagem):
@@ -109,6 +116,8 @@ def _validar(valores):
             minimo, maximo = NUMEROS[par]
             if not texto.isdecimal() or not minimo <= int(texto) <= maximo:
                 _erro(422, "numero_invalido", "%s.%s: use %d..%d." % (*par, minimo, maximo))
+        if par == ("assistente", "provedor") and texto not in ("", "ollama", "openai_compativel"):
+            _erro(422, "provedor_invalido", "Use ollama ou openai_compativel.")
         if texto and par == ("api", "proxies_confiaveis"):
             try:
                 for rede in texto.split(","):
@@ -126,6 +135,14 @@ def _validar(valores):
                 _erro(422, "url_invalida", "Informe uma URL https, ssh ou http valida.")
             if par == ("web", "origem") and (url.scheme not in ("http", "https") or url.path not in ("", "/")):
                 _erro(422, "url_invalida", "A origem web deve conter somente http(s)://host[:porta].")
+            if par == ("assistente", "url") and url.scheme not in ("http", "https"):
+                _erro(422, "url_invalida", "O assistente exige uma URL HTTP(S).")
+    if any(par in valores for par in (("assistente", "provedor"), ("assistente", "url"))):
+        provedor = valores.get(("assistente", "provedor")) or caminhos.valor("assistente", "provedor")[0]
+        endereco = valores.get(("assistente", "url")) or caminhos.valor("assistente", "url")[0]
+        url = urllib.parse.urlsplit(endereco)
+        if provedor == "openai_compativel" and url.scheme != "https" and url.hostname not in ("localhost", "127.0.0.1", "::1"):
+            _erro(422, "url_invalida", "A API externa exige HTTPS; HTTP e aceito somente para testes em localhost.")
 
 
 def _editar(texto, alteracoes):

@@ -21,6 +21,8 @@
   label{display:flex;flex-direction:column;font-size:12.5px;color:#4a4a55;gap:3px;margin-bottom:10px}
   /* font-size:16px evita o zoom automatico dos campos no iOS */
   input,select,textarea{font:inherit;font-size:16px;padding:8px 10px;border:1px solid var(--borda);border-radius:7px;background:#fff;color:#1d1d22;width:100%}
+  input[type="checkbox"]{width:auto;align-self:flex-start;accent-color:var(--azul)}
+  label.opcao{flex-direction:row;align-items:center;gap:8px}
   textarea{min-height:60px;resize:vertical}
   button{padding:9px 14px;border:0;border-radius:7px;background:var(--azul);color:#fff;font:600 14px/1 inherit;cursor:pointer}
   button.sec{background:#5b6472}
@@ -127,6 +129,7 @@
       <button data-aba="bloqueios">Bloqueios</button>
       <button data-aba="tokens">Tokens</button>
       <button data-aba="configuracao" hidden>Configuração</button>
+      <button data-aba="assistente" hidden>Assistência</button>
       <a href="usuarios.html">Usuários &rarr;</a>
     </nav>
 
@@ -141,6 +144,34 @@
         <div class="linha"><button id="btSalvarConf" type="submit" disabled>Salvar configuração</button>
         <button id="btRecarregarConf" type="button" class="sec">Recarregar</button></div>
       </form>
+      <details class="bloco" open><summary>IA opcional — chave externa</summary>
+        <p>A IA começa desligada. Na seção assistente, escolha o provedor, URL base e modelo.
+        Serviços compatíveis com OpenAI usam a URL HTTPS do provedor (ex.: https://api.openai.com/v1).
+        Ao ativar, as análises solicitadas podem enviar trechos de fontes e evidências ao provedor escolhido.
+        Com IA desligada, todas as tarefas continuam pelas regras locais.</p>
+        <p id="iaEstadoChave"></p>
+        <label>Chave da API externa <input id="iaChave" type="password" autocomplete="new-password" placeholder="Cole uma chave para cadastrar ou substituir"></label>
+        <div class="linha"><button type="button" id="btIaChave">Salvar chave</button><button type="button" id="btIaRemoverChave" class="sec">Remover chave</button></div>
+        <p>A chave é armazenada separadamente no servidor e nunca é devolvida pelo painel. Não é necessária para Ollama local.</p>
+      </details>
+    </section>
+
+    <section id="aba-assistente" class="aba" hidden>
+      <p id="assistenteEstado" class="aviso"></p>
+      <p>As análises geram propostas e preservam os registros oficiais. Extração exige evidência no documento;
+      casos sem dados suficientes ficam para revisão. O resumo público funciona sempre por regras locais.</p>
+      <form id="formAssistente">
+        <label>Análise <select id="assistenteTarefa">
+          <option value="documento">Extrair documento do cache</option><option value="correspondencias">Sugerir correspondências</option>
+          <option value="auditoria">Conferir inconsistências</option><option value="diagnostico">Diagnosticar coleta</option>
+          <option value="explicacao">Explicar dados de um radar</option>
+        </select></label>
+        <label id="assistenteRotulo">ID do artefato coletado <input id="assistenteAlvo" required placeholder="123"></label>
+        <label class="opcao"><input id="assistenteLocal" type="checkbox"> Usar somente regras locais nesta análise</label>
+        <button type="submit" id="btAssistente">Analisar</button>
+      </form>
+      <div id="assistenteResultado" role="status" aria-live="polite"></div>
+      <div id="assistenteHistorico"></div>
     </section>
 
     <!-- ================= PENDENTES ================= -->
@@ -310,6 +341,7 @@
     document.querySelector('[data-aba="bloqueios"]').hidden = !admin;
     document.querySelector('[data-aba="tokens"]').hidden = !admin;
     document.querySelector('[data-aba="configuracao"]').hidden = !admin;
+    document.querySelector('[data-aba="assistente"]').hidden = !admin;
     document.getElementById("formBloqueio").hidden = !admin;
     if (!ehModerador()) avisoGer("Seu escopo é <b>somente leitura</b> (contribuidor). As ações de verificar/editar/remover exigem <b>moderador</b> e as de bloqueios/tokens/usuários exigem <b>admin</b>.", "");
     else avisoGer("");
@@ -354,6 +386,7 @@
     if (nome === "bloqueios" && ehAdmin()) carregarBloqueios();
     if (nome === "tokens" && ehAdmin()) carregarTokens();
     if (nome === "configuracao" && ehAdmin()) carregarConfiguracao();
+    if (nome === "assistente" && ehAdmin()) carregarAssistente();
   }
   abas.forEach(function(b){ b.addEventListener("click", function(){ trocarAba(b.getAttribute("data-aba")); }); });
 
@@ -410,9 +443,16 @@
         secao.appendChild(titulo); destino.appendChild(secao); secoes[item.secao] = secao;
       }
       var label = document.createElement("label"); label.textContent = item.chave;
-      var input = document.createElement("input"); input.value = item.valor;
+      var booleano = item.secao === "assistente" && ["habilitado","documentos","correspondencias","auditoria","diagnostico","explicacoes","municipios"].indexOf(item.chave) >= 0;
+      if (item.secao === "assistente" && item.chave === "habilitado") label.textContent = "Usar IA (opcional)";
+      var input = document.createElement(item.secao === "assistente" && item.chave === "provedor" ? "select" : "input");
+      if (input.tagName === "SELECT") {
+        [["ollama","Ollama local"],["openai_compativel","API externa compatível com OpenAI"]].forEach(function(op){var el=document.createElement("option");el.value=op[0];el.textContent=op[1];input.appendChild(el);});
+      }
+      input.value = input.tagName === "SELECT" ? (item.valor || item.efetivo) : item.valor;
+      if (booleano) {input.type="checkbox";input.checked=String(item.efetivo)==="1";}
       input.dataset.chave = item.secao + "." + item.chave;
-      input.dataset.anterior = item.valor;
+      input.dataset.anterior = booleano ? (input.checked ? "1" : "0") : input.value;
       input.placeholder = String(item.efetivo || "(padrão)");
       input.disabled = !doc.gravavel || item.editavel === false || String(item.origem).indexOf("ambiente") === 0;
       if (item.tipo === "numero") input.inputMode = "numeric";
@@ -433,6 +473,7 @@
       document.getElementById("confMensagem").className = "";
       document.getElementById("confMensagem").textContent = "";
       renderConf(o.body);
+      carregarAssistente();
     }).catch(function(){ mensagemConf("Falha de rede ao ler a configuração.", true); });
   }
   document.getElementById("btRecarregarConf").addEventListener("click", carregarConfiguracao);
@@ -440,8 +481,9 @@
     e.preventDefault();
     if (!confAtual || !ehAdmin()) return;
     var alteracoes = {};
-    document.querySelectorAll("#confCampos input[data-chave]").forEach(function(input){
-      if (!input.disabled && input.value !== input.dataset.anterior) alteracoes[input.dataset.chave] = input.value;
+    document.querySelectorAll("#confCampos [data-chave]").forEach(function(input){
+      var valor=input.type==="checkbox"?(input.checked?"1":"0"):input.value;
+      if (!input.disabled && valor !== input.dataset.anterior) alteracoes[input.dataset.chave] = valor;
     });
     if (!Object.keys(alteracoes).length){ mensagemConf("Nenhuma alteração para salvar."); return; }
     var bt = document.getElementById("btSalvarConf"); bt.disabled = true;
@@ -452,6 +494,61 @@
     }).catch(function(){ mensagemConf("Falha de rede. Recarregue para conferir se a configuração foi salva.", true); })
       .then(function(){ bt.disabled = !confAtual.gravavel; });
   });
+
+  function carregarAssistente(){
+    req("/api/v1/gestao/assistente").then(function(o){
+      if(o.status!==200)return;
+      var a=o.body.assistente;
+      document.getElementById("assistenteEstado").textContent=a.habilitado?"IA habilitada: "+a.provedor+" · "+a.modelo+". Falhas usam automaticamente a alternativa local.":"IA desligada. Nenhuma chamada a modelos será feita; as análises usam somente regras locais.";
+      document.getElementById("iaEstadoChave").textContent=a.chave_configurada?(a.chave_por_ambiente?"Chave configurada no ambiente do servidor.":"Chave externa cadastrada no servidor."):"Nenhuma chave externa cadastrada.";
+      document.getElementById("btIaChave").disabled=!!a.chave_por_ambiente;
+      document.getElementById("btIaRemoverChave").disabled=!!a.chave_por_ambiente||!a.chave_configurada;
+      var lista=document.getElementById("assistenteHistorico");lista.replaceChildren();
+      var titulo=document.createElement("h3");titulo.textContent="Análises recentes";lista.appendChild(titulo);
+      (o.body.relatorios||[]).forEach(function(r){
+        var bt=document.createElement("button");bt.type="button";bt.className="sec mini";bt.textContent=r.tarefa+" · "+r.criado_em;
+        bt.onclick=function(){req("/api/v1/gestao/assistente/relatorios/"+encodeURIComponent(r.id)).then(function(res){if(res.status===200)mostrarAssistencia(res.body);});};lista.appendChild(bt);
+      });
+    }).catch(function(){document.getElementById("assistenteEstado").textContent="Não foi possível consultar o estado da assistência.";});
+  }
+  function mostrarAssistencia(r){
+    var el=document.getElementById("assistenteResultado");el.replaceChildren();
+    var resumo=document.createElement("p");resumo.className="aviso";
+    var motivos={documento_nao_oficial_local:"arquivo não oficial analisado localmente",desativada:"desligada",chave_ausente:"chave externa não configurada",provedor_indisponivel:"provedor indisponível",configuracao_invalida:"configuração do provedor incompleta",limite_entrada:"documento acima do limite de envio",limite_chamadas:"limite de consultas atingido",sugestao_nao_validada:"sugestão recusada por falta de evidência",resposta_excessiva:"resposta do provedor acima do limite"};
+    resumo.textContent=r.ia.usou_ia?"Proposta com IA ("+r.ia.provedor+" / "+r.ia.modelo+"). Confira as evidências antes de decidir.":"Análise pelas regras locais. IA: "+(motivos[r.ia.motivo]||r.ia.motivo)+". Dados oficiais preservados.";el.appendChild(resumo);
+    if(r.sugestao_ia){
+      var tituloIa=document.createElement("h3");tituloIa.textContent="Sugestão da IA para revisão";el.appendChild(tituloIa);
+      var proposta=r.sugestao_ia,listaIa=document.createElement("ul");
+      (proposta.fatos||proposta.achados||proposta.acoes||proposta.candidatos||proposta.registros||[]).forEach(function(i){
+        var li=document.createElement("li");li.textContent=i.texto||(i.trecho?"Página "+i.pagina+": "+i.trecho:i.id+" · "+i.encaminhamento);listaIa.appendChild(li);
+      });el.appendChild(listaIa);
+    }
+    var tituloLocal=document.createElement("h3");tituloLocal.textContent="Resultado das regras locais";el.appendChild(tituloLocal);
+    var local=r.alternativa_local,itens=local.fatos||local.achados||local.acoes||local.candidatos||local.registros||[],ul=document.createElement("ul");
+    itens.forEach(function(i){var li=document.createElement("li");li.textContent=i.texto||i.trecho||(i.id+" · "+i.encaminhamento+" · "+i.distancia_metros+" m");ul.appendChild(li);});el.appendChild(ul);
+    if(local.observacao){var p=document.createElement("p");p.textContent=local.observacao;el.appendChild(p);}
+    var detalhes=document.createElement("details");detalhes.className="bloco";var sum=document.createElement("summary");sum.textContent="Propostas, evidências e relatório completo";detalhes.appendChild(sum);
+    var pre=document.createElement("pre");pre.style.whiteSpace="pre-wrap";pre.style.overflowWrap="anywhere";pre.textContent=JSON.stringify(r,null,2);detalhes.appendChild(pre);el.appendChild(detalhes);
+  }
+  document.getElementById("assistenteTarefa").onchange=function(){
+    var t=this.value,entrada=document.getElementById("assistenteAlvo"),label=document.getElementById("assistenteRotulo");
+    label.firstChild.textContent=t==="documento"?"ID do artefato coletado ":t==="diagnostico"?"ID da execução de coleta ":"ID do radar ";entrada.placeholder=(t==="documento"||t==="diagnostico")?"123":"P-1130";
+  };
+  document.getElementById("formAssistente").onsubmit=function(e){
+    e.preventDefault();var t=document.getElementById("assistenteTarefa").value,d={tarefa:t,sem_ia:document.getElementById("assistenteLocal").checked};
+    d[t==="documento"?"artefato_id":t==="diagnostico"?"execucao_id":"ponto_id"]=document.getElementById("assistenteAlvo").value.trim();
+    var bt=document.getElementById("btAssistente");bt.disabled=true;
+    req("/api/v1/gestao/assistente",{method:"POST",headers:{"X-Radar-Configuracao":"1"},body:d}).then(function(o){
+      if(o.status===200){mostrarAssistencia(o.body);carregarAssistente();}else document.getElementById("assistenteResultado").textContent=erroMsg(o);
+    }).catch(function(){document.getElementById("assistenteResultado").textContent="Falha de rede; confira as análises recentes antes de repetir.";}).then(function(){bt.disabled=false;});
+  };
+  document.getElementById("btIaChave").onclick=function(){
+    var campo=document.getElementById("iaChave"),chave=campo.value;campo.value="";
+    req("/api/v1/gestao/assistente/chave",{method:"PUT",headers:{"X-Radar-Configuracao":"1"},body:{chave:chave}}).then(function(o){mensagemConf(o.status===200?"Chave cadastrada; o valor não será exibido.":erroMsg(o),o.status!==200);carregarAssistente();}).catch(function(){mensagemConf("Falha de rede ao cadastrar chave.",true);});
+  };
+  document.getElementById("btIaRemoverChave").onclick=function(){
+    req("/api/v1/gestao/assistente/chave",{method:"DELETE",headers:{"X-Radar-Configuracao":"1"},body:{}}).then(function(o){mensagemConf(o.status===200?"Chave removida.":erroMsg(o),o.status!==200);carregarAssistente();}).catch(function(){mensagemConf("Falha de rede ao remover chave.",true);});
+  };
 
   // ================= PENDENTES =================
   function carregarPendentes(cursor, acumular){

@@ -69,5 +69,24 @@ gov_iteracoes = 200000
 malha =
 
 [assistente]
+# Interruptor geral: 0 impede TODAS as chamadas de IA, inclusive manutencao antiga.
+habilitado = 0
+# ollama ou openai_compativel (OpenAI e provedores com Chat Completions).
+provedor = ollama
 url = http://127.0.0.1:11434
 modelo = gemma4:26b
+# Externo: URL base HTTPS, ex. https://api.openai.com/v1, e o modelo contratado.
+# A chave e gravada separadamente pelo painel; nunca coloque o valor neste arquivo.
+# Vazio usa assistente_chave ao lado do radar.conf. Alternativa: RADAR_IA_API_KEY.
+chave_arquivo =
+timeout = 20
+max_entrada = 20000
+max_saida_tokens = 1024
+max_chamadas = 10
+# Permissoes por tarefa; so valem quando habilitado = 1.
+documentos = 1
+correspondencias = 1
+auditoria = 1
+diagnostico = 1
+explicacoes = 1
+municipios = 1

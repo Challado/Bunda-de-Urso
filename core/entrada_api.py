@@ -23,6 +23,9 @@ def main(argv=None):
         return cgi()
     argumentos = list(sys.argv[1:] if argv is None else argv)
     with atendimento_local():
+        if argumentos[:1] == ["assistente"]:
+            from .assistencia import main as assistir
+            return assistir(argumentos[1:])
         if argumentos[:1] == ["instalacao"]:
             from .instalacao import main as instalar
             return instalar(argumentos[1:])

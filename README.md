@@ -103,6 +103,14 @@ O esquema é **SQL canônico, sem ORM** — nada de SQLAlchemy por aqui. São **
 
 Uma falha no portal de origem não deve derrubar a API. O cache e a base local continuam disponíveis, mas o sistema informa a idade dos dados e eventuais problemas de atualização.
 
+## Assistência opcional
+
+IA vem **desligada por padrão**. O painel administrativo oferece extração de documentos,
+correspondências, auditoria, diagnóstico de coleta e explicações, sempre com alternativa
+local e propostas para revisão. Aceita Ollama ou API externa compatível com OpenAI,
+com chave cadastrada separadamente. O resumo público usa regras locais e fontes.
+Veja [configuração, limites e funcionamento sem IA](docs/ASSISTENTE.md).
+
 ## O desafio central: onde diabos fica o radar
 
 Nem todo cadastro governamental contém GPS. É o pecado original do setor: o órgão sabe que o radar existe, sabe a rodovia, sabe o quilômetro — e, mesmo assim, te deixa procurando um ponto no meio do nada. Por isso, Bunda de Urso possui um **resolvedor geográfico** que tenta localizar cada equipamento oficial:

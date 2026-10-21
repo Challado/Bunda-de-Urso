@@ -45,6 +45,7 @@ _ENV = {
     ("geografia", "malha"): "RADAR_MALHA",
     ("assistente", "url"): "OLLAMA_URL",
     ("assistente", "modelo"): "OLLAMA_MODELO",
+    ("assistente", "habilitado"): "RADAR_IA_HABILITADA",
 }
 
 # Secoes/chaves conhecidas -- usado pelo exemplo, pelo verificador e pelo help.
@@ -57,7 +58,9 @@ SECOES = {
     "api": ("token_arquivo", "max_body", "proxies_confiaveis"),
     "coleta": ("max_bytes", "timeout", "tentativas", "espera_atualizacao"),
     "geografia": ("malha",),
-    "assistente": ("url", "modelo"),
+    "assistente": ("habilitado", "provedor", "url", "modelo", "chave_arquivo",
+                   "timeout", "max_entrada", "max_saida_tokens", "max_chamadas",
+                   "documentos", "correspondencias", "auditoria", "diagnostico", "explicacoes", "municipios"),
     "governanca": ("raio_correspondencia_m", "raio_zona_sombra_m",
                    "submissao_limite", "submissao_janela_segundos",
                    "sessao_ttl_segundos", "gov_iteracoes"),
@@ -77,6 +80,13 @@ PADROES = {
     ("geografia", "malha"): "",
     ("assistente", "url"): "http://127.0.0.1:11434",
     ("assistente", "modelo"): "gemma4:26b",
+    ("assistente", "habilitado"): "0",
+    ("assistente", "provedor"): "ollama",
+    ("assistente", "chave_arquivo"): "",
+    ("assistente", "timeout"): "20",
+    ("assistente", "max_entrada"): "20000",
+    ("assistente", "max_saida_tokens"): "1024",
+    ("assistente", "max_chamadas"): "10",
     ("governanca", "raio_correspondencia_m"): "150",
     ("governanca", "raio_zona_sombra_m"): "1000",
     ("governanca", "submissao_limite"): "20",
@@ -84,6 +94,8 @@ PADROES = {
     ("governanca", "sessao_ttl_segundos"): "28800",
     ("governanca", "gov_iteracoes"): "200000",
 }
+for _funcao_ia in ("documentos", "correspondencias", "auditoria", "diagnostico", "explicacoes", "municipios"):
+    PADROES[("assistente", _funcao_ia)] = "1"
 
 _CACHE = {"chave": None, "valores": {}, "problemas": []}
 

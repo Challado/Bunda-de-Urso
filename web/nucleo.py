@@ -91,6 +91,9 @@ ENDPOINTS_AJUDA = {
 }
 
 ENDPOINTS_ADMINISTRATIVOS = {
+    "/api/v1/gestao/assistente": ["GET", "POST"],
+    "/api/v1/gestao/assistente/chave": ["PUT", "DELETE"],
+    "/api/v1/gestao/assistente/relatorios/{id}": ["GET"],
     "/api/v1/gestao/configuracao": ["GET", "PUT"],
     "/api/v1/admin/sincronizar": ["POST"],
     "/api/v1/admin/rollback": ["POST"],
@@ -838,6 +841,24 @@ def _gestao(conn, p, metodo, environ, stdin_bytes):
     resto = p[len("/api/v1/gestao"):].strip("/")
     partes = resto.split("/") if resto else []
     try:
+        if partes[:1] == ["assistente"]:
+            governanca.exigir(ctx, "admin")
+            from core import assistencia, assistente_ia
+            if metodo in ("POST", "PUT", "DELETE") and (
+                    environ.get("HTTP_X_RADAR_CONFIGURACAO") != "1" or
+                    environ.get("HTTP_SEC_FETCH_SITE") == "cross-site" or
+                    environ.get("CONTENT_TYPE", "").split(";")[0] != "application/json"):
+                return _erro(403, "origem_invalida", "Use o painel administrativo.")
+            if partes == ["assistente"] and metodo == "GET":
+                return _resp({"sucesso": True, "assistente": assistente_ia.status(), "relatorios": assistencia.listar()}, extra_headers={"Cache-Control": "no-store"})
+            if partes == ["assistente"] and metodo == "POST":
+                return _resp(assistencia.analisar(conn, _corpo_json(stdin_bytes), autor=ctx.get("rotulo")), extra_headers={"Cache-Control": "no-store"})
+            if partes == ["assistente", "chave"] and metodo in ("PUT", "DELETE"):
+                dados = {"remover": True} if metodo == "DELETE" else _corpo_json(stdin_bytes)
+                return _resp(assistente_ia.salvar_chave(dados), extra_headers={"Cache-Control": "no-store"})
+            if len(partes) == 3 and partes[:2] == ["assistente", "relatorios"] and metodo == "GET":
+                return _resp(assistencia.obter(partes[2]), extra_headers={"Cache-Control": "no-store"})
+            return _erro(405, "metodo_nao_permitido", "Operacao do assistente nao permitida.")
         if partes == ["configuracao"]:
             governanca.exigir(ctx, "admin")
             from core import configuracao
@@ -1263,6 +1284,8 @@ def _ponto(conn, ident, formato, delimitador):
     if registro is None:
         return _erro(404, "ponto_nao_encontrado",
                      "ponto %s nao encontrado" % ident)
+    from core.assistencia import resumo_local
+    registro["explicacao"] = resumo_local(registro)
     st = consultas.status_base(conn)
     meta = _base_meta()
     meta["consultado_em"] = _agora()

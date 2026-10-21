@@ -15,10 +15,10 @@ Se nao fechar, fica NULL e vai para revisao humana.
 Fluxo, por (uf, nome) distinto pendente
 ---------------------------------------
 1. casamento aproximado deterministico (``core.casamento_municipio``);
-2. se falhar, pergunta ao ollama o nome oficial + UF (JSON);
+2. se falhar, consulta o provedor opcional pelo nome oficial + UF (JSON);
 3. valida a sugestao contra MUNICIPIO (exato ou aproximado com margem);
-4. confiante -> proposta (CSV e, com ``--aplicar``, o
-   ``config/correcoes_municipio.csv`` reaplicavel);
+4. confiante -> proposta CSV. ``--aplicar`` aplica somente aproximacoes locais;
+   propostas do modelo exigem conferencia humana antes de virar correcao;
    nao confiante -> ``revisar_humano``.
 
 Uso:
@@ -29,16 +29,12 @@ Uso:
 import argparse
 import csv
 import datetime
-import json
 import os
 import shutil
 import sqlite3
 import sys
-import urllib.error
-import urllib.request
 
 
-from core import config                                     # noqa: E402
 from core import correcoes_municipio as corr                # noqa: E402
 from core import casamento_municipio as cm                  # noqa: E402
 from core.manutencao.preencher_municipio import (                     # noqa: E402
@@ -50,18 +46,8 @@ from core import caminhos  # caminhos so pela porta unica
 DB_PADRAO = caminhos.banco()
 OLLAMA_PADRAO = caminhos.valor("assistente", "url")[0]
 MODELO_PADRAO = caminhos.valor("assistente", "modelo")[0]
-CSV_PADRAO = os.path.join(config.ROOT, "dados", "calibracao",
+CSV_PADRAO = os.path.join(caminhos.data_dir(), "calibracao",
                           "nomes_pendentes.csv")
-
-PROMPT = (
-    "Voce resolve nomes de municipios brasileiros. Dado um nome como a fonte "
-    "publicou, responda o NOME OFICIAL do municipio (como no IBGE) e a sigla "
-    "da UF. Responda SOMENTE um JSON: "
-    '{"municipio": "<nome oficial>", "uf": "<2 letras>"}. '
-    "Se nao tiver certeza, responda "
-    '{"municipio": "", "uf": ""}.\n'
-    "Nome publicado: %s\nUF declarada pela fonte: %s\n"
-)
 
 
 def pendentes(conn):
@@ -80,28 +66,11 @@ def pendentes(conn):
 
 
 def perguntar_modelo(base, modelo, nome, uf, timeout=90):
-    """-> dict {"municipio","uf"} proposto pelo modelo local (ou None)."""
-    corpo = json.dumps({
-        "model": modelo,
-        "prompt": PROMPT % (nome, uf or "(nao informada)"),
-        "stream": False,
-        "format": "json",
-        "options": {"temperature": 0},
-    }).encode("utf-8")
-    req = urllib.request.Request(base.rstrip("/") + "/api/generate", data=corpo,
-                                 headers={"Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            dados = json.loads(resp.read().decode("utf-8"))
-    except (urllib.error.URLError, ValueError, OSError):
-        return None
-    try:
-        saida = json.loads(dados.get("response", "") or "{}")
-    except ValueError:
-        return None
-    if not isinstance(saida, dict):
-        return None
-    return saida
+    """A consulta antiga tambem respeita o interruptor geral, provedor e limites."""
+    from core.assistente_ia import consultar_json
+    resultado = consultar_json("municipios", 'Sugira somente nome oficial e UF: {"municipio":"nome","uf":"UF"}. Se incerto, use strings vazias.',
+                               {"nome": nome, "uf": uf}, url=base, modelo=modelo)
+    return resultado["resposta"] if resultado["usou_ia"] else None
 
 
 def validar_sugestao(conn, sugestao):
@@ -180,7 +149,7 @@ def escrever_csv(caminho, propostas):
 
 def aplicar(propostas, db, csv_correcoes=corr.CAMINHO_PADRAO):
     """Grava as propostas confiaveis no CSV reaplicavel e aplica no banco."""
-    linhas = [p for p in propostas if p["codigo"]]
+    linhas = [p for p in propostas if p["codigo"] and p["origem"] == "aproximacao"]
     if not linhas:
         print("nada confiavel para aplicar.")
         return 0
@@ -213,9 +182,9 @@ def main(argv=None):
     ap.add_argument("--limite", type=int, default=0,
                     help="maximo de decisoes distintas a processar (0=todas)")
     ap.add_argument("--sem-modelo", action="store_true",
-                    help="nao consulta o ollama (so aproximacao deterministica)")
+                    help="nao consulta IA (so aproximacao deterministica)")
     ap.add_argument("--aplicar", action="store_true",
-                    help="grava o confiavel no CSV reaplicavel e aplica")
+        help="aplica somente aproximacoes locais; propostas de IA ficam no relatorio")
     args = ap.parse_args(argv)
 
     if not os.path.exists(args.db):
