@@ -197,6 +197,25 @@ são preservados. `--verificar` audita a instalação, sem aplicar alterações,
 falha se existem divergências. `--relatorio` salva a auditoria em JSON; a atualização
 sempre guarda `checagem-final.json` no backup.
 
+O perfil privado é enviado à API por `--perfil-conf`: também completa caminhos e
+opções de instalação ausentes em um `radar.conf` parcial. O plano usa uma cópia
+temporária; o arquivo definitivo só é gravado ao aplicar, depois do backup. Se
+`dados.banco` foi omitido, acompanha `dados.dir` já configurado.
+
+Ao aplicar, diretórios operacionais ausentes são criados e recebem grupo e
+permissões adequados, inclusive os pais novos para permitir acesso pelo CGI.
+São recriados também a regra do logrotate, autorização do painel, páginas e entradas
+da API/coletor. Pastas ausentes ou com permissões divergentes impedem o resultado
+de "já atualizado", mesmo quando a revisão não mudou. Um destino vazio do código
+pode ser preenchido; arquivos e pastas de outros aplicativos continuam protegidos.
+
+No final aparece **Observações**, com diretórios criados, permissões ajustadas,
+opções e padrões acrescentados, pacotes preparados, serviços iniciados e regras
+gerenciadas criadas/atualizadas. O JSON contém a lista em `observacoes`; falhas após
+o backup também guardam essa lista e `recuperacao_automatica`. Os arquivos anteriores
+são recuperados em falha, mas pastas preparadas podem permanecer. O banco existente
+é preservado e um banco ausente não é substituído silenciosamente por uma base vazia.
+
 A regra do logrotate informa `su` com `instalacao.usuario` e `instalacao.grupo`
 do `radar.conf`, permitindo rotacionar a pasta de logs gravável pelo grupo do CGI.
 A validação usa `logrotate --debug`, sem girar os arquivos. Em falha, o relatório

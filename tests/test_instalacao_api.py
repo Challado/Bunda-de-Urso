@@ -4,6 +4,7 @@ import getpass
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -54,10 +55,10 @@ class TestInstalacaoAPI(unittest.TestCase):
         self.externo = self.home.parent / "radar-dados-sync.py"
         self.externo.write_text("# ESPECIFICO DO SERVIDOR, NAO ALTERAR")
 
-    def instalar(self, aplicar=False):
+    def instalar(self, aplicar=False, extras=()):
         return subprocess.run([sys.executable, str(ROOT / "web" / "api.pse"), "instalacao", "--conf", str(self.conf),
                                "--laboratorio", str(self.lab), "--usuario-web", getpass.getuser(),
-                               *(["--aplicar"] if aplicar else [])], env=self.env,
+                               *(["--aplicar"] if aplicar else []), *extras], env=self.env,
                               capture_output=True, text=True, timeout=120)
 
     def test_simulacao_nao_modifica_instalacao(self):
@@ -115,6 +116,11 @@ class TestInstalacaoAPI(unittest.TestCase):
         self.assertEqual((self.home / "ANTERIOR").read_text(), "versao antiga")
         self.assertEqual((self.web / "api.pse").read_text(), "# entrada antiga")
         self.assertEqual(self.conf.read_bytes(), antes_conf)
+        relatorio = json.loads(next((self.dados / "backups" / "instalacao").glob("*/checagem-final.json")).read_text())
+        self.assertFalse(relatorio["sucesso"])
+        self.assertTrue(relatorio["recuperacao_automatica"])
+        self.assertTrue(relatorio["observacoes"])
+        self.assertIn("Observacoes:", resultado.stdout)
         with closing(db.connect_readonly(self.banco)) as conn:
             self.assertEqual(conn.execute("SELECT valor FROM SENTINELA").fetchone()[0], "nao perder")
 
@@ -149,6 +155,86 @@ class TestInstalacaoAPI(unittest.TestCase):
         self.assertIn("timeout = 95", texto)
         self.assertIn("tentativas = 3", texto)
         self.assertEqual(auditoria_instalacao.opcoes_faltantes(texto), {})
+
+    def test_recria_logrotate_e_pastas_ausentes_mesmo_sem_versao_nova(self):
+        r = self.instalar(True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        regra = self.lab / "etc" / "logrotate.d" / "openclaw-radar"
+        esperado = regra.read_bytes()
+        shutil.rmtree(regra.parent)
+        shutil.rmtree(self.lab / "logs")
+        self.dados.chmod(0o700)
+        for nome in ("raw", "staging", "calibracao"):
+            shutil.rmtree(self.dados / nome)
+        r = self.instalar(True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(regra.read_bytes(), esperado)
+        for pasta in (self.lab / "logs", self.dados / "raw", self.dados / "staging", self.dados / "calibracao"):
+            self.assertEqual(pasta.stat().st_mode & 0o7777, 0o2770)
+        self.assertIn("Regra do logrotate criada", r.stdout)
+        self.assertIn("Diretorio criado", r.stdout)
+        self.assertEqual(self.dados.stat().st_mode & 0o7777, 0o2770)
+        self.assertIn("Permissoes ajustadas (2770)", r.stdout)
+        relatorio = json.loads(sorted((self.dados / "backups" / "instalacao").glob("*/checagem-final.json"))[-1].read_text())
+        self.assertTrue(any("logrotate criada" in a for a in relatorio["observacoes"]))
+        r = self.instalar(True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("sem nova copia ou backup", r.stdout)
+
+    def test_perfil_completa_config_parcial_sem_mudar_valores_existentes(self):
+        logs = self.lab / "novos" / "pais" / "logs"
+        perfil = self.lab / "perfil.conf"
+        perfil.write_text(self.conf.read_text().replace(str(self.lab / "logs"), str(logs)).replace(str(self.banco), str(self.lab / "banco-errado.sqlite3")))
+        self.conf.write_text(self.conf.read_text().replace("banco = " + str(self.banco) + "\n", "").replace("[logs]\ndir = " + str(self.lab / "logs") + "\n", "") + "[coleta]\ntimeout = 95\n[web]\norigem =\n")
+        extras = ("--perfil-conf", str(perfil))
+        antes = {p: p.read_bytes() for p in self.lab.rglob("*") if p.is_file()}
+        r = self.instalar(extras=extras)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(antes, {p: p.read_bytes() for p in self.lab.rglob("*") if p.is_file()})
+        r = self.instalar(True, extras)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("banco = " + str(self.banco), self.conf.read_text())
+        self.assertIn("timeout = 95", self.conf.read_text())
+        self.assertIn("origem =\n", self.conf.read_text())
+        self.assertIn("url = /teste/", self.conf.read_text())
+        self.assertEqual(logs.stat().st_mode & 0o7777, 0o2770)
+        self.assertEqual(logs.parent.stat().st_mode & 0o7777, 0o755)
+        self.assertIn("Opcao acrescentada do perfil: logs.dir", r.stdout)
+        with closing(db.connect_readonly(self.banco)) as conn:
+            self.assertEqual(conn.execute("SELECT valor FROM SENTINELA").fetchone()[0], "nao perder")
+
+    def test_cria_config_web_e_pais_ausentes_com_umask_restritiva(self):
+        perfil = self.lab / "perfil.conf"
+        perfil.write_text(self.conf.read_text())
+        self.conf.unlink()
+        self.conf.parent.rmdir()
+        shutil.rmtree(self.web.parent)
+        script = "import os,subprocess,sys;os.umask(0o077);sys.exit(subprocess.call(sys.argv[1:]))"
+        cmd = [sys.executable, "-c", script, sys.executable, str(ROOT / "web" / "api.pse"),
+               "instalacao", "--conf", str(self.conf), "--perfil-conf", str(perfil),
+               "--laboratorio", str(self.lab), "--usuario-web", getpass.getuser(), "--aplicar"]
+        r = subprocess.run(cmd, env=self.env, text=True, capture_output=True, timeout=120)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue(self.conf.is_file())
+        self.assertTrue((self.web / "api.pse").is_file())
+        self.assertEqual(self.web.parent.stat().st_mode & 0o7777, 0o755)
+        self.assertIn("Configuracao criada a partir do perfil", r.stdout)
+
+    def test_relatorio_cria_pasta_sem_trocar_permissoes_de_pai_existente(self):
+        self.lab.chmod(0o750)
+        relatorio = self.lab / "relatorios" / "instalacao.json"
+        r = self.instalar(True, ("--relatorio", str(relatorio)))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.lab.stat().st_mode & 0o7777, 0o750)
+        self.assertEqual(relatorio.parent.stat().st_mode & 0o7777, 0o700)
+        self.assertTrue(json.loads(relatorio.read_text())["observacoes"])
+
+    def test_banco_ausente_nao_e_substituido_por_base_vazia(self):
+        self.banco.unlink()
+        r = self.instalar(True)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertFalse(self.banco.exists())
+        self.assertIn("banco configurado nao existe", r.stderr)
 
     def test_verificacao_detecta_arquivo_corrompido_e_reaplicacao_conserta(self):
         instalado = self.instalar(True)
@@ -218,15 +304,17 @@ class TestInstalacaoAPI(unittest.TestCase):
 
     def test_preparacao_inicia_so_servico_inativo_sem_reiniciar_os_demais(self):
         chamadas = []
+        observacoes = []
         def executar(cmd, **kwargs):
             chamadas.append(cmd)
             ativo = cmd[1] == "is-active" and cmd[2] in ("nginx.service", "fcgiwrap.socket")
             return subprocess.CompletedProcess(cmd, 0 if ativo or cmd[1] == "start" else 3)
         with patch.object(auditoria_instalacao, "ambiente_servidor", return_value=[]), \
                 patch("core.instalacao.subprocess.run", side_effect=executar):
-            _preparar_servicos()
+            _preparar_servicos(observacoes)
         self.assertEqual([c for c in chamadas if c[1] == "start"], [["systemctl", "start", "cron.service"]])
         self.assertFalse(any("restart" in c for c in chamadas))
+        self.assertEqual(observacoes, ["Servico iniciado: cron.service"])
 
     def test_preparacao_nao_inicia_servicos_com_nginx_invalido(self):
         with patch.object(auditoria_instalacao, "ambiente_servidor", return_value=[

@@ -4,7 +4,8 @@ O servidor e descrito no radar.conf, nunca neste modulo. Nao baixa credenciais,
 nao restaura o banco automaticamente e nao executa material de referencia/.
 """
 import argparse
-from contextlib import closing
+import configparser
+from contextlib import closing, contextmanager
 import datetime
 import fcntl
 import hashlib
@@ -26,6 +27,85 @@ from .governanca import GovernancaError
 
 CODIGO = ("core", "coletor", "config", "sql", "web", "deploy", "tools")
 ESTATICOS = {".html", ".json", ".png", ".ico", ".css", ".js", ".svg"}
+
+
+@contextmanager
+def _usar_conf(arquivo):
+    anterior = os.environ.get("RADAR_CONF")
+    os.environ["RADAR_CONF"] = str(arquivo)
+    caminhos.recarregar()
+    try:
+        yield
+    finally:
+        if anterior is None:
+            os.environ.pop("RADAR_CONF", None)
+        else:
+            os.environ["RADAR_CONF"] = anterior
+        caminhos.recarregar()
+
+
+@contextmanager
+def _configuracao_preparada(conf, perfil=None):
+    """Completa um perfil em temporario; so --aplicar grava no destino."""
+    fonte = conf if conf.is_file() else Path(caminhos.conf_path())
+    with _usar_conf(fonte):
+        texto = fonte.read_text() if fonte.is_file() else ""
+        faltantes = {}
+        if perfil:
+            padroes = configparser.ConfigParser(interpolation=None, strict=False)
+            padroes.read_string(perfil.read_text())
+            gravadas = auditoria.chaves_gravadas(texto)
+            for secao in padroes.sections():
+                for chave, valor in padroes.items(secao):
+                    if secao != "sincronizacao" and chave in caminhos.SECOES.get(secao, ()) and (secao, chave) not in gravadas:
+                        faltantes[secao, chave] = valor
+            # Um banco omitido acompanha dados.dir existente. Uma chave vazia
+            # existente e preservada, como nas outras opcoes do servidor.
+            if ("dados", "dir") in gravadas and ("dados", "banco") in faltantes:
+                faltantes["dados", "banco"] = caminhos.banco()
+        from .configuracao import _editar, _validar
+        _validar(faltantes)
+        with tempfile.TemporaryDirectory(prefix="radar-conf-efetiva-") as pasta:
+            if faltantes or not conf.is_file():
+                efetiva = Path(pasta) / "radar.conf"
+                efetiva.write_text(_editar(texto, faltantes))
+            else:
+                efetiva = conf
+            with _usar_conf(efetiva):
+                yield
+
+
+def _diretorio(pasta, observacoes, modo=None, grupo=None):
+    """Cria tambem os pais com travessia; nao altera pais preexistentes."""
+    ausentes = []
+    atual = pasta
+    while not atual.exists():
+        ausentes.append(atual)
+        atual = atual.parent
+    for alvo in reversed(ausentes):
+        alvo.mkdir(mode=0o755)
+        alvo.chmod(0o755)  # o shell do instalador usa umask 077
+        observacoes.append("Diretorio criado: " + str(alvo))
+    if not pasta.is_dir():
+        raise RuntimeError("O destino de diretorio esta ocupado por um arquivo: " + str(pasta))
+    antes = pasta.stat()
+    if grupo is not None and os.geteuid() == 0 and antes.st_gid != grupo:
+        os.chown(pasta, -1, grupo)
+        observacoes.append("Grupo ajustado: " + str(pasta))
+    if modo is not None and pasta.stat().st_mode & 0o7777 != modo:
+        pasta.chmod(modo)
+        observacoes.append("Permissoes ajustadas (%04o): %s" % (modo, pasta))
+
+
+def _pastas_operacionais(dirs):
+    return tuple(dict.fromkeys((dirs["dados"], dirs["logs"], dirs["dados"] / "raw",
+                                dirs["dados"] / "staging", dirs["dados"] / "calibracao", dirs["banco"].parent)))
+
+
+def _observacoes(observacoes):
+    print("\nObservacoes:")
+    for aviso in observacoes or ["Nenhuma alteracao de preparacao executada."]:
+        print("- " + aviso)
 
 
 def _executar(cmd, **kwargs):
@@ -89,8 +169,10 @@ def _validar_layout(origem, conf, laboratorio):
             raise RuntimeError("Checkout incompleto: " + nome)
     if not (origem / "core" / "configuracao.py").is_file():
         raise RuntimeError("Versao anterior ao suporte de configuracao pela API.")
-    if dirs["codigo"].exists() and not (dirs["codigo"] / "core").is_dir():
-        raise RuntimeError("Destino do codigo ocupado por outra aplicacao.")
+    if dirs["codigo"].is_dir() and not (dirs["codigo"] / "core").is_dir():
+        reconhecido = any((dirs["codigo"] / nome).exists() for nome in ("VERSAO", "coletor", "deploy"))
+        if any(dirs["codigo"].iterdir()) and not reconhecido:
+            raise RuntimeError("Destino do codigo ocupado por outra aplicacao.")
     if not dirs["banco"].is_file():
         raise RuntimeError("O banco configurado nao existe. Este instalador atualiza o servidor existente e nao cria base vazia.")
     # Nao permite montar uma arvore de configuracao publica por link.
@@ -149,16 +231,20 @@ def _cron_tick(texto, wrapper):
     return "\n".join(linhas) + "\n"
 
 
-def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None):
+def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, observacoes=None):
     if not laboratorio and os.geteuid() != 0:
         raise RuntimeError("Execute como root para aplicar no servidor.")
     conta = pwd.getpwnam(usuario_web)
     grupo = conta.pw_gid
+    observacoes = observacoes if observacoes is not None else []
+    for pasta in _pastas_operacionais(dirs):
+        _diretorio(pasta, observacoes, modo=0o2770, grupo=grupo)
     agora = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     backup = dirs["dados"] / "backups" / "instalacao" / agora
-    backup.mkdir(parents=True, mode=0o700)
-    backup.chmod(0o700)
+    _diretorio(backup.parent, observacoes, modo=0o700)
+    _diretorio(backup, observacoes, modo=0o700)
     indice = []
+    relatorio = None
     wrapper = dirs["codigo"].parent / "radar-tick.sh"
     entrada_cron = wrapper.with_name("radar-api.pse")
     logrotate = (laboratorio / "etc" if laboratorio else Path("/etc")) / "logrotate.d" / "openclaw-radar"
@@ -168,7 +254,7 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None):
         try:
             for alvo in (dirs["codigo"], dirs["web"], dirs["conf"], wrapper, entrada_cron,
                          logrotate, sudoers, Path(str(dirs["conf"]) + ".painel")):
-                alvo.parent.mkdir(parents=True, exist_ok=True)
+                _diretorio(alvo.parent, observacoes)
                 _guardar(alvo, backup, indice)
             (backup / "restauracao.json").write_text(json.dumps(indice, indent=2))
             # Pausa novas chamadas CGI e tick durante a troca coordenada.
@@ -189,9 +275,14 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None):
                         fonte.backup(copia)
                         copia.execute("PRAGMA journal_mode=DELETE")
                 (backup / "radar.sqlite3").chmod(0o600)
-                _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http)
+                _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http, observacoes)
+                helper_existia = sudoers.is_file()
                 _instalar_helper(dirs, usuario_web, sudoers, laboratorio)
-                logrotate.write_text(auditoria.render_logrotate(origem, dirs["logs"]))
+                observacoes.append("Regra do painel %s: %s" % ("atualizada" if helper_existia else "criada", sudoers))
+                conteudo = auditoria.render_logrotate(origem, dirs["logs"])
+                if not logrotate.is_file() or logrotate.read_text() != conteudo:
+                    observacoes.append("Regra do logrotate %s: %s" % ("atualizada" if logrotate.is_file() else "criada", logrotate))
+                logrotate.write_text(conteudo)
                 logrotate.chmod(0o644)
                 api = dirs["web"] / "api.pse"
                 # Inicializacao/migracoes continuam passando pela mesma entrada.
@@ -209,6 +300,7 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None):
                 wrapper.write_text(wrapper.read_text().replace(
                     '${RADAR_PYTHON:-/usr/bin/python3}', '${RADAR_PYTHON:-' + sys.executable + '}'))
                 wrapper.chmod(0o755)
+                observacoes.append("Entradas da API e do coletor atualizadas: %s; %s" % (entrada_cron, wrapper))
             if not laboratorio:
                 # Testa as permissoes reais do usuario CGI, nao somente root.
                 _executar(["runuser", "-u", usuario_web, "--", sys.executable,
@@ -222,23 +314,31 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None):
                 _executar(["crontab", "-"], input=esperado)
                 if auditoria.ler_crontab() != esperado:
                     raise RuntimeError("Crontab gravado diverge do esperado.")
+                if atual != esperado:
+                    observacoes.append("Cron do coletor ajustado para uma passada por minuto; outras rotinas preservadas.")
             relatorio = _diagnosticar(origem, dirs, usuario_web, laboratorio, cron, final=True)
             relatorio["backup"] = str(backup)
+            relatorio["observacoes"] = list(observacoes)
             (backup / "checagem-final.json").write_text(json.dumps(relatorio, ensure_ascii=False, indent=2) + "\n")
             if not relatorio["sucesso"]:
                 raise RuntimeError("Checagem final reprovada; consulte checagem-final.json no backup.")
             (backup / "CONCLUIDO").write_text(agora + "\n")
             print("Instalacao concluida. Backup: " + str(backup))
-        except BaseException:
+        except BaseException as exc:
             _restaurar(indice)
             if not laboratorio and (backup / "crontab-anterior.txt").is_file():
                 _recuperar_cron(backup / "crontab-anterior.txt", wrapper)
+            observacoes.append("Falha: arquivos anteriores recuperados; banco preservado. Pastas preparadas podem permanecer.")
+            relatorio = relatorio or {"sucesso": False, "erro": str(exc), "backup": str(backup)}
+            relatorio.update(observacoes=list(observacoes), recuperacao_automatica=True)
+            (backup / "checagem-final.json").write_text(json.dumps(relatorio, ensure_ascii=False, indent=2) + "\n")
             print("Falha: codigo, web, wrappers e conf restaurados. Banco preservado; backup em " + str(backup), file=sys.stderr)
             raise
     return relatorio
 
 
-def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http=None):
+def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http=None, observacoes=None):
+    observacoes = observacoes if observacoes is not None else []
     nova = Path(tempfile.mkdtemp(prefix=".radar-novo-", dir=dirs["codigo"].parent))
     try:
         for pasta in CODIGO:
@@ -262,8 +362,17 @@ def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http=Non
             # Ja foi copiado para o backup; so remove a arvore duplicada antiga.
             shutil.rmtree(anterior)
         conf = dirs["conf"]
+        efetivos = caminhos._ler_conf()[0]
         if not conf.exists():
             shutil.copy2(caminhos.conf_path(), conf)
+            observacoes.append("Configuracao criada a partir do perfil: " + str(conf))
+        else:
+            from .configuracao import _editar
+            gravadas = auditoria.chaves_gravadas(conf.read_text())
+            novas = {par: valor for par, valor in efetivos.items() if par not in gravadas and par[0] != "sincronizacao"}
+            if novas:
+                conf.write_text(_editar(conf.read_text(), novas))
+                observacoes.extend("Opcao acrescentada do perfil: %s.%s = %s" % (*par, valor) for par, valor in novas.items())
         # Migra parametros antigos de governanca sem substituir opcoes do .conf.
         antigo = backup / "item-00" / "config" / "governanca.json"
         existentes = auditoria.chaves_gravadas(conf.read_text())
@@ -273,6 +382,7 @@ def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http=Non
                          if k.lower() in caminhos.SECOES["governanca"] and
                          ("governanca", k.lower()) not in existentes}
             if faltantes:
+                observacoes.extend("Opcao preservada da configuracao antiga: governanca." + k for k in faltantes)
                 with conf.open("a") as saida:
                     saida.write("\n[governanca]\n")
                     for k, v in faltantes.items():
@@ -281,24 +391,21 @@ def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http=Non
         from .configuracao import _editar
         if origem_http and ("web", "origem") not in auditoria.chaves_gravadas(conf.read_text()):
             conf.write_text(_editar(conf.read_text(), {("web", "origem"): origem_http}))
+            observacoes.append("Opcao acrescentada: web.origem (origem HTTP inicial).")
         faltantes = auditoria.opcoes_faltantes(conf.read_text())
         if faltantes:
             conf.write_text(_editar(conf.read_text(), faltantes))
+            observacoes.extend("Opcao acrescentada com valor padrao: %s.%s = %s" % (*par, valor or "(vazio)") for par, valor in faltantes.items())
+        # Os subprocessos e a rotacao devem consultar o arquivo definitivo.
+        os.environ["RADAR_CONF"] = str(conf)
         caminhos.recarregar()
         if os.geteuid() == 0:
             os.chown(conf.parent, 0, 0)
             os.chown(conf, 0, 0)
         conf.parent.chmod(0o755)
         conf.chmod(0o644)
-        for nome in ("dados", "logs"):
-            dirs[nome].mkdir(parents=True, exist_ok=True)
-        for pasta in (dirs["dados"], dirs["logs"], dirs["dados"] / "raw",
-                      dirs["dados"] / "staging", dirs["dados"] / "calibracao",
-                      dirs["banco"].parent):
-            pasta.mkdir(parents=True, exist_ok=True)
-            if os.geteuid() == 0:
-                os.chown(pasta, -1, grupo)
-            pasta.chmod(0o2770)
+        for pasta in _pastas_operacionais(dirs):
+            _diretorio(pasta, observacoes, modo=0o2770, grupo=grupo)
         for arquivo in [dirs["banco"], *dirs["banco"].parent.glob(dirs["banco"].name + "-*")]:
             if os.geteuid() == 0:
                 os.chown(arquivo, -1, grupo)
@@ -320,6 +427,7 @@ def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http=Non
                 raise RuntimeError("Remova fontes Python antigos do webroot antes de instalar: " + arquivo.name)
         _permissoes(dirs["web"], grupo)
         api.chmod(0o755)
+        observacoes.append("Codigo e paginas instalados na revisao " + versao + ".")
     finally:
         if nova.exists():
             shutil.rmtree(nova)
@@ -388,52 +496,67 @@ def main(argv=None):
     parser.add_argument("--laboratorio", type=Path, help="restringe destinos a esta pasta e nao altera cron do sistema")
     parser.add_argument("--sem-cron", action="store_true")
     parser.add_argument("--origem-http", help="origem inicial da consulta HTTP; usada somente se web.origem ainda nao existe")
+    parser.add_argument("--perfil-conf", type=Path, help="perfil inicial: completa somente chaves ausentes, sem substituir o radar.conf")
+    parser.add_argument("--pacote-preparado", action="append", default=[], help=argparse.SUPPRESS)
     modo.add_argument("--verificar", action="store_true", help="audita a instalacao atual, sem copiar arquivos")
     parser.add_argument("--relatorio", type=Path, help="salva a checagem em JSON no arquivo indicado")
     modo.add_argument("--restaurar", type=Path, help="restaura codigo/web/configuracao de um backup; nunca restaura banco automaticamente")
     args = parser.parse_args(argv)
+    observacoes = ["Dependencia preparada pelo instalador: " + pacote for pacote in args.pacote_preparado]
     try:
-        origem = Path(caminhos.ROOT)
-        lab = args.laboratorio.resolve() if args.laboratorio else None
-        dirs = _validar_layout(origem, args.conf.absolute(), lab)
-        if args.restaurar:
-            return _recuperar(args.restaurar, dirs, lab)
-        print(json.dumps({"acao": "aplicar" if args.aplicar else "simular",
-                          "destinos": {k: str(v) for k, v in dirs.items()},
-                          "usuario_web": args.usuario_web,
-                          "cron_tick": not args.sem_cron and not bool(lab)}, indent=2))
-        if args.aplicar:
-            if not lab and os.geteuid() != 0:
-                raise RuntimeError("Execute com sudo para aplicar no servidor.")
-            if args.origem_http:
-                from .configuracao import _validar
-                _validar({("web", "origem"): args.origem_http})
-            if not lab:
-                _preparar_servicos()
-            plano = _diagnosticar(origem, dirs, args.usuario_web, lab, not args.sem_cron)
-            precisa = plano["atualizacao_necessaria"] or any(c["estado"] in ("erro", "atualizar") for c in plano["checagens"])
-            relatorio = None if precisa else _diagnosticar(origem, dirs, args.usuario_web, lab, not args.sem_cron, final=True)
-            if relatorio is not None and relatorio["sucesso"]:
-                relatorio["acao"] = "sem_alteracoes"
-                print("Instalacao ja atualizada; checagens aprovadas, sem nova copia ou backup.")
-            else:
-                relatorio = _aplicar(origem, dirs, args.usuario_web, lab, not args.sem_cron, args.origem_http)
-            resultado = 0
-        else:
-            relatorio = _diagnosticar(origem, dirs, args.usuario_web, lab, not args.sem_cron,
-                                     final=args.verificar)
-            resultado = 0 if not args.verificar or relatorio["sucesso"] else 1
-        print(json.dumps(relatorio, ensure_ascii=False, indent=2))
-        if args.relatorio:
-            args.relatorio.write_text(json.dumps(relatorio, ensure_ascii=False, indent=2) + "\n")
-        if not args.aplicar:
-            print("Checagem concluida. Nenhum arquivo da instalacao foi alterado.")
-        return resultado
-    except (OSError, ValueError, KeyError, RuntimeError, GovernancaError, subprocess.SubprocessError) as exc:
+        with _configuracao_preparada(args.conf.absolute(), args.perfil_conf):
+            return _instalar(args, observacoes)
+    except (OSError, ValueError, KeyError, RuntimeError, GovernancaError, subprocess.SubprocessError, configparser.Error) as exc:
         print("Instalacao recusada: " + str(exc), file=sys.stderr)
         if isinstance(exc, subprocess.CalledProcessError):
             print(exc.stderr[:2000], file=sys.stderr)
         return 1
+    finally:
+        _observacoes(observacoes)
+
+
+def _instalar(args, observacoes):
+    origem = Path(caminhos.ROOT)
+    lab = args.laboratorio.resolve() if args.laboratorio else None
+    dirs = _validar_layout(origem, args.conf.absolute(), lab)
+    if args.restaurar:
+        return _recuperar(args.restaurar, dirs, lab)
+    print(json.dumps({"acao": "aplicar" if args.aplicar else "simular",
+                      "destinos": {k: str(v) for k, v in dirs.items()},
+                      "usuario_web": args.usuario_web,
+                      "cron_tick": not args.sem_cron and not bool(lab)}, indent=2))
+    if args.aplicar:
+        if not lab and os.geteuid() != 0:
+            raise RuntimeError("Execute como root para aplicar no servidor.")
+        if args.origem_http:
+            from .configuracao import _validar
+            _validar({("web", "origem"): args.origem_http})
+        if not lab:
+            _preparar_servicos(observacoes)
+        plano = _diagnosticar(origem, dirs, args.usuario_web, lab, not args.sem_cron)
+        precisa = plano["atualizacao_necessaria"] or any(c["estado"] in ("erro", "atualizar") for c in plano["checagens"])
+        relatorio = None if precisa else _diagnosticar(origem, dirs, args.usuario_web, lab, not args.sem_cron, final=True)
+        if relatorio is not None and relatorio["sucesso"]:
+            relatorio["acao"] = "sem_alteracoes"
+            print("Instalacao ja atualizada; checagens aprovadas, sem nova copia ou backup.")
+        else:
+            relatorio = _aplicar(origem, dirs, args.usuario_web, lab, not args.sem_cron, args.origem_http, observacoes)
+        resultado = 0
+    else:
+        relatorio = _diagnosticar(origem, dirs, args.usuario_web, lab, not args.sem_cron,
+                                 final=args.verificar)
+        resultado = 0 if not args.verificar or relatorio["sucesso"] else 1
+    if args.relatorio:
+        pai = args.relatorio.absolute().parent
+        if not pai.exists():
+            _diretorio(pai, observacoes, modo=0o700)
+    relatorio["observacoes"] = list(observacoes)
+    print(json.dumps(relatorio, ensure_ascii=False, indent=2))
+    if args.relatorio:
+        args.relatorio.write_text(json.dumps(relatorio, ensure_ascii=False, indent=2) + "\n")
+    if not args.aplicar:
+        print("Checagem concluida. Nenhum arquivo da instalacao foi alterado.")
+    return resultado
 
 
 def _recuperar(backup, dirs, laboratorio):
@@ -472,7 +595,8 @@ def _recuperar_cron(cron_antigo, wrapper):
     _executar(["crontab", "-"], input="\n".join(linhas) + "\n")
 
 
-def _preparar_servicos():
+def _preparar_servicos(observacoes=None):
+    observacoes = observacoes if observacoes is not None else []
     checagens = auditoria.ambiente_servidor()
     erros = [c for c in checagens if c["estado"] == "erro" and not c["checagem"].startswith("servico.")]
     if erros:
@@ -487,6 +611,7 @@ def _preparar_servicos():
             for unidade in alternativas:
                 r = subprocess.run(["systemctl", "start", unidade], capture_output=True, timeout=30)
                 if r.returncode == 0:
+                    observacoes.append("Servico iniciado: " + unidade)
                     break
             else:
                 raise RuntimeError("Nao foi possivel iniciar " + "/".join(alternativas))
@@ -499,11 +624,21 @@ def _diagnosticar(origem, dirs, usuario_web, laboratorio, cron, final=False):
     divergencias = auditoria.arquivos_divergentes(origem, dirs, CODIGO, ESTATICOS)
     checagens.append({"checagem": "arquivos_do_aplicativo", "estado": "ok" if not divergencias else "erro" if final else "atualizar",
                       "detalhe": "%d arquivo(s) ausente(s) ou diferente(s)" % len(divergencias)})
-    faltantes = auditoria.opcoes_faltantes(dirs["conf"].read_text() if dirs["conf"].exists() else Path(caminhos.conf_path()).read_text())
+    texto = dirs["conf"].read_text() if dirs["conf"].exists() else ""
+    faltantes = auditoria.opcoes_faltantes(texto)
+    gravadas = auditoria.chaves_gravadas(texto)
+    faltantes.update({par: valor for par, valor in caminhos._ler_conf()[0].items()
+                     if par not in gravadas and par[0] != "sincronizacao"})
     checagens.append({"checagem": "radar.conf", "estado": "ok" if not faltantes else "erro" if final else "atualizar",
                       "detalhe": "novas opcoes: " + ", ".join("%s.%s" % par for par in faltantes) if faltantes else "esquema atualizado"})
     checagens.append({"checagem": "versao", "estado": "ok" if instalada == versao else "erro" if final else "atualizar",
                       "detalhe": "instalada=%s; disponivel=%s" % (instalada or "sem registro", versao)})
+    grupo = pwd.getpwnam(usuario_web).pw_gid
+    pastas = [str(p) for p in _pastas_operacionais(dirs)
+              if not p.is_dir() or p.stat().st_mode & 0o7777 != 0o2770 or
+              (os.geteuid() == 0 and p.stat().st_gid != grupo)]
+    checagens.append({"checagem": "diretorios", "estado": "erro" if final and pastas else "atualizar" if pastas else "ok",
+                      "detalhe": "Criar/ajustar: " + ", ".join(pastas) if pastas else "pastas operacionais e permissoes corretas"})
     if cron and not laboratorio and shutil.which("crontab"):
         atual = auditoria.ler_crontab()
         esperado = _cron_tick(atual, dirs["codigo"].parent / "radar-tick.sh")
@@ -547,7 +682,9 @@ def _diagnosticar(origem, dirs, usuario_web, laboratorio, cron, final=False):
             except (OSError, subprocess.SubprocessError):
                 checagens.append({"checagem": "gravacao_do_painel", "estado": "erro", "detalhe": "autorizacao do painel indisponivel"})
     return {"sucesso": not any(c["estado"] == "erro" for c in checagens),
-            "atualizacao_necessaria": bool(divergencias or faltantes or instalada != versao),
+            "atualizacao_necessaria": bool(divergencias or faltantes or pastas or instalada != versao or any(
+                c["estado"] in ("erro", "atualizar") and c["checagem"] in
+                ("cron.coletor", "logrotate", "logrotate.sintaxe", "permissoes", "gravacao_do_painel") for c in checagens)),
             "modo": "verificacao" if final else "planejamento",
             "versao_instalada": instalada, "versao_disponivel": versao,
             "arquivos_divergentes": divergencias, "checagens": checagens}
