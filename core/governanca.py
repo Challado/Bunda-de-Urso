@@ -1079,7 +1079,7 @@ def listar_pendentes(conn, limite=100, cursor=None, status=None):
 
 def obter_radar(conn, ponto_id):
     from . import consultas
-    reg = consultas.buscar_ponto_por_id(conn, "P-%d" % ponto_id)
+    reg = consultas.buscar_ponto_por_id(conn, "P-%d" % ponto_id, incluir_ocultos=True)
     if reg is None:
         raise GovernancaError(404, "ponto_nao_encontrado",
                               "ponto P-%d nao encontrado" % ponto_id)

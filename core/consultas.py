@@ -822,14 +822,22 @@ def operacoes_do_ponto(conn, pid):
 
 
 ##-- BUNDITA DE URSO #{1} -- O detalhe de um alias deve retornar a mesma entidade canonica da busca. ##
-def buscar_ponto_por_id(conn, pid_str):
+def buscar_ponto_por_id(conn, pid_str, *, incluir_ocultos=False):
+    """Detalhe público filtrado; ocultos são consultados pela gestão autenticada."""
     try:
         pid = int(str(pid_str).upper().replace("P-", ""))
     except (TypeError, ValueError):
         return None
     visao = VisaoCanonica(conn)
     ##-- BUNDITA DE URSO #{20} -- O detalhe do alias tambem precisa preservar a posicao que aparece no mapa. ##
-    r = dbmod.query_one(conn, _PONTO_SQL + " WHERE p.id = ?", (pid,))
+    clausulas, params = [], []
+    if not incluir_ocultos:
+        from .governanca import clausulas_consulta
+        clausulas, params = clausulas_consulta(conn)
+    sql = _PONTO_SQL + " WHERE p.id = ?"
+    if clausulas:
+        sql += " AND " + " AND ".join(clausulas)
+    r = dbmod.query_one(conn, sql, [pid] + params)
     if r is None:
         return None
     registro = montar_registro(conn, r, visao=visao)

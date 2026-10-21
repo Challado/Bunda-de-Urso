@@ -479,19 +479,34 @@
   document.title = "Radar " + id + " — detalhes";
 
   var url = API + "?rota=" + encodeURIComponent("/api/v1/radares/" + id) + "&formato=json";
-  fetch(url).then(function(r){ return r.json(); }).then(function(d){
-    if (!d || d.sucesso === false){
-      var m = (d && d.erro && d.erro.mensagem) || "não foi possível obter os detalhes";
-      semId("Falha ao consultar <code>" + esc(id) + "</code>: " + esc(m));
-      return;
-    }
-    var res = d.resultado || {};
-    var pontos = res.pontos || [];
-    if (!pontos.length){ semId("Nenhum registro encontrado para <code>" + esc(id) + "</code>."); return; }
-    desenhar(pontos[0]);
-  }).catch(function(e){
-    semId("Erro de rede: " + esc(e.message));
-  });
+  var consultaAtual=0, mapaAtivo=null;
+  function carregarDetalhe(){
+    var consulta=++consultaAtual;
+    if(mapaAtivo){mapaAtivo.remove();mapaAtivo=null;}
+    principal.innerHTML="<div class='carregando'>Carregando os detalhes…</div>";
+    fetch(url,{cache:"no-store"}).then(function(r){ return r.json(); }).then(function(d){
+      if(consulta!==consultaAtual) return;
+      if (!d || d.sucesso === false){
+        if(d && d.erro && d.erro.codigo==="ponto_nao_encontrado"){
+          semId("Radar "+esc(id)+" não encontrado ou removido."); return;
+        }
+        var m = (d && d.erro && d.erro.mensagem) || "não foi possível obter os detalhes";
+        semId("Falha ao consultar <code>" + esc(id) + "</code>: " + esc(m));
+        return;
+      }
+      var res = d.resultado || {};
+      var pontos = res.pontos || [];
+      if (!pontos.length){ semId("Nenhum registro encontrado para <code>" + esc(id) + "</code>."); return; }
+      desenhar(pontos[0]);
+    }).catch(function(e){
+      if(consulta!==consultaAtual) return;
+      semId("Erro de rede: " + esc(e.message));
+    });
+  }
+  carregarDetalhe();
+  // Voltar a uma página aberta antes da remoção exige consultar o estado atual.
+  window.addEventListener("focus",carregarDetalhe);
+  window.addEventListener("pageshow",function(e){if(e.persisted) carregarDetalhe();});
 
   function desenhar(p){
     var loc = p.localizacao || {};
@@ -547,6 +562,7 @@
     try{
       if (lat != null && lon != null && window.L){
         var map = L.map("mapa").setView([lat, lon], 15);
+        mapaAtivo=map;
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 19, attribution: "&copy; OpenStreetMap"}).addTo(map);
         L.circleMarker([lat, lon], {radius:9, color:"#c0392b", weight:3, fillColor:"#ffe08a", fillOpacity:.95}).addTo(map)
           .bindPopup("<b>" + esc(p.id) + "</b>" + (viaTxt ? "<br>" + esc(viaTxt) : "")).openPopup();

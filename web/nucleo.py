@@ -465,7 +465,7 @@ def _erro(status, codigo, mensagem, campo=None):
             "timestamp": _agora(),
         },
     }
-    return status, {"Content-Type": "application/json; charset=utf-8"}, body
+    return status, {"Content-Type": "application/json; charset=utf-8", "Cache-Control":"no-store"}, body
 
 
 ##-- BUNDITA DE URSO #{10} -- Sem medicao de idade nao existe evidencia para afirmar cache fresco. ##
@@ -499,6 +499,7 @@ def _headers_radar(meta, status_code):
     base = meta.get("base", {})
     resultado = meta.get("resultado", {})
     return {
+        "Cache-Control": "no-store",
         "X-Radar-Snapshot-ID": str(base.get("snapshot_id") or ""),
         "X-Radar-Base-Updated-At": str(base.get("publicado_em") or ""),
         "X-Radar-Cache-Age-Seconds": str(base.get("idade_snapshot_segundos") or ""),
@@ -662,7 +663,7 @@ def _ingestao_radares(environ, stdin_bytes):
 # Toda escrita passa por core.governanca (a API e o unico caminho de escrita).
 # ---------------------------------------------------------------------------
 def _resp(obj, status=200, extra_headers=None):
-    headers = {"Content-Type": "application/json; charset=utf-8"}
+    headers = {"Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store"}
     if extra_headers:
         headers.update(extra_headers)
     return status, headers, obj

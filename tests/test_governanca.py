@@ -362,6 +362,34 @@ class TestGestaoRadar(BaseGov):
                             h["motivo"] == "nao existe radar aqui"
                             for h in hist))
 
+    def test_removidos_e_desabilitados_nao_abrem_por_id_publico(self):
+        self._admin()
+        cookie = self._sessao()
+        for i, acao in enumerate(("remover", "desabilitar")):
+            with self.subTest(acao=acao):
+                pid = self._colab(lat=-23.55-i/100)
+                rota = "/api/v1/radares/P-%d" % pid
+                antes = self._req("GET", rota)
+                self.assertEqual(antes[0], 200)
+                self.assertEqual(antes[1]["Cache-Control"], "no-store")
+                self.assertEqual(self._req("POST", "/api/v1/gestao/radar/%d/%s" % (pid, acao),
+                    {"motivo": "cadastro inexistente"}, headers={"HTTP_COOKIE": cookie})[0], 200)
+                # A consulta por ID não pode contornar a exclusão, nem com cookie admin.
+                for headers in ({}, {"HTTP_COOKIE": cookie}):
+                    publico = self._req("GET", rota, query="incluir_ocultos=1", headers=headers)
+                    self.assertEqual(publico[0], 404, publico[2])
+                administrativo = self._req("GET", "/api/v1/gestao/radar/%d" % pid,
+                                           headers={"HTTP_COOKIE": cookie})
+                self.assertEqual(administrativo[0], 200, administrativo[2])
+                self.assertEqual(administrativo[1]["Cache-Control"], "no-store")
+                if acao == "remover":
+                    for status in (None, "nao_verificado", "verificado", "desabilitado"):
+                        lista = self._doc(self._req("GET", "/api/v1/gestao/pendentes",
+                            query=("status=" + status) if status else "",
+                            headers={"HTTP_COOKIE": cookie}))
+                        self.assertNotIn("P-%d" % pid, [p["id"] for p in lista["pendentes"]])
+                    self.assertTrue(self._doc(administrativo)["radar"]["governanca"]["removido_em"])
+
     def test_contribuidor_nao_remove(self):
         self._admin()
         pid = self._colab()

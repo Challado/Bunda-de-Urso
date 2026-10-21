@@ -58,6 +58,12 @@ def main():
                 subprocess.run([sys.executable,str(API),*args],env=ambiente,
                                check=True,capture_output=True,timeout=15)
 
+        if '--com-gestao' in sys.argv:
+            subprocess.run([sys.executable,str(API),'ferramenta','radar_admin',
+                            'criar-admin','gestao-e2e'],env=dict(ambiente,
+                            RADAR_ADMIN_SENHA=os.environ['RADAR_TEST_ADMIN_SENHA']),
+                           check=True,capture_output=True,timeout=15)
+
         class Handler(SimpleHTTPRequestHandler):
             def __init__(self,*args,**kwargs):
                 super().__init__(*args,directory=str(ROOT / 'web'),**kwargs)

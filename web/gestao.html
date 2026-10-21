@@ -269,7 +269,7 @@
   // fetch same-origin; devolve sempre {status, body}
   function req(rota, opts){
     opts = opts || {};
-    var init = {method: opts.method || "GET", credentials: "same-origin", headers: {}};
+    var init = {method: opts.method || "GET", credentials: "same-origin", cache:"no-store", headers: {}};
     if (opts.body !== undefined){
       init.headers["Content-Type"] = "application/json";
       init.body = JSON.stringify(opts.body);
@@ -346,7 +346,6 @@
     if (!ehModerador()) avisoGer("Seu escopo é <b>somente leitura</b> (contribuidor). As ações de verificar/editar/remover exigem <b>moderador</b> e as de bloqueios/tokens/usuários exigem <b>admin</b>.", "");
     else avisoGer("");
     trocarAba("pendentes");
-    carregarPendentes();
   }
 
   document.getElementById("formLogin").addEventListener("submit", function(ev){
@@ -383,6 +382,7 @@
   function trocarAba(nome){
     abas.forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-aba") === nome); });
     document.querySelectorAll(".aba").forEach(function(s){ s.hidden = (s.id !== "aba-" + nome); });
+    if (nome === "pendentes") carregarPendentes();
     if (nome === "bloqueios" && ehAdmin()) carregarBloqueios();
     if (nome === "tokens" && ehAdmin()) carregarTokens();
     if (nome === "configuracao" && ehAdmin()) carregarConfiguracao();
@@ -551,7 +551,9 @@
   };
 
   // ================= PENDENTES =================
+  var versaoPendentes=0;
   function carregarPendentes(cursor, acumular){
+    var versao=++versaoPendentes;
     var el = document.getElementById("listaPendentes");
     if (!acumular) el.innerHTML = "<div class='vazio'>Carregando…</div>";
     var status = document.getElementById("filtroStatus").value;
@@ -559,6 +561,7 @@
     if (status) q += "&status=" + encodeURIComponent(status);
     if (cursor) q += "&cursor=" + encodeURIComponent(cursor);
     req("/api/v1/gestao/pendentes", {query: q}).then(function(o){
+      if(versao!==versaoPendentes) return;
       if (o.status === 401){ sessaoCaiu(); return; }
       if (o.status !== 200){ el.innerHTML = "<div class='aviso err'>" + esc(erroMsg(o)) + "</div>"; return; }
       var pts = o.body.pendentes || [];
@@ -590,7 +593,7 @@
       });
       var mais = document.getElementById("btMaisPend");
       if (mais) mais.addEventListener("click", function(){ carregarPendentes(mais.getAttribute("data-cursor"), true); });
-    }).catch(function(e){ el.innerHTML = "<div class='aviso err'>Erro de rede: " + esc(e.message) + "</div>"; });
+    }).catch(function(e){ if(versao===versaoPendentes) el.innerHTML = "<div class='aviso err'>Erro de rede: " + esc(e.message) + "</div>"; });
   }
   function pillStatus(s){
     if (!s) return "<span class='pill neutro'>—</span>";
@@ -601,7 +604,7 @@
   document.getElementById("btAtualizarPend").addEventListener("click", function(){ carregarPendentes(); });
 
   // ================= RADAR (detalhe + acoes) =================
-  var radarAtual = null;
+  var radarAtual = null, radarAbertoId=null, versaoRadar=0;
   document.getElementById("btAbrirRadar").addEventListener("click", function(){
     var v = document.getElementById("buscaId").value.trim();
     if (v) abrirRadar(v);
@@ -611,23 +614,33 @@
   });
 
   function abrirRadar(id){
+    id=String(id).trim().toUpperCase().replace(/^(\d+)$/,"P-$1");
+    var versao=++versaoRadar;
+    radarAbertoId=id; radarAtual=null;
     trocarAba("radar");
     document.querySelector('.abas button[data-aba="radar"]').classList.add("on");
     var el = document.getElementById("radarConteudo");
     el.innerHTML = "<div class='vazio'>Carregando " + esc(id) + "…</div>";
     req("/api/v1/gestao/radar/" + encodeURIComponent(id)).then(function(o){
+      if(versao!==versaoRadar) return;
       if (o.status === 401){ sessaoCaiu(); return; }
       if (o.status !== 200){ el.innerHTML = "<div class='aviso err'>" + esc(erroMsg(o)) + "</div>"; return; }
       radarAtual = o.body.radar || {};
+      radarAbertoId=radarAtual.id || id;
       renderRadar(radarAtual);
       carregarHistorico(radarAtual.id || id);
-    }).catch(function(e){ el.innerHTML = "<div class='aviso err'>Erro de rede: " + esc(e.message) + "</div>"; });
+    }).catch(function(e){ if(versao===versaoRadar) el.innerHTML = "<div class='aviso err'>Erro de rede: " + esc(e.message) + "</div>"; });
   }
 
   function renderRadar(p){
     var loc = p.localizacao || {};
     var via = loc.via || {};
     var g = p.governanca || {};
+    if(g.removido_em){
+      document.getElementById("radarConteudo").innerHTML="<div class='aviso'>Radar "+esc(p.id)+" removido. Este registro está disponível apenas para consulta do histórico.</div><p>Motivo: "+esc(g.motivo_remocao || "não informado")+"</p><div id='histRadar'></div>";
+      document.getElementById("buscaId").value=p.id;
+      return;
+    }
     var viaTxt = [via.codigo, via.nome].filter(Boolean).join(" · ");
     var h = "";
     h += "<div class='bloco'>";
@@ -658,7 +671,7 @@
     if (ehModerador()){
       h += "<button id='btVerificar' class='ok'>Verificar</button>";
       h += "<button id='btDesabilitar' class='sec'>Desabilitar</button>";
-      h += "<button id='btRemover' class='perigo'>Remover (tombstone)</button>";
+      h += "<button id='btRemover' class='perigo'>Remover radar</button>";
     } else {
       h += "<span class='vazio'>Ações de moderação exigem escopo moderador ou admin.</span>";
     }
@@ -740,13 +753,24 @@
     });
   }
   function acaoRemover(){
-    motivoModal("Remover (tombstone) " + (radarAtual.id||""), "ex.: radar inexistente / duplicado", true).then(function(r){
+    if(!radarAtual) return;
+    var id=radarAtual.id;
+    motivoModal("Remover radar " + id, "ex.: radar inexistente / duplicado", true).then(function(r){
       if (!r || r.motivo === undefined) return;
-      req("/api/v1/gestao/radar/" + encodeURIComponent(radarAtual.id) + "/remover", {method:"POST", body:r}).then(function(o){
+      var botao=document.getElementById("btRemover");
+      if(botao) botao.disabled=true;
+      req("/api/v1/gestao/radar/" + encodeURIComponent(id) + "/remover", {method:"POST", body:r}).then(function(o){
         if (o.status === 401){ sessaoCaiu(); return; }
-        if (o.status === 200){ fecharModal(); avisoGer("Radar removido (tombstone; a linha é preservada).", "ok"); abrirRadar(radarAtual.id); }
-        else { alert("Falha: " + erroMsg(o)); }
-      });
+        if (o.status !== 200){ avisoGer(esc(erroMsg(o)),"err"); return; }
+        fecharModal(); avisoGer("Radar "+esc(id)+" removido.", "ok");
+        if(radarAbertoId===id){
+          ++versaoRadar; radarAtual=null; radarAbertoId=null;
+          document.getElementById("buscaId").value="";
+          document.getElementById("radarConteudo").innerHTML="<div class='vazio'>Radar removido. Escolha outro cadastro para continuar.</div>";
+          trocarAba("pendentes");
+        }else carregarPendentes();
+      }).catch(function(){avisoGer("Falha de rede ao remover o radar. Confira o cadastro antes de tentar novamente.","err");})
+        .then(function(){if(botao) botao.disabled=false;});
     });
   }
   function acaoSalvar(){
@@ -789,7 +813,7 @@
   function carregarHistorico(id){
     req("/api/v1/gestao/radar/" + encodeURIComponent(id) + "/historico").then(function(o){
       var el = document.getElementById("histRadar");
-      if (!el) return;
+      if (!el || !radarAtual || radarAtual.id!==id) return;
       if (o.status !== 200){ el.innerHTML = "<div class='vazio'>—</div>"; return; }
       var hist = o.body.historico || [];
       if (!hist.length){ el.innerHTML = "<div class='vazio'>Sem registros.</div>"; return; }
