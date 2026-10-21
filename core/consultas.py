@@ -760,6 +760,10 @@ def buscar_ponto_por_id(conn, pid_str):
         return None
     registro = montar_registro(conn, r, visao=visao)
     if registro is not None:
+        # A lista do mapa usa um resumo. O detalhe precisa do mesmo historico
+        # metrologico e identificacao devolvidos no endpoint do instrumento.
+        registro["equipamentos"] = [buscar_equipamento_por_id(conn, e["id"], visao=visao) or e
+                                    for e in registro["equipamentos"]]
         registro["dados_por_fonte"] = _dados_por_fonte(conn, pid, visao)
         # Complementos sao inferencias da base, nao publicacoes da fonte do envio.
         # O detalhe expoe a origem separadamente, sem reescrever o bruto.
@@ -1235,7 +1239,7 @@ def _montar_equipamento_original(conn, r):
     for v in dbmod.query_all(
             conn, "SELECT v.id, tv.codigo AS tipo, v.data_verificacao, "
             "v.validade_ate, rv.codigo AS resultado, v.numero_certificado, "
-            "v.norma_aplicada, v.observacoes, org.nome AS orgao "
+            "v.norma_aplicada, v.observacoes, v.registro_fonte_id, org.nome AS orgao "
             "FROM VERIFICACAO_METROLOGICA v "
             "LEFT JOIN TIPO_VERIFICACAO tv ON tv.id=v.tipo_verificacao_id "
             "LEFT JOIN RESULTADO_VERIFICACAO rv ON rv.id=v.resultado_id "
@@ -1254,7 +1258,8 @@ def _montar_equipamento_original(conn, r):
             "situacao_metrologica_derivada": _situacao_metrologica(
                 v["validade_ate"]),
             "documentos": [],
-            "fonte": None,
+            "fonte_registro_id": v["registro_fonte_id"],
+            "fonte": (_fontes_por_registro(conn, v["registro_fonte_id"]) or [None])[0],
             "observacoes": v["observacoes"],
         })
 

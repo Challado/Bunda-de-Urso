@@ -272,6 +272,23 @@
     }catch(e){}
     return "";
   }
+  function renderMetrologia(p){
+    var fontes = p.dados_por_fonte || p.fontes || [];
+    var temInmetro = fontes.some(function(f){return /inmetro|psie|rbmlq/i.test(f.nome || "");});
+    var equipamentos = (p.equipamentos || []).map(function(e){return {
+      id:e.id, numero_serie:e.numero_serie, registro_aprovacao_modelo:e.registro_aprovacao_modelo,
+      portaria_aprovacao_modelo:e.portaria_aprovacao_modelo, identificadores_oficiais:e.identificadores_oficiais,
+      verificacoes_metrologicas:e.verificacoes_metrologicas
+    };});
+    var temVerificacoes = equipamentos.some(function(e){return (e.verificacoes_metrologicas || []).length;});
+    var texto = temInmetro ? "Há publicação do Inmetro/PSIE vinculada a este cadastro. Os campos originais estão no bloco da fonte abaixo." :
+      "Não há publicação do Inmetro/PSIE vinculada a este cadastro na base. Isso não comprova ausência de registro no Inmetro nem irregularidade do equipamento.";
+    if (temVerificacoes) texto += " As verificações disponíveis estão abaixo, com resultado, datas e fonte quando informados. Confira a identificação do instrumento e a data de cada verificação.";
+    else texto += " Nenhuma verificação metrológica estruturada está vinculada ao equipamento nesta resposta. Não é possível confirmar sua situação metrológica com esses dados.";
+    var h = "<details class='secao' id='metrologia' open><summary>Inmetro e verificações metrológicas</summary><div class='corpo'><p class='explicacao'>" + esc(texto) + "</p>";
+    if (equipamentos.length) h += renderDict({equipamentos:equipamentos});
+    return h + "</div></details>";
+  }
   function renderFontes(p){
     var fontes = (p.dados_por_fonte || []).slice();
     // Compatibilidade com respostas anteriores, sem atribuir o resumo a uma fonte.
@@ -371,6 +388,7 @@
     h += "</div>";
     h += "<div id='mapa'></div>";
 
+    h += renderMetrologia(p);
     h += renderFontes(p);
     if (p.explicacao) h += secao("Resumo com fontes e divergências", {resumo:p.explicacao.texto});
     h += "<details class='secao consolidado' open><summary>Visão consolidada do radar</summary><div class='corpo'><p class='explicacao'>Resumo organizado pela base a partir dos registros associados. Para conferir o que cada fonte publicou, consulte os blocos acima. Posições inferidas são estimativas, não GPS oficial.</p>";

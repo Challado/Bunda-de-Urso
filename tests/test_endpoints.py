@@ -76,7 +76,7 @@ def _popular(dbpath):
             "resultado_id": dbmod.domain_id(
                 conn, "RESULTADO_VERIFICACAO", "conforme"),
             "data_verificacao": "2025-01-01", "validade_ate": "2026-01-01",
-            "numero_certificado": "CERT-1"})
+            "numero_certificado": "CERT-1", "registro_fonte_id": reg_id})
         conn.commit()
     finally:
         conn.close()
@@ -242,6 +242,18 @@ class TestEndpoints(unittest.TestCase):
     def test_equipamento_nao_encontrado(self):
         status, _h, _c = self._req("/api/v1/equipamentos/E-99999")
         self.assertEqual(status, 404)
+
+    def test_detalhe_radar_preserva_metrologia_do_endpoint_do_instrumento(self):
+        equipamento, _ = self._json("/api/v1/equipamentos/E-1")
+        ponto, _ = self._json("/api/v1/radares/P-1")
+        eq = equipamento["resultado"]["equipamento"]
+        self.assertEqual(ponto["resultado"]["pontos"][0]["equipamentos"][0], eq)
+        ver = eq["verificacoes_metrologicas"][0]
+        self.assertEqual(ver["numero_certificado"], "CERT-1")
+        self.assertTrue(ver["fonte_registro_id"])
+        self.assertIn("ANTT", ver["fonte"]["nome"])
+        # Uma verificacao atribuida a outra fonte nao e inventada como Inmetro.
+        self.assertNotIn("INMETRO", ver["fonte"]["nome"])
 
     def test_equipamento_metodo_nao_permitido(self):
         status, _h, _c = self._req("/api/v1/equipamentos/E-1", "",
