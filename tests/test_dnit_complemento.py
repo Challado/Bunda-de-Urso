@@ -235,6 +235,7 @@ def exportar_blob_real():
 def verificar_exportacao_robusta():
     """Navegador real: fluxos comuns que antes viravam apenas timeout generico."""
     corpo = MULTAS.read_bytes()
+    liberar = threading.Event()
     b64 = base64.b64encode(corpo).decode()
     script = '''<script>function baixar(){const a=document.createElement('a');
         a.href=URL.createObjectURL(new Blob([Uint8Array.from(atob(%s),c=>c.charCodeAt(0))]));
@@ -242,6 +243,9 @@ def verificar_exportacao_robusta():
 
     class Handler(servidor_http.BaseHTTPRequestHandler):
         def do_GET(self):
+            if self.path == '/sem-resposta':
+                liberar.wait(15)
+                return
             paginas = {
                 '/menu': '''<button aria-label="Baixar" onclick="this.insertAdjacentHTML('afterend',
                     '<div role=menuitem onclick=baixar()>Excel</div>')"><img alt="Baixar"></button>''',
@@ -276,15 +280,18 @@ def verificar_exportacao_robusta():
                     raise AssertionError('Exportacao falhou: ' + rota)
             if baixar_xlsx(base + '/dnit-tabela', timeout=15, mostrar_tabela=True) != corpo:
                 raise AssertionError('DNIT precisa mostrar a tabela antes de exportar')
-            for rota, esperado in (('/api-erro', '503'), ('/javascript', 'Falha demonstrativa'), ('/bloqueio', 'bloqueou acesso')):
+            for rota, esperado in (('/api-erro', '503'), ('/javascript', 'Falha demonstrativa'), ('/bloqueio', 'bloqueou acesso'), ('/sem-resposta', 'Tempo esgotado')):
                 try:
-                    baixar_xlsx(base + rota, timeout=8)
+                    baixar_xlsx(base + rota, timeout=3 if rota == '/sem-resposta' else 8)
                 except http.ErroFonte as exc:
                     if esperado not in str(exc):
                         raise AssertionError('Diagnostico omitiu a causa: ' + str(exc)) from exc
+                    if rota == '/sem-resposta' and 'diagnostico=' not in str(exc):
+                        raise AssertionError('Timeout sem contexto da pagina') from exc
                 else:
                     raise AssertionError('Pagina com falha nao pode retornar planilha: ' + rota)
     finally:
+        liberar.set()
         servidor.shutdown(); servidor.server_close(); thread.join()
 
 

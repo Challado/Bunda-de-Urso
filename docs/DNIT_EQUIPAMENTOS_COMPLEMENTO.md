@@ -16,6 +16,46 @@ responda. Falha de acesso gera erro de coleta, sem trocar o snapshot bom por vaz
 e sem resolver verificacoes humanas. O exportador procura botoes/links visiveis
 de Excel/exportacao; mudanca na interface pode exigir ajuste.
 
+### Investigacao da coleta e da instalacao em 22/10
+
+O status publico do servidor, atualizado as 21:08 UTC, mostrou que o bootstrap
+de 21:06 UTC recusou o link `status-atualizacoes.json` na pasta web. Assim,
+o exportador corrigido anteriormente ainda nao estava instalado: o erro do
+DNIT continuava sendo a tentativa X-358 das 17:54 UTC, com timeout apos 90 s.
+A validacao do instalador foi corrigida para aceitar esse link apenas quando
+leva ao relatorio persistente configurado, incluindo a cadeia pelo diretorio
+do aplicativo. A verificacao de permissoes tambem o preserva durante a troca
+dos fontes. Outros destinos continuam recusados.
+
+Ha uma etapa anterior a exportacao que o conector nao acionava: **Mostrar
+Tabela**. Esse fluxo foi identificado tambem em um
+[coletor publico independente](https://github.com/patarruda/if697_acidentesPRF/blob/HEAD/radares_scrapTable.py).
+Agora o conector DNIT abre a tabela antes de procurar o Excel. O teste com
+navegador real so disponibiliza a exportacao depois desse clique.
+
+O workflow manual `.github/workflows/dnit.yml` verifica o **portal real** em
+separado dos testes locais. Guarda captura de tela, controles visiveis, status
+de rede, falhas JavaScript e scripts publicos do proprio DNIT; executa o mesmo
+conector da instalacao e confere todas as linhas recebidas. O XLSX baixado
+fica no artefato, sem importar em producao. Falha externa reprova a verificacao;
+ela nunca usa a fixture como substituto de um download atual.
+
+Resultado do [teste externo de 22/10, 21:13 UTC](https://github.com/Challado/Bunda-de-Urso/actions/runs/39855409278):
+o navegador do GitHub nao recebeu resposta HTTP do DNIT em 45 s; depois, o
+conector tambem esgotou seus 90 s durante a navegacao inicial. Nao houve HTML,
+script ou XLSX recebido. Portanto, a coleta online continua **nao confirmada**.
+Timeout de socket agora tambem inclui contexto no erro registrado, em vez de
+apenas `TimeoutError: timed out`; ha um teste com servidor que nao responde.
+
+Para permitir a complementacao sem depender dessa disponibilidade, a planilha
+exatamente como fornecida pelo operador fica em `importacoes/dnit/2026-10-22/`
+no repositorio privado, com manifesto de origem e SHA-256. O bootstrap aceita
+`--aplicar --dnit-arquivo CAMINHO.xlsx`: primeiro instala e verifica, depois
+importa pela API e registra a etapa. A opcao e explicita; nunca e acionada como
+substituto silencioso de um download. O teste do bootstrap importa as 1.655
+linhas sem rejeicoes e repete sem duplicacao. A data original da exportacao
+nao foi confirmada e nao e apresentada como uma consulta atual ao DNIT.
+
 ## Dados que se complementam
 
 | Publicacao | Registros | Campos exclusivos relevantes |
@@ -52,13 +92,13 @@ O recurso `dnit_equipamentos` entra na agenda semanal do `api.pse tick`, com
 vencimento independente da planilha PNCV. Para tentar imediatamente, como root:
 
 ```sh
-python3 web/api.pse sync --fonte dnit_equipamentos
+/openclaw/bin/radar-api.pse sync --fonte dnit_equipamentos
 ```
 
 Se o portal estiver indisponivel, um XLSX exportado pelo operador pode ser lido:
 
 ```sh
-python3 web/api.pse sync --fonte dnit_equipamentos --arquivo TabelaEquipamentosFiscalizacao.xlsx
+/openclaw/bin/radar-api.pse sync --fonte dnit_equipamentos --arquivo TabelaEquipamentosFiscalizacao.xlsx
 ```
 
 O instalador privado prepara Chromium quando nao encontra um navegador compativel.

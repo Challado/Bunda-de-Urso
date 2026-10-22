@@ -325,8 +325,9 @@ def baixar_xlsx(url, timeout=None, mostrar_tabela=False):
             detalhe = {"pagina": diagnostico, "falhas_rede": cdp.falhas if cdp else [],
                        "erros_javascript": cdp.excecoes if cdp else [], "stderr_navegador": navegador_stderr}
             atualizacoes.evento("exportacao.erro", erro=str(exc), diagnostico=detalhe)
-            if isinstance(exc, http.ErroFonte):
-                raise http.ErroFonte(str(exc) + "; diagnostico=" + json.dumps(atualizacoes.limpar(detalhe), ensure_ascii=False)) from exc
+            if isinstance(exc, (http.ErroFonte, OSError, subprocess.SubprocessError)):
+                mensagem = ("Tempo esgotado ao acessar/exportar pagina publica: " + url) if isinstance(exc, TimeoutError) else str(exc)
+                raise http.ErroFonte(mensagem + "; diagnostico=" + json.dumps(atualizacoes.limpar(detalhe), ensure_ascii=False)) from exc
             raise
         finally:
             _encerrar_navegador(proc, cdp)
