@@ -74,6 +74,11 @@ def ler_crontab():
     env = dict(os.environ, LC_ALL="C")
     res = subprocess.run(["crontab", "-l"], capture_output=True, text=True,
                          env=env, timeout=15)
+    from . import atualizacoes
+    # Cron pode conter comandos de outros projetos com credenciais. Seu texto
+    # permanece no backup restrito; o diario registra somente o resultado.
+    atualizacoes.evento("cron.ler", codigo_comando=res.returncode,
+                       stderr=res.stderr, tem_crontab=res.returncode == 0)
     if res.returncode == 0:
         return res.stdout
     if res.returncode == 1 and "no crontab for" in res.stderr.lower():
@@ -105,6 +110,9 @@ def validar_logrotate(arquivo):
     comando = ["logrotate", "--debug", str(arquivo)]
     try:
         r = subprocess.run(comando, capture_output=True, text=True, timeout=30)
+        from . import atualizacoes
+        atualizacoes.evento("logrotate.validar", comando=comando, codigo_comando=r.returncode,
+                           stdout=r.stdout, stderr=r.stderr)
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {"checagem": "logrotate.sintaxe", "estado": "erro", "comando": comando,
                 "detalhe": "Nao foi possivel concluir a verificacao do logrotate: " + str(exc)}
@@ -179,6 +187,9 @@ def ambiente_servidor(laboratorio=False):
             for unidade in alternativas:
                 r = subprocess.run(["systemctl", "is-active", unidade], capture_output=True,
                                    text=True, timeout=15)
+                from . import atualizacoes
+                atualizacoes.evento("auditoria.servico", unidade=unidade, codigo_comando=r.returncode,
+                                   stdout=r.stdout, stderr=r.stderr)
                 if r.returncode == 0:
                     ativos.append(unidade)
             resultados.append({"checagem": "servico." + alternativas[0].split(".")[0],
@@ -186,6 +197,8 @@ def ambiente_servidor(laboratorio=False):
                                "detalhe": ", ".join(ativos) if ativos else "servico inativo ou indisponivel; confira antes de aplicar"})
     if shutil.which("nginx"):
         r = subprocess.run(["nginx", "-t"], capture_output=True, text=True, timeout=30)
+        from . import atualizacoes
+        atualizacoes.evento("auditoria.nginx", codigo_comando=r.returncode, stdout=r.stdout, stderr=r.stderr)
         resultados.append({"checagem": "nginx.configuracao", "estado": "ok" if r.returncode == 0 else "erro",
                            "detalhe": "sintaxe aceita" if r.returncode == 0 else "nginx -t reprovou; confira a configuracao do servidor"})
     return resultados

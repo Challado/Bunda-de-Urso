@@ -127,6 +127,12 @@ class TestInstalacaoAPI(unittest.TestCase):
         self.assertTrue(relatorio["recuperacao_automatica"])
         self.assertTrue(relatorio["observacoes"])
         self.assertIn("Observacoes:", resultado.stdout)
+        status = json.loads((self.home / "status-atualizacoes.json").read_text())["operacoes"]["instalacao"]
+        self.assertEqual(status["estado"], "erro")
+        self.assertTrue(status["recuperacao_automatica"])
+        self.assertTrue(status["erros"])
+        self.assertIn("RuntimeError", status["traceback"])
+        self.assertTrue(Path(status["arquivo_relatorio"]).is_file())
         with closing(db.connect_readonly(self.banco)) as conn:
             self.assertEqual(conn.execute("SELECT valor FROM SENTINELA").fetchone()[0], "nao perder")
 

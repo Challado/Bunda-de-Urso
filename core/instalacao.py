@@ -18,6 +18,8 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
+from . import atualizacoes
 
 from . import caminhos, db
 from . import auditoria_instalacao as auditoria
@@ -110,8 +112,25 @@ def _observacoes(observacoes):
 
 
 def _executar(cmd, **kwargs):
-    return subprocess.run(cmd, check=True, capture_output=True, text=True,
-                          timeout=120, **kwargs).stdout
+    inicio = time.monotonic()
+    atualizacoes.evento("comando.inicio", comando=cmd)
+    try:
+        r = subprocess.run(cmd, check=True, capture_output=True, text=True,
+                           timeout=120, **kwargs)
+    except (OSError, subprocess.SubprocessError) as exc:
+        ocultar = "configuracao" in cmd and "mostrar" in cmd
+        atualizacoes.evento("comando.erro", comando=cmd, erro=str(exc),
+                           stdout="[configuracao omitida]" if ocultar else getattr(exc, "stdout", None),
+                           stderr=getattr(exc, "stderr", None),
+                           codigo_comando=getattr(exc, "returncode", None),
+                           duracao_comando_s=round(time.monotonic() - inicio, 3))
+        raise
+    # Configuracao completa pode conter URLs/chaves do administrador.
+    ocultar = "configuracao" in cmd and "mostrar" in cmd
+    atualizacoes.evento("comando.fim", comando=cmd, codigo_comando=r.returncode,
+                       stdout="[configuracao omitida]" if ocultar else r.stdout, stderr=r.stderr,
+                       duracao_comando_s=round(time.monotonic() - inicio, 3))
+    return r.stdout
 
 
 def _ambiente(conf):
@@ -249,6 +268,7 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
     backup = dirs["dados"] / "backups" / "instalacao" / agora
     _diretorio(backup.parent, observacoes, modo=0o700)
     _diretorio(backup, observacoes, modo=0o700)
+    atualizacoes.evento("backup.inicio", backup=str(backup))
     indice = []
     relatorio = None
     wrapper = dirs["codigo"].parent / "radar-tick.sh"
@@ -277,6 +297,7 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
                     nginx_alterado = True
                     observacoes.append("Nginx: acesso HTTP direto a radar.conf bloqueado em " + str(arquivo))
             (backup / "restauracao.json").write_text(json.dumps(indice, indent=2))
+            atualizacoes.evento("backup.arquivos", arquivos=indice)
             if nginx_alterado:
                 _executar(["nginx", "-t"])
                 _executar(["systemctl", "reload", "nginx"])
@@ -302,7 +323,11 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
                         fonte.backup(copia)
                         copia.execute("PRAGMA journal_mode=DELETE")
                 (backup / "radar.sqlite3").chmod(0o600)
+                atualizacoes.evento("backup.banco", integridade="ok", banco_backup=str(backup / "radar.sqlite3"))
+                atualizacoes.evento("instalar.arquivos")
                 _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http, observacoes)
+                atualizacoes.publicar_link()
+                atualizacoes.evento("instalar.configuracao")
                 _instalar_configuracao_web(dirs, grupo, observacoes)
                 if sudoers_antigo.exists():
                     sudoers_antigo.unlink()
@@ -313,6 +338,7 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
                     observacoes.append("Regra do logrotate %s: %s" % ("atualizada" if logrotate.is_file() else "criada", logrotate))
                 logrotate.write_text(conteudo)
                 logrotate.chmod(0o644)
+                atualizacoes.evento("instalar.logrotate", arquivo_logrotate=str(logrotate), conteudo=conteudo)
                 api = dirs["web"] / "api.pse"
                 # Inicializacao/migracoes continuam passando pela mesma entrada.
                 _executar([sys.executable, str(api), "ferramenta", "inicializar_banco"],
@@ -351,12 +377,14 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
             relatorio = _diagnosticar(origem, dirs, usuario_web, laboratorio, cron, final=True)
             relatorio["backup"] = str(backup)
             relatorio["observacoes"] = list(observacoes)
+            atualizacoes.evento("checagem.final", relatorio=relatorio)
             (backup / "checagem-final.json").write_text(json.dumps(relatorio, ensure_ascii=False, indent=2) + "\n")
             if not relatorio["sucesso"]:
                 raise RuntimeError("Checagem final reprovada; consulte checagem-final.json no backup.")
             (backup / "CONCLUIDO").write_text(agora + "\n")
             print("Instalacao concluida. Backup: " + str(backup))
         except BaseException as exc:
+            atualizacoes.evento("recuperacao.inicio", erro=str(exc))
             if not _esquema_compativel_com_backup(backup, dirs["banco"]):
                 mensagem = ("Esquema do banco migrado: codigo atualizado preservado para manter compatibilidade. "
                             "Corrija a checagem final e reaplique o instalador. Backup: " + str(backup))
@@ -365,8 +393,10 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
                 relatorio.update(erro=str(exc), observacoes=list(observacoes), recuperacao_automatica=False)
                 (backup / "checagem-final.json").write_text(json.dumps(relatorio, ensure_ascii=False, indent=2) + "\n")
                 print(mensagem, file=sys.stderr)
+                atualizacoes.evento("recuperacao.nao_aplicada", recuperacao_automatica=False, observacoes=observacoes)
                 raise
             _restaurar(indice)
+            atualizacoes.publicar_link()
             if nginx_alterado:
                 _executar(["nginx", "-t"])
                 _executar(["systemctl", "reload", "nginx"])
@@ -377,6 +407,7 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
             relatorio.update(observacoes=list(observacoes), recuperacao_automatica=True)
             (backup / "checagem-final.json").write_text(json.dumps(relatorio, ensure_ascii=False, indent=2) + "\n")
             print("Falha: codigo, web, wrappers e conf restaurados. Banco preservado; backup em " + str(backup), file=sys.stderr)
+            atualizacoes.evento("recuperacao.fim", recuperacao_automatica=True, relatorio=relatorio)
             raise
     return relatorio
 
@@ -544,7 +575,21 @@ def main(argv=None):
     observacoes = ["Dependencia preparada pelo instalador: " + pacote for pacote in args.pacote_preparado]
     try:
         with _configuracao_preparada(args.conf.absolute(), args.perfil_conf):
-            return _instalar(args, observacoes)
+            # A simulacao continua sem gravar nem mesmo arquivos de diagnostico.
+            if not (args.aplicar or args.restaurar):
+                return _instalar(args, observacoes)
+            _validar_layout(Path(caminhos.ROOT), args.conf.absolute(),
+                            args.laboratorio.resolve() if args.laboratorio else None)
+            _diretorio(Path(caminhos.log_dir()), observacoes)
+            with atualizacoes.acompanhar("instalacao", modo="restaurar" if args.restaurar else "aplicar",
+                                        bootstrap_id=os.environ.get("RADAR_BOOTSTRAP_ID"),
+                                        conf=str(args.conf.absolute())) as registro:
+                resultado = _instalar(args, observacoes)
+                atualizacoes.publicar_link()
+                registro.terminar(resultado, observacoes=observacoes)
+                print("Status das atualizacoes: " + caminhos.link_atualizacoes())
+                print("Log detalhado: " + caminhos.log_atualizacoes())
+                return resultado
     except (OSError, ValueError, KeyError, RuntimeError, GovernancaError, subprocess.SubprocessError, configparser.Error) as exc:
         print("Instalacao recusada: " + str(exc), file=sys.stderr)
         if isinstance(exc, subprocess.CalledProcessError):
@@ -558,6 +603,7 @@ def _instalar(args, observacoes):
     origem = Path(caminhos.ROOT)
     lab = args.laboratorio.resolve() if args.laboratorio else None
     dirs = _validar_layout(origem, args.conf.absolute(), lab)
+    atualizacoes.evento("layout.validado", destinos={k: str(v) for k, v in dirs.items()})
     if args.restaurar:
         return _recuperar(args.restaurar, dirs, lab)
     print(json.dumps({"acao": "aplicar" if args.aplicar else "simular",
@@ -574,6 +620,7 @@ def _instalar(args, observacoes):
         if not lab:
             _preparar_servicos(observacoes)
         plano = _diagnosticar(origem, dirs, args.usuario_web, lab, not args.sem_cron)
+        atualizacoes.evento("checagem.inicial", relatorio=plano)
         precisa = plano["atualizacao_necessaria"] or any(c["estado"] in ("erro", "atualizar") for c in plano["checagens"])
         relatorio = None if precisa else _diagnosticar(origem, dirs, args.usuario_web, lab, not args.sem_cron, final=True)
         if relatorio is not None and relatorio["sucesso"]:
@@ -591,6 +638,7 @@ def _instalar(args, observacoes):
         if not pai.exists():
             _diretorio(pai, observacoes, modo=0o700)
     relatorio["observacoes"] = list(observacoes)
+    atualizacoes.evento("relatorio", relatorio=relatorio)
     print(json.dumps(relatorio, ensure_ascii=False, indent=2))
     if args.relatorio:
         args.relatorio.write_text(json.dumps(relatorio, ensure_ascii=False, indent=2) + "\n")
@@ -669,11 +717,15 @@ def _preparar_servicos(observacoes=None):
                           ("fcgiwrap.socket", "fcgiwrap.service")):
         for unidade in alternativas:
             ativo = subprocess.run(["systemctl", "is-active", unidade], capture_output=True, timeout=15)
+            atualizacoes.evento("servico.consulta", unidade=unidade, codigo_comando=ativo.returncode,
+                               stdout=ativo.stdout, stderr=ativo.stderr)
             if ativo.returncode == 0:
                 break
         else:
             for unidade in alternativas:
                 r = subprocess.run(["systemctl", "start", unidade], capture_output=True, timeout=30)
+                atualizacoes.evento("servico.iniciar", unidade=unidade, codigo_comando=r.returncode,
+                                   stdout=r.stdout, stderr=r.stderr)
                 if r.returncode == 0:
                     observacoes.append("Servico iniciado: " + unidade)
                     break
@@ -718,14 +770,14 @@ def _diagnosticar(origem, dirs, usuario_web, laboratorio, cron, final=False):
             cmd = ([] if laboratorio else ["runuser", "-u", usuario_web, "--"]) + [sys.executable,str(api),"fila","verificar"]
             _executar(cmd,env=_ambiente(dirs["conf"]))
             checagens.append({"checagem":"fila.recebimento", "estado":"ok", "detalhe":"gravacao duravel da fila pelo usuario CGI, sem SQLite"})
-        except (OSError, subprocess.SubprocessError):
-            checagens.append({"checagem":"fila.recebimento", "estado":"erro", "detalhe":"o usuario CGI nao conseguiu gravar na fila; reaplique o instalador"})
+        except (OSError, subprocess.SubprocessError) as exc:
+            checagens.append({"checagem":"fila.recebimento", "estado":"erro", "detalhe":str(exc), "traceback":traceback.format_exc()})
         try:
             _cgi(api, dirs["conf"], "/health/ready", usuario=None if laboratorio else usuario_web)
             _cgi(api, dirs["conf"], "/api/v1/status", usuario=None if laboratorio else usuario_web)
             checagens.append({"checagem": "api_e_banco", "estado": "ok", "detalhe": "prontidao e consulta do banco pela API"})
-        except (OSError, RuntimeError, ValueError, subprocess.SubprocessError):
-            checagens.append({"checagem": "api_e_banco", "estado": "erro", "detalhe": "API instalada nao passou na checagem"})
+        except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as exc:
+            checagens.append({"checagem": "api_e_banco", "estado": "erro", "detalhe": str(exc), "traceback": traceback.format_exc()})
         origem_http = caminhos.valor("web", "origem")[0]
         if origem_http and not laboratorio:
             try:
@@ -752,8 +804,8 @@ def _diagnosticar(origem, dirs, usuario_web, laboratorio, cron, final=False):
         try:
             _verificar_gravacao(dirs, usuario=None if laboratorio else usuario_web)
             checagens.append({"checagem": "gravacao_do_painel", "estado": "ok", "detalhe": "CGI le o link e cria arquivo na pasta da configuracao sem elevacao"})
-        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
-            checagens.append({"checagem": "gravacao_do_painel", "estado": "erro", "detalhe": "O CGI nao conseguiu ler/gravar a configuracao pelo link"})
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+            checagens.append({"checagem": "gravacao_do_painel", "estado": "erro", "detalhe": str(exc), "traceback": traceback.format_exc()})
         if not laboratorio:
             checagens.append(auditoria.validar_logrotate(logrotate))
             try:

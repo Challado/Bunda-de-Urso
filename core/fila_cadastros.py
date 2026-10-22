@@ -10,9 +10,10 @@ import re
 import tempfile
 import sys
 import time
+import traceback
 import uuid
 
-from . import caminhos, config, db, governanca
+from . import caminhos, config, db, governanca, atualizacoes
 from .contexto_api import operacao_local
 
 ESTADOS = ('pendentes', 'processando', 'concluidos', 'rejeitados')
@@ -256,7 +257,8 @@ def processar(limite=None, db_path=None):
                         raise ValueError('origem incompleta')
                     if doc.get('estado') not in TERMINAIS and hashlib.sha256(json.dumps(doc['dados'],sort_keys=True,ensure_ascii=False,allow_nan=False).encode()).hexdigest() != doc.get('digest'):
                         raise ValueError('conteudo divergente')
-                except (ValueError, KeyError, TypeError):
+                except (ValueError, KeyError, TypeError) as exc:
+                    atualizacoes.evento("fila.origem_invalida", protocolo=origem.stem, erro=str(exc), traceback=traceback.format_exc())
                     _mover(origem, pasta() / 'quarentena' / origem.name)
                     doc = {'versao':1, 'protocolo':origem.stem, 'digest':None,
                            'recebido_em':governanca._agora(), 'tentativas':0,
@@ -272,6 +274,7 @@ def processar(limite=None, db_path=None):
                     atendidos += 1
                     continue
                 if doc['tentativas'] >= caminhos.inteiro('cadastro', 'tentativas'):
+                    atualizacoes.evento("fila.tentativas_esgotadas", protocolo=doc['protocolo'], erro="tentativas_esgotadas")
                     doc['erro'] = {'codigo':'tentativas_esgotadas', 'mensagem':'Nao foi possivel confirmar o processamento; origem preservada para revisao.'}
                     _finalizar(origem, doc, 'falhou')
                     resumo['falharam'] += 1
@@ -296,6 +299,8 @@ def processar(limite=None, db_path=None):
                     _finalizar(arquivo, doc, 'processado')
                     resumo['processados'] += 1
                 except Exception as exc:
+                    atualizacoes.evento("fila.processar_erro", protocolo=doc['protocolo'], tentativa=doc['tentativas'],
+                                       erro=type(exc).__name__ + ": " + str(exc), traceback=traceback.format_exc())
                     if isinstance(exc, governanca.GovernancaError) and exc.status < 500:
                         doc['erro'] = {'codigo': exc.codigo, 'mensagem': exc.mensagem, 'detalhes': exc.detalhes}
                         _finalizar(arquivo, doc, 'rejeitado')
@@ -368,6 +373,13 @@ def main(argv=None):
     p.add_argument('--db')
     args = p.parse_args(argv)
     try:
+        if args.acao in ('processar', 'reprocessar'):
+            with atualizacoes.acompanhar('fila', acao=args.acao) as registro:
+                resultado = processar(args.limite, args.db) if args.acao == 'processar' else reprocessar(args.protocolo)
+                codigo = 1 if resultado.get('falharam') else 0
+                registro.terminar(codigo, resumo=resultado)
+                print(json.dumps(resultado, ensure_ascii=False, indent=2))
+                return codigo
         resultado = (verificar() if args.acao == 'verificar' else
                      processar(args.limite, args.db) if args.acao == 'processar' else
                      reprocessar(args.protocolo) if args.acao == 'reprocessar' else consultar(args.protocolo))

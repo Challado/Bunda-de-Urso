@@ -317,13 +317,22 @@ def baixar(url, etag=None, last_modified=None, method="GET", data=None,
         except NaoModificado:
             raise
         except ErroRetentavel as exc:
+            from core import atualizacoes
+            atualizacoes.registrar("http", {"etapa": "tentativa.erro", "url": url,
+                                           "tentativa": tentativa + 1, "max_tentativas": tentativas,
+                                           "erro": str(exc), "tipo": type(exc).__name__})
+            atualizacoes.evento("http.erro", url=url, tentativa=tentativa + 1, erro=str(exc))
             ultimo = exc
             if tentativa == tentativas - 1:
                 break
             espera = exc.espera if exc.espera is not None \
                 else min(15, 2 ** tentativa)
             _dormir(espera)
-        except ErroFonte:
+        except ErroFonte as exc:
+            from core import atualizacoes
+            atualizacoes.registrar("http", {"etapa": "tentativa.erro", "url": url,
+                                           "tentativa": tentativa + 1, "erro": str(exc), "tipo": type(exc).__name__})
+            atualizacoes.evento("http.erro", url=url, tentativa=tentativa + 1, erro=str(exc))
             raise
     raise ErroFonte("HTTP falhou apos %d tentativas: %s"
                     % (tentativas, ultimo)) from ultimo

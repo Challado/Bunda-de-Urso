@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core import config                                   # noqa: E402
 from core import db as dbmod                              # noqa: E402
+from core import atualizacoes                             # noqa: E402
 from coletor import agenda as agenda_mod                  # noqa: E402
 
 
@@ -143,6 +144,8 @@ def executar(db_path=None, agora=None, forcar=None, arquivos=None,
                     try:
                         origem = resolver()
                     except Exception as exc:            # noqa: BLE001
+                        import traceback
+                        atualizacoes.evento("resolver_url.erro", fonte=chave, erro=str(exc), traceback=traceback.format_exc())
                         resultados.append({
                             "fonte": chave, "acao": "erro",
                             "tipo": type(exc).__name__,
@@ -174,10 +177,14 @@ def executar(db_path=None, agora=None, forcar=None, arquivos=None,
                     try:
                         resultado["pos_coleta"] = _resolver_pos_coleta(spec)(conn)
                     except Exception as exc:               # noqa: BLE001
+                        import traceback
+                        atualizacoes.evento("pos_coleta.erro", fonte=chave, erro=str(exc), traceback=traceback.format_exc())
                         resultado["pos_coleta_erro"] = {
                             "tipo": type(exc).__name__, "detalhe": str(exc)[:200]}
                 resultados.append(resultado)
             except Exception as exc:                       # noqa: BLE001
+                import traceback
+                atualizacoes.evento("fonte.erro", fonte=chave, erro=str(exc), traceback=traceback.format_exc())
                 resultados.append({
                     "fonte": chave, "acao": "erro",
                     "tipo": type(exc).__name__, "detalhe": str(exc)[:200]})
@@ -231,8 +238,11 @@ def _main_servico(argv=None):
         if i:
             import time
             time.sleep(args.intervalo_tick)
-        res = executar(db_path=args.db, forcar=args.forcar,
-                       arquivos=arquivos, dry_run=args.dry_run)
+        with atualizacoes.acompanhar("tick", simulacao=args.dry_run) as registro:
+            res = executar(db_path=args.db, forcar=args.forcar,
+                           arquivos=arquivos, dry_run=args.dry_run)
+            falhas = [r for r in res if r["acao"] == "erro" or r.get("pos_coleta_erro")]
+            registro.terminar(1 if falhas else 0, resultados=res, falhas=len(falhas), total_fontes=len(res))
         print(json.dumps({"quando": agora_utc().isoformat(),
                           "resultados": res}, ensure_ascii=False),
               flush=True)

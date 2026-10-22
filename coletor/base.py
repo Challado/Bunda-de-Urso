@@ -13,9 +13,12 @@ import json
 import os
 import shutil
 import sqlite3
+import time
+import traceback
 
 from core import config
 from core import db as dbmod
+from core import atualizacoes
 
 
 def agora_utc():
@@ -165,6 +168,14 @@ class ColetorBase(object):
             "tentativas": 1,
         })
         self.conn.commit()
+        self._diario_coleta = {"execucao_id": exec_id, "recurso_id": recurso_id,
+                              "pid": os.getpid(),
+                              "fonte": self.FONTE["nome"], "recurso": self.RECURSO["nome"],
+                              "iniciado_em": agora_utc(), "estado": "em_andamento", "erros_validacao": []}
+        self._diario_coleta["arquivo_relatorio"] = str(os.path.join(
+            config.caminhos.data_dir(), "atualizacoes", "coleta-" + str(exec_id) + ".json"))
+        self._inicio_coleta = time.monotonic()
+        atualizacoes.registrar("coleta", self._diario_coleta, fonte=recurso_id, historico="coleta-" + str(exec_id))
         return exec_id
 
     def encerrar_execucao(self, exec_id, status, artefato_id=None,
@@ -186,6 +197,13 @@ class ColetorBase(object):
         self.conn.execute("UPDATE EXECUCAO_COLETA SET %s WHERE id=?" % sets,
                           list(campos.values()) + [exec_id])
         self.conn.commit()
+        diario = getattr(self, "_diario_coleta", {})
+        atualizacoes.registrar("coleta", {
+            **diario, "execucao_id": exec_id, "estado": status,
+            "terminado_em": agora_utc(), "artefato_id": artefato_id,
+            "duracao_s": round(time.monotonic() - getattr(self, "_inicio_coleta", time.monotonic()), 3),
+            "contadores": contadores,
+        }, fonte=diario.get("recurso_id", self.RECURSO["nome"]), historico="coleta-" + str(exec_id))
 
     # -- registro bruto ----------------------------------------------------
     def registrar_registro(self, artefato_id, ordem, identificador, payload):
@@ -282,6 +300,9 @@ class ColetorBase(object):
     # -- orquestracao ------------------------------------------------------
     ##-- BUNDITA DE URSO #{9} -- Rejeicoes perdiam a causa e falhas do programa eram publicadas como sucesso. ##
     def _rejeitar(self, registro_id, exec_id, codigo, descricao):
+        if hasattr(self, "_diario_coleta"):
+            self._diario_coleta["erros_validacao"].append({
+                "registro_id": registro_id, "execucao_id": exec_id, "codigo": codigo, "descricao": descricao})
         self.conn.execute("UPDATE REGISTRO_FONTE SET status_validacao='rejeitado' WHERE id=?",
                           (registro_id,))
         dbmod.insert(self.conn, "ERRO_VALIDACAO", {
@@ -425,7 +446,12 @@ class ColetorBase(object):
         fonte_id, recurso_id = self.garantir_referencias()
         exec_id = self.iniciar_execucao(recurso_id)
         try:
+            self._diario_coleta.update(etapa="download_e_leitura", origem=origem)
+            atualizacoes.registrar("coleta", self._diario_coleta, fonte=recurso_id)
             conteudo, ext, mime, registros = self.carregar(origem)
+            self._diario_coleta.update(etapa="normalizacao", recebidos=len(registros), bytes=len(conteudo),
+                                      hash_sha256=sha256_bytes(conteudo.encode("utf-8") if isinstance(conteudo, str) else conteudo))
+            atualizacoes.registrar("coleta", self._diario_coleta, fonte=recurso_id)
             # Snapshot repetido nao se reingere (spec 8.1-A / 17.4-3): a
             # pagina pode mudar so em token/contador, o que trocaria o hash
             # do artefato e duplicaria TODOS os registros (DER-MG 10/2026).
@@ -458,7 +484,7 @@ class ColetorBase(object):
             try:
                 self.encerrar_execucao(
                     exec_id, "erro", erro_codigo=type(exc).__name__,
-                    erro_detalhe=str(exc)[:500])
+                    erro_detalhe=str(exc)[:500], erro_completo=str(exc), traceback=traceback.format_exc())
             except Exception:      # pragma: no cover
                 pass
             raise
@@ -498,7 +524,7 @@ class ColetorBase(object):
             try:
                 self.encerrar_execucao(
                     exec_id, "erro", erro_codigo=type(exc).__name__,
-                    erro_detalhe=str(exc)[:500])
+                    erro_detalhe=str(exc)[:500], erro_completo=str(exc), traceback=traceback.format_exc())
             except Exception:      # pragma: no cover
                 pass
             raise
