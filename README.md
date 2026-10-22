@@ -107,6 +107,13 @@ A relação estadual da **AGETO/TO** também é coletada semanalmente, com GPS,
 rodovia/km, série e número Inmetro. A carga pode usar o PDF local quando o
 portal estiver indisponível. Veja [a fonte AGETO e os comandos pela API](docs/FONTE_AGETO_TO.md).
 
+No painel de gestão, **Cruzamentos** confere novamente as contribuições ativas,
+inclusive as já verificadas, com as fontes oficiais importadas. A tela de cada
+contribuição também oferece **Cruzar com fontes oficiais**. As sugestões mostram
+a fonte, a distância e divergências; a confirmação **Usar cadastro oficial** mantém
+o ponto oficial no mapa e preserva o histórico da contribuição duplicada.
+O cruzamento funciona sem IA. Veja [o fluxo e os endpoints](docs/CRUZAMENTOS.md).
+
 ## Assistência opcional
 
 IA vem **desligada por padrão**. O painel administrativo oferece extração de documentos,

@@ -101,6 +101,8 @@ ENDPOINTS_ADMINISTRATIVOS = {
     "/api/v1/gestao/pendentes": ["GET"],
     "/api/v1/gestao/radar/{id}": ["GET", "PATCH"],
     "/api/v1/gestao/radar/{id}/verificar": ["POST"],
+    "/api/v1/gestao/radar/{id}/cruzar": ["POST"],
+    "/api/v1/gestao/cruzamentos": ["POST"],
     "/api/v1/gestao/radar/{id}/desabilitar": ["POST"],
     "/api/v1/gestao/radar/{id}/remover": ["POST"],
     "/api/v1/gestao/radar/{id}/historico": ["GET"],
@@ -116,6 +118,8 @@ ENDPOINTS_ADMINISTRATIVOS = {
 }
 
 ENDPOINTS_DESC = {
+    "/api/v1/gestao/radar/{id}/cruzar": "Recruza contribuicao ativa, inclusive verificada, com fontes oficiais locais; gera sugestoes auditadas.",
+    "/api/v1/gestao/cruzamentos": "Recruza contribuicoes ativas em lotes de ate 20, com cursor e teto por ID; exige moderador.",
     "/api/v1/radares": "Pontos de fiscalizacao (radar instalado) num raio.",
     "/api/v1/radares/submeter": ("Submissao PUBLICA de radar (sem token): "
                                   "entra como colaborativo/nao verificado e "
@@ -904,6 +908,15 @@ def _gestao(conn, p, metodo, environ, stdin_bytes):
                 motivo=dados.get("motivo"))
             return _resp({"sucesso": True})
 
+        if partes == ["cruzamentos"]:
+            if metodo != "POST":
+                return _erro(405, "metodo_nao_permitido", "Use POST.")
+            governanca.exigir(ctx, "moderador")
+            from core import cruzamentos
+            dados = _corpo_json(stdin_bytes)
+            return _resp({"sucesso": True, "resultado": cruzamentos.cruzar_lote(
+                conn, dados, ctx, _ip_requisicao(environ))})
+
         # -- fila de pendentes --------------------------------------------
         if partes[:1] == ["pendentes"]:
             if metodo != "GET":
@@ -945,6 +958,11 @@ def _gestao(conn, p, metodo, environ, stdin_bytes):
             governanca.exigir(ctx, "moderador")
             dados = _corpo_json(stdin_bytes) or {}
             ip = _ip_requisicao(environ)
+            if acao == "cruzar":
+                from core import cruzamentos
+                resultado = cruzamentos.cruzar(conn, pid, ctx, ip)
+                return _resp({"sucesso": True, "resultado": resultado,
+                              "radar": governanca.obter_radar(conn, pid)})
             if acao == "verificar":
                 governanca.verificar_radar(conn, pid, ctx,
                                            motivo=dados.get("motivo"), ip=ip)

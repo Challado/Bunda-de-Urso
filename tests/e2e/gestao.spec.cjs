@@ -3,8 +3,8 @@ test.use({comGestao:true,processarFila:false});
 const rota=(caminho)=>'api.pse?rota='+encodeURIComponent(caminho)+'&formato=json';
 const caminho=(url)=>new URL(url).searchParams.get('rota');
 
-async function preparar(page,request,credenciais){
-  const envio=await request.post(rota('/api/v1/radares/submeter'),{data:{latitude:-23.55,longitude:-46.63,velocidade_geral:40}});
+async function preparar(page,request,credenciais,local={latitude:-23.55,longitude:-46.63,velocidade_geral:40}){
+  const envio=await request.post(rota('/api/v1/radares/submeter'),{data:local});
   expect(envio.status()).toBe(201);
   const id=(await envio.json()).resultado.cadastros[0].id;
   await page.goto('gestao.html');
@@ -58,6 +58,68 @@ test('remover limpa a tela e a fila e impede a página pública de continuar exi
   await expect(page.locator('#histRadar')).toContainText('Radar inexistente');
   await expect(page.locator('#btRemover,#btVerificar,#btSalvar')).toHaveCount(0);
   await publico.close();
+});
+
+test('radar já verificado pode ser recruzado e substituído pelo cadastro oficial mantendo histórico',async({page,request,credenciaisGestao})=>{
+  const id=await preparar(page,request,credenciaisGestao,{latitude:-24.9557,longitude:-53.4553,velocidade_geral:80});
+  await page.locator('#btVerificar').click();
+  await page.locator('#modalOk').click();
+  await expect(page.locator('#radarConteudo .pill.ok')).toHaveText('verificado');
+  for(let i=0;i<2;i++){
+    await page.locator('#btCruzarRadar').click();
+    await expect(page.locator('#resultadoCruzarRadar')).toContainText('1 correspondência(s)');
+    await expect(page.locator('#btCruzarRadar')).toBeEnabled();
+  }
+  const consulta=await page.request.get(rota('/api/v1/gestao/radar/'+id));
+  const radar=(await consulta.json()).radar;
+  expect(radar.correspondencias).toHaveLength(1);
+  expect(radar.governanca.verificacao_status).toBe('verificado');
+  const oficial=radar.correspondencias[0].oficial.id;
+  await expect(page.locator('#radarConteudo')).toContainText('ANTT');
+  await page.getByRole('button',{name:'Usar cadastro oficial',exact:true}).click();
+  await expect(page.locator('#modalCorpo')).toContainText('seu histórico é preservado');
+  await page.locator('#modalOk').click();
+  await expect(page.locator('#avisoGer')).toContainText('Cadastro oficial selecionado');
+  await expect(page.locator('#buscaId')).toHaveValue(oficial);
+  expect((await request.get(rota('/api/v1/radares/'+id))).status()).toBe(404);
+  expect((await request.get(rota('/api/v1/radares/'+oficial))).status()).toBe(200);
+  const historico=await page.request.get(rota('/api/v1/gestao/radar/'+id+'/historico'));
+  expect((await historico.json()).historico.some(h=>h.campos?.cruzamento_oficial)).toBe(true);
+});
+
+test('menu Cruzamentos inclui verificados e não verificados e abre resultados para revisão',async({page,request,credenciaisGestao})=>{
+  const id=await preparar(page,request,credenciaisGestao,{latitude:-24.9557,longitude:-53.4553,velocidade_geral:80});
+  expect((await page.request.post(rota('/api/v1/gestao/radar/'+id+'/verificar'),{data:{}})).status()).toBe(200);
+  expect((await request.post(rota('/api/v1/radares/submeter'),{data:{latitude:-23,longitude:-46,velocidade_geral:40}})).status()).toBe(201);
+  await page.getByRole('button',{name:'Cruzamentos',exact:true}).click();
+  await page.locator('#btCruzarTodos').click();
+  await expect(page.locator('#progressoCruzamento')).toContainText('Concluído. 2 cadastro(s)');
+  await expect(page.locator('#btCruzarTodos')).toBeEnabled();
+  await expect(page.locator('#progressoCruzamento')).toContainText('1 com correspondências');
+  await page.getByRole('button',{name:'Revisar '+id,exact:true}).click();
+  await expect(page.locator('#aba-radar')).toBeVisible();
+  await expect(page.locator('#buscaId')).toHaveValue(id);
+  await expect(page.locator('#radarConteudo .pill.ok')).toHaveText('verificado');
+});
+
+test('falhas de cruzamento liberam os botões para tentar novamente e preservam o radar',async({page,request,credenciaisGestao})=>{
+  const id=await preparar(page,request,credenciaisGestao);
+  await page.route('**/api.pse?**',r=>{
+    const c=caminho(r.request().url());
+    if(c==='/api/v1/gestao/cruzamentos' || c==='/api/v1/gestao/radar/'+id+'/cruzar')
+      return r.fulfill({status:503,json:{sucesso:false,erro:{mensagem:'Banco ocupado'}}});
+    return r.continue();
+  });
+  await page.locator('#btCruzarRadar').click();
+  await expect(page.locator('#resultadoCruzarRadar')).toContainText('Banco ocupado');
+  await expect(page.locator('#btCruzarRadar')).toBeEnabled();
+  await expect(page.locator('#buscaId')).toHaveValue(id);
+  await page.getByRole('button',{name:'Cruzamentos',exact:true}).click();
+  await page.locator('#btCruzarTodos').click();
+  await expect(page.locator('#progressoCruzamento')).toContainText('Interrompido: Banco ocupado');
+  await expect(page.locator('#btCruzarTodos')).toBeEnabled();
+  await expect(page.locator('#btPararCruzamento')).toBeHidden();
+  expect((await request.get(rota('/api/v1/radares/'+id))).status()).toBe(200);
 });
 
 test('Pendentes consulta novamente e ignora resposta antiga recebida depois da remoção',async({page,request,credenciaisGestao})=>{

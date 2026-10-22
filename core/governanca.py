@@ -780,15 +780,14 @@ def _complementar_por_proximidade(conn, ponto_id, candidatos):
 
 def _inserir_correspondencia(conn, colaborativo_id, oficial_id, distancia,
                             status):
-    if conn.execute("SELECT 1 FROM CORRESPONDENCIA_PONTO WHERE "
-                    "ponto_colaborativo_id=? AND ponto_oficial_id=?",
-                    (colaborativo_id, oficial_id)).fetchone():
-        return None
-    return dbmod.insert(conn, "CORRESPONDENCIA_PONTO", {
-        "ponto_colaborativo_id": colaborativo_id,
-        "ponto_oficial_id": oficial_id,
-        "distancia_metros": round(distancia, 3),
-        "status": status, "criado_em": _agora()})
+    # Duas chamadas CGI podem conferir o mesmo par simultaneamente.
+    # A restricao unica protege tanto o cadastro quanto o recruzamento.
+    row = conn.execute(
+        "INSERT INTO CORRESPONDENCIA_PONTO (ponto_colaborativo_id, ponto_oficial_id, "
+        "distancia_metros, status, criado_em) VALUES (?, ?, ?, ?, ?) "
+        "ON CONFLICT (ponto_colaborativo_id, ponto_oficial_id) DO NOTHING RETURNING id",
+        (colaborativo_id, oficial_id, round(distancia, 3), status, _agora())).fetchone()
+    return row[0] if row else None
 
 
 def correspondencias_do_ponto(conn, ponto_id):
@@ -1092,6 +1091,11 @@ def obter_radar(conn, ponto_id):
         "motivo_remocao": _scalar_ponto(conn, ponto_id, "motivo_remocao"),
     }
     reg["correspondencias"] = correspondencias_do_ponto(conn, ponto_id)
+    from .cruzamentos import evidencia
+    for correspondencia in reg["correspondencias"]:
+        correspondencia["oficial"] = evidencia(
+            conn, correspondencia["ponto_colaborativo_id"],
+            correspondencia["ponto_oficial_id"], correspondencia["distancia_metros"])
     return reg
 
 
@@ -1280,6 +1284,18 @@ def resolver_correspondencia(conn, correspondencia_id, status, ctx, motivo=None)
         raise GovernancaError(404, "correspondencia_nao_encontrada",
                               "correspondencia %s nao encontrada"
                               % correspondencia_id)
+    if row["resolvido_em"]:
+        if row["status"] == status:
+            return
+        raise GovernancaError(409, "correspondencia_resolvida",
+                              "Esta correspondência já foi decidida; a decisão foi preservada.")
+    from .cruzamentos import evidencia
+    atual = _resumo_ponto(conn, row["ponto_colaborativo_id"])
+    fonte = evidencia(conn, row["ponto_colaborativo_id"], row["ponto_oficial_id"])
+    if (not atual or atual["removido_em"] or atual["verificacao_status"] == "desabilitado"
+            or not fonte or not fonte["disponivel"]):
+        raise GovernancaError(409, "correspondencia_indisponivel",
+                              "O cadastro ou a fonte oficial não está mais disponível; refaça o cruzamento.")
     if status == "colaborativo_vence" and not (motivo or "").strip():
         raise GovernancaError(422, "motivo_obrigatorio",
                               "fundamente a substituicao do ponto oficial", campo="motivo")
