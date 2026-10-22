@@ -34,7 +34,22 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Instalar navegador e dependências no runner
-        run: npx playwright install --with-deps ${{ matrix.browser }}
+        run: |
+          NAVEGADOR=""
+          if [[ "${{ matrix.browser }}" == chromium ]]; then
+            for CANDIDATO in chromium chromium-browser google-chrome google-chrome-stable; do
+              if command -v "$CANDIDATO" >/dev/null; then
+                NAVEGADOR="$(command -v "$CANDIDATO")"
+                break
+              fi
+            done
+          fi
+          if [[ -n "$NAVEGADOR" ]]; then
+            "$NAVEGADOR" --version
+            printf 'RADAR_TEST_CHROMIUM=%s\n' "$NAVEGADOR" >> "$GITHUB_ENV"
+          else
+            npx playwright install --with-deps ${{ matrix.browser }}
+          fi
       - name: Cadastro e detalhe, API CGI e banco temporário (desktop e tela estreita)
         run: npx playwright test --project="${{ matrix.browser }}-*"
       - name: Relatório, capturas e rastreamentos
