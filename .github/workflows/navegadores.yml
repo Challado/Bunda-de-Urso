@@ -16,7 +16,8 @@ concurrency:
 jobs:
   cadastro:
     name: Cadastro e detalhe (${{ matrix.browser }})
-    runs-on: ubuntu-latest
+    # Playwright 1.58.2 suporta 24.04; ubuntu-latest migrou para 26.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
       fail-fast: false
