@@ -56,6 +56,20 @@ def _encerrar_navegador(proc, cdp):
     proc.wait(timeout=5)
 
 
+def _aguardar_endereco_cdp(arquivo, proc, prazo):
+    """Chromium cria DevToolsActivePort antes de escrever suas duas linhas."""
+    while proc.poll() is None and time.monotonic() < prazo:
+        try:
+            linhas = arquivo.read_text().splitlines()
+        except FileNotFoundError:
+            linhas = []
+        if (len(linhas) >= 2 and linhas[0].isdigit() and
+                0 < int(linhas[0]) <= 65535 and linhas[1].startswith('/devtools/browser/')):
+            return int(linhas[0]), linhas[1]
+        time.sleep(0.05)
+    raise http.ErroFonte("Chromium nao iniciou a exportacao publica (endereco CDP incompleto)")
+
+
 class _CDP:
     def __init__(self, porta, caminho, prazo):
         self.prazo, self.sequencia, self.eventos = prazo, 0, []
@@ -257,12 +271,8 @@ def baixar_xlsx(url, timeout=None, mostrar_tabela=False):
         diagnostico = {}
         try:
             porta_arquivo = perfil / "DevToolsActivePort"
-            while not porta_arquivo.exists():
-                if proc.poll() is not None or time.monotonic() >= prazo:
-                    raise http.ErroFonte("Chromium nao iniciou a exportacao publica")
-                time.sleep(0.1)
-            porta, caminho = porta_arquivo.read_text().splitlines()[:2]
-            cdp = _CDP(int(porta), caminho, prazo)
+            porta, caminho = _aguardar_endereco_cdp(porta_arquivo, proc, prazo)
+            cdp = _CDP(porta, caminho, prazo)
             cdp.chamar("Browser.setDownloadBehavior", {"behavior": "allow", "downloadPath": str(downloads)})
             alvo = cdp.chamar("Target.createTarget", {"url": "about:blank"})["targetId"]
             sessao = cdp.chamar("Target.attachToTarget", {"targetId": alvo, "flatten": True})["sessionId"]

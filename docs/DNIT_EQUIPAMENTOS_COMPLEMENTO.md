@@ -47,6 +47,12 @@ script ou XLSX recebido. Portanto, a coleta online continua **nao confirmada**.
 Timeout de socket agora tambem inclui contexto no erro registrado, em vez de
 apenas `TimeoutError: timed out`; ha um teste com servidor que nao responde.
 
+O teste Chromium no Actions tambem revelou uma corrida na inicializacao:
+`DevToolsActivePort` podia existir vazio ou com apenas a porta, causando
+`ValueError` antes de navegar. O coletor agora espera as duas linhas completas
+e validas dentro do prazo original. Um teste reproduz essas escritas parciais;
+o encerramento do processo continua garantido em caso de falha.
+
 Para permitir a complementacao sem depender dessa disponibilidade, a planilha
 exatamente como fornecida pelo operador fica em `importacoes/dnit/2026-10-22/`
 no repositorio privado, com manifesto de origem e SHA-256. O bootstrap aceita

@@ -11,8 +11,9 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from coletor import agenda, http, sync
 from coletor.exportacao_publica import baixar_xlsx
@@ -186,6 +187,24 @@ class DNITComplementoTest(unittest.TestCase):
 
 
 class ExportacaoPublicaTest(unittest.TestCase):
+    def test_aguarda_arquivo_de_controle_com_duas_linhas_completas(self):
+        from coletor.exportacao_publica import _aguardar_endereco_cdp
+        with tempfile.TemporaryDirectory() as pasta:
+            arquivo = Path(pasta) / 'DevToolsActivePort'
+            arquivo.write_text('')
+            def escrever():
+                time.sleep(.1)
+                arquivo.write_text('43210\n')
+                time.sleep(.1)
+                arquivo.write_text('43210\n/devtools/browser/teste\n')
+            thread = threading.Thread(target=escrever)
+            thread.start()
+            try:
+                self.assertEqual(_aguardar_endereco_cdp(arquivo, Mock(poll=lambda: None), time.monotonic() + 5),
+                                 (43210, '/devtools/browser/teste'))
+            finally:
+                thread.join()
+
     def test_erro_de_navegador_ausente_e_url_privada(self):
         with patch('coletor.exportacao_publica.shutil.which', return_value=None):
             with self.assertRaisesRegex(http.ErroFonte, 'Chromium'):
