@@ -91,6 +91,13 @@ class TestTick(unittest.TestCase):
         res = self._run(arquivos={"antt": common.ANTT_FIXTURE}, dry_run=True)
         self.assertEqual(res[0]["acao"], "executaria")
 
+    def test_dry_run_nao_acessa_descoberta_na_internet(self):
+        from unittest.mock import patch
+        with patch.object(ColetorANTT, "resolver_url", side_effect=AssertionError("Nao acessar rede")) as resolver:
+            res = self._run(dry_run=True)
+        resolver.assert_not_called()
+        self.assertEqual(res[0]["acao"], "executaria")
+
     def test_inativo(self):
         agenda = {"antt": dict(AGENDA["antt"], ativo=False)}
         res = self._run(agenda=agenda)
@@ -122,6 +129,12 @@ class TestTick(unittest.TestCase):
     def test_espera_minimo_em_erro(self):
         hist = [{"status": "erro", "iniciada_em": _ts(self.base)}]
         self.assertEqual(tick.espera_s(10, hist), 300)
+
+    def test_falhas_de_fontes_semanais_ou_anuais_nao_esperam_anos(self):
+        for intervalo in (7 * 86400, 365 * 86400):
+            self.assertEqual(tick.espera_s(intervalo, [{"status": "erro"}]), 3600)
+            self.assertEqual(tick.espera_s(intervalo, [{"status": "erro"}] * 10), 8 * 3600)
+            self.assertEqual(tick.espera_s(intervalo, [{"status": "ok"}]), intervalo)
 
     # -- gancho pos-coleta -------------------------------------------------
     def _agenda_com_pos(self, fn):

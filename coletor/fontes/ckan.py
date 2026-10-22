@@ -12,6 +12,7 @@ import json
 import re
 
 from core import config
+from core import atualizacoes
 from coletor import http
 
 
@@ -23,9 +24,14 @@ def package_show(base_url, dataset_id, timeout=None, tolerante=False):
     cadeia de certificado incompleta (``verificar_ssl=False``).
     """
     url = "%s/api/3/action/package_show?id=%s" % (base_url.rstrip("/"), dataset_id)
-    corpo, _headers, _url_final = http.baixar(
-        url, timeout=timeout, verificar_ssl=not tolerante)
-    dados = json.loads(corpo.decode("utf-8", "replace"))
+    try:
+        corpo, _headers, _url_final = http.baixar(
+            url, timeout=timeout, verificar_ssl=not tolerante)
+        dados = json.loads(corpo.decode("utf-8", "replace"))
+    except Exception as exc:
+        atualizacoes.evento("ckan.descoberta_erro", url=url, erro=str(exc),
+                           aviso="O conector pode recorrer a URL alternativa; isso nao confirma que ela esteja atualizada.")
+        raise
     if not dados.get("success"):
         raise RuntimeError("package_show falhou para %s" % dataset_id)
     return dados["result"].get("resources", [])

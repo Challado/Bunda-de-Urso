@@ -251,6 +251,11 @@ def _uma_tentativa(url, etag, last_modified, method, data, timeout, limite,
             if not corpo:
                 raise ErroFonte("HTTP %d com corpo vazio em %s"
                                 % (status, alvo))
+            amostra = corpo[:4096].lstrip().lower()
+            if amostra.startswith((b"<html", b"<!doctype html")) and any(
+                    trecho in amostra for trecho in (b"<title>request rejected</title>",
+                        b"the requested url was rejected", b"<title>access denied</title>")):
+                raise ErroFonte("HTTP %d com pagina de bloqueio de acesso, em vez do recurso publico: %s" % (status, alvo))
             try:
                 devolvidos = dict(resp.headers) if resp.headers else {}
             except (TypeError, ValueError):

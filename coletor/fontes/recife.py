@@ -63,7 +63,7 @@ class ColetorRecife(ColetorBase):
                 conteudo = f.read()
             ext = os.path.splitext(origem)[1].lower() or ".csv"
         else:
-            url = origem or self.RECURSO["url_recurso"]
+            url = origem or self.resolver_url()
             conteudo, _headers, _url_final = http.baixar(url)
             ext = ".csv"
         registros = self._parse_csv(conteudo)

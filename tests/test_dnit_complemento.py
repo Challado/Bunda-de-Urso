@@ -197,6 +197,10 @@ class ExportacaoPublicaTest(unittest.TestCase):
     def test_blob_real_sem_node_ou_playwright_no_coletor(self):
         exportar_blob_real()
 
+    @unittest.skipUnless(shutil.which('chromium') or os.environ.get('RADAR_TEST_CHROMIUM'), 'Chromium necessario para os cenarios de exportacao')
+    def test_menu_icone_iframe_carregamento_e_diagnostico_reais(self):
+        verificar_exportacao_robusta()
+
 
 def exportar_blob_real():
     """Tambem chamado pelo Actions Chromium, onde o navegador ja foi instalado."""
@@ -224,6 +228,58 @@ def exportar_blob_real():
             recebido = baixar_xlsx('http://127.0.0.1:' + str(servidor.server_port), timeout=25)
         if recebido != corpo:
             raise AssertionError('A exportacao blob nao preservou o arquivo XLSX')
+    finally:
+        servidor.shutdown(); servidor.server_close(); thread.join()
+
+
+def verificar_exportacao_robusta():
+    """Navegador real: fluxos comuns que antes viravam apenas timeout generico."""
+    corpo = MULTAS.read_bytes()
+    b64 = base64.b64encode(corpo).decode()
+    script = '''<script>function baixar(){const a=document.createElement('a');
+        a.href=URL.createObjectURL(new Blob([Uint8Array.from(atob(%s),c=>c.charCodeAt(0))]));
+        a.download='TabelaEquipamentosFiscalizacao.xlsx';a.click();}</script>''' % repr(b64)
+
+    class Handler(servidor_http.BaseHTTPRequestHandler):
+        def do_GET(self):
+            paginas = {
+                '/menu': '''<button aria-label="Baixar" onclick="this.insertAdjacentHTML('afterend',
+                    '<div role=menuitem onclick=baixar()>Excel</div>')"><img alt="Baixar"></button>''',
+                '/assincrono': '''<button mattooltip="Exportar Excel" onclick="window.n=(window.n||0)+1;if(n>1)baixar()">Arquivo</button>''',
+                '/frame': '<iframe src="/filho" width="600" height="300"></iframe>',
+                '/frame-reload': '<iframe id="f" src="/esperar" width="600" height="300"></iframe><script>setTimeout(()=>{f.src="/filho"},600)</script>',
+                '/esperar': 'Carregando dados publicos',
+                '/filho': '<button onclick="baixar()"><mat-icon>file_download</mat-icon></button>',
+                '/api-erro': '<script>fetch("/api-indisponivel")</script>',
+                '/javascript': '<script>setTimeout(()=>{throw Error("Falha demonstrativa na pagina")},250)</script>',
+                '/bloqueio': '<title>Request Rejected</title><p>The requested URL was rejected</p>',
+            }
+            self.send_response(503 if self.path == '/api-indisponivel' else 200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8'); self.end_headers()
+            self.wfile.write((paginas.get(self.path, 'Indisponivel') + script).encode())
+
+        def log_message(self, *args):
+            pass
+
+    servidor = servidor_http.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    thread = threading.Thread(target=servidor.serve_forever, daemon=True); thread.start()
+    real_which = shutil.which
+    navegador = os.environ.get('RADAR_TEST_CHROMIUM') or real_which('chromium')
+    try:
+        with patch('coletor.exportacao_publica.http.url_checada'), patch(
+                'coletor.exportacao_publica.shutil.which', side_effect=lambda n: navegador if n == 'chromium' else real_which(n)):
+            base = 'http://127.0.0.1:' + str(servidor.server_port)
+            for rota in ('/menu', '/assincrono', '/frame', '/frame-reload'):
+                if baixar_xlsx(base + rota, timeout=15) != corpo:
+                    raise AssertionError('Exportacao falhou: ' + rota)
+            for rota, esperado in (('/api-erro', '503'), ('/javascript', 'Falha demonstrativa'), ('/bloqueio', 'bloqueou acesso')):
+                try:
+                    baixar_xlsx(base + rota, timeout=3)
+                except http.ErroFonte as exc:
+                    if esperado not in str(exc):
+                        raise AssertionError('Diagnostico omitiu a causa: ' + str(exc)) from exc
+                else:
+                    raise AssertionError('Pagina com falha nao pode retornar planilha: ' + rota)
     finally:
         servidor.shutdown(); servidor.server_close(); thread.join()
 

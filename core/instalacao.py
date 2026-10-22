@@ -638,6 +638,11 @@ def _instalar(args, observacoes):
         if not pai.exists():
             _diretorio(pai, observacoes, modo=0o700)
     relatorio["observacoes"] = list(observacoes)
+    if args.aplicar:
+        # Atualiza o consolidado tambem com recursos que nao venceram ainda.
+        # O dry-run nao consulta portais nem baixa arquivos; usa somente a API.
+        _executar([sys.executable, str(dirs["web"] / "api.pse"), "tick", "--dry-run"],
+                  env=_ambiente(dirs["conf"]))
     atualizacoes.evento("relatorio", relatorio=relatorio)
     print(json.dumps(relatorio, ensure_ascii=False, indent=2))
     if args.relatorio:
@@ -718,6 +723,7 @@ def _preparar_servicos(observacoes=None):
         for unidade in alternativas:
             ativo = subprocess.run(["systemctl", "is-active", unidade], capture_output=True, timeout=15)
             atualizacoes.evento("servico.consulta", unidade=unidade, codigo_comando=ativo.returncode,
+                               codigo_esperado=ativo.returncode in (0, 3, 4),
                                stdout=ativo.stdout, stderr=ativo.stderr)
             if ativo.returncode == 0:
                 break

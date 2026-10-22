@@ -38,6 +38,18 @@ recurso, pois uma fonte pode ter publicacoes independentes. Cada item identifica
 a fonte, o recurso e a execucao. `arquivo_relatorio` aponta para o JSON individual;
 `bootstrap_id` relaciona a instalacao ao `.sh` que a iniciou.
 
+O instalador executa `api.pse tick --dry-run` ao terminar. Esta passada nao
+consulta a internet: inclui a ultima execucao de todos os recursos cadastrados,
+mesmo anterior a criacao do diario, usando LEFT JOIN. `resumo.falhas_atuais`
+identifica fonte, recurso e causa; `recursos_nunca_coletados` distingue ausencia
+de coleta de sucesso. A agenda atualiza esse panorama em cada passada e preserva
+tracebacks novos quando a execucao ja tem detalhamento completo.
+
+`codigo_esperado` identifica retornos normais de sondagem: systemctl pode devolver
+3 para unidade inativa e 4 para inexistente. Essas respostas continuam no log,
+mas nao entram em `erros` se houver uma alternativa ativa. Se nenhuma unidade
+do servico estiver ativa, a checagem agregada continua reprovada.
+
 `erros` preserva falhas observadas mesmo se uma etapa posterior conseguiu
 recuperar a operacao. `estado: ok` indica a conclusao, sem apagar erros de
 tentativas anteriores. As checagens iniciais podem apontar justamente os
@@ -60,6 +72,18 @@ seu grupo de processos e registram 143/130.
 O detalhamento comeca depois de instalar esta revisao. Nao recria mensagens de
 erros anteriores que nao foram guardadas. O banco preserva seu historico anterior
 de execucoes, consultavel pelas operacoes existentes da API.
+
+A primeira versao do diario incluia somente fontes executadas depois da
+instalacao. A revisao de 22/10 corrige isso: o ultimo estado historico de cada
+recurso tambem aparece no consolidado, com `origem_diagnostico: historico_do_banco`.
+O banco preserva mensagens antigas limitadas a 500 caracteres; nao e possivel
+reconstruir tracebacks antigos inexistentes. Fontes sem dataset estruturado
+mantem `status_integracao: pendente`, sem gerar radares a partir de noticias.
+
+Depois de falha, a espera exponencial usa base de ate uma hora e multiplicador
+de ate oito: entre cinco minutos e oito horas, conforme a fonte e as tentativas.
+A periodicidade semanal/anual continua igual depois de sucesso. Isso impede
+que uma falha de publicacao anual adie a proxima tentativa por anos.
 
 O bootstrap exige Python 3 basico para abrir o diario antes de preparar o Python
 3.13 do aplicativo. Sem Python 3, recusa antes de alterar o servidor. Se a

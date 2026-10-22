@@ -12,3 +12,15 @@ test('coletor exporta XLSX blob com Chromium e preserva o arquivo',async({browse
     RADAR_TEST_CHROMIUM:process.env.RADAR_TEST_CHROMIUM || chromium.executablePath()}});
   expect(resultado.stderr).toBe('');
 });
+
+test('exportacao trata menu, icone, iframe, carregamento e erros da pagina',async({browserName},info)=>{
+  test.skip(browserName!=='chromium' || info.project.name!=='chromium-desktop',
+    'O coletor de exportacao utiliza Chromium.');
+  test.setTimeout(65000);
+  const executar=promisify(execFile);
+  const resultado=await executar(process.env.RADAR_TEST_PYTHON || 'python3',[
+    '-c','from tests.test_dnit_complemento import verificar_exportacao_robusta; verificar_exportacao_robusta()'
+  ],{timeout:60000,env:{...process.env,
+    RADAR_TEST_CHROMIUM:process.env.RADAR_TEST_CHROMIUM || chromium.executablePath()}});
+  expect(resultado.stderr).toBe('');
+});

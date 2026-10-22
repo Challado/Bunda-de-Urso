@@ -10,19 +10,56 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import socket
 import struct
 import subprocess
 import tempfile
 import time
+import urllib.parse
 
 from coletor import http
-from core import config
+from core import config, atualizacoes
+
+
+def _url_diagnostico(url):
+    """Caminho publico basta; consultas podem carregar tokens de redirecionamento."""
+    partes = urllib.parse.urlsplit(url)
+    return urllib.parse.urlunsplit((partes.scheme, partes.hostname or "", partes.path, "", ""))
+
+
+def _encerrar_navegador(proc, cdp):
+    """Espera o navegador e encerra filhos antes de remover o perfil temporario."""
+    if cdp:
+        try:
+            if proc.poll() is None:
+                cdp.prazo = time.monotonic() + 2
+                cdp.chamar("Browser.close")
+        except (OSError, http.ErroFonte):
+            pass  # A conexao pode fechar justamente porque Browser.close funcionou.
+        finally:
+            cdp.sock.close()
+    try:
+        os.killpg(proc.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        pass
+    # O launcher pode ja ter terminado deixando renderizadores vivos. Todos
+    # pertencem a sessao exclusiva criada abaixo, sem atingir outros navegadores.
+    try:
+        os.killpg(proc.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    proc.wait(timeout=5)
 
 
 class _CDP:
     def __init__(self, porta, caminho, prazo):
         self.prazo, self.sequencia, self.eventos = prazo, 0, []
+        self.falhas, self.excecoes = [], []
         self.sock = socket.create_connection(("127.0.0.1", porta), timeout=10)
         nonce = base64.b64encode(os.urandom(16)).decode()
         pedido = ("GET %s HTTP/1.1\r\nHost: 127.0.0.1:%d\r\nUpgrade: websocket\r\n"
@@ -106,26 +143,78 @@ class _CDP:
                 if mensagem.get("error"):
                     raise http.ErroFonte("Falha no navegador: " + str(mensagem["error"].get("message")))
                 return mensagem.get("result", {})
-            # Somente a ultima resposta DOCUMENTO importa, sem acumular rede/segredos.
-            if mensagem.get("method") == "Network.responseReceived" and mensagem.get("params", {}).get("type") == "Document":
-                self.eventos[:] = [mensagem]
+            metodo, params = mensagem.get("method"), mensagem.get("params", {})
+            if metodo == "Network.responseReceived":
+                resposta = params.get("response", {})
+                if params.get("type") == "Document":
+                    self.eventos.append({"frameId": params.get("frameId"), "status": resposta.get("status"),
+                                         "url": _url_diagnostico(resposta.get("url", ""))})
+                    self.eventos[:] = self.eventos[-12:]
+                if resposta.get("status", 0) >= 400:
+                    self.falhas.append({"tipo": params.get("type"), "status": resposta["status"],
+                                        "url": _url_diagnostico(resposta.get("url", ""))})
+            elif metodo == "Network.loadingFailed":
+                self.falhas.append({"tipo": params.get("type"), "erro": params.get("errorText"),
+                                    "cancelado": params.get("canceled", False)})
+            elif metodo == "Runtime.exceptionThrown":
+                detalhes = params.get("exceptionDetails", {})
+                self.excecoes.append(atualizacoes.limpar(detalhes.get("exception", {}).get("description") or detalhes.get("text")))
+            self.falhas[:] = self.falhas[-12:]
+            self.excecoes[:] = self.excecoes[-8:]
 
 
 _EXPORTAR = r"""(() => {
- const corpo=(document.body?.innerText||'').slice(0,3000).toLowerCase();
- if (/verify you are human|confirme que voc[eê] [eé] humano|access denied|captcha/.test(corpo))
-   return {bloqueio:true};
- const candidatos=[...document.querySelectorAll('button,a,[role="button"],input[type="button"]')]
-  .filter(e=>e.getClientRects().length && !e.disabled)
-  .map(e=>({e,t:[e.innerText,e.value,e.title,e.getAttribute('aria-label'),e.getAttribute('download'),e.className,
-    ...[...e.querySelectorAll('i,span,svg')].map(x=>x.getAttribute('class'))].filter(Boolean).join(' ')}))
-  .filter(x=>/excel|\.xlsx|exportar|exporta[cç][aã]o|\bexport\b/i.test(x.t))
+ const corpo=(document.body?.innerText||'').slice(0,4000).toLowerCase();
+ const contexto={titulo:document.title,url:location.origin+location.pathname,pronto:document.readyState};
+ if (/verify you are human|confirme que voc[eê] [eé] humano|access denied|captcha|request rejected|requested url was rejected/.test(corpo))
+   return {...contexto,bloqueio:true};
+ const candidatos=[...document.querySelectorAll('button,a,[role="button"],[role="menuitem"],input[type="button"],input[type="submit"]')]
+  .filter(e=>e.getClientRects().length && getComputedStyle(e).visibility!=='hidden' && !e.disabled && e.getAttribute('aria-disabled')!=='true')
+  .map(e=>({e,t:[e.innerText,e.value,e.title,e.getAttribute('aria-label'),e.getAttribute('download'),
+    e.getAttribute('mattooltip'),e.getAttribute('data-original-title'),e.getAttribute('data-tooltip'),e.className,
+    ...[...e.querySelectorAll('i,span,svg,img,mat-icon')].flatMap(x=>[x.getAttribute('class'),x.getAttribute('alt'),x.getAttribute('title')])]
+    .filter(Boolean).join(' ').replace(/\s+/g,' ').slice(0,300)}))
+  .filter(x=>/excel|\.xlsx|exportar|exporta[cç][aã]o|\bexport\b|baixar|download|file_download|save_alt|get_app/i.test(x.t))
+  .filter(x=>!/pdf|\.csv|\bjson\b|imprimir/i.test(x.t) || /excel|xlsx/i.test(x.t))
   .sort((a,b)=>Number(/excel|xlsx/i.test(b.t))-Number(/excel|xlsx/i.test(a.t)));
- window.__radarExportados=window.__radarExportados||[];
- const alvo=candidatos.find(x=>!window.__radarExportados.includes(x.t));
- if(!alvo)return {aguardando:true};
- window.__radarExportados.push(alvo.t); alvo.e.click(); return {clicou:true};
+ window.__radarExportados=window.__radarExportados||new WeakMap();
+ const agora=Date.now();
+ const alvo=candidatos.find(x=>{const p=window.__radarExportados.get(x.e);return !p || (p.n<4 && agora-p.quando>=4000)});
+ const controles=candidatos.slice(0,12).map(x=>x.t);
+ if(!alvo)return {...contexto,aguardando:true,controles};
+ const n=(window.__radarExportados.get(alvo.e)?.n||0)+1;
+ window.__radarExportados.set(alvo.e,{n,quando:agora});
+ try {alvo.e.click();return {...contexto,clicou:true,rotulo:alvo.t,tentativa:n,controles}}
+ catch(e){return {...contexto,erroClique:String(e),rotulo:alvo.t,tentativa:n,controles}}
 })()"""
+
+
+def _contextos_exportacao(cdp, sessao, prazo, anexos):
+    """A exportacao pode estar num iframe, inclusive com processo separado."""
+    contextos = [(sessao, None)]
+    arvore = cdp.chamar("Page.getFrameTree", sessao=sessao).get("frameTree", {})
+    pendentes = list(arvore.get("childFrames", []))
+    while pendentes and len(contextos) < 8 and time.monotonic() < prazo:
+        ramo = pendentes.pop(0)
+        pendentes.extend(ramo.get("childFrames", []))
+        try:
+            mundo = cdp.chamar("Page.createIsolatedWorld", {
+                "frameId": ramo["frame"]["id"], "worldName": "radar-exportacao"}, sessao)
+            contextos.append((sessao, mundo["executionContextId"]))
+        except http.ErroFonte:
+            # Iframes de outra origem podem pertencer a outro processo CDP.
+            continue
+    alvos = cdp.chamar("Target.getTargets").get("targetInfos", [])
+    for alvo in alvos:
+        if alvo.get("type") != "iframe" or len(contextos) >= 8:
+            continue
+        if alvo["targetId"] not in anexos:
+            anexo = cdp.chamar("Target.attachToTarget", {"targetId": alvo["targetId"], "flatten": True})
+            anexos[alvo["targetId"]] = anexo["sessionId"]
+            cdp.chamar("Runtime.enable", sessao=anexo["sessionId"])
+            cdp.chamar("Network.enable", sessao=anexo["sessionId"])
+        contextos.append((anexos[alvo["targetId"]], None))
+    return contextos
 
 
 def baixar_xlsx(url, timeout=None):
@@ -148,8 +237,10 @@ def baixar_xlsx(url, timeout=None):
                  or os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy"))
         if proxy:
             cmd.insert(-1, "--proxy-server=" + proxy)
-        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        stderr = tempfile.TemporaryFile()
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=stderr, start_new_session=True)
         cdp = None
+        diagnostico = {}
         try:
             porta_arquivo = perfil / "DevToolsActivePort"
             while not porta_arquivo.exists():
@@ -163,35 +254,59 @@ def baixar_xlsx(url, timeout=None):
             sessao = cdp.chamar("Target.attachToTarget", {"targetId": alvo, "flatten": True})["sessionId"]
             cdp.chamar("Network.enable", sessao=sessao)
             cdp.chamar("Page.enable", sessao=sessao)
+            cdp.chamar("Runtime.enable", sessao=sessao)
             navegacao = cdp.chamar("Page.navigate", {"url": url}, sessao)
             if navegacao.get("errorText"):
                 raise http.ErroFonte("Navegacao publica falhou: " + navegacao["errorText"])
-            proximo_clique = 0
+            proximo_clique, proximo_contexto = 0, 0
+            contextos = [(sessao, None)]
+            anexos = {}
             while time.monotonic() < prazo:
+                if any(a.stat().st_size > http.MAX_BYTES_PADRAO for a in downloads.iterdir() if a.is_file()):
+                    raise http.ErroFonte("Download da planilha excede o limite de coleta")
                 for arquivo in downloads.glob("*.xlsx"):
                     if arquivo.is_file() and arquivo.stat().st_size > 0:
                         if arquivo.stat().st_size > http.MAX_BYTES_PADRAO:
                             raise http.ErroFonte("Planilha exportada excede o limite de coleta")
                         return arquivo.read_bytes()
                 for evento in cdp.eventos:
-                    status = evento["params"]["response"]["status"]
-                    if status >= 400:
+                    status = evento["status"]
+                    if status >= 400 and evento.get("frameId") == navegacao.get("frameId"):
                         raise http.ErroFonte("Pagina publica respondeu HTTP %d: %s" % (status, url))
                 if time.monotonic() >= proximo_clique:
-                    resultado = cdp.chamar("Runtime.evaluate", {
-                        "expression": _EXPORTAR, "returnByValue": True}, sessao)
-                    valor = resultado.get("result", {}).get("value", {})
-                    if valor.get("bloqueio"):
-                        raise http.ErroFonte("Pagina solicitou verificacao humana; exportacao interrompida")
-                    proximo_clique = time.monotonic() + (5 if valor.get("clicou") else 0.5)
+                    if time.monotonic() >= proximo_contexto:
+                        contextos = _contextos_exportacao(cdp, sessao, prazo, anexos)
+                        proximo_contexto = time.monotonic() + 5
+                    for contexto_sessao, contexto_id in contextos:
+                        parametros = {"expression": _EXPORTAR, "returnByValue": True}
+                        if contexto_id is not None:
+                            parametros["contextId"] = contexto_id
+                        try:
+                            resultado = cdp.chamar("Runtime.evaluate", parametros, contexto_sessao)
+                        except http.ErroFonte as exc:
+                            if any(t in str(exc) for t in ("Cannot find context", "Execution context was destroyed", "No frame with given", "Session with given id not found")):
+                                atualizacoes.evento("exportacao.contexto_alterado", aviso=str(exc))
+                                proximo_contexto = 0
+                                continue
+                            raise
+                        valor = resultado.get("result", {}).get("value") or {}
+                        diagnostico[valor.get("url", str(contexto_id))] = valor or {"excecao": resultado.get("exceptionDetails")}
+                        if valor.get("bloqueio") and contexto_sessao == sessao and contexto_id is None:
+                            raise http.ErroFonte("Pagina bloqueou acesso ou solicitou verificacao humana; exportacao interrompida")
+                        if valor.get("clicou") or valor.get("erroClique"):
+                            atualizacoes.evento("exportacao.clique", diagnostico=valor)
+                    proximo_clique = time.monotonic() + 0.5
                 time.sleep(0.1)
             raise http.ErroFonte("Pagina nao disponibilizou exportacao XLSX no prazo: " + url)
+        except Exception as exc:
+            stderr.seek(0)
+            navegador_stderr = stderr.read().decode("utf-8", "replace")
+            detalhe = {"pagina": diagnostico, "falhas_rede": cdp.falhas if cdp else [],
+                       "erros_javascript": cdp.excecoes if cdp else [], "stderr_navegador": navegador_stderr}
+            atualizacoes.evento("exportacao.erro", erro=str(exc), diagnostico=detalhe)
+            if isinstance(exc, http.ErroFonte):
+                raise http.ErroFonte(str(exc) + "; diagnostico=" + json.dumps(atualizacoes.limpar(detalhe), ensure_ascii=False)) from exc
+            raise
         finally:
-            if cdp:
-                cdp.sock.close()
-            proc.terminate()
-            try:
-                proc.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.wait(timeout=5)
+            _encerrar_navegador(proc, cdp)
+            stderr.close()

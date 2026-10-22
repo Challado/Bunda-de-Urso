@@ -1,0 +1,112 @@
+{
+  "revisao": "2026-10-22",
+  "consultado_em": "2026-10-22T19:08:29+00:00",
+  "versao_servidor": "bcf06de461df0872bf623ecdd30223406d4444c0",
+  "escopo": "Leitura da API publica e testes em banco temporario; sem acesso SSH nem modificacao da producao.",
+  "total_recursos": 50,
+  "ultimos_resultados": {
+    "ok": 18,
+    "erro": 7,
+    "sem_mudanca": 25
+  },
+  "falhas_atuais": [
+    {
+      "recurso_id": "RF-46",
+      "fonte": "DNIT - Controle de velocidade (PNCV)",
+      "recurso": "DNIT Multas - Equipamentos de fiscalizacao (exportacao XLSX)",
+      "iniciada_em": "2026-10-22T17:54:54+00:00",
+      "erro_codigo": "ErroFonte",
+      "erro_detalhe": "Pagina nao disponibilizou exportacao XLSX no prazo: https://servicos.dnit.gov.br/multas/informacoes/equipamentos-fiscalizacao",
+      "verificacao_externa": {
+        "recurso": "RF-46",
+        "erro": "HTTPError: HTTP Error 503: Service Unavailable"
+      },
+      "observacao": "HTTP 503 tambem com Chromium. Fluxos de exportacao testados localmente; coleta real permanece pendente."
+    },
+    {
+      "recurso_id": "RF-2",
+      "fonte": "Recife - Equipamentos de fiscalizacao de transito",
+      "recurso": "equipamentos-de-monitoramento (CSV)",
+      "iniciada_em": "2026-10-22T17:41:35+00:00",
+      "erro_codigo": "ErroFonte",
+      "erro_detalhe": "HTTP falhou apos 3 tentativas: Falha de rede em https://dados.recife.pe.gov.br/dataset/9acffb30-ed06-4b16-84ff-710478f18760/resource/36c2b47b-f439-4895-8b65-3f3dda36a4a7/download/lista-de-equipamentos-de-fiscalizacao-de-transito.csv: timed out",
+      "verificacao_externa": {
+        "recurso": "RF-2",
+        "erro": "HTTPError: HTTP Error 503: Service Unavailable"
+      }
+    },
+    {
+      "recurso_id": "RF-1",
+      "fonte": "ANTT - Dados dos radares em rodovias concedidas",
+      "recurso": "dados-dos-radares (JSON/CSV por edicao)",
+      "iniciada_em": "2026-10-22T16:56:35+00:00",
+      "erro_codigo": "ErroFonte",
+      "erro_detalhe": "HTTP falhou apos 3 tentativas: Falha de rede em https://dados.antt.gov.br/dataset/79d287f4-f5ca-4385-a17c-f61f53831f17/resource/eaace43a-aedf-4f69-949e-5001ae54173b/download/dados-dos-radares6_2026.json: [Errno 104] Connection reset by peer",
+      "verificacao_externa": {
+        "recurso": "RF-1",
+        "status": 200,
+        "bytes": 246,
+        "tipo": "text/html; charset=utf-8",
+        "url": "https://dados.antt.gov.br/dataset/79d287f4-f5ca-4385-a17c-f61f53831f17"
+      },
+      "observacao": "HTTP 200 devolveu HTML Request Rejected tambem na API CKAN; sem arquivo novo confirmado."
+    },
+    {
+      "recurso_id": "RF-29",
+      "fonte": "STTU Natal - portal institucional (sem cadastro estadual)",
+      "recurso": "portal STTU Natal (sem cadastro estadual de equipamentos)",
+      "iniciada_em": "2026-10-17T21:21:48+00:00",
+      "erro_codigo": "ErroFonte",
+      "erro_detalhe": "HTTP falhou apos 3 tentativas: HTTP 500 em https://www.natal.rn.gov.br/sttu",
+      "verificacao_externa": {
+        "recurso": "RF-29",
+        "erro": "HTTPError: HTTP Error 404: Not Found"
+      },
+      "observacao": "Portal institucional sem lista estruturada; endereco respondeu 404 nesta verificacao."
+    },
+    {
+      "recurso_id": "RF-27",
+      "fonte": "IMMU Manaus - Fiscalizacao eletronica (locais)",
+      "recurso": "locais de fiscalizacao eletronica (lista HTML por categoria)",
+      "iniciada_em": "2026-10-17T21:20:12+00:00",
+      "erro_codigo": "ErroFonte",
+      "erro_detalhe": "HTTP falhou apos 3 tentativas: Falha de rede em https://www.manaus.am.gov.br/noticia/transito/fiscalizacao-eletronica-salvar-vidas/: timed out",
+      "verificacao_externa": {
+        "recurso": "RF-27",
+        "status": 200,
+        "bytes": 2548018,
+        "tipo": "text/html; charset=UTF-8",
+        "url": "https://www.manaus.am.gov.br/noticia/transito/fiscalizacao-eletronica-salvar-vidas/"
+      },
+      "observacao": "Pagina respondeu 200. Coleta pela API em banco temporario importou 34 registros, zero rejeicoes; producao nao foi alterada."
+    },
+    {
+      "recurso_id": "RF-25",
+      "fonte": "Detran-MA - Fiscalizacao eletronica de velocidade",
+      "recurso": "Fiscalizacao eletronica (lista de radares instalados, PDF)",
+      "iniciada_em": "2026-10-17T21:18:35+00:00",
+      "erro_codigo": "ErroFonte",
+      "erro_detalhe": "HTTP falhou apos 3 tentativas: Falha de rede em https://sgp5.detran.ma.gov.br/uploads/midias/uf4n8qryt82xiqdp8nu5mv5i1ocvry.pdf: timed out",
+      "verificacao_externa": {
+        "recurso": "RF-25",
+        "erro": "URLError: <urlopen error Tunnel connection failed: 502 Bad Gateway>"
+      }
+    },
+    {
+      "recurso_id": "RF-15",
+      "fonte": "Boa Vista SMST - Locais de radares (noticia 2024)",
+      "recurso": "noticia historica sobre instalacao de radares (2024)",
+      "iniciada_em": "2026-10-17T21:16:10+00:00",
+      "erro_codigo": "lote_sem_registros_validos",
+      "erro_detalhe": null,
+      "verificacao_externa": {
+        "recurso": "RF-15",
+        "status": 200,
+        "bytes": 38618,
+        "tipo": "text/html; charset=UTF-8",
+        "url": "https://boavista.rr.gov.br/noticias/2024/1/prefeitura-instala-novos-equipamentos-de-fiscalizacao-eletronica-para-reduzir-acidentes-em-boa-vista"
+      },
+      "observacao": "Noticia historica com lista em imagem, integracao pendente; nao constitui cadastro estruturado atual."
+    }
+  ]
+}

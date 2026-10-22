@@ -351,8 +351,11 @@ for _chave, _classe in dict(NOVAS_FONTES, cetsp=ColetorCETSP,
         "intervalo_s": SEMANA, "url_direta": None, "ativo": True,
     }
 
-# Teto do backoff apos erro consecutivo (multiplicador sobre intervalo_s).
+# Teto do backoff apos erro consecutivo (multiplicador sobre a base limitada).
 BACKOFF_TETO = 8
+# Uma publicacao semanal/anual nao deve demorar semanas/anos para retentar
+# uma falha temporaria. A agenda normal permanece igual depois de sucesso.
+BACKOFF_BASE_MAX_S = HORA
 # Espera minima apos erro, em segundos (evita retentar a cada minuto).
 BACKOFF_MINIMO_S = 300
 

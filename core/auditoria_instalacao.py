@@ -78,6 +78,7 @@ def ler_crontab():
     # Cron pode conter comandos de outros projetos com credenciais. Seu texto
     # permanece no backup restrito; o diario registra somente o resultado.
     atualizacoes.evento("cron.ler", codigo_comando=res.returncode,
+                       codigo_esperado=res.returncode == 1 and "no crontab for" in res.stderr.lower(),
                        stderr=res.stderr, tem_crontab=res.returncode == 0)
     if res.returncode == 0:
         return res.stdout
@@ -189,12 +190,15 @@ def ambiente_servidor(laboratorio=False):
                                    text=True, timeout=15)
                 from . import atualizacoes
                 atualizacoes.evento("auditoria.servico", unidade=unidade, codigo_comando=r.returncode,
+                                   codigo_esperado=r.returncode in (0, 3, 4),
                                    stdout=r.stdout, stderr=r.stderr)
                 if r.returncode == 0:
                     ativos.append(unidade)
             resultados.append({"checagem": "servico." + alternativas[0].split(".")[0],
                                "estado": "ok" if ativos else "erro",
                                "detalhe": ", ".join(ativos) if ativos else "servico inativo ou indisponivel; confira antes de aplicar"})
+            atualizacoes.evento("auditoria.servico.resultado", alternativas=list(alternativas), ativos=ativos,
+                               erro=None if ativos else "Nenhuma unidade ativa: " + ", ".join(alternativas))
     if shutil.which("nginx"):
         r = subprocess.run(["nginx", "-t"], capture_output=True, text=True, timeout=30)
         from . import atualizacoes

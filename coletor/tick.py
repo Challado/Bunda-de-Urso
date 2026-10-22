@@ -71,7 +71,7 @@ def espera_s(intervalo_s, hist):
             break
         erros += 1
     fator = min(2 ** max(erros - 1, 0), agenda_mod.BACKOFF_TETO)
-    base = intervalo_s if intervalo_s and intervalo_s > 0 else 0
+    base = min(intervalo_s, agenda_mod.BACKOFF_BASE_MAX_S) if intervalo_s and intervalo_s > 0 else 0
     return max(base * fator, agenda_mod.BACKOFF_MINIMO_S)
 
 
@@ -114,6 +114,44 @@ def _resolver_pos_coleta(spec):
     return getattr(importlib.import_module(nome_mod), nome_fn)
 
 
+def _registrar_estado_recursos(conn, agenda, resultados):
+    """Inclui a ultima tentativa de TODOS os recursos, mesmo antes do diario.
+
+    Consulta local pela mesma operacao da API, sem download e sem perder fontes
+    sem execucao. Um tick ocioso nao transforma uma coleta anterior com erro em ok.
+    """
+    itens = {(v["conector"].FONTE["nome"], v["conector"].RECURSO["nome"]): (k, v)
+             for k, v in agenda.items()}
+    decisoes = {v["fonte"]: v for v in resultados}
+    recursos = []
+    for row in dbmod.query_all(conn, """
+        SELECT rf.id AS recurso_id, f.nome AS fonte, rf.nome AS recurso, rf.status_integracao,
+               e.id AS execucao_id, e.status, e.iniciada_em, e.terminada_em,
+               e.erro_codigo, e.erro_detalhe, e.http_status, e.linhas_recebidas,
+               e.linhas_validas, e.linhas_rejeitadas, e.registros_criados, e.registros_alterados
+        FROM RECURSO_FONTE rf
+        LEFT JOIN FONTE f ON f.id = rf.fonte_id
+        LEFT JOIN EXECUCAO_COLETA e ON e.id = (
+            SELECT u.id FROM EXECUCAO_COLETA u WHERE u.recurso_id = rf.id ORDER BY u.id DESC LIMIT 1)
+        ORDER BY rf.id
+    """):
+        chave, item = itens.get((row["fonte"], row["recurso"]), (None, {}))
+        recursos.append({
+            "recurso_id": row["recurso_id"], "execucao_id": row["execucao_id"],
+            "fonte": row["fonte"], "recurso": row["recurso"],
+            "status_integracao": row["status_integracao"],
+            "estado": row["status"] or "nunca_coletado",
+            "iniciado_em": row["iniciada_em"], "terminado_em": row["terminada_em"],
+            "origem_diagnostico": "historico_do_banco",
+            "contadores": {k: row[k] for k in ("erro_codigo", "erro_detalhe", "http_status",
+                "linhas_recebidas", "linhas_validas", "linhas_rejeitadas", "registros_criados", "registros_alterados")},
+            "agenda": {"conector": chave, "gerenciada": chave is not None,
+                       "ativa": item.get("ativo", True) if chave else None,
+                       "intervalo_s": item.get("intervalo_s"), "decisao": decisoes.get(chave)},
+        })
+    atualizacoes.registrar("agenda", {"estado": "ok", "total_recursos": len(recursos)}, recursos=recursos)
+
+
 def executar(db_path=None, agora=None, forcar=None, arquivos=None,
              dry_run=False, agenda=None):
     """Uma passada. Retorna a lista de decisoes (testavel sem rede)."""
@@ -137,6 +175,11 @@ def executar(db_path=None, agora=None, forcar=None, arquivos=None,
                     "intervalo_s": item.get("intervalo_s"),
                     "faltam_s": diag.get("faltam_s")})
                 continue
+            if dry_run:
+                resultados.append({"fonte": chave, "acao": "executaria", "motivo": diag["motivo"],
+                                   "origem": arquivos.get(chave) or item.get("url_direta"),
+                                   "origem_a_resolver": not bool(arquivos.get(chave) or item.get("url_direta"))})
+                continue
             origem = arquivos.get(chave) or item.get("url_direta")
             if origem is None:
                 resolver = getattr(item["conector"], "resolver_url", None)
@@ -155,11 +198,6 @@ def executar(db_path=None, agora=None, forcar=None, arquivos=None,
                 resultados.append({
                     "fonte": chave, "acao": "pulado",
                     "motivo": "sem_origem"})
-                continue
-            if dry_run:
-                resultados.append({
-                    "fonte": chave, "acao": "executaria",
-                    "motivo": diag["motivo"], "origem": origem})
                 continue
             conector = item["conector"](conn=conn)
             try:
@@ -188,6 +226,7 @@ def executar(db_path=None, agora=None, forcar=None, arquivos=None,
                 resultados.append({
                     "fonte": chave, "acao": "erro",
                     "tipo": type(exc).__name__, "detalhe": str(exc)[:200]})
+        _registrar_estado_recursos(conn, agenda, resultados)
     finally:
         conn.close()
     return resultados

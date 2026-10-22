@@ -34,14 +34,14 @@ def limpar(valor):
         return limpar(valor.decode("utf-8", errors="replace"))
     if isinstance(valor, dict):
         return {str(k): "[oculto]" if re.search(
-            r"(?i)(senha|password|secret|token|authorization|api[_-]?key|chave)", str(k))
+            r"(?i)(senha|password|secret|token|authorization|api[_-]?key|user_content_key|signature|chave)", str(k))
                 else limpar(v) for k, v in valor.items()}
     if isinstance(valor, (list, tuple)):
         return [limpar(v) for v in valor]
     if isinstance(valor, str):
         valor = re.sub(r"(https?://)[^\s/@]+:[^\s/@]+@", r"\1[oculto]@", valor)
         valor = re.sub(r"(?i)(authorization\s*[:=]\s*)(?:bearer\s+)?[^\r\n]+", r"\1[oculto]", valor)
-        return re.sub(r"(?i)((?:password|senha|secret|token|api[_-]?key|chave)\s*[\"']?\s*[:=]\s*[\"']?)[^\s\"'&,}\r\n]+",
+        return re.sub(r"(?i)((?:password|senha|secret|token|api[_-]?key|user_content_key|signature|chave)\s*[\"']?\s*[:=]\s*[\"']?)[^\s\"'&,}\r\n]+",
                       r"\1[oculto]", valor)
     return valor if valor is None or isinstance(valor, (int, float, bool)) else str(valor)
 
@@ -78,7 +78,7 @@ def _marcar_interrompidos(estado, pasta):
                 pass
 
 
-def registrar(operacao, dados, *, fonte=None, historico=None):
+def registrar(operacao, dados, *, fonte=None, historico=None, recursos=None):
     """Lock+rename impedem perder outras fontes ou publicar JSON pela metade.
 
     Sem radar.conf, desenvolvimento/testes continuam sem arquivos operacionais.
@@ -119,11 +119,26 @@ def registrar(operacao, dados, *, fonte=None, historico=None):
                 estado.setdefault("fontes", {})[str(fonte)] = evento
             else:
                 estado.setdefault("operacoes", {})[operacao] = evento
+            for recurso in recursos or ():
+                novo = limpar(recurso)
+                chave = str(novo["recurso_id"])
+                anterior = estado.setdefault("fontes", {}).get(chave, {})
+                # O banco completa o historico anterior a este diario. Nao
+                # substitui traceback/bytes/origem de uma execucao ja detalhada.
+                if anterior.get("execucao_id") == novo.get("execucao_id") and anterior:
+                    novo = {**novo, **anterior, "agenda": novo.get("agenda", {})}
+                estado["fontes"][chave] = novo
             estado["resumo"] = {
                 "operacoes_com_erro": [k for k, v in estado.get("operacoes", {}).items() if v.get("estado") in ("erro", "interrompido")],
                 "fontes_com_erro": [k for k, v in estado.get("fontes", {}).items() if v.get("estado") in ("erro", "interrompido")],
                 "fontes_em_andamento": [k for k, v in estado.get("fontes", {}).items() if v.get("estado") == "em_andamento"],
                 "total_recursos_acompanhados": len(estado.get("fontes", {})),
+                "recursos_nunca_coletados": [k for k, v in estado.get("fontes", {}).items() if v.get("estado") == "nunca_coletado"],
+                "falhas_atuais": [{"recurso_id": k, "fonte": v.get("fonte"), "recurso": v.get("recurso"),
+                                   "estado": v.get("estado"),
+                                   "erro_codigo": v.get("contadores", {}).get("erro_codigo"),
+                                   "causa": v.get("contadores", {}).get("erro_detalhe") or v.get("erro")}
+                                  for k, v in estado.get("fontes", {}).items() if v.get("estado") in ("erro", "interrompido")],
             }
             # O append fica dentro do mesmo lock que protege o resumo.
             with log.open("a") as saida:
@@ -162,7 +177,7 @@ class Registro:
 
     def evento(self, etapa, **dados):
         item = limpar({"etapa": etapa, "quando": agora(), **dados})
-        if dados.get("erro") or dados.get("codigo_comando", 0):
+        if dados.get("erro") or (dados.get("codigo_comando", 0) and not dados.get("codigo_esperado", False)):
             self.dados["erros"].append(item)
         for checagem in dados.get("relatorio", {}).get("checagens", []):
             if checagem.get("estado") == "erro":
