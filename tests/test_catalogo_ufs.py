@@ -121,7 +121,7 @@ class CatalogoUFsTest(unittest.TestCase):
         self.assertEqual(por_uf["SP"]["nosso_modulo"], "dersp")
         self.assertEqual(por_uf["PR"]["nosso_modulo"], "derpr")
         self.assertEqual(por_uf["MG"]["nosso_modulo"], "dermg")
-        self.assertEqual(por_uf["PE"]["nosso_modulo"], "recife")
+        self.assertEqual(por_uf["PE"]["nosso_modulo"], "der_pe_lombadas")
         # complemento municipal de MG
         municipais = por_uf["MG"].get("modulos_municipais", [])
         self.assertIn("pbh", [m.get("modulo") for m in municipais])
@@ -131,15 +131,29 @@ class CatalogoUFsTest(unittest.TestCase):
         por_uf = {e["uf"]: e for e in self.ufs}
         esperado = {
             "GO": "goinfra", "BA": "seinfra_ba", "CE": "amc_ce",
-            "RJ": "der_rj", "RS": "daer_rs", "ES": "cariacica_es",
-            "SC": "joinville_sc", "AM": "immu_am", "MS": "agetran_ms",
-            "PB": "semob_pb", "AP": "ctmac_ap", "RO": "semtran_ro",
-            "PA": "segbell_pa", "DF": "detran_df", "MA": "detran_ma",
+            "RJ": "der_rj", "RS": "daer_rs", "ES": "der_es",
+            "SC": "sie_sc_portateis", "AM": "immu_am", "MS": "agetran_ms",
+            "PB": "semob_pb", "RO": "semtran_ro",
+            "DF": "detran_df", "MA": "detran_ma",
             "SE": "der_se", "TO": "ageto_to",
         }
         for uf, modulo in esperado.items():
             self.assertEqual(por_uf[uf]["nosso_modulo"], modulo,
                              "UF %s com modulo inesperado" % uf)
+
+    def test_catalogo_separa_esfera_e_nao_conta_diagnostico_como_pontos(self):
+        from coletor.agenda import AGENDA_PADRAO
+        por_uf = {e["uf"]: e for e in self.ufs}
+        for uf in ("AP", "PA"):
+            self.assertIsNone(por_uf[uf]["nosso_modulo"])
+            self.assertTrue(por_uf[uf]["modulo_diagnostico"])
+        for e in self.ufs:
+            self.assertIs(e["cobertura_municipal_confirmada"], False)
+            for lista, esferas in (("fontes_estaduais", ("estadual", "distrital")),
+                                    ("modulos_municipais", ("municipal",))):
+                for fonte in e[lista]:
+                    cls = AGENDA_PADRAO[fonte["modulo"]]["conector"]
+                    self.assertIn(cls.FONTE["esfera"], esferas)
 
     def test_diagnosticos_4_ufs_finais(self):
         # AC/AL/RN/PI: conector diagnostico que DOCUMENTA a ausencia de

@@ -1,90 +1,85 @@
-# Radar Brasil — Acompanhamento da cobertura das 27 UFs
+# Cobertura estadual e municipal — 22/10/2026
 
-Tabela de acompanhamento nacional. Este documento **nao** comprova cobertura: a
-existencia de uma fonte municipal **nao cobre** todas as rodovias/municipios do
-estado. `cobertura_estadual_confirmada` permanece **false** ate auditoria por
-circunscricao (municipios/rodovias efetivamente inventariados).
+O Brasil tem 26 estados e o Distrito Federal. O catalogo de fontes abrange as 27 UFs; **a coleta ainda nao cobre todos os radares estaduais nem todos os municipios**. Inmetro e fontes federais sao camadas independentes e nao substituem cadastro de cada orgao.
 
-- Legenda de evidencia: `conjunto_dados` / `geoarquivo_oficial` (recurso
-  anunciado CSV/XLSX/KML/GeoJSON); `relatorio_oficial` / `lista_documentos` /
-  `lista_localizacao` (documento/lista oficial, pode exigir PDF/HTML e
-  geocodificacao); `lista_trechos` (trechos elegiveis, nunca radar fixo
-  comprovado); `lista_historica` (publicacao historica, nao prova situacao
-  atual); `institucional_sem_lista` (orgao oficial sem publicacao de lista —
-  requer LAI).
-- Status nosso: `implementado` (existe conector no repo), `parcial` (conector
-  cobre apenas parte da circunscricao), `pendente`, `pendente_lai` (so ha dado
-  historico), `sem_publicacao` (sem lista publicada; requer LAI/contato).
-- A coluna **Modulo** traz o conector do repo. Em `AC`/`AL`/`RN`/`PI` existe um
-  conector **diagnostico** (documenta a ausencia de cadastro; `normalizar`→None),
-  por isso `nosso_modulo` fica `null` no catalogo.
-- Fonte de verdade maquina-legivel: `coletor/catalogo_ufs.json`.
+A tabela conta conectores que importam dados. Fontes somente documentais/diagnosticas nao contam como cobertura. Um conector estadual pode publicar apenas locais elegiveis ou parte do seu inventario.
 
-## Tabela por UF
+| UF | Estado | Fontes estaduais/distritais | Fontes municipais |
+|---|---|---|---|
+| AC | Acre | Cadastro estadual ainda nao integrado | Cadastro municipal ainda nao integrado |
+| AL | Alagoas | Cadastro estadual ainda nao integrado | Cadastro municipal ainda nao integrado |
+| AP | Amapá | Cadastro estadual ainda nao integrado | Cadastro municipal ainda nao integrado |
+| AM | Amazonas | Cadastro estadual ainda nao integrado | `immu_am` |
+| BA | Bahia | `seinfra_ba` | `salvador_ba` |
+| CE | Ceará | Cadastro estadual ainda nao integrado | `amc_ce` |
+| DF | Distrito Federal | `detran_df` | Cadastro municipal ainda nao integrado |
+| ES | Espírito Santo | `der_es` | `cariacica_es` |
+| GO | Goiás | `goinfra` | Cadastro municipal ainda nao integrado |
+| MA | Maranhão | `detran_ma` | Cadastro municipal ainda nao integrado |
+| MT | Mato Grosso | Cadastro estadual ainda nao integrado | Cadastro municipal ainda nao integrado |
+| MS | Mato Grosso do Sul | Cadastro estadual ainda nao integrado | `agetran_ms` |
+| MG | Minas Gerais | `dermg` | `pbh` |
+| PR | Paraná | `derpr` | `curitiba_pr` |
+| PB | Paraíba | Cadastro estadual ainda nao integrado | `semob_pb` |
+| PA | Pará | Cadastro estadual ainda nao integrado | Cadastro municipal ainda nao integrado |
+| PE | Pernambuco | `der_pe_lombadas`, `der_pe_mistos` | `recife` |
+| PI | Piauí | Cadastro estadual ainda nao integrado | Cadastro municipal ainda nao integrado |
+| RN | Rio Grande do Norte | Cadastro estadual ainda nao integrado | Cadastro municipal ainda nao integrado |
+| RS | Rio Grande do Sul | `daer_rs`, `daer_rs_fixos`, `daer_rs_redutores` | Cadastro municipal ainda nao integrado |
+| RJ | Rio de Janeiro | `der_rj` | Cadastro municipal ainda nao integrado |
+| RO | Rondônia | Cadastro estadual ainda nao integrado | `semtran_ro` |
+| RR | Roraima | Cadastro estadual ainda nao integrado | Cadastro municipal ainda nao integrado |
+| SC | Santa Catarina | `sie_sc_portateis`, `sie_sc_locais` | `joinville_cadastro_sc` |
+| SE | Sergipe | `der_se` | `aracaju_se` |
+| SP | São Paulo | `dersp` | `cetsp` |
+| TO | Tocantins | `ageto_to` | `araguaiana_to` |
 
-| UF | Fonte | Evidencia | URL oficial | Status nosso | Modulo | O que falta |
-|----|-------|-----------|-------------|--------------|--------|-------------|
-| AC | Detran-AC - portal institucional / relato historico | institucional_sem_lista (**historico**, 2013) | https://www.detran.ac.gov.br/ | pendente_lai | diagnostico `detran_ac` | Portal so oferece consulta de autos/convênios; noticia de 2013 (agencia.ac.gov.br) esta HTTP 503. Cadastro atual via LAI (Detran-AC/DERACRE) |
-| AL | DER-AL - canal institucional | institucional_sem_lista (**sem publicacao de lista**) | https://alagoasdigital.al.gov.br/orgao/49 | sem_publicacao | diagnostico `der_al` | Lista oficial via LAI (DER-AL/DMT Maceio); der.al.gov.br fora do ar; cameras nao provam radar de velocidade |
-| AP | CTMac Macapa - pontos publicados | lista_localizacao_historica | https://macapa.ap.gov.br/radares-de-macapa-passam-a-ter-velocidade-maxima-permitida-de-60-km-h-a-partir-desta-terca-21/ | implementado | `ctmac_ap` | Lista de 17 locais (2022); localizar publicacao recente e coordenadas |
-| AM | IMMU Manaus - relacao oficial 2026 | lista_localizacao | https://www.manaus.am.gov.br/noticia/transito/fiscalizacao-eletronica-salvar-vidas/ | parcial | `immu_am` | Cobre a capital; validar arquivo/atualizacoes e status posterior |
-| BA | SEINFRA Bahia - KML radares fixos (fonte adicional: estaticos) | geoarquivo_oficial | https://www.ba.gov.br/infraestrutura/12046/mapas | parcial | `seinfra_ba` | Conector cobre parte; conferir links atuais do KML e atributos |
-| CE | AMC Fortaleza - mapa/dados fiscalizacao eletronica | geoarquivo_oficial | https://mapas.fortaleza.ce.gov.br/mapa/538/equipamentos-de-fiscalizacao-eletronica | implementado | `amc_ce` | GeoJSON/KML/SHP/CSV; separar radares de cameras. CKAN complementar |
-| DF | Detran-DF - camada Equipamentos Eletronicos no Geoportal | geoportal_documentado | https://detran.df.gov.br/wp-content/uploads/2022/10/Equipamentos_Eletronicos.pdf | parcial | `detran_df` | Identificar servico WMS/WFS/ArcGIS e termos de acesso |
-| ES | Cariacica - mapa, estudos e faixas monitoradas | lista_documentos | https://cariacica.es.gov.br/pagina/ler/861/mapa-radares | implementado | `cariacica_es` | Municipio NAO cobre todo o ES |
-| GO | Goinfra - relatorio de equipamentos de monitoramento | relatorio_oficial | https://goias.gov.br/goinfra/relatorio-de-equipamentos-de-monitoramento-da-goinfra/ | implementado | `goinfra` | Lista com codigos/series/km/coords (atualizada 07/10/2026) |
-| MA | Detran-MA - fiscalizacao eletronica em rodovias estaduais | lista_localizacao | https://www.detran.ma.gov.br/inicio/paginas/Pagina.xhtml?id=23582 | implementado | `detran_ma` | Complementar com SMTT Sao Luis |
-| MG | DER-MG - radares fixos e portateis | lista_localizacao | https://der.mg.gov.br/transportes/localizacao-de-radares-fixos-e-portateis | implementado | `dermg` (+ municipal `pbh`) | Conferir sentidos/equipamentos/status. Municipal: `pbh` (Belo Horizonte) |
-| MS | Agetran Campo Grande - radares ativados | lista_localizacao | https://www.campogrande.ms.gov.br/cgnoticias/noticia/novos-radares-operam-em-carater-educativo-ate-14-de-julho/ | implementado | `agetran_ms` | Cidades fora da capital nao cobertas |
-| MT | Cuiaba - mapa e equipamentos | lista_historica (**historico**, 2015) | https://www.cuiaba.mt.gov.br/noticias/comeca-campanha-de-esclarecimento-sobre-a-fiscalizacao-eletronica | pendente | — | Atualizacao oficial; equipamentos de 2015 nao sao atuais |
-| PA | SEGBEL Belem - relacao e portarias | lista_documentos | https://seguranca.belem.pa.gov.br/portarias-de-ativacao-e-desativacao-de-radares/ | parcial | `segbell_pa` | Reunir situacao temporal das portarias; so a capital |
-| PB | Semob Joao Pessoa - locais publicados | lista_localizacao | https://www.joaopessoa.pb.gov.br/noticias/secretarias-e-orgaos/semob/semobjp-orienta-populacao-sobre-novos-locais-com-radares-medidores-de-velocidade/ | parcial | `semob_pb` | So a capital; conferir lista completa e versao vigente |
-| PR | DER-PR - fiscalizacao de velocidade | lista_localizacao | https://www.der.pr.gov.br/Pagina/Fiscalizacao-de-velocidade | implementado | `derpr` | Trechos nao sao operacoes confirmadas. Municipal: Curitiba |
-| PE | Recife - equipamentos de fiscalizacao (CSV/dicionario) | conjunto_dados | https://dados.recife.pe.gov.br/dataset/equipamentos-de-monitoramento-e-fiscalizacao-de-transito | implementado | `recife` | Separar radares de cameras de monitoramento. So a capital |
-| PI | STRANS Teresina - Localizacao de Radares | lista_historica (**historico**, 2019) | https://antigo.pmt.pi.gov.br/2019/04/10/localizacao-dos-radares-sera-divulgada-mensalmente-no-site-da-prefeitura/ | pendente_lai | diagnostico `teresina_pi` | Noticia de 2019 SO anuncia a lista (nao a publica); STRANS fora do ar. Dado atual via LAI (STRANS/DER-PI) |
-| RJ | DER-RJ - radares portateis por local/horario | lista_localizacao (portatil) | https://sgitp.der.rj.gov.br/radares-portateis | implementado | `der_rj` | Trecho elegivel (janela 06-22), nao presenca o dia todo. Adicional: DER_RJ_FIXOS |
-| RN | STTU Natal - portal institucional | institucional_sem_lista (**sem publicacao estadual**) | https://www.natal.rn.gov.br/sttu | sem_publicacao | diagnostico `natal_rn` | DER-RN em HTTP 503; STTU Natal tem subpagina municipal com PDFs por equipamento (so a capital). Relacao via LAI (STTU/DER-RN) |
-| RS | DAER-RS - locais de fiscalizacao com radar portatil | lista_trechos | https://www.daer.rs.gov.br/radares-moveis | implementado | `daer_rs` | Pontos elegiveis != operacoes pontuais confirmadas. Adicional: DAER_RS_PORTATEIS |
-| RO | Porto Velho - relacao de radares fixos e estudos 2026 | lista_documentos | https://semtran.portovelho.ro.gov.br/pagina/fiscalizacao-eletronica-radares-fixos | implementado | `semtran_ro` | PDF com serie/validades 2026.1 (so a capital) |
-| RR | Boa Vista - locais de radares | lista_localizacao_historica (**historico**, 2024) | https://boavista.rr.gov.br/noticias/2024/1/prefeitura-instala-novos-equipamentos-de-fiscalizacao-eletronica-para-reduzir-acidentes-em-boa-vista | pendente | — | Locais publicados apenas em imagem; verificar cadastro vigente |
-| SC | Joinville DETRANS - estudos tecnicos 2026 | lista_documentos | https://www.joinville.sc.gov.br/publicacoes/estudos-tecnicos-equipamentos-de-fiscalizacao-eletronica-radares-e-lombadas/ | parcial | `joinville_sc` | Estudos tecnicos nao sao equipamento instalado; nao representa todo o SC |
-| SP | DER-SP - dados abertos radar (XLSX) | conjunto_dados | https://dadosabertos.sp.gov.br/dataset/radar | implementado | `dersp` | XLSX de agosto/2026 |
-| SE | DER Sergipe - radares fixos e estudos tecnicos | lista_documentos | https://der.se.gov.br/localizacao-de-radares-fixos/ | implementado | `der_se` | Distinguir projeto/estudo de equipamento instalado. Complemento: SMTT Aracaju |
-| TO | AGETO - relacao estadual de radares fixos | lista_localizacao | https://www.to.gov.br/ageto/lista-de-radares/l3d43475lu1 | implementado | `ageto_to` | PDF rev01 com 58 equipamentos georreferenciados; ASTT Araguaina permanece no conector municipal `araguaiana_to`; cobertura integral e atividade atual nao comprovadas |
+## Publicacoes novas integradas
 
-## UFs sem publicacao de lista (requerem LAI/contato)
+As contagens abaixo sao registros da publicacao, incluindo historicos/desativados; **nao sao contagem de radares ativos ou de equipamentos fisicos unicos**. Publicacoes diferentes podem descrever o mesmo aparelho, e a identidade exige evidencia.
 
-- **AL — DER-AL**: apenas canal institucional; dados de cameras nao provam radar
-  de velocidade. Sem listagem publicada. Conector diagnostico `der_al`.
-- **RN — STTU Natal**: sem cadastro ESTADUAL publicado (DER-RN em HTTP 503). Ha
-  apenas publicacao MUNICIPAL de Natal (subpagina `/sttu/equipamentos`, PDFs por
-  equipamento, so a capital). Conector diagnostico `natal_rn`; relacao via LAI
-  (STTU/DER-RN).
+| Fonte | UF | Esfera | Registros | Com coordenadas validas |
+|---|---|---|---:|---:|
+| [der_es](https://servicos.der.es.gov.br/Radares.aspx) | ES | estadual | 392 | 0 |
+| [der_pe_lombadas](https://www.der.pe.gov.br/transito-menu/lombadas-eletronicas/lista-de-trechos-monitorados-2/1382-lista-de-trechos-monitorados-lombadas) | PE | estadual | 119 | 119 |
+| [der_pe_mistos](https://www.der.pe.gov.br/transito-menu/equipamentos-de-fiscalizacao-eletronica/lista-de-trechos-2/1383-equipamentos-mistos) | PE | estadual | 61 | 61 |
+| [curitiba_pr](https://transito.curitiba.pr.gov.br/fiscalizacaoeletronica) | PR | municipal | 293 | 293 |
+| [salvador_ba](https://transonline.salvador.ba.gov.br/equipamentos/index.php) | BA | municipal | 106 | 106 |
+| [aracaju_se](https://smtt.aracaju.se.gov.br/medidores-de-velocidade/) | SE | municipal | 44 | 0 |
+| [daer_rs_fixos](https://www.daer.rs.gov.br/pardais) | RS | estadual | 60 | 0 |
+| [daer_rs_redutores](https://www.daer.rs.gov.br/localizacao-das-lombadas) | RS | estadual | 131 | 0 |
+| [joinville_cadastro_sc](https://www.joinville.sc.gov.br/publicacoes/estudos-tecnicos-equipamentos-de-fiscalizacao-eletronica-radares-e-lombadas/) | SC | municipal | 54 | 3 |
+| [cetsp](https://www.cetsp.com.br/consultas/fiscalizacao-eletronica-do-transito.aspx) | SP | municipal | 2032 | 2011 |
+| [sie_sc_portateis](https://www.sie.sc.gov.br/) | SC | estadual | 38 | 0 |
+| [sie_sc_locais](https://www.sie.sc.gov.br/) | SC | estadual | 662 | 0 |
 
-## UFs em estado historico (nao comprovam operacao atual)
+Os dez cadastros locais acrescentam 3.292 registros. Santa Catarina acrescenta um inventario de 38 portateis sem local de uso e 662 locais elegiveis, separados dos pontos instalados. A CET-SP publica 2.126 registros, dos quais 2.032 metrologicos sao importados; 837 destes possuem ativacao sem data de desativacao na publicacao consultada. A CET tambem publica 21 pares numericos fora da faixa de latitude/longitude: ficam no bruto e nao viram posicao. Ha 2.593 coordenadas validas entre os novos cadastros. Em Curitiba, 16 cartoes sem fiscalizacao de velocidade sao excluidos dos 309 publicados. No DER-PE, faixas da mesma linha com rowspan permanecem agrupadas: 119 equipamentos, nao 241 radares.
 
-- **AC** — publicacao de 2013 (offline/HTTP 503). Depende de LAI
-  (Detran-AC/DERACRE). Conector diagnostico `detran_ac`.
-- **PI** — publicacao de 2019, que apenas anuncia a lista. Depende de LAI
-  (STRANS/DER-PI). Conector diagnostico `teresina_pi`.
-- **MT** — publicacao de 2015 (Cuiaba). Depende de atualizacao oficial.
-- **RR** — noticia de 2024 (Boa Vista), locais apenas em imagem.
+## Lacunas e resultado da pesquisa
 
-## Estado de integracao (resumo)
+- AC: noticias antigas; ainda nao foi localizado cadastro estadual atual consumivel.
+- AL: DER indisponivel na consulta; DMTT Maceio institucional. Controladores educativos de ciclovia nao comprovam radar autuador.
+- AP: noticia municipal historica e anuncios de afericao; conector atual apenas documental, sem lista vigente normalizada. SETRAP retornou 503.
+- AM: Manaus tem conector municipal; nao foi localizado inventario estadual. SEINFRA retornou 403.
+- CE: Fortaleza tem conector municipal. DER/SOP e Detran retornaram 503; portal de dados nao permitiu a consulta.
+- MS: Campo Grande tem conector municipal. Detran/AGESUL acessiveis, sem cadastro estadual encontrado nas paginas consultadas.
+- MT: publicacao municipal antiga; portal SINFRA/ArcGIS encontrado, sem camada oficial de radares confirmada.
+- PA: portarias de Belem 2022 e mapa 2020, sem cadastro vigente confirmado. Detran/dados abertos indisponiveis; SETRAN retornou 403.
+- PB: Joao Pessoa tem conector municipal. DER retornou 503, sem cadastro estadual obtido.
+- PI: portal DER acessivel, busca publica sem resultado para radares; Teresina antiga apenas anuncia lista.
+- RJ: conector de locais portateis existente; pagina de fixos retornou 503.
+- RN: indice de busca cita lista da STTU, mas `/sttu/equipamentos` retornou 404; DER retornou 503. Nao importar trechos do indice como cadastro.
+- RO: Porto Velho tem conector municipal; DER retornou 503.
+- RR: portal Detran acessivel sem cadastro encontrado; noticia de Boa Vista e historica/em imagem.
+- SC: dados abertos CKAN sem resultado para radar; portal SIE publicou os dois PDFs estaduais agora integrados. Cadastro de fixos estaduais ainda nao obtido.
+- Catalogos CKAN consultados em SC, MG e RS retornaram zero conjuntos na busca por `radar`; isso nao prova ausencia de dados fora desses catalogos.
 
-- implementado: **15** UFs — GO (`goinfra`), CE (`amc_ce`), RJ (`der_rj`),
-  RS (`daer_rs`), ES (`cariacica_es`), AP (`ctmac_ap`), MS (`agetran_ms`),
-  RO (`semtran_ro`), MA (`detran_ma`), SE (`der_se`), TO (`araguaiana_to`),
-  SP (`dersp`), PR (`derpr`), MG (`dermg` + municipal `pbh`), PE (`recife`).
-- parcial: **6** UFs — BA (`seinfra_ba`), SC (`joinville_sc`), AM (`immu_am`),
-  PB (`semob_pb`), PA (`segbell_pa`), DF (`detran_df`).
-- pendente_lai: **2** UFs — AC (`detran_ac`), PI (`teresina_pi`).
-- sem_publicacao: **2** UFs — AL (`der_al`), RN (`natal_rn`).
-- pendente: **2** UFs — MT, RR.
+Falha de acesso significa que a fonte nao foi verificada nesta pesquisa, e nao que o orgao nao possua radares ou que nao publique nada. Os demais municipios de cada UF permanecem pendentes ate haver publicacao individual identificada e conector validado.
 
-## Fontes federais (comuns a todas as UFs)
+## Coleta e validacao
 
-- INMETRO PSIE: https://servicos.rbmlq.gov.br/Instrumento
-- PRF radares fixos: https://www.gov.br/prf/pt-br/assuntos/fiscalizacao-de-velocidade/radares-fixos
-- DNIT PNCV: https://servicos.dnit.gov.br/dadosabertos/dataset/controle-de-velocidade
-- ANTT radares: https://dados.antt.gov.br/dataset/79d287f4-f5ca-4385-a17c-f61f53831f17
+As novas fontes entram na agenda semanal existente, via `api.pse tick`; nao criam outro cron nem dependem de IA. O CLI `api.pse sync --fonte NOME` aceita os mesmos conectores da agenda, inclusive arquivos locais para carga assistida. Todos preservam artefato original e registros de proveniencia; formato vazio/alterado gera erro, sem substituir o ultimo snapshot valido.
+
+O instalador privado continua atualizando o fonte publico. **Codigo integrado nao significa dados ja coletados no servidor 3**. Depois de atualizar o servidor, a agenda coleta as fontes novas. Consulte `/api/v1/atualizacoes` para confirmar resultado, rejeicoes e data.
+
+Fixtures reais e manifesto: `tests/fixtures/cadastros_publicos/`. Testes incluem carga pela API, repeticao sem duplicar, exclusao de cameras, desativacoes, faixas, resposta DSR e separacao entre locais elegiveis e aparelhos. GPS/velocidade/serie nao publicados permanecem ausentes.

@@ -1,4 +1,8 @@
 {
+  "AGETO-TO - Relacao dos equipamentos fixos medidores de velocidade": {
+    "pct_municipio": 100.0,
+    "pct_posicao": 100.0
+  },
   "AMC Fortaleza - Equipamentos de fiscalizacao eletronica": {
     "pct_municipio": 100.0,
     "pct_posicao": 100.0
@@ -23,13 +27,37 @@
     "pct_municipio": 0.0,
     "pct_posicao": 0.0
   },
+  "CET Sao Paulo - Fiscalizacao eletronica": {
+    "pct_municipio": 100.0,
+    "pct_posicao": 98.97
+  },
   "Cariacica - Mapa de radares de fiscalizacao eletronica": {
     "pct_municipio": 100.0,
     "pct_posicao": 100.0
   },
+  "DAER-RS - Controladores fixos": {
+    "pct_municipio": 0.0,
+    "pct_posicao": 0.0
+  },
+  "DAER-RS - Redutores de velocidade": {
+    "pct_municipio": 0.0,
+    "pct_posicao": 0.0
+  },
+  "DER-ES - Equipamentos de fiscalizacao": {
+    "pct_municipio": 0.0,
+    "pct_posicao": 0.0
+  },
   "DER-MG - Localizacao de radares fixos e portateis": {
     "pct_municipio": 100.0,
     "pct_posicao": 0.0
+  },
+  "DER-PE - Equipamentos mistos": {
+    "pct_municipio": 0.0,
+    "pct_posicao": 100.0
+  },
+  "DER-PE - Lombadas eletronicas": {
+    "pct_municipio": 100.0,
+    "pct_posicao": 100.0
   },
   "DER-PR - Fiscalizacao de velocidade (fixa e portatil)": {
     "pct_municipio": 100.0,
@@ -54,6 +82,10 @@
   "Detran-MA - Fiscalizacao eletronica de velocidade": {
     "pct_municipio": 100.0,
     "pct_posicao": 100.0
+  },
+  "Detrans Joinville - Cadastro bienal de radares": {
+    "pct_municipio": 100.0,
+    "pct_posicao": 5.56
   },
   "GOINFRA - Equipamentos de monitoramento (GO)": {
     "pct_municipio": 100.0,
@@ -87,11 +119,23 @@
     "pct_municipio": 100.0,
     "pct_posicao": 0.0
   },
+  "SIE-SC/PMRv - Inventario de radares portateis": {
+    "pct_municipio": 0.0,
+    "pct_posicao": 0.0
+  },
+  "SMTT Aracaju - Medidores de velocidade": {
+    "pct_municipio": 100.0,
+    "pct_posicao": 0.0
+  },
   "Semob Joao Pessoa - Medidores de velocidade (locais)": {
     "pct_municipio": 100.0,
     "pct_posicao": 0.0
   },
-  "AGETO-TO - Relacao dos equipamentos fixos medidores de velocidade": {
+  "Setran Curitiba - Fiscalizacao eletronica": {
+    "pct_municipio": 100.0,
+    "pct_posicao": 100.0
+  },
+  "Transalvador - Mapa de equipamentos": {
     "pct_municipio": 100.0,
     "pct_posicao": 100.0
   }

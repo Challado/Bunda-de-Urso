@@ -199,13 +199,14 @@ def _status_de(resp):
 # baixar
 # --------------------------------------------------------------------------
 def _uma_tentativa(url, etag, last_modified, method, data, timeout, limite,
-                   verificar_ssl):
+                   verificar_ssl, headers=None):
     cabecalhos = {
         "User-Agent": config.USER_AGENT,
         "Accept": ("application/json,text/csv,text/html,application/xml,"
                    "application/vnd.openxmlformats-officedocument."
                    "spreadsheetml.sheet,application/octet-stream;q=0.8"),
     }
+    cabecalhos.update(headers or {})
     if etag:
         cabecalhos["If-None-Match"] = etag
     if last_modified:
@@ -218,6 +219,8 @@ def _uma_tentativa(url, etag, last_modified, method, data, timeout, limite,
     alvo = url
     for _salto in range(_MAX_SALTOS + 1):
         url_checada(alvo)
+        if urllib.parse.urlsplit(alvo).netloc != urllib.parse.urlsplit(url).netloc:
+            cabecalhos.pop("X-PowerBI-ResourceKey", None)
         req = urllib.request.Request(alvo, data=corpo_envio, method=metodo,
                                      headers=cabecalhos)
         try:
@@ -286,7 +289,7 @@ def _tratar_erro_http(status, recebidos, alvo, metodo, corpo_envio):
 
 
 def baixar(url, etag=None, last_modified=None, method="GET", data=None,
-           timeout=None, max_bytes=None, verificar_ssl=True):
+           timeout=None, max_bytes=None, verificar_ssl=True, headers=None):
     """Baixa ``url`` e devolve ``(corpo, headers, url_final)``.
 
     Repete em falhas transitorias (429/5xx/rede) ate 3 tentativas, respeitando
@@ -294,6 +297,14 @@ def baixar(url, etag=None, last_modified=None, method="GET", data=None,
     :class:`NaoModificado`; qualquer outra falha levanta :class:`ErroFonte`.
     """
     url_checada(url)
+    # Somente cabecalhos de publicacao publica; nao aceita cookies/credenciais.
+    permitidos = {"accept": "Accept", "content-type": "Content-Type",
+                  "x-powerbi-resourcekey": "X-PowerBI-ResourceKey"}
+    extras = {}
+    for chave, valor in (headers or {}).items():
+        if chave.lower() not in permitidos or not isinstance(valor, str) or "\n" in valor or "\r" in valor:
+            raise ErroFonte("Cabecalho HTTP nao permitido")
+        extras[permitidos[chave.lower()]] = valor
     limite = int(max_bytes) if max_bytes is not None else MAX_BYTES_PADRAO
     tempo = float(timeout) if timeout is not None \
         else float(config.DEFAULT_TIMEOUT)
@@ -302,7 +313,7 @@ def baixar(url, etag=None, last_modified=None, method="GET", data=None,
     for tentativa in range(tentativas):
         try:
             return _uma_tentativa(url, etag, last_modified, method, data,
-                                  tempo, limite, verificar_ssl)
+                                  tempo, limite, verificar_ssl, extras)
         except NaoModificado:
             raise
         except ErroRetentavel as exc:

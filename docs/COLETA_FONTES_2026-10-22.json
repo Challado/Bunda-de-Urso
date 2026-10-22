@@ -1,0 +1,102 @@
+{
+  "verificado_em_utc": "2026-10-22T13:52:22.844336+00:00",
+  "ambiente": "Downloads publicos reais, execucao via web/api.pse sync em bancos temporarios. Nao altera o servidor 3.",
+  "fontes": {
+    "aracaju_se": {
+      "status": "ok",
+      "linhas_recebidas": 44,
+      "criados": 44,
+      "atualizados": 0,
+      "rejeitados": 0,
+      "saida": 0
+    },
+    "cetsp": {
+      "status": "ok",
+      "linhas_recebidas": 2032,
+      "criados": 2032,
+      "atualizados": 0,
+      "rejeitados": 0,
+      "saida": 0
+    },
+    "curitiba_pr": {
+      "status": "ok",
+      "linhas_recebidas": 293,
+      "criados": 293,
+      "atualizados": 0,
+      "rejeitados": 0,
+      "saida": 0
+    },
+    "daer_rs_fixos": {
+      "status": "ok",
+      "linhas_recebidas": 60,
+      "criados": 60,
+      "atualizados": 0,
+      "rejeitados": 0,
+      "saida": 0
+    },
+    "daer_rs_redutores": {
+      "status": "ok",
+      "linhas_recebidas": 131,
+      "criados": 131,
+      "atualizados": 0,
+      "rejeitados": 0,
+      "saida": 0
+    },
+    "der_es": {
+      "status": "ok",
+      "linhas_recebidas": 392,
+      "criados": 392,
+      "atualizados": 0,
+      "rejeitados": 0,
+      "saida": 0
+    },
+    "der_pe_lombadas": {
+      "status": "ok",
+      "linhas_recebidas": 119,
+      "criados": 119,
+      "atualizados": 0,
+      "rejeitados": 0,
+      "saida": 0
+    },
+    "der_pe_mistos": {
+      "status": "ok",
+      "linhas_recebidas": 61,
+      "criados": 61,
+      "atualizados": 0,
+      "rejeitados": 0,
+      "saida": 0
+    },
+    "joinville_cadastro_sc": {
+      "status": "ok",
+      "linhas_recebidas": 54,
+      "criados": 54,
+      "atualizados": 0,
+      "rejeitados": 0,
+      "saida": 0
+    },
+    "salvador_ba": {
+      "status": "ok",
+      "linhas_recebidas": 106,
+      "criados": 106,
+      "atualizados": 0,
+      "rejeitados": 0,
+      "saida": 0
+    },
+    "sie_sc_locais": {
+      "status": "ok",
+      "linhas_recebidas": 662,
+      "criados": 662,
+      "atualizados": 0,
+      "rejeitados": 0,
+      "saida": 0
+    },
+    "sie_sc_portateis": {
+      "status": "ok",
+      "linhas_recebidas": 38,
+      "criados": 38,
+      "atualizados": 0,
+      "rejeitados": 0,
+      "saida": 0
+    }
+  }
+}

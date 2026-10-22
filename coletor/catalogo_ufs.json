@@ -1,5 +1,5 @@
 {
-  "versao": "2026-10-10",
+  "versao": "2026-10-22",
   "objetivo": "Catalogo nacional de fontes oficiais das 27 UFs para integracao. Inventario de pontos de partida; NAO e prova de cobertura nacional. cobertura_estadual_confirmada permanece false ate auditoria por circunscricao.",
   "legenda_tipo_esperado": {
     "cadastro_equipamento": "Relacao de equipamentos/pontos (series, modelo, local).",
@@ -11,7 +11,7 @@
     "institucional_sem_lista": "Orgao oficial encontrado, sem publicacao de lista individual de equipamentos."
   },
   "legenda_estado_integracao": {
-    "implementado": "Existe conector no nosso repo.",
+    "implementado": "Existe conector de dados; nao confirma cobertura integral nem operacao atual de todos os registros.",
     "parcial": "Conector existe mas cobre apenas parte da circunscricao.",
     "pendente": "Sem conector; recurso publico a descobrir/implementar.",
     "sem_publicacao": "Nao ha publicacao de lista; requer LAI/contato institucional.",
@@ -29,7 +29,11 @@
       "nosso_modulo": null,
       "observacao": "Publicacao de 2013 (historico) em agencia.ac.gov.br (HTTP 503 em 10/10/2026); portal atual https://www.detran.ac.gov.br/ so oferece consulta de autos/convênios, sem cadastro. Solicitar cadastro atual via LAI (Detran-AC/DERACRE). Modulo diagnostico: detran_ac.",
       "cobertura_estadual_confirmada": false,
-      "modulo_diagnostico": "detran_ac"
+      "modulo_diagnostico": "detran_ac",
+      "nome_uf": "Acre",
+      "fontes_estaduais": [],
+      "modulos_municipais": [],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "AL",
@@ -42,7 +46,11 @@
       "nosso_modulo": null,
       "observacao": "Apenas canal institucional do DER-AL (alagoasdigital); https://www.der.al.gov.br/ fora do ar em 10/10/2026. DMT Maceio tambem institucional. Sem lista publicada; solicitar relacao via LAI. Modulo diagnostico: der_al.",
       "cobertura_estadual_confirmada": false,
-      "modulo_diagnostico": "der_al"
+      "modulo_diagnostico": "der_al",
+      "nome_uf": "Alagoas",
+      "fontes_estaduais": [],
+      "modulos_municipais": [],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "AP",
@@ -51,10 +59,15 @@
       "url_pagina": "https://macapa.ap.gov.br/radares-de-macapa-passam-a-ter-velocidade-maxima-permitida-de-60-km-h-a-partir-desta-terca-21/",
       "classificacao_evidencia": "lista_localizacao_historica",
       "tipo_esperado": "cadastro_equipamento",
-      "estado_integracao": "implementado",
-      "nosso_modulo": "ctmac_ap",
-      "observacao": "Lista de 17 locais divulgada em 2022; localizar publicacao recente, documentos tecnicos e coordenadas.",
-      "cobertura_estadual_confirmada": false
+      "estado_integracao": "pendente_lai",
+      "nosso_modulo": null,
+      "observacao": "Lista de 17 locais divulgada em 2022; localizar publicacao recente, documentos tecnicos e coordenadas. Auditoria 22/10/2026: conector apenas documental, sem importacao de pontos; nao contar como cobertura.",
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Amapá",
+      "fontes_estaduais": [],
+      "modulos_municipais": [],
+      "cobertura_municipal_confirmada": false,
+      "modulo_diagnostico": "ctmac_ap"
     },
     {
       "uf": "AM",
@@ -66,7 +79,18 @@
       "estado_integracao": "parcial",
       "nosso_modulo": "immu_am",
       "observacao": "Lista de equipamentos e locais de 2026; validar arquivo, atualizacoes e status posterior.",
-      "cobertura_estadual_confirmada": false
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Amazonas",
+      "fontes_estaduais": [],
+      "modulos_municipais": [
+        {
+          "modulo": "immu_am",
+          "nome": "IMMU Manaus - Fiscalizacao eletronica (locais)",
+          "url": "https://www.manaus.am.gov.br/noticia/transito/fiscalizacao-eletronica-salvar-vidas/",
+          "esfera": "municipal"
+        }
+      ],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "BA",
@@ -77,8 +101,26 @@
       "tipo_esperado": "cadastro_equipamento",
       "estado_integracao": "parcial",
       "nosso_modulo": "seinfra_ba",
-      "observacao": "Pagina oficial com KML, mapa web e PDF; descobrir links atuais e testar geometria/atributos. Fonte adicional: SEINFRA_BA_ESTATICOS.",
-      "cobertura_estadual_confirmada": false
+      "observacao": "Pagina oficial com KML, mapa web e PDF; descobrir links atuais e testar geometria/atributos. Fonte adicional: SEINFRA_BA_ESTATICOS. Novo cadastro: salvador_ba.",
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Bahia",
+      "fontes_estaduais": [
+        {
+          "modulo": "seinfra_ba",
+          "nome": "SEINFRA-BA - Radares fixos e estaticos",
+          "url": "https://www.ba.gov.br/infraestrutura/12046/mapas",
+          "esfera": "estadual"
+        }
+      ],
+      "modulos_municipais": [
+        {
+          "modulo": "salvador_ba",
+          "nome": "Transalvador - Mapa de equipamentos",
+          "url": "https://transonline.salvador.ba.gov.br/equipamentos/index.php",
+          "esfera": "municipal"
+        }
+      ],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "CE",
@@ -90,7 +132,18 @@
       "estado_integracao": "implementado",
       "nosso_modulo": "amc_ce",
       "observacao": "2026: GeoJSON/KML/SHP/CSV com campos sitio/status/finalidade/endereco/viasentido/bairro/faixas. Fonte adicional CKAN: AMC_FORTALEZA_CKAN.",
-      "cobertura_estadual_confirmada": false
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Ceará",
+      "fontes_estaduais": [],
+      "modulos_municipais": [
+        {
+          "modulo": "amc_ce",
+          "nome": "AMC Fortaleza - Equipamentos de fiscalizacao eletronica",
+          "url": "https://mapas.fortaleza.ce.gov.br/mapa/538/equipamentos-de-fiscalizacao-eletronica",
+          "esfera": "municipal"
+        }
+      ],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "DF",
@@ -102,19 +155,48 @@
       "estado_integracao": "parcial",
       "nosso_modulo": "detran_df",
       "observacao": "Documento ensina consultar a camada Equipamentos Eletronicos no Geoportal; nao e lista tabular. Identificar WMS/WFS/ArcGIS. Historico adicional: DER_DF_HISTORICO (pardais 2011).",
-      "cobertura_estadual_confirmada": false
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Distrito Federal",
+      "fontes_estaduais": [
+        {
+          "modulo": "detran_df",
+          "nome": "Detran-DF - Relacao de medidores de velocidade",
+          "url": "https://www.detran.df.gov.br/equipamentos-eletronicos",
+          "esfera": "distrital"
+        }
+      ],
+      "modulos_municipais": [],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "ES",
-      "nome_fonte": "Cariacica - mapa, estudos e faixas monitoradas",
-      "orgao": "Prefeitura de Cariacica",
-      "url_pagina": "https://cariacica.es.gov.br/pagina/ler/861/mapa-radares",
-      "classificacao_evidencia": "lista_documentos",
+      "nome_fonte": "DER-ES - Equipamentos de fiscalizacao",
+      "orgao": "DER-ES",
+      "url_pagina": "https://servicos.der.es.gov.br/Radares.aspx",
+      "classificacao_evidencia": "cadastro_oficial",
       "tipo_esperado": "cadastro_equipamento",
-      "estado_integracao": "implementado",
-      "nosso_modulo": "cariacica_es",
-      "observacao": "Publica mapa, estudos tecnicos e PDF de faixas; municipio NAO cobre todo o Espirito Santo.",
-      "cobertura_estadual_confirmada": false
+      "estado_integracao": "parcial",
+      "nosso_modulo": "der_es",
+      "observacao": "392 registros com codigos, series e situacoes historicas; nao publica GPS. Municipal de Cariacica separado. Novo cadastro: der_es.",
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Espírito Santo",
+      "fontes_estaduais": [
+        {
+          "modulo": "der_es",
+          "nome": "DER-ES - Equipamentos de fiscalizacao",
+          "url": "https://servicos.der.es.gov.br/Radares.aspx",
+          "esfera": "estadual"
+        }
+      ],
+      "modulos_municipais": [
+        {
+          "modulo": "cariacica_es",
+          "nome": "Cariacica - Mapa de radares de fiscalizacao eletronica",
+          "url": "https://cariacica.es.gov.br/pagina/ler/861/mapa-radares",
+          "esfera": "municipal"
+        }
+      ],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "GO",
@@ -126,7 +208,18 @@
       "estado_integracao": "implementado",
       "nosso_modulo": "goinfra",
       "observacao": "Atualizado 07/10/2026: codigos, series, tipos, rodovias, km, coordenadas, velocidades, datas e estudos. Fonte adicional: GOINFRA_ESTUDOS.",
-      "cobertura_estadual_confirmada": false
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Goiás",
+      "fontes_estaduais": [
+        {
+          "modulo": "goinfra",
+          "nome": "GOINFRA - Equipamentos de monitoramento (GO)",
+          "url": "https://goias.gov.br/goinfra/relatorio-de-equipamentos-de-monitoramento-da-goinfra/",
+          "esfera": "estadual"
+        }
+      ],
+      "modulos_municipais": [],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "MA",
@@ -138,7 +231,18 @@
       "estado_integracao": "implementado",
       "nosso_modulo": "detran_ma",
       "observacao": "Detran-MA declara divulgar localizacao e informacoes de radares estaduais. Fonte adicional municipal: SMTT_SAO_LUIS.",
-      "cobertura_estadual_confirmada": false
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Maranhão",
+      "fontes_estaduais": [
+        {
+          "modulo": "detran_ma",
+          "nome": "Detran-MA - Fiscalizacao eletronica de velocidade",
+          "url": "https://www.detran.ma.gov.br/inicio/paginas/Pagina.xhtml?id=23582",
+          "esfera": "estadual"
+        }
+      ],
+      "modulos_municipais": [],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "MG",
@@ -153,12 +257,22 @@
       "cobertura_estadual_confirmada": false,
       "modulos_municipais": [
         {
-          "municipio": "Belo Horizonte",
           "modulo": "pbh",
-          "estado_integracao": "implementado",
-          "url_pagina": "https://dados.pbh.gov.br/pt_BR/dataset/fiscalizacao-eletronica"
+          "nome": "Belo Horizonte - Fiscalizacao eletronica",
+          "url": "https://dados.pbh.gov.br/pt_BR/dataset/fiscalizacao-eletronica",
+          "esfera": "municipal"
         }
-      ]
+      ],
+      "nome_uf": "Minas Gerais",
+      "fontes_estaduais": [
+        {
+          "modulo": "dermg",
+          "nome": "DER-MG - Localizacao de radares fixos e portateis",
+          "url": "https://der.mg.gov.br/transportes/localizacao-de-radares-fixos-e-portateis",
+          "esfera": "estadual"
+        }
+      ],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "MS",
@@ -170,7 +284,18 @@
       "estado_integracao": "implementado",
       "nosso_modulo": "agetran_ms",
       "observacao": "Publicacao 26/06/2026 informa locais e inicio de fiscalizacao em 15/07; cidades fora da capital NAO cobertas.",
-      "cobertura_estadual_confirmada": false
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Mato Grosso do Sul",
+      "fontes_estaduais": [],
+      "modulos_municipais": [
+        {
+          "modulo": "agetran_ms",
+          "nome": "Agetran Campo Grande - Radares de fiscalizacao eletronica",
+          "url": "https://www.campogrande.ms.gov.br/cgnoticias/noticia/novos-radares-operam-em-carater-educativo-ate-14-de-julho/",
+          "esfera": "municipal"
+        }
+      ],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "MT",
@@ -182,7 +307,11 @@
       "estado_integracao": "pendente",
       "nosso_modulo": null,
       "observacao": "Publicacao de 2015 (historico): NAO considerar equipamentos atuais sem atualizacao oficial.",
-      "cobertura_estadual_confirmada": false
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Mato Grosso",
+      "fontes_estaduais": [],
+      "modulos_municipais": [],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "PA",
@@ -191,10 +320,15 @@
       "url_pagina": "https://seguranca.belem.pa.gov.br/portarias-de-ativacao-e-desativacao-de-radares/",
       "classificacao_evidencia": "lista_documentos",
       "tipo_esperado": "cadastro_equipamento",
-      "estado_integracao": "parcial",
-      "nosso_modulo": "segbell_pa",
-      "observacao": "Portarias de ativacao/desativacao com identificadores; reunir situacao temporal e complementar com relacao de radares.",
-      "cobertura_estadual_confirmada": false
+      "estado_integracao": "pendente_lai",
+      "nosso_modulo": null,
+      "observacao": "Portarias de ativacao/desativacao com identificadores; reunir situacao temporal e complementar com relacao de radares. Auditoria 22/10/2026: conector apenas documental, sem importacao de pontos; nao contar como cobertura.",
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Pará",
+      "fontes_estaduais": [],
+      "modulos_municipais": [],
+      "cobertura_municipal_confirmada": false,
+      "modulo_diagnostico": "segbell_pa"
     },
     {
       "uf": "PB",
@@ -206,7 +340,18 @@
       "estado_integracao": "parcial",
       "nosso_modulo": "semob_pb",
       "observacao": "Prefeitura aponta portal.semobjp.pb.gov.br para a lista completa; conferir versao vigente.",
-      "cobertura_estadual_confirmada": false
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Paraíba",
+      "fontes_estaduais": [],
+      "modulos_municipais": [
+        {
+          "modulo": "semob_pb",
+          "nome": "Semob Joao Pessoa - Medidores de velocidade (locais)",
+          "url": "https://www.joaopessoa.pb.gov.br/noticias/secretarias-e-orgaos/semob/semobjp-orienta-populacao-sobre-novos-locais-com-radares-medidores-de-velocidade/",
+          "esfera": "municipal"
+        }
+      ],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "PR",
@@ -217,20 +362,62 @@
       "tipo_esperado": "cadastro_equipamento",
       "estado_integracao": "implementado",
       "nosso_modulo": "derpr",
-      "observacao": "Fontes fixos e portateis; trechos possiveis NAO sao operacoes confirmadas. Fonte adicional municipal: CURITIBA.",
-      "cobertura_estadual_confirmada": false
+      "observacao": "Fontes fixos e portateis; trechos possiveis NAO sao operacoes confirmadas. Fonte adicional municipal: CURITIBA. Novo cadastro: curitiba_pr.",
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Paraná",
+      "fontes_estaduais": [
+        {
+          "modulo": "derpr",
+          "nome": "DER-PR - Fiscalizacao de velocidade (fixa e portatil)",
+          "url": "https://www.der.pr.gov.br/Pagina/Fiscalizacao-de-velocidade",
+          "esfera": "estadual"
+        }
+      ],
+      "modulos_municipais": [
+        {
+          "modulo": "curitiba_pr",
+          "nome": "Setran Curitiba - Fiscalizacao eletronica",
+          "url": "https://transito.curitiba.pr.gov.br/fiscalizacaoeletronica",
+          "esfera": "municipal"
+        }
+      ],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "PE",
-      "nome_fonte": "Recife - equipamentos de fiscalizacao (CSV/dicionario)",
-      "orgao": "CTTU (Recife)",
-      "url_pagina": "https://dados.recife.pe.gov.br/dataset/equipamentos-de-monitoramento-e-fiscalizacao-de-transito",
-      "classificacao_evidencia": "conjunto_dados",
+      "nome_fonte": "DER-PE - Lombadas eletronicas",
+      "orgao": "DER-PE",
+      "url_pagina": "https://www.der.pe.gov.br/transito-menu/lombadas-eletronicas/lista-de-trechos-monitorados-2/1382-lista-de-trechos-monitorados-lombadas",
+      "classificacao_evidencia": "cadastro_oficial",
       "tipo_esperado": "cadastro_equipamento",
-      "estado_integracao": "implementado",
-      "nosso_modulo": "recife",
-      "observacao": "CSV e dicionario JSON, licenca ODbL; separar radares de cameras de monitoramento.",
-      "cobertura_estadual_confirmada": false
+      "estado_integracao": "parcial",
+      "nosso_modulo": "der_pe_lombadas",
+      "observacao": "119 equipamentos com faixas agrupadas e GPS, mais 61 equipamentos mistos. Recife permanece fonte municipal independente. Novo cadastro: der_pe_lombadas. Novo cadastro: der_pe_mistos.",
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Pernambuco",
+      "fontes_estaduais": [
+        {
+          "modulo": "der_pe_lombadas",
+          "nome": "DER-PE - Lombadas eletronicas",
+          "url": "https://www.der.pe.gov.br/transito-menu/lombadas-eletronicas/lista-de-trechos-monitorados-2/1382-lista-de-trechos-monitorados-lombadas",
+          "esfera": "estadual"
+        },
+        {
+          "modulo": "der_pe_mistos",
+          "nome": "DER-PE - Equipamentos mistos",
+          "url": "https://www.der.pe.gov.br/transito-menu/equipamentos-de-fiscalizacao-eletronica/lista-de-trechos-2/1383-equipamentos-mistos",
+          "esfera": "estadual"
+        }
+      ],
+      "modulos_municipais": [
+        {
+          "modulo": "recife",
+          "nome": "Recife - Equipamentos de fiscalizacao de transito",
+          "url": "https://dados.recife.pe.gov.br/dataset/equipamentos-de-monitoramento-e-fiscalizacao-de-transito",
+          "esfera": "municipal"
+        }
+      ],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "PI",
@@ -243,7 +430,11 @@
       "nosso_modulo": null,
       "observacao": "Publicacao de 2019 (historico) ANUNCIA divulgacao mensal da lista (sem publica-la); STRANS fora do ar em 10/10/2026 (strans.teresina.pi.gov.br) e Prefeitura/DER-PI atuais sem cadastro. Solicitar dado atual via LAI (STRANS/DER-PI). Modulo diagnostico: teresina_pi.",
       "cobertura_estadual_confirmada": false,
-      "modulo_diagnostico": "teresina_pi"
+      "modulo_diagnostico": "teresina_pi",
+      "nome_uf": "Piauí",
+      "fontes_estaduais": [],
+      "modulos_municipais": [],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "RJ",
@@ -255,7 +446,18 @@
       "estado_integracao": "implementado",
       "nosso_modulo": "der_rj",
       "observacao": "Rodovia/km/velocidade/sentido e janela 06-22; NAO significa equipamento presente o dia todo. Fonte adicional: DER_RJ_FIXOS.",
-      "cobertura_estadual_confirmada": false
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Rio de Janeiro",
+      "fontes_estaduais": [
+        {
+          "modulo": "der_rj",
+          "nome": "DER-RJ - Radares portateis (locais de fiscalizacao)",
+          "url": "https://sgitp.der.rj.gov.br/radares-portateis",
+          "esfera": "estadual"
+        }
+      ],
+      "modulos_municipais": [],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "RN",
@@ -268,7 +470,11 @@
       "nosso_modulo": null,
       "observacao": "DER-RN (https://www.der.rn.gov.br/) respondeu HTTP 503 em 10/10/2026; sem cadastro ESTADUAL. A STTU Natal tem subpagina municipal 'Equipamentos de Fiscalizacao Eletronica' (/sttu/equipamentos) com PDFs por equipamento (nao maquina-legivel, so a capital). Solicitar relacao via LAI (STTU/DER-RN). Modulo diagnostico: natal_rn.",
       "cobertura_estadual_confirmada": false,
-      "modulo_diagnostico": "natal_rn"
+      "modulo_diagnostico": "natal_rn",
+      "nome_uf": "Rio Grande do Norte",
+      "fontes_estaduais": [],
+      "modulos_municipais": [],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "RS",
@@ -279,8 +485,31 @@
       "tipo_esperado": "trecho_elegivel",
       "estado_integracao": "implementado",
       "nosso_modulo": "daer_rs",
-      "observacao": "Atualizacao declarada semanal; pontos elegiveis NAO equivalem a operacoes pontuais confirmadas. Fonte adicional: DAER_RS_PORTATEIS.",
-      "cobertura_estadual_confirmada": false
+      "observacao": "Atualizacao declarada semanal; pontos elegiveis NAO equivalem a operacoes pontuais confirmadas. Fonte adicional: DAER_RS_PORTATEIS. Novo cadastro: daer_rs_fixos. Novo cadastro: daer_rs_redutores.",
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Rio Grande do Sul",
+      "fontes_estaduais": [
+        {
+          "modulo": "daer_rs",
+          "nome": "DAER-RS - Locais de fiscalizacao com radar portatil",
+          "url": "https://www.daer.rs.gov.br/radares-moveis",
+          "esfera": "estadual"
+        },
+        {
+          "modulo": "daer_rs_fixos",
+          "nome": "DAER-RS - Controladores fixos",
+          "url": "https://www.daer.rs.gov.br/pardais",
+          "esfera": "estadual"
+        },
+        {
+          "modulo": "daer_rs_redutores",
+          "nome": "DAER-RS - Redutores de velocidade",
+          "url": "https://www.daer.rs.gov.br/localizacao-das-lombadas",
+          "esfera": "estadual"
+        }
+      ],
+      "modulos_municipais": [],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "RO",
@@ -292,7 +521,18 @@
       "estado_integracao": "implementado",
       "nosso_modulo": "semtran_ro",
       "observacao": "PDF detalhado e serie/validades atualizados em 2026.1.",
-      "cobertura_estadual_confirmada": false
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Rondônia",
+      "fontes_estaduais": [],
+      "modulos_municipais": [
+        {
+          "modulo": "semtran_ro",
+          "nome": "SEMTRAN Porto Velho - Fiscalizacao eletronica (radares fixos)",
+          "url": "https://semtran.portovelho.ro.gov.br/pagina/fiscalizacao-eletronica-radares-fixos",
+          "esfera": "municipal"
+        }
+      ],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "RR",
@@ -304,19 +544,47 @@
       "estado_integracao": "pendente",
       "nosso_modulo": null,
       "observacao": "Noticia municipal de 2024 (historico) descreve locais; verificar cadastro vigente.",
-      "cobertura_estadual_confirmada": false
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Roraima",
+      "fontes_estaduais": [],
+      "modulos_municipais": [],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "SC",
-      "nome_fonte": "Joinville DETRANS - estudos tecnicos 2026",
-      "orgao": "Detrans (Joinville)",
-      "url_pagina": "https://www.joinville.sc.gov.br/publicacoes/estudos-tecnicos-equipamentos-de-fiscalizacao-eletronica-radares-e-lombadas/",
-      "classificacao_evidencia": "lista_documentos",
-      "tipo_esperado": "estudo_tecnico",
+      "nome_fonte": "SIE-SC/PMRv - Inventario de radares portateis",
+      "orgao": "SIE-SC/PMRv",
+      "url_pagina": "https://www.sie.sc.gov.br/",
+      "classificacao_evidencia": "cadastro_oficial",
+      "tipo_esperado": "cadastro_equipamento",
       "estado_integracao": "parcial",
-      "nosso_modulo": "joinville_sc",
-      "observacao": "Atualizacao agosto/2026 e PDFs por equipamento; NAO representa todos os municipios de SC.",
-      "cobertura_estadual_confirmada": false
+      "nosso_modulo": "sie_sc_portateis",
+      "observacao": "Inventario estadual de 38 medidores portateis SEM GPS; 662 locais elegiveis em tabela separada, sem associar arbitrariamente serie a local. Cadastro municipal de Joinville: 54 locais. Novo cadastro: joinville_cadastro_sc. Novo cadastro: sie_sc_portateis. Novo cadastro: sie_sc_locais.",
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Santa Catarina",
+      "fontes_estaduais": [
+        {
+          "modulo": "sie_sc_portateis",
+          "nome": "SIE-SC/PMRv - Inventario de radares portateis",
+          "url": "https://www.sie.sc.gov.br/",
+          "esfera": "estadual"
+        },
+        {
+          "modulo": "sie_sc_locais",
+          "nome": "SIE-SC/PMRv - Locais elegiveis de fiscalizacao portatil",
+          "url": "https://www.sie.sc.gov.br/",
+          "esfera": "estadual"
+        }
+      ],
+      "modulos_municipais": [
+        {
+          "modulo": "joinville_cadastro_sc",
+          "nome": "Detrans Joinville - Cadastro bienal de radares",
+          "url": "https://www.joinville.sc.gov.br/publicacoes/estudos-tecnicos-equipamentos-de-fiscalizacao-eletronica-radares-e-lombadas/",
+          "esfera": "municipal"
+        }
+      ],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "SP",
@@ -327,8 +595,26 @@
       "tipo_esperado": "cadastro_equipamento",
       "estado_integracao": "implementado",
       "nosso_modulo": "dersp",
-      "observacao": "XLSX de localizacao e informacoes dos radares DER, atualizado agosto/2026.",
-      "cobertura_estadual_confirmada": false
+      "observacao": "XLSX de localizacao e informacoes dos radares DER, atualizado agosto/2026. Novo cadastro: cetsp.",
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "São Paulo",
+      "fontes_estaduais": [
+        {
+          "modulo": "dersp",
+          "nome": "DER-SP - Radares estaduais",
+          "url": "https://dadosabertos.sp.gov.br/dataset/radar",
+          "esfera": "estadual"
+        }
+      ],
+      "modulos_municipais": [
+        {
+          "modulo": "cetsp",
+          "nome": "CET Sao Paulo - Fiscalizacao eletronica",
+          "url": "https://www.cetsp.com.br/consultas/fiscalizacao-eletronica-do-transito.aspx",
+          "esfera": "municipal"
+        }
+      ],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "SE",
@@ -339,8 +625,26 @@
       "tipo_esperado": "cadastro_equipamento",
       "estado_integracao": "implementado",
       "nosso_modulo": "der_se",
-      "observacao": "Pagina DER-SE com relatorio de radares e lombadas fixas; distinguir projeto/estudo de equipamento instalado e checar data. Complemento municipal: SMTT_ARACAJU.",
-      "cobertura_estadual_confirmada": false
+      "observacao": "Pagina DER-SE com relatorio de radares e lombadas fixas; distinguir projeto/estudo de equipamento instalado e checar data. Complemento municipal: SMTT_ARACAJU. Novo cadastro: aracaju_se.",
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Sergipe",
+      "fontes_estaduais": [
+        {
+          "modulo": "der_se",
+          "nome": "DER-SE - Localizacao de radares e lombadas fixas",
+          "url": "https://der.se.gov.br/localizacao-de-radares-fixos/",
+          "esfera": "estadual"
+        }
+      ],
+      "modulos_municipais": [
+        {
+          "modulo": "aracaju_se",
+          "nome": "SMTT Aracaju - Medidores de velocidade",
+          "url": "https://smtt.aracaju.se.gov.br/medidores-de-velocidade/",
+          "esfera": "municipal"
+        }
+      ],
+      "cobertura_municipal_confirmada": false
     },
     {
       "uf": "TO",
@@ -351,9 +655,26 @@
       "tipo_esperado": "cadastro_equipamento",
       "estado_integracao": "implementado",
       "nosso_modulo": "ageto_to",
-      "modulos_municipais": [{"modulo": "araguaiana_to", "municipio": "Araguaina"}],
+      "modulos_municipais": [
+        {
+          "modulo": "araguaiana_to",
+          "nome": "ASTT Araguaina - Medidores de velocidade (lista de enderecos)",
+          "url": "https://www.araguaina.to.gov.br/servicos/medidores-de-velocidade-lista-de-enderecos",
+          "esfera": "municipal"
+        }
+      ],
       "observacao": "Relacao geral AGETO com GPS, rodovia/km, serie e numero Inmetro; 58 equipamentos no PDF rev01 conferido em 21/10/2026. ASTT Araguaina permanece como complemento municipal. A lista nao comprova atividade atual nem cobertura integral.",
-      "cobertura_estadual_confirmada": false
+      "cobertura_estadual_confirmada": false,
+      "nome_uf": "Tocantins",
+      "fontes_estaduais": [
+        {
+          "modulo": "ageto_to",
+          "nome": "AGETO-TO - Relacao dos equipamentos fixos medidores de velocidade",
+          "url": "https://www.to.gov.br/ageto/lista-de-radares/l3d43475lu1",
+          "esfera": "estadual"
+        }
+      ],
+      "cobertura_municipal_confirmada": false
     }
   ]
 }

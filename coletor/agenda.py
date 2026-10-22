@@ -50,6 +50,9 @@ from coletor.fontes.der_al import ColetorDerAL
 from coletor.fontes.natal_rn import ColetorNatalRN
 from coletor.fontes.teresina_pi import ColetorTeresinaPI
 from coletor.fontes.base_lwb import ColetorBaseLWB
+from coletor.fontes.cadastros_publicos import NOVAS_FONTES
+from coletor.fontes.cetsp import ColetorCETSP
+from coletor.fontes.sie_sc import ColetorSIEPortateis, ColetorSIELocais
 
 HORA = 3600
 DIA = 86400
@@ -332,6 +335,14 @@ AGENDA_PADRAO = {
         "ativo": False,        # complementar: ligar so quando quiser
     },
 }
+
+for _chave, _classe in dict(NOVAS_FONTES, cetsp=ColetorCETSP,
+                          sie_sc_portateis=ColetorSIEPortateis,
+                          sie_sc_locais=ColetorSIELocais).items():
+    AGENDA_PADRAO[_chave] = {
+        "rotulo": _classe.FONTE["nome"], "conector": _classe,
+        "intervalo_s": SEMANA, "url_direta": None, "ativo": True,
+    }
 
 # Teto do backoff apos erro consecutivo (multiplicador sobre intervalo_s).
 BACKOFF_TETO = 8

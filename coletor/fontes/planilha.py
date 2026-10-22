@@ -143,6 +143,9 @@ class _ColetorTabelas(HTMLParser):
         elif tag == "tr" and self._tab is not None:
             self._linha = []
         elif tag in ("td", "th") and self._linha is not None:
+            # HTML permite omitir </td>; o DER-ES publica assim o codigo.
+            if self._cel is not None:
+                self.handle_endtag("td")
             self._cel = []
         elif tag == "br" and self._cel is not None:
             self._cel.append(" ")
@@ -152,6 +155,8 @@ class _ColetorTabelas(HTMLParser):
             self._linha.append("".join(self._cel).strip())
             self._cel = None
         elif tag == "tr" and self._linha is not None:
+            if self._cel is not None:
+                self.handle_endtag("td")
             self._tab.append(self._linha)
             self._linha = None
         elif tag == "table" and self._tab is not None:
