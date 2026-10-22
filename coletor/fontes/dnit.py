@@ -206,7 +206,7 @@ class ColetorDNITEquipamentos(ColetorDNIT):
                 corpo = arquivo.read()
         else:
             from coletor.exportacao_publica import baixar_xlsx
-            corpo = baixar_xlsx(origem or self.PAGINA)
+            corpo = baixar_xlsx(origem or self.PAGINA, mostrar_tabela=True)
         if not corpo.startswith(b"PK"):
             raise ValueError("Exportacao DNIT nao e um XLSX")
         linhas = pl.ler_xlsx(corpo)

@@ -197,12 +197,27 @@ def _validar_layout(origem, conf, laboratorio):
             raise RuntimeError("Destino do codigo ocupado por outra aplicacao.")
     if not dirs["banco"].is_file():
         raise RuntimeError("O banco configurado nao existe. Este instalador atualiza o servidor existente e nao cria base vazia.")
-    # Somente o link gerenciado da configuracao e permitido no webroot.
+    # A configuracao e o relatorio publico podem ter links conhecidos. Nunca
+    # autorizar outros destinos apenas porque o nome parece um arquivo de status.
     if dirs["web"].is_dir():
         for item in dirs["web"].rglob("*"):
-            if item.is_symlink() and item != dirs["web"] / "radar.conf":
+            if item.is_symlink() and item != dirs["web"] / "radar.conf" and not _link_status_publico(item, dirs["web"]):
                 raise RuntimeError("Revise o link existente no webroot antes de instalar: " + str(item))
     return dirs
+
+
+def _link_status_publico(item, web):
+    """Aceita o relatorio persistente, inclusive via link na pasta do aplicativo."""
+    if item != web / "status-atualizacoes.json":
+        return False
+    try:
+        alvo = item.resolve()
+        # Durante a troca atomica da arvore, o link do aplicativo ainda sera
+        # recriado por publicar_link(). Aceita esse destino conhecido ausente.
+        return alvo == Path(caminhos.status_atualizacoes()).resolve() or (
+            alvo == Path(caminhos.link_atualizacoes()) and not alvo.exists())
+    except (OSError, RuntimeError):
+        return False
 
 
 def _guardar(caminho, backup, indice):
@@ -234,7 +249,7 @@ def _restaurar(indice):
 def _permissoes(arvore, gid, gravavel=False, link_configuracao=False):
     for item in [arvore, *arvore.rglob("*")]:
         if item.is_symlink():
-            if link_configuracao and item == arvore / "radar.conf":
+            if link_configuracao and (item == arvore / "radar.conf" or _link_status_publico(item, arvore)):
                 continue
             raise RuntimeError("Symlink inesperado: " + str(item))
         if os.geteuid() == 0:

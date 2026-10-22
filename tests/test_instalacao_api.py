@@ -113,6 +113,30 @@ class TestInstalacaoAPI(unittest.TestCase):
         with closing(db.connect_readonly(self.banco)) as conn:
             self.assertEqual(conn.execute("SELECT valor FROM SENTINELA").fetchone()[0], "nao perder")
 
+    def test_atualizacao_preserva_link_publico_do_relatorio(self):
+        r = self.instalar(True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        publico = self.web / "status-atualizacoes.json"
+        # Forma usada no servidor: web -> aplicativo -> dados persistentes.
+        publico.symlink_to(self.home / "status-atualizacoes.json")
+        r = self.instalar(True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue(publico.is_symlink())
+        self.assertEqual(publico.resolve(), self.dados / "atualizacoes" / "status.json")
+        self.assertIn("operacoes", json.loads(publico.read_text()))
+        # Tambem funciona na copia efetiva do codigo/web, nao apenas no atalho
+        # que detecta uma revisao ja instalada.
+        (self.home / "core" / "entrada_api.py").write_text("# divergente")
+        r = self.instalar(True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("operacoes", json.loads(publico.read_text()))
+        # Mesmo nome apontando para outro arquivo continua recusado.
+        publico.unlink()
+        publico.symlink_to(self.conf)
+        r = self.instalar(True)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("Revise o link existente", r.stderr)
+
     def test_falha_restaura_codigo_web_e_config_sem_apagar_banco(self):
         (self.web / "nucleo.py").write_text("# fonte antigo indevido no webroot")
         antes_conf = self.conf.read_bytes()

@@ -1,0 +1,34 @@
+name: DNIT ao vivo (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exportacao:
+    name: Exportacao real do portal publico
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Abrir portal e testar o coletor de producao sem acessar o servidor
+        run: node .github/scripts/diagnosticar_dnit.cjs
+      - name: Evidencias da pagina, rede e exportacao
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dnit-ao-vivo
+          path: test-results/dnit-ao-vivo/
+          retention-days: 7
+          if-no-files-found: error

@@ -163,6 +163,20 @@ class _CDP:
             self.excecoes[:] = self.excecoes[-8:]
 
 
+_MOSTRAR_TABELA = r"""(() => {
+ if([...document.querySelectorAll('table tbody td')].some(e=>e.getClientRects().length))
+   return {tabelaVisivel:true};
+ const botoes=[...document.querySelectorAll('button,a,[role="button"]')]
+   .filter(e=>e.getClientRects().length && getComputedStyle(e).visibility!=='hidden' && !e.disabled && e.getAttribute('aria-disabled')!=='true');
+ const rotulo=e=>[e.innerText,e.title,e.getAttribute('aria-label')].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
+ window.__radarTabelas=window.__radarTabelas||new WeakSet();
+ const alvo=botoes.find(e=>/^(mostrar|exibir|visualizar) (a )?tabela$/i.test(rotulo(e)) && !window.__radarTabelas.has(e));
+ if(!alvo)return {aguardandoTabela:true};
+ window.__radarTabelas.add(alvo);alvo.click();
+ return {clicou:true,rotulo:rotulo(alvo),etapa:'mostrar_tabela'};
+})()"""
+
+
 _EXPORTAR = r"""(() => {
  const corpo=(document.body?.innerText||'').slice(0,4000).toLowerCase();
  const contexto={titulo:document.title,url:location.origin+location.pathname,pronto:document.readyState};
@@ -217,7 +231,7 @@ def _contextos_exportacao(cdp, sessao, prazo, anexos):
     return contextos
 
 
-def baixar_xlsx(url, timeout=None):
+def baixar_xlsx(url, timeout=None, mostrar_tabela=False):
     """Abre somente a pagina publica e aciona sua exportacao Excel visivel."""
     http.url_checada(url)
     navegador = next((shutil.which(n) for n in (
@@ -282,6 +296,11 @@ def baixar_xlsx(url, timeout=None):
                         if contexto_id is not None:
                             parametros["contextId"] = contexto_id
                         try:
+                            preparacao = {}
+                            if mostrar_tabela:
+                                preparacao = cdp.chamar("Runtime.evaluate", dict(parametros, expression=_MOSTRAR_TABELA), contexto_sessao).get("result", {}).get("value") or {}
+                                if preparacao.get("clicou"):
+                                    atualizacoes.evento("exportacao.preparacao", diagnostico=preparacao)
                             resultado = cdp.chamar("Runtime.evaluate", parametros, contexto_sessao)
                         except http.ErroFonte as exc:
                             if any(t in str(exc) for t in ("Cannot find context", "Execution context was destroyed", "No frame with given", "Session with given id not found")):
@@ -290,6 +309,8 @@ def baixar_xlsx(url, timeout=None):
                                 continue
                             raise
                         valor = resultado.get("result", {}).get("value") or {}
+                        if mostrar_tabela:
+                            valor["tabela"] = preparacao
                         diagnostico[valor.get("url", str(contexto_id))] = valor or {"excecao": resultado.get("exceptionDetails")}
                         if valor.get("bloqueio") and contexto_sessao == sessao and contexto_id is None:
                             raise http.ErroFonte("Pagina bloqueou acesso ou solicitou verificacao humana; exportacao interrompida")

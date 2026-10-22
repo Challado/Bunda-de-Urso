@@ -111,7 +111,7 @@ class DNITComplementoTest(unittest.TestCase):
             b, ext, mime, r = c.carregar(c.resolver_url())
             self.assertEqual(len(r), 1655)
             self.assertEqual(b, MULTAS.read_bytes())
-            baixar.assert_called_once_with(c.PAGINA)
+            baixar.assert_called_once_with(c.PAGINA, mostrar_tabela=True)
         for b in (b'<html>erro</html>', PNCV.read_bytes()):
             with patch('coletor.exportacao_publica.baixar_xlsx', return_value=b):
                 with self.assertRaises(ValueError):
@@ -250,6 +250,8 @@ def verificar_exportacao_robusta():
                 '/frame-reload': '<iframe id="f" src="/esperar" width="600" height="300"></iframe><script>setTimeout(()=>{f.src="/filho"},600)</script>',
                 '/esperar': 'Carregando dados publicos',
                 '/filho': '<button onclick="baixar()"><mat-icon>file_download</mat-icon></button>',
+                '/dnit-tabela': '''<button onclick="this.insertAdjacentHTML('afterend',
+                    '<table><tbody><tr><td>Dados do DNIT</td></tr></tbody></table><button onclick=baixar()>Exportar Excel</button>');this.textContent='Mostrar mapa'">Mostrar Tabela</button>''',
                 '/api-erro': '<script>fetch("/api-indisponivel")</script>',
                 '/javascript': '<script>setTimeout(()=>{throw Error("Falha demonstrativa na pagina")},250)</script>',
                 '/bloqueio': '<title>Request Rejected</title><p>The requested URL was rejected</p>',
@@ -272,6 +274,8 @@ def verificar_exportacao_robusta():
             for rota in ('/menu', '/assincrono', '/frame', '/frame-reload'):
                 if baixar_xlsx(base + rota, timeout=15) != corpo:
                     raise AssertionError('Exportacao falhou: ' + rota)
+            if baixar_xlsx(base + '/dnit-tabela', timeout=15, mostrar_tabela=True) != corpo:
+                raise AssertionError('DNIT precisa mostrar a tabela antes de exportar')
             for rota, esperado in (('/api-erro', '503'), ('/javascript', 'Falha demonstrativa'), ('/bloqueio', 'bloqueou acesso')):
                 try:
                     baixar_xlsx(base + rota, timeout=8)
