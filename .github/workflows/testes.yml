@@ -25,7 +25,9 @@ concurrency:
 jobs:
   suite:
     name: Suíte de testes
-    runs-on: ubuntu-latest
+    # Mantem o mesmo ambiente suportado pelos testes de navegador; o alias
+    # latest migrou para 26.04 e mudou o Chromium disponivel no runner.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -50,7 +52,7 @@ jobs:
 
   rigido:
     name: Rígido (contratos e invariantes)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5

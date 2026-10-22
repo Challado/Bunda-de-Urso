@@ -126,7 +126,18 @@ def registrar(operacao, dados, *, fonte=None, historico=None, recursos=None):
                 # O banco completa o historico anterior a este diario. Nao
                 # substitui traceback/bytes/origem de uma execucao ja detalhada.
                 if anterior.get("execucao_id") == novo.get("execucao_id") and anterior:
-                    novo = {**novo, **anterior, "agenda": novo.get("agenda", {})}
+                    banco = novo
+                    novo = {**banco, **anterior, "agenda": banco.get("agenda", {})}
+                    novo["contadores"] = {**anterior.get("contadores", {}),
+                                          **{k: v for k, v in banco.get("contadores", {}).items() if v is not None}}
+                    if banco.get("estado") in ("ok", "erro", "sem_mudanca"):
+                        novo["estado"] = banco["estado"]
+                        novo["terminado_em"] = banco.get("terminado_em") or anterior.get("terminado_em")
+                        if anterior.get("estado") not in ("ok", "erro", "sem_mudanca"):
+                            novo["estado_anterior_diario"] = anterior.get("estado")
+                            individual = arquivo.parent / ("coleta-" + str(novo["execucao_id"]) + ".json")
+                            if individual.exists():
+                                _atomico(individual, novo)
                 estado["fontes"][chave] = novo
             estado["resumo"] = {
                 "operacoes_com_erro": [k for k, v in estado.get("operacoes", {}).items() if v.get("estado") in ("erro", "interrompido")],

@@ -105,3 +105,17 @@ class RevisaoRelatoriosTest(unittest.TestCase):
         _encerrar_navegador(processo, None)
         time.sleep(.4)
         self.assertFalse(marca.exists())
+
+    def test_estado_final_do_banco_corrige_diario_incompleto_sem_perder_traceback(self):
+        atualizacoes.registrar('coleta', {'recurso_id': 3, 'execucao_id': 7, 'estado': 'em_andamento',
+                                        'contadores': {'traceback': 'diagnostico completo'}}, fonte=3, historico='coleta-7')
+        atualizacoes.registrar('agenda', {'estado': 'ok'}, recursos=[{
+            'recurso_id': 3, 'execucao_id': 7, 'estado': 'erro',
+            'contadores': {'erro_codigo': 'ErroFonte', 'erro_detalhe': 'Causa gravada no banco'}}])
+        fonte = self.estado()['fontes']['3']
+        self.assertEqual(fonte['estado'], 'erro')
+        self.assertEqual(fonte['contadores']['erro_codigo'], 'ErroFonte')
+        self.assertEqual(fonte['contadores']['traceback'], 'diagnostico completo')
+        from core import caminhos
+        individual = Path(caminhos.status_atualizacoes()).parent / 'coleta-7.json'
+        self.assertEqual(json.loads(individual.read_text())['estado'], 'erro')

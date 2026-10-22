@@ -44,6 +44,9 @@ mesmo anterior a criacao do diario, usando LEFT JOIN. `resumo.falhas_atuais`
 identifica fonte, recurso e causa; `recursos_nunca_coletados` distingue ausencia
 de coleta de sucesso. A agenda atualiza esse panorama em cada passada e preserva
 tracebacks novos quando a execucao ja tem detalhamento completo.
+Se o processo terminou depois de confirmar o resultado no banco e antes de
+finalizar o diario, o resultado terminal do banco corrige o consolidado e o
+JSON individual, preservando o traceback e registrando `estado_anterior_diario`.
 
 `codigo_esperado` identifica retornos normais de sondagem: systemctl pode devolver
 3 para unidade inativa e 4 para inexistente. Essas respostas continuam no log,

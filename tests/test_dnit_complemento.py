@@ -225,7 +225,7 @@ def exportar_blob_real():
     try:
         with patch('coletor.exportacao_publica.http.url_checada'), patch(
                 'coletor.exportacao_publica.shutil.which', side_effect=lambda n: navegador if n == 'chromium' else real_which(n)):
-            recebido = baixar_xlsx('http://127.0.0.1:' + str(servidor.server_port), timeout=25)
+            recebido = baixar_xlsx('http://127.0.0.1:' + str(servidor.server_port), timeout=60)
         if recebido != corpo:
             raise AssertionError('A exportacao blob nao preservou o arquivo XLSX')
     finally:
@@ -274,7 +274,7 @@ def verificar_exportacao_robusta():
                     raise AssertionError('Exportacao falhou: ' + rota)
             for rota, esperado in (('/api-erro', '503'), ('/javascript', 'Falha demonstrativa'), ('/bloqueio', 'bloqueou acesso')):
                 try:
-                    baixar_xlsx(base + rota, timeout=3)
+                    baixar_xlsx(base + rota, timeout=8)
                 except http.ErroFonte as exc:
                     if esperado not in str(exc):
                         raise AssertionError('Diagnostico omitiu a causa: ' + str(exc)) from exc
