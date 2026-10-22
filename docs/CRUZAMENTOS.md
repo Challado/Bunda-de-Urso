@@ -17,6 +17,9 @@ divergências de localização cadastral ou velocidade comparável. Proximidade 
 sugestão, inclusive se houver vários candidatos ou conflitos. Não confirma
 automaticamente identidade de aparelho, número de série ou certificado Inmetro.
 A verificação manual e os campos do cadastro permanecem como estavam.
+Se as coordenadas mudarem e o par sair do raio configurado, ou se a fonte
+for removida/desabilitada, a sugestão antiga continua no histórico, mas fica
+indisponível para confirmação. A distância exibida usa as coordenadas atuais.
 
 Ao conferir as evidências, **Usar cadastro oficial** mantém o ponto oficial no
 mapa e retira a contribuição duplicada da consulta pública por remoção lógica;

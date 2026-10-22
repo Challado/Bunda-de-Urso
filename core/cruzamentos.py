@@ -3,7 +3,7 @@
 Chamado pela API, em unidades pequenas. Sugestoes usam a mesma tabela de
 correspondencias do cadastro; decisoes anteriores nunca sao reabertas.
 """
-from . import config, db, governanca as gov
+from . import config, db, geo, governanca as gov
 
 
 def _velocidades(conn, pid):
@@ -13,12 +13,16 @@ def _velocidades(conn, pid):
         "WHERE l.ponto_id=?", (pid,))}
 
 
-def evidencia(conn, colaborativo_id, oficial_id, distancia=None):
+def evidencia(conn, colaborativo_id, oficial_id):
     """Comparacao legivel; dados ausentes nao se tornam igualdade."""
     atual = gov._resumo_ponto(conn, colaborativo_id)
     oficial = gov._resumo_ponto(conn, oficial_id)
     if atual is None or oficial is None:
         return None
+    coordenadas = (atual["latitude"], atual["longitude"], oficial["latitude"], oficial["longitude"])
+    distancia = (round(geo.haversine_m(*coordenadas), 3)
+                 if all(v is not None for v in coordenadas) else None)
+    dentro_raio = distancia is not None and distancia <= config.RAIO_CORRESPONDENCIA_M
     divergencias = []
     for campo, rotulo in (("municipio", "Município"), ("uf", "UF"),
                           ("via", "Rodovia"), ("km", "Quilômetro")):
@@ -43,7 +47,8 @@ def evidencia(conn, colaborativo_id, oficial_id, distancia=None):
             "municipio": oficial["municipio"], "uf": oficial["uf"],
             "via": oficial["via"], "km": oficial["km"],
             "velocidades": vb, "fontes": fontes, "divergencias": divergencias,
-            "disponivel": bool(fontes) and oficial["removido_em"] is None
+            "dentro_raio": dentro_raio,
+            "disponivel": dentro_raio and bool(fontes) and oficial["removido_em"] is None
             and oficial["verificacao_status"] != "desabilitado"}
 
 
@@ -78,7 +83,7 @@ def cruzar(conn, ponto_id, ctx, ip=None):
         if not vinculo["resolvido_em"]:
             conn.execute("UPDATE CORRESPONDENCIA_PONTO SET distancia_metros=? WHERE id=?",
                          (candidato["distancia_metros"], vinculo["id"]))
-        item = evidencia(conn, ponto_id, oid, candidato["distancia_metros"])
+        item = evidencia(conn, ponto_id, oid)
         item.update(correspondencia_id=vinculo["id"], status=vinculo["status"],
                     resolvido_em=vinculo["resolvido_em"])
         resultado["candidatos"].append(item)

@@ -720,8 +720,8 @@
         var local=[oficial.municipio,oficial.uf,oficial.via,oficial.km!=null?"km "+oficial.km:null].filter(Boolean).join(" · ");
         var divergencias=(oficial.divergencias || []).map(function(d){return "<p class='aviso'>"+esc(d)+"</p>";}).join("");
         h += "<tr><td>" + esc(c.id) + "</td><td><a target='_blank' rel='noopener' href='detalhe.html?id="+encodeURIComponent(oid)+"'>"+esc(oid)+"</a><p>"+esc(fontes)+"</p><p>"+esc(local)+"</p>"+divergencias+
-          (oficial.disponivel===false?"<p>Fonte indisponível para confirmação.</p>":"")+"</td><td>" + esc(c.ponto_colaborativo_id) + "</td>" +
-          "<td>" + esc(c.distancia_metros != null ? Math.round(c.distancia_metros) + " m" : "—") + "</td>" +
+          (oficial.disponivel===false?"<p>Correspondência indisponível para confirmação: confira as coordenadas atuais e a fonte.</p>":"")+"</td><td>" + esc(c.ponto_colaborativo_id) + "</td>" +
+          "<td>" + esc(oficial.distancia_metros != null ? Math.round(oficial.distancia_metros) + " m" : "—") + "</td>" +
           "<td>" + esc(statusExibido || "—") + "</td><td>";
         if (ehModerador() && oficial.disponivel && !c.resolvido_em && (c.status === "corroborado" || c.status === "pendente" || !c.status)){
           h += "<button class='mini' data-corr='" + esc(c.id) + "' data-status='colaborativo_vence'>Manter contribuição</button> " +

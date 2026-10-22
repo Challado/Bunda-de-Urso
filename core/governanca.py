@@ -1095,7 +1095,7 @@ def obter_radar(conn, ponto_id):
     for correspondencia in reg["correspondencias"]:
         correspondencia["oficial"] = evidencia(
             conn, correspondencia["ponto_colaborativo_id"],
-            correspondencia["ponto_oficial_id"], correspondencia["distancia_metros"])
+            correspondencia["ponto_oficial_id"])
     return reg
 
 

@@ -184,6 +184,23 @@ class TestCruzamentos(BaseGov):
                                    {"status": "oficial_vence"}, headers=self.headers)[0], 409)
         self.assertEqual(self.cruzar(pid)["resultado"]["candidatos"], [])
 
+    def test_coordenadas_alteradas_invalidam_sugestao_antiga_sem_apagar_historico(self):
+        pid = self.colab(verificar=True)
+        self._oficial(-23.5501, -46.6301, "OFICIAL")
+        oficial = self._novo_id()
+        cid = self.cruzar(pid)["resultado"]["candidatos"][0]["correspondencia_id"]
+        status, _, corpo = self._req("PATCH", "/api/v1/gestao/radar/P-%d" % oficial,
+                                    {"latitude": -24.5, "longitude": -47.5}, headers=self.headers)
+        self.assertEqual(status, 200, corpo)
+        doc = self.cruzar(pid)
+        self.assertEqual(doc["resultado"]["candidatos"], [])
+        vinculo = doc["radar"]["correspondencias"][0]
+        self.assertEqual(vinculo["id"], cid)
+        self.assertFalse(vinculo["oficial"]["disponivel"])
+        self.assertGreater(vinculo["oficial"]["distancia_metros"], 100000)
+        self.assertEqual(self._req("POST", "/api/v1/gestao/correspondencias/%d" % cid,
+                                   {"status": "oficial_vence"}, headers=self.headers)[0], 409)
+
     def test_autorizacao_metodo_e_parametros_do_lote(self):
         pid = self.colab()
         for rota in ("/api/v1/gestao/cruzamentos", "/api/v1/gestao/radar/P-%d/cruzar" % pid):
