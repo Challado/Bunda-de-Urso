@@ -16,7 +16,7 @@ import os
 
 from coletor.fontes.antt import ColetorANTT
 from coletor.fontes.recife import ColetorRecife
-from coletor.fontes.dnit import ColetorDNIT
+from coletor.fontes.dnit import ColetorDNIT, ColetorDNITEquipamentos
 from coletor.fontes.dersp import ColetorDERSP
 from coletor.fontes.derpr import ColetorDERPR
 from coletor.fontes.dermg import ColetorDERMG
@@ -78,6 +78,13 @@ AGENDA_PADRAO = {
     "dnit": {
         "rotulo": "DNIT - controle de velocidade (PNCV)",
         "conector": ColetorDNIT,
+        "intervalo_s": SEMANA,
+        "url_direta": None,
+        "ativo": True,
+    },
+    "dnit_equipamentos": {
+        "rotulo": "DNIT Multas - series e registros Inmetro (exportacao publica)",
+        "conector": ColetorDNITEquipamentos,
         "intervalo_s": SEMANA,
         "url_direta": None,
         "ativo": True,

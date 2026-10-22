@@ -109,6 +109,7 @@ class ColetorDNIT(ColetorBase):
     # -- normalizar -------------------------------------------------------
     def identificador(self, raw):
         return nz.pick(raw, "Código Identificação", "Codigo Identificacao",
+                       "Código do Equipamento", "Codigo do Equipamento",
                        "codigo", "Codigo")
 
     @staticmethod
@@ -132,7 +133,13 @@ class ColetorDNIT(ColetorBase):
     def normalizar(self, idx, raw):
         lat, lon = pl.parse_coordenadas(
             nz.pick(raw, "Coordenadas (Lat/Long)", "Coordenadas", "coordenadas"))
-        if lat is None or lon is None:
+        multas = "Código do Equipamento" in raw and "Coordenadas" in raw
+        if multas:
+            # Formato confirmado nos 1.631 codigos comuns aos dois XLSX.
+            lat, lon = lon, lat
+        if multas and lat is not None and lon is not None and not (-34 <= lat <= 6 and -74 <= lon <= -34):
+            raise ValueError("Coordenadas DNIT Multas fora do formato longitude/latitude brasileiro")
+        if (lat is None or lon is None) and not multas:
             # sem coordenada: preserva o registro bruto, nao posiciona
             return None
         fab, mod = self._marca_modelo(
@@ -147,12 +154,19 @@ class ColetorDNIT(ColetorBase):
             ("Cod. ET: %s" % raw.get("Cód. ET")) if raw.get("Cód. ET") else None,
             ("Cod. EV: %s" % raw.get("Cód. EV")) if raw.get("Cód. EV") else None,
         ) if x)
+        serie = str(nz.pick(raw, "Nº de Série", "Nº de Serie") or "").strip()
+        serie = serie if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", serie) and serie != "0" else None
+        numero = str(nz.pick(raw, "Registro INMETRO") or "").strip()
+        numero = str(int(numero)) if serie and re.fullmatch(r"\d+", numero) and int(numero) > 0 else None
         return {
             "identificador": self.identificador(raw),
             "latitude": lat,
             "longitude": lon,
             "qualidade": "oficial",
-            "metodo_obtencao": "publicacao DNIT (PNCV)",
+            "metodo_obtencao": "publicacao DNIT (Multas)" if multas else "publicacao DNIT (PNCV)",
+            "complementar_cadastro_oficial": True,
+            "numero_serie": serie,
+            "numero_inmetro": numero,
             "uf": nz.pick(raw, "UF", "Uf", "uf"),
             "municipio_nome": nz.pick(raw, "Município", "Municipio", "municipio"),
             "via_codigo": self._via(nz.pick(raw, "Rodovia", "rodovia")),
@@ -166,3 +180,42 @@ class ColetorDNIT(ColetorBase):
             "sentido_original": None,
             "observacoes": observacoes or None,
         }
+
+
+class ColetorDNITEquipamentos(ColetorDNIT):
+    """Outra publicacao do MESMO orgao e codigo: fonte comum, recurso separado.
+
+    O XLSX e gerado pelo SheetJS no navegador (blob), portanto nao ha URL
+    compartilhavel do arquivo enviado. Aciona a exportacao publica ou le um
+    XLSX local exportado pelo operador. Nao substitui a planilha PNCV.
+    """
+    PAGINA = "https://servicos.dnit.gov.br/multas/informacoes/equipamentos-fiscalizacao"
+    RECURSO = {
+        "nome": "DNIT Multas - Equipamentos de fiscalizacao (exportacao XLSX)",
+        "url_recurso": PAGINA, "formato_origem": "xlsx",
+        "periodicidade_segundos": 604800, "status_integracao": "parcial",
+    }
+
+    @classmethod
+    def resolver_url(cls):
+        return cls.PAGINA
+
+    def carregar(self, origem):
+        if origem and os.path.isfile(origem):
+            with open(origem, "rb") as arquivo:
+                corpo = arquivo.read()
+        else:
+            from coletor.exportacao_publica import baixar_xlsx
+            corpo = baixar_xlsx(origem or self.PAGINA)
+        if not corpo.startswith(b"PK"):
+            raise ValueError("Exportacao DNIT nao e um XLSX")
+        linhas = pl.ler_xlsx(corpo)
+        esperadas = {"Código do Equipamento", "Equipamento", "UF", "Município",
+                     "Rodovia", "Km", "Coordenadas", "Registro INMETRO", "Nº de Série"}
+        if not linhas or len(linhas[0]) != len(esperadas) or set(linhas[0]) != esperadas:
+            raise ValueError("DNIT Multas alterou o cabecalho da exportacao")
+        registros = pl.dicts_de_linhas(linhas)
+        codigos = [str(self.identificador(r) or "").strip().upper() for r in registros]
+        if not registros or not all(codigos) or len(set(codigos)) != len(codigos):
+            raise ValueError("Exportacao DNIT vazia ou com codigos ausentes/ambiguos")
+        return corpo, ".xlsx", MIME_XLSX, registros

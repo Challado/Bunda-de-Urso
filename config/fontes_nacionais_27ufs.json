@@ -344,6 +344,13 @@
     {
       "nome": "ANTT radares",
       "url": "https://dados.antt.gov.br/dataset/79d287f4-f5ca-4385-a17c-f61f53831f17"
+    },
+    {
+      "nome": "DNIT Multas - Equipamentos de fiscalizacao (complemento do PNCV)",
+      "url": "https://servicos.dnit.gov.br/multas/informacoes/equipamentos-fiscalizacao",
+      "modulo": "dnit_equipamentos",
+      "estado_integracao": "parcial",
+      "nota_tecnica": "Exportacao SheetJS/blob por Chromium ou XLSX local. Formato e carga conjunta testados; acesso online retornou 503 neste ambiente em 22/10/2026."
     }
   ],
   "fontes_adicionais": [

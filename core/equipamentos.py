@@ -4,6 +4,7 @@ Serie isolada e proximidade nao sao chaves. Reuso automatico exige fontes
 oficiais, tipo/serie exatos e fabricante conhecido ou local cadastral completo.
 """
 import json
+import math
 
 from . import db
 from .dedup import normalizar_serie, normalizar_texto, serie_generica
@@ -150,6 +151,54 @@ def resolver(conn, fonte_id, registro_id, ponto_id, dados):
         if mesma_fabrica or mesmo_local:
             elegiveis.append(c['id'])
     return elegiveis[0] if len(elegiveis) == 1 else None
+
+
+def complementar_cadastro(conn, fonte_id, registro_id, ponto_id, identificador_id,
+                          dados, anterior, local):
+    """Refina um unico equipamento do mesmo codigo oficial e mesmo local.
+
+    Opt-in do conector DNIT. Um cadastro sem serie nao e prova de um segundo
+    instrumento. Nao altera serie conhecida, decisoes, certificados, outros
+    locais ou publicacoes de outro codigo/orgao. Series divergentes continuam
+    sendo equipamentos distintos (possivel substituicao).
+    """
+    if not anterior or identificador_id is None or not _oficial(conn, fonte_id):
+        return None
+    if any(anterior[k] is None or local[k] is None for k in ("municipio_id", "via_id", "km")):
+        return None
+    if (anterior["municipio_id"] != local["municipio_id"] or anterior["via_id"] != local["via_id"]
+            or not math.isclose(anterior["km"], local["km"], abs_tol=0.000001, rel_tol=0)):
+        return None
+    codigo = db.scalar(conn, "SELECT valor_normalizado FROM IDENTIFICADOR_EXTERNO WHERE id=?", (identificador_id,))
+    rows = db.query_all(conn, "SELECT e.* FROM EQUIPAMENTO e JOIN INSTALACAO i ON i.equipamento_id=e.id "
+                       "WHERE i.ponto_id=?", (ponto_id,))
+    if len(rows) != 1:
+        return None
+    row = rows[0]
+    a, b = str(row["numero_serie"] or "").strip().upper(), str(dados["numero_serie"] or "").strip().upper()
+    if (a and b and a != b) or row["tipo_radar_id"] != dados["tipo_radar_id"]:
+        return None
+    if not modelos_compativeis(conn, row["modelo_id"], dados["modelo_id"]) or _decidido(conn, row["id"], registro_id):
+        return None
+    origens = db.query_all(conn, "SELECT r.identificador_na_fonte, rf.fonte_id, v.decisao_id "
+        "FROM VINCULO_REGISTRO_EQUIPAMENTO v JOIN REGISTRO_FONTE r ON r.id=v.registro_id "
+        "JOIN ARTEFATO_COLETA ar ON ar.id=r.artefato_id JOIN RECURSO_FONTE rf ON rf.id=ar.recurso_id "
+        "WHERE v.equipamento_id=?", (row["id"],))
+    do_orgao = [o for o in origens if o["fonte_id"] == fonte_id]
+    if not do_orgao or any(o["decisao_id"] is not None
+                         or str(o["identificador_na_fonte"] or "").strip().upper() != codigo for o in do_orgao):
+        return None
+    # Republicacao mais pobre preserva a relacao instalada conhecida, inclusive
+    # quando o Inmetro ja corroborou o instrumento em seu proprio ponto.
+    if a and not b:
+        return row["id"] if _oficial_exclusivo(conn, row["id"]) else None
+    if any(o["fonte_id"] != fonte_id or o["decisao_id"] is not None for o in origens):
+        return None
+    if db.scalar(conn, "SELECT 1 FROM INSTALACAO WHERE equipamento_id=? AND ponto_id<>? LIMIT 1", (row["id"], ponto_id)):
+        return None
+    if not a and db.scalar(conn, "SELECT 1 FROM VERIFICACAO_METROLOGICA WHERE equipamento_id=? LIMIT 1", (row["id"],)):
+        return None
+    return row["id"]
 
 
 def reconciliar(conn):

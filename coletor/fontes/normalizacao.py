@@ -535,6 +535,8 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None,
     else:
         ponto_existente_id = None
         identificador_id = _identificador_externo_id(conn, fonte_id, d)
+    ponto_anterior = dbmod.query_one(conn, "SELECT municipio_id, via_id, km FROM PONTO_FISCALIZACAO WHERE id=?",
+                                    (ponto_existente_id,)) if ponto_existente_id is not None and d.get("complementar_cadastro_oficial") else None
     campos_ponto = {
         "posicao_id": posicao_id,
         "municipio_id": municipio_id,
@@ -657,6 +659,10 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None,
     if not ponto_criado:
         equipamento_id = _equipamento_do_ponto(
             conn, ponto_id, tipo_radar_id, d.get("numero_serie"), modelo_id, d.get("ano_fabricacao"))
+        if equipamento_id is None and d.get("complementar_cadastro_oficial") and reutilizar_identidade:
+            from core.equipamentos import complementar_cadastro
+            equipamento_id = complementar_cadastro(conn, fonte_id, registro_id, ponto_id,
+                identificador_id, dados_equipamento, ponto_anterior, campos_ponto)
     if equipamento_id is None and reutilizar_identidade:
         from core.equipamentos import resolver
         equipamento_id = resolver(conn, fonte_id, registro_id, ponto_id, dados_equipamento)
@@ -665,9 +671,9 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None,
     else:
         from core.equipamentos import modelo_complementado
         modelo = modelo_complementado(conn, dbmod.scalar(conn, "SELECT modelo_id FROM EQUIPAMENTO WHERE id=?", (equipamento_id,)), modelo_id)
-        conn.execute("UPDATE EQUIPAMENTO SET modelo_id=?, "
+        conn.execute("UPDATE EQUIPAMENTO SET modelo_id=?, numero_serie=COALESCE(numero_serie, ?), "
                      "ano_fabricacao=COALESCE(ano_fabricacao, ?) WHERE id=?",
-                     (modelo, d.get("ano_fabricacao"), equipamento_id))
+                     (modelo, d.get("numero_serie"), d.get("ano_fabricacao"), equipamento_id))
     instalacao_id = _buscar_por(conn, "INSTALACAO", {
         "ponto_id": ponto_id, "equipamento_id": equipamento_id})
     if instalacao_id is None:
@@ -683,6 +689,17 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None,
         conn.execute("INSERT OR IGNORE INTO IDENTIFICADOR_EQUIPAMENTO "
                      "(identificador_id, equipamento_id) VALUES (?,?)",
                      (identificador_id, equipamento_id))
+
+    # Identificador secundario publicado pelo DNIT: o codigo administrativo
+    # continua sendo a chave do ponto. Numero de certificado nao entra aqui.
+    numero_inmetro = str(d.get("numero_inmetro") or "")
+    if (d.get("numero_serie") and re.fullmatch(r"[0-9]+", numero_inmetro)
+            and int(numero_inmetro) > 0 and fonte_id is not None
+            and dbmod.scalar(conn, "SELECT n.codigo FROM FONTE f JOIN NATUREZA_FONTE n ON n.id=f.natureza_id WHERE f.id=?", (fonte_id,)) == "oficial"):
+        auxiliar = _identificador_externo_id(conn, fonte_id, {
+            "identificador": numero_inmetro, "tipo_identificador": "numero_inmetro"})
+        conn.execute("INSERT OR IGNORE INTO IDENTIFICADOR_EQUIPAMENTO (identificador_id, equipamento_id) VALUES (?,?)",
+                     (auxiliar, equipamento_id))
 
     # vinculo de proveniencia (cada registro -> o ponto canonico)
     conn.execute(
