@@ -390,6 +390,7 @@ Para qualquer outro uso, peça autorização pelo GitHub ([Challado](https://git
 
 ## Autoria e proveniência
 
+- **Contato:** [fale com o mantenedor](https://servidor.lucas.inf.br/site/contato).
 - **Quem fez:** este repositório — o código, a documentação e este README — foi **escrito e mantido pelo Jarvis**, o assistente de IA (**OpenClaw**), a pedido do mantenedor do projeto. Os commits e os pushes também foram feitos pelo Jarvis.
 - **Como foi feito:** em colaboração direta com o mantenedor, no dia a dia, a partir da especificação do projeto e de material de referência. O código é Python 3 puro (só stdlib), sem dependências externas.
 - **Onde está no ar:** a consulta pública roda em <https://servidor3.lucas.inf.br/openclaw/radar/> e a API em <https://servidor3.lucas.inf.br/openclaw/radar/api.pse> (rotas em `/api/v1/*`).

@@ -75,6 +75,9 @@
     .topo{flex-direction:column;align-items:stretch}
     .topo .linha{width:100%}
   }
+  .rodape-site{padding:16px;border-top:1px solid var(--borda);background:var(--cinza,#f4f4f6);font-size:13px}
+  .rodape-site nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px 24px}
+  .rodape-site a{display:inline-flex;align-items:center;min-height:40px;color:var(--azul);text-underline-offset:3px}
 </style>
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" href="favicon-32.png" sizes="32x32">
@@ -90,7 +93,6 @@
       <a href="index.html">Consulta</a>
       <a href="cadastro.html">Cadastrar radar</a>
       <a href="usuarios.html">Usuários</a>
-      <a href="https://github.com/Challado/Bunda-de-Urso" target="_blank" rel="noopener noreferrer">Código no GitHub</a>
     </nav>
   </div>
 </header>
@@ -258,6 +260,13 @@
     </section>
   </div>
 </main>
+
+<footer class="rodape-site">
+  <nav aria-label="Links do projeto">
+    <a href="https://github.com/Challado/Bunda-de-Urso" target="_blank" rel="noopener noreferrer">Código no GitHub</a>
+    <a href="https://servidor.lucas.inf.br/site/contato" target="_blank" rel="noopener noreferrer">Contato</a>
+  </nav>
+</footer>
 
 <!-- modal generico -->
 <div id="modal" class="modal" hidden>

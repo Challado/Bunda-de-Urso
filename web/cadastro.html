@@ -44,6 +44,9 @@
   .resultado-cadastro ul{padding-left:20px}
   :focus-visible{outline:3px solid var(--azul);outline-offset:3px}
   @media (max-width:560px){.grade{grid-template-columns:1fr}header .logo{height:40px}.geoBox button{width:100%}}
+  .rodape-site{padding:16px;border-top:1px solid var(--borda);background:var(--cinza,#f4f4f6);font-size:13px}
+  .rodape-site nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px 24px}
+  .rodape-site a{display:inline-flex;align-items:center;min-height:40px;color:var(--azul);text-underline-offset:3px}
 </style>
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" href="favicon-32.png" sizes="32x32">
@@ -58,7 +61,6 @@
     <nav class="nav">
       <a href="index.html">Consulta</a>
       <a href="gestao.html">Administração</a>
-      <a href="https://github.com/Challado/Bunda-de-Urso" target="_blank" rel="noopener noreferrer">Código no GitHub</a>
     </nav>
   </div>
 </header>
@@ -106,6 +108,13 @@
   </form>
   <div id="res" style="margin-top:14px" role="status" aria-live="polite" aria-atomic="true"></div>
 </main>
+
+<footer class="rodape-site">
+  <nav aria-label="Links do projeto">
+    <a href="https://github.com/Challado/Bunda-de-Urso" target="_blank" rel="noopener noreferrer">Código no GitHub</a>
+    <a href="https://servidor.lucas.inf.br/site/contato" target="_blank" rel="noopener noreferrer">Contato</a>
+  </nav>
+</footer>
 <script>
 var API = "api.pse?rota=/api/v1/radares/submeter&formato=json";
 var CAMPOS = ["identificador","tipo_radar","modelo","latitude","longitude","uf","municipio","via","km","velocidade_geral","sentido","observacoes","contato"];
