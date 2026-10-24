@@ -151,6 +151,8 @@ def _validar(valores):
 
 def _editar(texto, alteracoes):
     """Uma secao por nome, ultima chave prevalece, comentarios preservados."""
+    texto = texto.replace("# Precedencia: variavel de ambiente > este arquivo > padrao do checkout.",
+                          "# RADAR_CONF seleciona este arquivo; os parametros sao lidos somente daqui.")
     secoes, inicio, secao = {}, [], None
     for linha in texto.splitlines():
         limpo = linha.strip()
