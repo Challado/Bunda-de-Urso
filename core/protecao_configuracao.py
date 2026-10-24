@@ -60,8 +60,13 @@ def proteger_texto(texto, prefixo, webroot, origem, raiz_local=False):
                 pai = pai["pai"]
             if pai is servidor and d["palavras"][0] in ("root", "alias") and len(d["palavras"]) == 2:
                 raiz = d["palavras"][1]
-                if raiz.startswith("/") and "$" not in raiz and Path(webroot).resolve().is_relative_to(Path(raiz).resolve()):
-                    corresponde = True
+                if raiz.startswith("/") and "$" not in raiz:
+                    destino = Path(webroot).resolve()
+                    # Um link intermediario pode levar para fora da raiz
+                    # canonica, mas a URI continua servindo o mesmo destino.
+                    servido = (Path(raiz) / prefixo.lstrip('/')).resolve()
+                    if destino.is_relative_to(Path(raiz).resolve()) or (d['palavras'][0] == 'root' and servido == destino):
+                        corresponde = True
         if not corresponde:
             continue
         encontrados += 1

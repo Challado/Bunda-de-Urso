@@ -62,6 +62,13 @@ O instalador baixa o código público e executa a instalação pela API local. E
 protege configuração e pastas privadas no nginx, testa os bloqueios por HTTP,
 pausa as entradas, aguarda os coletores e faz backup SQLite consistente.
 
+A recarga do nginx é assíncrona. Antes de migrar, o instalador espera até
+15 segundos pela ativação das regras e consulta sondas reais com URLs únicas
+e cabeçalhos sem cache. Só continua quando todas retornam 403/404; uma resposta
+200 persistente reprova a instalação. A identificação do server também reconhece
+links intermediários na raiz web. As observações mostram os arquivos do nginx
+alterados e o diretório de backup usado na preparação.
+
 Se o banco **já estiver em `dados.dir`**, ele é usado nesse local: não é trocado
 por uma base vazia ou uma cópia antiga. IDs, decisões e fila são preservados.
 Logs, tokens, chaves e caches legados são migrados para a raiz de dados, e os

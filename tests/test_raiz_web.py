@@ -167,6 +167,39 @@ class TestRaizWeb(unittest.TestCase):
                 _bloqueios_http(self.web,'https://radar.test','/radar/')
         self.assertFalse(list(self.web.rglob('.sonda-*')))
 
+    def test_bloqueio_http_aguarda_recarga_e_nao_reutiliza_cache(self):
+        class Resposta:
+            def __init__(self,status): self.status=status
+            def __enter__(self):return self
+            def __exit__(self,*args):pass
+        pedidos=[]
+        def abrir(pedido,**kw):
+            pedidos.append(pedido)
+            # O worker antigo ja protegia radar.conf, mas ainda serve o backup.
+            return Resposta(200 if len(pedidos)==2 else 404)
+        with patch('core.raiz_web.urllib.request.urlopen',side_effect=abrir), patch('core.raiz_web.time.sleep') as pausa:
+            _bloqueios_http(self.web,'https://radar.test','/radar/',aguardar=2)
+        pausa.assert_called_once()
+        self.assertTrue(all('radar_sonda=' in p.full_url for p in pedidos))
+        self.assertTrue(all(p.get_header('Cache-control')=='no-cache, no-store' for p in pedidos))
+        self.assertGreater(len(pedidos),3)
+        self.assertFalse(list(self.web.rglob('.sonda-*')))
+
+    def test_bloqueio_http_200_persistente_reprova_mesmo_com_espera(self):
+        class Resposta:
+            status=200
+            def __enter__(self):return self
+            def __exit__(self,*args):pass
+        relogio=[0]
+        def pausa(segundos):relogio[0]+=segundos
+        with patch('core.raiz_web.urllib.request.urlopen',return_value=Resposta()), \
+             patch('core.raiz_web.time.monotonic',side_effect=lambda:relogio[0]), \
+             patch('core.raiz_web.time.sleep',side_effect=pausa):
+            with self.assertRaisesRegex(RuntimeError,'Protecao HTTP reprovada'):
+                _bloqueios_http(self.web,'https://radar.test','/radar/',aguardar=.5)
+        self.assertEqual(relogio[0],.5)
+        self.assertFalse(list(self.web.rglob('.sonda-*')))
+
     def test_banco_ja_movido_e_secoes_repetidas_sao_preservados_e_normalizados(self):
         dados=self.web/'dados'
         self.dados.rename(dados)

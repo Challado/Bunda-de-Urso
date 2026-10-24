@@ -44,7 +44,25 @@ class TestProtecaoConfiguracao(unittest.TestCase):
     def test_nginx_real_layout_local_bloqueia_banco_codigo_logs_e_segredos(self):
         self._nginx_real(raiz_local=True)
 
-    def _nginx_real(self, raiz_local=False):
+    def test_nginx_real_recarga_legado_e_confirma_todas_as_sondas(self):
+        self._nginx_real(raiz_local=True, recarregar=True)
+
+    def test_identifica_raiz_com_link_intermediario_sem_server_name(self):
+        with tempfile.TemporaryDirectory(prefix='radar-raiz-link-') as pasta:
+            base=Path(pasta)
+            real=base/'openclaw/html/radar'
+            real.mkdir(parents=True)
+            www=base/'www'
+            www.mkdir()
+            (www/'openclaw').symlink_to(real.parent,target_is_directory=True)
+            fonte='server { server_name _; root "'+str(www)+'"; }'
+            novo,n=proteger_texto(fonte,'/openclaw/radar/',real,'https://servidor3.test',raiz_local=True)
+            self.assertEqual(n,1)
+            self.assertIn('location = "/openclaw/radar/radar.conf.anterior" { return 404; }',novo)
+            self.assertIn('location ^~ "/openclaw/radar/dados/" { return 404; }',novo)
+            self.assertEqual(proteger_texto(novo,'/openclaw/radar/',real,'https://servidor3.test',raiz_local=True)[0],novo)
+
+    def _nginx_real(self, raiz_local=False, recarregar=False):
         binario = os.environ.get("RADAR_TEST_NGINX") or shutil.which("nginx")
         if not binario:
             self.skipTest("nginx nao instalado (o CI instala o pacote)")
@@ -85,6 +103,9 @@ class TestProtecaoConfiguracao(unittest.TestCase):
             with patch("core.protecao_configuracao.subprocess.run", side_effect=lambda cmd, **kw: executar_real(comando + ["-T"], **kw)):
                 self.assertEqual(planejar("/radar/", web, "", raiz_local=raiz_local), [])
             with tempfile.TemporaryFile() as saida:
+                if recarregar:
+                    legado,_=proteger_texto(fonte,'/radar/',web,'',raiz_local=False)
+                    nginx_conf.write_text(legado)
                 processo = subprocess.Popen(comando + ["-g", "daemon off;"], stdout=saida, stderr=saida)
                 try:
                     limite = time.monotonic() + 5
@@ -98,6 +119,14 @@ class TestProtecaoConfiguracao(unittest.TestCase):
                                 saida.seek(0)
                                 self.fail(saida.read().decode())
                             time.sleep(0.05)
+                    if recarregar:
+                        with urllib.request.urlopen('http://127.0.0.1:%d/radar/radar.conf.anterior'%porta,timeout=2) as r:
+                            self.assertEqual(r.status,200)
+                        nginx_conf.write_text(protegido)
+                        recarga=subprocess.run(comando+['-s','reload'],capture_output=True,text=True,timeout=10)
+                        self.assertEqual(recarga.returncode,0,recarga.stderr)
+                        from core.raiz_web import _bloqueios_http
+                        _bloqueios_http(web,'http://127.0.0.1:%d'%porta,'/radar/',aguardar=5)
                     uris = ["/radar/radar.conf", "/radar/%72adar.conf?download=1"]
                     if raiz_local:
                         uris += ["/radar/" + rel for rel in privados]

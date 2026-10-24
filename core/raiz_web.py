@@ -15,6 +15,7 @@ import pwd
 import shlex
 import shutil
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -192,7 +193,7 @@ def _transferir_crons(backup, antigo, raiz, usuario, conf=None):
     return anteriores
 
 
-def _bloqueios_http(raiz, origem, prefixo):
+def _bloqueios_http(raiz, origem, prefixo, aguardar=0):
     if not origem:
         raise RuntimeError('Configure web.origem para testar a protecao HTTP antes de migrar dados.')
     from .configuracao import _validar
@@ -220,16 +221,32 @@ def _bloqueios_http(raiz, origem, prefixo):
         temporario.write_text('sonda privada de configuracao')
         temporario.chmod(0o644)
         criados.append(temporario)
-        for rel in ['radar.conf', 'radar.conf.anterior', temporario.name, *(p + '/' + nome for p in PASTAS_PRIVADAS)]:
-            url = origem.rstrip('/') + prefixo.rstrip('/') + '/' + urllib.parse.quote(rel)
+        limite = time.monotonic() + max(0, aguardar)
+        tentativa = 0
+        while True:
+            tentativa += 1
             try:
-                with urllib.request.urlopen(url, timeout=20) as resposta:
-                    codigo = resposta.status
-            except urllib.error.HTTPError as exc:
-                codigo = exc.code
-                exc.close()
-            if codigo not in (403, 404):
-                raise RuntimeError('Protecao HTTP reprovada (%s): %s' % (codigo, rel))
+                for rel in ['radar.conf', 'radar.conf.anterior', temporario.name, *(p + '/' + nome for p in PASTAS_PRIVADAS)]:
+                    url = origem.rstrip('/') + prefixo.rstrip('/') + '/' + urllib.parse.quote(rel)
+                    # Nao reutiliza uma resposta em cache de antes da recarga.
+                    url += '?radar_sonda=' + uuid.uuid4().hex
+                    pedido = urllib.request.Request(url, headers={'Cache-Control':'no-cache, no-store', 'Pragma':'no-cache'})
+                    timeout = min(5, max(.1, limite - time.monotonic())) if aguardar else 20
+                    try:
+                        with urllib.request.urlopen(pedido, timeout=timeout) as resposta:
+                            codigo = resposta.status
+                    except urllib.error.HTTPError as exc:
+                        codigo = exc.code
+                        exc.close()
+                    if codigo not in (403, 404):
+                        raise RuntimeError('Protecao HTTP reprovada (%s): %s' % (codigo, rel))
+                break
+            except (RuntimeError, OSError, urllib.error.URLError) as exc:
+                restante = limite - time.monotonic()
+                if restante <= 0:
+                    raise
+                print('Aguardando ativacao das regras do nginx (tentativa %d): %s' % (tentativa, exc), flush=True)
+                time.sleep(min(.25, restante))
     finally:
         for arquivo in criados:
             arquivo.unlink(missing_ok=True)
@@ -414,6 +431,7 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
     backup = dados/'backups/raiz-web'/agora
     backup.mkdir(parents=True, mode=0o700)
     backup.chmod(0o700)
+    observacoes.append('Backup da preparacao: '+str(backup))
     indice = []
     def posse(fonte, destino):
         if os.geteuid() == 0:
@@ -463,15 +481,20 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
         _diretorio(raiz, observacoes)
         origem_http=caminhos.valor('web','origem')[0] or args.origem_http or ''
         if not lab:
+            print('RADAR_ETAPA: proteger_nginx', flush=True)
             for arquivo,anterior,novo in planejar(caminhos.web_url(),raiz,origem_http,raiz_local=True):
                 if arquivo.read_text()!=anterior:
                     raise RuntimeError('Nginx alterado durante o planejamento')
                 guardar(arquivo)
                 arquivo.write_text(novo)
                 alterou_nginx=True
+                observacoes.append('Regras privadas do nginx atualizadas: '+str(arquivo))
             _executar(['nginx','-t'])
             _executar(['systemctl','reload','nginx'])
-            _bloqueios_http(raiz,origem_http,caminhos.web_url())
+            # systemctl reload retorna antes da troca assincrona dos workers.
+            _bloqueios_http(raiz,origem_http,caminhos.web_url(),aguardar=15)
+            observacoes.append('Nginx: arquivos privados bloqueados por HTTP apos recarga.')
+            print('RADAR_ETAPA: migrar_instalacao', flush=True)
         with ExitStack() as locks:
             trava=locks.enter_context(open(dados/'instalacao.lock','a'))
             fcntl.flock(trava,fcntl.LOCK_EX|fcntl.LOCK_NB)
