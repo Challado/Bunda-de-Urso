@@ -21,15 +21,21 @@ Este mesmo arquivo serve a DOIS mundos:
        ./api.pse senha admin
        ./api.pse ajuda
 
-So isto mora no webroot; o aplicativo fica onde o arquivo de configuracao
-disser (/etc/radar-brasil/radar.conf, secao [instalacao] home). Este arquivo
-nao sabe -- e nao deve saber -- caminho de producao: ele pergunta.
+O radar.conf ao lado desta entrada define os caminhos, relativos a sua pasta.
+Instalacoes anteriores ainda podem usar a configuracao em /etc.
+Nenhum caminho de producao pertence a este arquivo.
 """
 import os
 import sys
 
 CONF_PADRAO = "/etc/radar-brasil/radar.conf"
-os.environ.setdefault("RADAR_CONF", CONF_PADRAO)
+# Configuracao junto aos scripts; /etc permanece somente para instalacoes antigas.
+_aqui = os.path.dirname(os.path.abspath(__file__))
+_locais = (_aqui, os.path.dirname(_aqui)) if os.path.basename(_aqui) == "web" else (_aqui,)
+_local = next((os.path.join(p, "radar.conf") for p in _locais
+               if os.path.isfile(os.path.join(p, "radar.conf"))), CONF_PADRAO)
+if not (os.environ.get("RADAR_CONF") or "").strip():
+    os.environ["RADAR_CONF"] = _local
 
 
 def _conf(secao, chave):
@@ -59,7 +65,7 @@ _raiz = os.environ.get("RADAR_BRASIL_HOME") or _conf("instalacao", "home")
 if not _raiz:
     # Sem configuracao: o checkout desta instalacao (webroot dentro do projeto).
     _aqui = os.path.dirname(os.path.abspath(__file__))
-    for _cand in (os.path.dirname(_aqui), _aqui):
+    for _cand in (_aqui, os.path.dirname(_aqui)):
         if os.path.isdir(os.path.join(_cand, "core")):
             _raiz = _cand
             break

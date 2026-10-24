@@ -575,6 +575,8 @@ def _verificar_gravacao(dirs, usuario=None):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Atualiza a instalacao descrita no radar.conf; padrao: simular.")
     parser.add_argument("--conf", required=True, type=Path)
+    parser.add_argument("--migrar-raiz-web", action="store_true",
+                        help="reune codigo, configuracao e dados na raiz web configurada")
     modo = parser.add_mutually_exclusive_group()
     modo.add_argument("--aplicar", action="store_true")
     parser.add_argument("--usuario-web", default="www-data")
@@ -589,6 +591,12 @@ def main(argv=None):
     args = parser.parse_args(argv)
     observacoes = ["Dependencia preparada pelo instalador: " + pacote for pacote in args.pacote_preparado]
     try:
+        with _usar_conf(args.conf.absolute()):
+            local = (Path(caminhos.home()).resolve() == Path(caminhos.web_raiz()).resolve()
+                     and args.conf.absolute() == Path(caminhos.web_raiz()) / "radar.conf")
+            if args.migrar_raiz_web or local:
+                from .raiz_web import executar
+                return executar(args, observacoes)
         with _configuracao_preparada(args.conf.absolute(), args.perfil_conf):
             # A simulacao continua sem gravar nem mesmo arquivos de diagnostico.
             if not (args.aplicar or args.restaurar):

@@ -39,6 +39,12 @@ class TestProtecaoConfiguracao(unittest.TestCase):
         self.assertIn("alias /srv/radar-web/;", novo)
 
     def test_nginx_real_bloqueia_download_e_mantem_pagina_acessivel(self):
+        self._nginx_real()
+
+    def test_nginx_real_layout_local_bloqueia_banco_codigo_logs_e_segredos(self):
+        self._nginx_real(raiz_local=True)
+
+    def _nginx_real(self, raiz_local=False):
         binario = os.environ.get("RADAR_TEST_NGINX") or shutil.which("nginx")
         if not binario:
             self.skipTest("nginx nao instalado (o CI instala o pacote)")
@@ -48,7 +54,18 @@ class TestProtecaoConfiguracao(unittest.TestCase):
             web.mkdir(parents=True)
             conf = base / "radar.conf"
             conf.write_text("configuracao privada de teste")
-            (web / "radar.conf").symlink_to(conf)
+            if raiz_local:
+                (web / "radar.conf").write_text("configuracao privada de teste")
+            else:
+                (web / "radar.conf").symlink_to(conf)
+            privados = ["dados/radar.sqlite3", "dados/raw/original.json", "dados/segredos/api_token",
+                        "logs/tick.log", "core/entrada_api.py", "web/api.pse", "deploy/api.pse",
+                        "radar.conf.anterior", "radar.conf.lock", "sql/schema.sqlite.sql", ".radar-temporario-privado"]
+            if raiz_local:
+                for rel in privados:
+                    arquivo = web / rel
+                    arquivo.parent.mkdir(parents=True, exist_ok=True)
+                    arquivo.write_text("conteudo privado nao deve sair por HTTP")
             (web / "index.html").write_text("pagina publica de teste")
             with socket.socket() as s:
                 s.bind(("127.0.0.1", 0))
@@ -57,7 +74,7 @@ class TestProtecaoConfiguracao(unittest.TestCase):
             temporarios = " ".join('%s_temp_path "%s";' % (nome, base / nome)
                                    for nome in ("client_body", "proxy", "fastcgi", "uwsgi", "scgi"))
             fonte = fonte.replace("http {", "http { " + temporarios)
-            protegido, encontrados = proteger_texto(fonte, "/radar/", web, "")
+            protegido, encontrados = proteger_texto(fonte, "/radar/", web, "", raiz_local=raiz_local)
             self.assertEqual(encontrados, 1)
             nginx_conf = base / "nginx.conf"
             nginx_conf.write_text(protegido)
@@ -66,7 +83,7 @@ class TestProtecaoConfiguracao(unittest.TestCase):
             self.assertEqual(teste.returncode, 0, teste.stderr)
             executar_real = subprocess.run
             with patch("core.protecao_configuracao.subprocess.run", side_effect=lambda cmd, **kw: executar_real(comando + ["-T"], **kw)):
-                self.assertEqual(planejar("/radar/", web, ""), [])
+                self.assertEqual(planejar("/radar/", web, "", raiz_local=raiz_local), [])
             with tempfile.TemporaryFile() as saida:
                 processo = subprocess.Popen(comando + ["-g", "daemon off;"], stdout=saida, stderr=saida)
                 try:
@@ -81,7 +98,11 @@ class TestProtecaoConfiguracao(unittest.TestCase):
                                 saida.seek(0)
                                 self.fail(saida.read().decode())
                             time.sleep(0.05)
-                    for uri in ("/radar/radar.conf", "/radar/%72adar.conf?download=1"):
+                    uris = ["/radar/radar.conf", "/radar/%72adar.conf?download=1"]
+                    if raiz_local:
+                        uris += ["/radar/" + rel for rel in privados]
+                        uris += ["/radar/dados/%72adar.sqlite3?download=1"]
+                    for uri in uris:
                         with self.assertRaises(urllib.error.HTTPError) as erro:
                             urllib.request.urlopen("http://127.0.0.1:%d%s" % (porta, uri), timeout=2)
                         self.assertEqual(erro.exception.code, 404)

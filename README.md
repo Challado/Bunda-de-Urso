@@ -1,4 +1,8 @@
 # BUNDA DE URSO
+
+A instalação com `radar.conf` junto aos scripts e caminhos relativos está
+descrita em [Migração para a raiz web](docs/MIGRACAO_RAIZ_WEB.md). A migração
+é feita pelo instalador privado, preservando o banco e preparando www-data.
 ## Cadastro nacional aberto, rastreável e auditável de radares e fiscalização eletrônica de trânsito
 
 [![Validação](https://github.com/Challado/Bunda-de-Urso/actions/workflows/testes.yml/badge.svg)](https://github.com/Challado/Bunda-de-Urso/actions/workflows/testes.yml)

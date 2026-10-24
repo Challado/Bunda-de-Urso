@@ -3,7 +3,7 @@
 # Este arquivo diz AO PROGRAMA onde estao as coisas. O codigo nao sabe (e nao
 # deve saber) caminho de producao: ele pergunta aqui.
 #
-#   LOCAL:  /etc/radar-brasil/radar.conf   (root:root, 0644; pasta 0755)
+#   LOCAL:  radar.conf na raiz da instalacao (www-data:www-data, 0660)
 #   OUTRO:  RADAR_CONF=/caminho/alternativo (util para teste)
 #
 # Precedencia: variavel de ambiente > este arquivo > padrao do checkout.
@@ -18,34 +18,34 @@
 [instalacao]
 # Raiz do codigo instalado: onde ficam core/, coletor/, web/, sql/.
 # E o diretorio que o cron, o nginx e os scripts usam como referencia.
-home = /openclaw/bin/radar
+home = .
 
 # Dono esperado do codigo e contas da rotacao de logs (diretiva su do logrotate).
-usuario = root
+usuario = www-data
 grupo = www-data
 
 [dados]
 # Diretorio de dados: banco, arquivos brutos (raw/), staging/ e calibracao/.
-dir = /var/lib/radar-brasil
+dir = dados
 
 # Banco SQLite de producao. Vazio = <dir>/radar.sqlite3
-banco = /var/lib/radar-brasil/radar.sqlite3
+banco = dados/radar.sqlite3
 
 [web]
 # Webroot servido pelo nginx/fcgiwrap (onde mora o api.pse instalado).
-raiz = /var/www/html/openclaw/radar
+raiz = .
 
 # Prefixo publico da consulta (usado em links). Sem barra no fim e aceito.
-url = /openclaw/radar/
+url = /
 # Origem HTTP(S) opcional para verificar API e pagina pelo endereco publicado.
 origem =
 
 [logs]
 # Logs do tick e do dados-sync (o logrotate le daqui).
-dir = /var/log/openclaw/radar
+dir = logs
 
 [api]
-token_arquivo = /etc/radar-brasil/api_token
+token_arquivo = dados/segredos/api_token
 max_body = 8388608
 proxies_confiaveis =
 

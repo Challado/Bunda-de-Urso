@@ -63,7 +63,7 @@ def _arquivo(web=False):
         _erro(503, "configuracao_invalida", "radar.conf excede 64 KiB.")
     if web:
         link = Path(caminhos.web_raiz()) / "radar.conf"
-        if not link_aponta_configuracao(link, arq):
+        if link.absolute() != arq.absolute() and not link_aponta_configuracao(link, arq):
             _erro(503, "configuracao_indisponivel", "Execute o instalador para preparar o link radar.conf do painel.")
         # A escrita atomica substitui o destino em /etc, preservando o link.
         arq = link.resolve(strict=True)
@@ -114,8 +114,6 @@ def _validar(valores):
             _erro(422, "valor_invalido", "Use texto de uma linha, ate 2048 caracteres.")
         if texto != texto.strip() or '"' in texto or "'" in texto:
             _erro(422, "valor_invalido", "Nao use aspas ou espacos nas extremidades.")
-        if texto and par in CAMINHOS and not os.path.isabs(texto):
-            _erro(422, "caminho_invalido", "Use caminhos absolutos ao editar pela API.")
         if texto and par in NUMEROS:
             minimo, maximo = NUMEROS[par]
             if not texto.isdecimal() or not minimo <= int(texto) <= maximo:
@@ -190,7 +188,7 @@ def _validar_destinos(alteracoes):
     for par, texto in efetivos.items():
         if par not in alteracoes and not (par == ("dados", "banco") and ("dados", "dir") in alteracoes):
             continue
-        destino = Path(texto)
+        destino = Path(caminhos._absoluto(texto, caminhos.conf_path()))
         if not destino.exists():
             _erro(422, "destino_ausente", "%s.%s: prepare o destino no servidor antes de salvar." % par)
         if par == ("dados", "banco") and not destino.is_file():
@@ -201,10 +199,14 @@ def _validar_destinos(alteracoes):
             _erro(422, "destino_invalido", "O destino do codigo deve conter core/entrada_api.py.")
         if par == ("web", "raiz") and not (destino / "api.pse").is_file():
             _erro(422, "destino_invalido", "O webroot deve conter api.pse.")
-    web = Path(efetivos[("web", "raiz")]).resolve()
+    web = Path(caminhos._absoluto(efetivos[("web", "raiz")], caminhos.conf_path())).resolve()
+    local = (Path(caminhos.conf_path()).absolute() == web / "radar.conf" and
+             Path(caminhos.home()).resolve() == web)
     for par in (("dados", "dir"), ("dados", "banco"), ("api", "token_arquivo")):
         texto = efetivos.get(par, caminhos.token_arquivo())
-        if Path(texto).resolve().is_relative_to(web):
+        destino = Path(caminhos._absoluto(texto, caminhos.conf_path())).resolve()
+        privado = any(destino.is_relative_to(web / pasta) for pasta in ("dados", "logs"))
+        if destino.is_relative_to(web) and not (local and privado):
             _erro(422, "destino_publico", "Dados e segredos devem ficar fora do webroot.")
     if ("instalacao", "home") in alteracoes and not alteracoes[("instalacao", "home")]:
         _erro(422, "destino_invalido", "O caminho do codigo nao pode ser apagado pelo painel.")

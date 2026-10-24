@@ -23,14 +23,20 @@ def ativo(funcao=None):
 
 def arquivo_chave():
     valor = caminhos.valor("assistente", "chave_arquivo")[0]
-    arq = Path(valor) if valor else Path(caminhos.conf_path()).absolute().parent / "assistente_chave"
+    base = Path(caminhos.conf_path()).absolute().parent
+    if base == Path(caminhos.home()).resolve() == Path(caminhos.web_raiz()).resolve():
+        base = Path(caminhos.data_dir()) / "segredos"
+    arq = Path(caminhos.caminho("assistente", "chave_arquivo")) if valor else base / "assistente_chave"
     protegidos = {Path(caminhos.conf_path()).resolve(), Path(caminhos.banco()).resolve(),
                   Path(caminhos.token_arquivo()).resolve()}
+    web = Path(caminhos.web_raiz()).resolve()
+    local = Path(caminhos.conf_path()).absolute() == web / "radar.conf" and Path(caminhos.home()).resolve() == web
+    privado = local and arq.resolve().is_relative_to(web / "dados" / "segredos")
     if (not arq.is_absolute() or arq.resolve() in protegidos or
-            arq.resolve().is_relative_to(Path(caminhos.web_raiz()).resolve()) or
-            arq.resolve().is_relative_to(Path(caminhos.home()).resolve()) or
+            (arq.resolve().is_relative_to(web) and not privado) or
+            (arq.resolve().is_relative_to(Path(caminhos.home()).resolve()) and not privado) or
             arq.name.startswith("radar.conf")):
-        raise GovernancaError(422, "chave_invalida", "O arquivo da chave deve ter caminho absoluto fora do webroot.")
+        raise GovernancaError(422, "chave_invalida", "A chave deve ficar em arquivo privado, separado de fontes e configuracao.")
     return arq
 
 

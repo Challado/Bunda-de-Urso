@@ -10,6 +10,7 @@ import sys
 import tempfile
 import textwrap
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from core import caminhos
@@ -54,6 +55,17 @@ class TestSemConfiguracao(BaseCaminhos):
         self.assertEqual(caminhos.data_dir(), str(ROOT / "dados"))
         self.assertEqual(caminhos.banco(), str(ROOT / "dados" / "radar.sqlite3"))
         self.assertEqual(caminhos.bruto(), str(ROOT / "dados" / "raw"))
+
+    def test_descobre_conf_na_raiz_e_preserva_override_explicito(self):
+        local = self.dir / "radar.conf"
+        local.write_text("[instalacao]\nhome = .\n[web]\nraiz = .\n[dados]\ndir = dados\n")
+        with patch.object(caminhos, "ROOT", str(self.dir)):
+            os.environ.pop("RADAR_CONF")
+            self.assertEqual(caminhos.conf_path(), str(local))
+            self.assertEqual(caminhos.home(), str(self.dir))
+            self.assertEqual(caminhos.token_arquivo(), str(self.dir / "dados/segredos/api_token"))
+            os.environ["RADAR_CONF"] = str(self.dir / "outra.conf")
+            self.assertEqual(caminhos.conf_path(), str(self.dir / "outra.conf"))
 
     def test_arquivo_ausente_nao_e_problema(self):
         self.assertEqual(caminhos.problemas(), [])

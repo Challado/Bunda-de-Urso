@@ -109,7 +109,11 @@ _CACHE = {"chave": None, "valores": {}, "problemas": []}
 
 def conf_path():
     """Caminho do arquivo de configuracao em uso."""
-    return (os.environ.get(CONF_ENV) or "").strip() or CONF_PADRAO
+    explicito = (os.environ.get(CONF_ENV) or "").strip()
+    if explicito:
+        return os.path.abspath(explicito)
+    local = os.path.join(ROOT, "radar.conf")
+    return local if os.path.isfile(local) else CONF_PADRAO
 
 
 def existe_conf():
@@ -229,8 +233,10 @@ def inteiro(secao, chave):
 
 
 def token_arquivo():
-    return caminho("api", "token_arquivo",
-                   os.path.join(_base_conf(), "api_token"))
+    base = _base_conf()
+    if os.path.abspath(conf_path()) == os.path.join(home(), "radar.conf") and home() == web_raiz():
+        base = os.path.join(data_dir(), "segredos")
+    return caminho("api", "token_arquivo", os.path.join(base, "api_token"))
 
 
 def caminho(secao, chave, padrao="", env=None):

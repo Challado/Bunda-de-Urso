@@ -1,4 +1,4 @@
-"""Bloqueio HTTP somente do link radar.conf; preserva os demais locais do nginx."""
+"""Protege configuracao e pastas privadas, preservando os locais publicos do nginx."""
 import json
 from pathlib import Path
 import re
@@ -39,7 +39,7 @@ def _analisar(texto):
     return blocos, diretivas
 
 
-def proteger_texto(texto, prefixo, webroot, origem):
+def proteger_texto(texto, prefixo, webroot, origem, raiz_local=False):
     """Retorna texto e numero de servers do radar identificados neste arquivo."""
     uri = prefixo.rstrip("/") + "/radar.conf"
     if not uri.startswith("/") or any(ord(c) < 32 for c in uri):
@@ -74,10 +74,38 @@ def proteger_texto(texto, prefixo, webroot, origem):
             alteracoes.append((servidor["abertura"], servidor["abertura"], "\n    " + regra + "\n"))
     for inicio, fim, valor in sorted(alteracoes, reverse=True):
         texto = texto[:inicio] + valor + texto[fim:]
+    if raiz_local:
+        # Blocos exatos/de prefixo ganham de handlers genericos (.pse, estaticos).
+        # O instalador testa os bloqueios por HTTP antes de copiar dados privados.
+        regras = [("^~", prefixo.rstrip("/") + "/" + nome + "/")
+                  for nome in ("dados", "logs", "core", "coletor", "config", "sql",
+                               "web", "deploy", "tools", ".git", ".github", ".updater")]
+        regras.append(("^~", prefixo.rstrip("/") + "/.radar-"))
+        regras += [("=", prefixo.rstrip("/") + "/" + nome)
+                   for nome in ("radar.conf.lock", "radar.conf.anterior", "radar.conf.auditoria.jsonl",
+                                "VERSAO", "README.md", "LICENSE", "arquivos-instalados.json")]
+        # Reanalisa depois da insercao do bloqueio radar.conf.
+        blocos, _ = _analisar(texto)
+        alteracoes = []
+        for servidor in (b for b in blocos if b["palavras"] == ["server"]):
+            if not any(b["pai"] is servidor and b["palavras"] == ["location", "=", uri] for b in blocos):
+                continue
+            for modificador, caminho in regras:
+                palavras = ["location", modificador, caminho]
+                regra_privada = "location " + modificador + " " + json.dumps(caminho) + " { return 404; }"
+                locais = [b for b in blocos if b["pai"] is servidor and b["palavras"] == palavras]
+                if locais:
+                    for local in locais:
+                        if texto[local["inicio"]:local["fim"]] != regra_privada:
+                            alteracoes.append((local["inicio"], local["fim"], regra_privada))
+                else:
+                    alteracoes.append((servidor["abertura"], servidor["abertura"], "\n    " + regra_privada + "\n"))
+        for inicio, fim, valor in sorted(alteracoes, reverse=True):
+            texto = texto[:inicio] + valor + texto[fim:]
     return texto, encontrados
 
 
-def planejar(prefixo, webroot, origem):
+def planejar(prefixo, webroot, origem, raiz_local=False):
     r = subprocess.run(["nginx", "-T"], check=True, capture_output=True, text=True, timeout=30)
     arquivos = dict.fromkeys(re.findall(r"^# configuration file (.+):$", r.stdout, re.M))
     plano, encontrados, vistos = [], 0, set()
@@ -87,7 +115,7 @@ def planejar(prefixo, webroot, origem):
             continue
         vistos.add(arquivo)
         anterior = arquivo.read_text()
-        novo, servidores = proteger_texto(anterior, prefixo, webroot, origem)
+        novo, servidores = proteger_texto(anterior, prefixo, webroot, origem, raiz_local=raiz_local)
         encontrados += servidores
         if novo != anterior:
             if not arquivo.is_relative_to(Path("/etc/nginx")):
