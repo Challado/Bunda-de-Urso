@@ -519,10 +519,13 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
                 alterou_nginx=True
                 observacoes.append('Regras privadas do nginx atualizadas: '+str(arquivo))
             _executar(['nginx','-t'])
-            _executar(['systemctl','reload','nginx'])
+            if alterou_nginx:
+                _executar(['systemctl','reload','nginx'])
+            else:
+                observacoes.append('Nginx ja preparado; configuracao do operador preservada, sem recarga.')
             # systemctl reload retorna antes da troca assincrona dos workers.
             _bloqueios_http(raiz,origem_http,caminhos.web_url(),aguardar=15)
-            observacoes.append('Nginx: arquivos privados bloqueados por HTTP apos recarga.')
+            observacoes.append('Nginx: arquivos privados bloqueados por HTTP.')
             print('RADAR_ETAPA: migrar_instalacao', flush=True)
         with ExitStack() as locks:
             trava=locks.enter_context(open(dados/'instalacao.lock','a'))

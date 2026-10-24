@@ -87,6 +87,15 @@ class TestProtecaoConfiguracao(unittest.TestCase):
         self.assertIn('location = "/api.pse"',novo)
         self.assertIn('location ^~ "/resources/"',novo)
 
+    def test_include_do_operador_preserva_o_bloco_original_inteiro(self):
+        fonte='server { root /srv/www; include /etc/nginx/snippets/radar-brasil.conf; location /proxy/yahoo/ { proxy_pass https://exemplo.invalid/; } location ~ \\.pse$ { fastcgi_pass unix:/socket; } }'
+        novo,n=proteger_texto(fonte,'/radar/','/srv/www/radar','',raiz_local=True)
+        self.assertEqual(n,1)
+        self.assertEqual(novo,fonte)
+
+    def test_nginx_real_com_snippet_preserva_vhost_e_publica_apenas_resources_api(self):
+        self._nginx_real(raiz_local=True, usar_snippet=True)
+
     def test_identifica_raiz_com_link_intermediario_sem_server_name(self):
         with tempfile.TemporaryDirectory(prefix='radar-raiz-link-') as pasta:
             base=Path(pasta)
@@ -102,7 +111,7 @@ class TestProtecaoConfiguracao(unittest.TestCase):
             self.assertIn('location ^~ "/openclaw/radar/resources/"',novo)
             self.assertEqual(proteger_texto(novo,'/openclaw/radar/',real,'https://servidor3.test',raiz_local=True)[0],novo)
 
-    def _nginx_real(self, raiz_local=False, recarregar=False):
+    def _nginx_real(self, raiz_local=False, recarregar=False, usar_snippet=False):
         binario = os.environ.get("RADAR_TEST_NGINX") or shutil.which("nginx")
         if not binario:
             self.skipTest("nginx nao instalado (o CI instala o pacote)")
@@ -155,6 +164,15 @@ class TestProtecaoConfiguracao(unittest.TestCase):
             fonte=fonte.replace('root "%s";'% (base/'www'),'root "%s"; '%(base/'www')+handler)
             protegido, encontrados = proteger_texto(fonte, "/radar/", web, "", raiz_local=raiz_local)
             self.assertEqual(encontrados, 1)
+            if usar_snippet:
+                inicio=protegido.index('# radar: inicio publicacao resources')
+                fim=protegido.index('# radar: fim publicacao resources')+len('# radar: fim publicacao resources')
+                snippet=base/'radar-brasil.conf'
+                snippet.write_text(protegido[inicio:fim].replace('# radar: inicio publicacao resources','').replace('# radar: fim publicacao resources',''))
+                protegido=protegido[:inicio]+'include "'+str(snippet)+'";'+protegido[fim:]
+                substituir=patch('core.protecao_configuracao.SNIPPET_RADAR',str(snippet))
+                substituir.start()
+                self.addCleanup(substituir.stop)
             nginx_conf = base / "nginx.conf"
             nginx_conf.write_text(protegido)
             comando = [binario, "-p", str(base), "-c", str(nginx_conf), "-e", "stderr"]

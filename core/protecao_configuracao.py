@@ -11,6 +11,7 @@ PAGINAS = ('index.html', 'cadastro.html', 'detalhe.html', 'gestao.html',
            'usuarios.html', 'status.html', 'status-estado.html')
 INICIO_PUBLICACAO = '# radar: inicio publicacao resources'
 FIM_PUBLICACAO = '# radar: fim publicacao resources'
+SNIPPET_RADAR = '/etc/nginx/snippets/radar-brasil.conf'
 
 
 def _analisar(texto):
@@ -116,7 +117,16 @@ def _publicacao_texto(texto, prefixo, webroot, origem):
     # O template CGI e preservado antes de retirar a secao gerenciada anterior.
     texto=re.sub(re.escape(INICIO_PUBLICACAO)+r'.*?'+re.escape(FIM_PUBLICACAO),'',texto,flags=re.S)
     texto,encontrados=proteger_texto(texto,prefixo,webroot,origem,raiz_local=False)
-    blocos,_=_analisar(texto)
+    blocos,diretivas=_analisar(texto)
+    servidores=[b for b in blocos if b['palavras']==['server'] and any(
+        l['pai'] is b and l['palavras']==['location','=',base+'/radar.conf'] for l in blocos)]
+    externos=[b for b in servidores if any(d['pai'] is b and d['palavras']==['include',SNIPPET_RADAR] for d in diretivas)]
+    if externos:
+        if len(externos)!=len(servidores):
+            raise RuntimeError('Use o include do snippet do Radar em todos os servers que publicam este prefixo; nenhum arquivo foi alterado.')
+        # Configuracao fornecida pelo operador: preserva o vhost literalmente.
+        # nginx -T ja validou o include; as sondas reais validam seus bloqueios.
+        return original,encontrados
     alteracoes=[]
     for i, servidor in enumerate(b for b in blocos if b['palavras']==['server']):
         locais=[b for b in blocos if b['pai'] is servidor and b['palavras'][:1]==['location']]

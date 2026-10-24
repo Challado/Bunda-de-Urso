@@ -54,6 +54,12 @@ do relatório pela API, que lê o JSON dentro de `dados.dir`, sem abrir SQLite.
 As regras são geradas a partir do prefixo/raiz configurados e preservam o
 handler FastCGI existente, sem fixar caminho de socket.
 
+Quando os servers já incluem `/etc/nginx/snippets/radar-brasil.conf`, o
+instalador preserva seus blocos literalmente e verifica a proteção por HTTP.
+O nginx não é recarregado quando o instalador não alterou sua configuração.
+Isso permite manter o Radar em um snippet separado dos certificados, proxies
+e demais projetos do servidor.
+
 ## Atualizar o servidor
 
 No checkout privado, como root, sem sudo:
