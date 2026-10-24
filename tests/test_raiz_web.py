@@ -57,7 +57,7 @@ class TestRaizWeb(unittest.TestCase):
     def rodar(self, *extras, conf=None):
         return subprocess.run([sys.executable,str(ROOT/'web/api.pse'),'instalacao','--conf',str(conf or self.conf),
                                '--laboratorio',str(self.lab),'--usuario-web',getpass.getuser(),*extras],
-                              env=self.env,capture_output=True,text=True,timeout=100,cwd='/tmp')
+                              env=dict(self.env,RADAR_CONF=str(conf or self.conf)),capture_output=True,text=True,timeout=100,cwd='/tmp')
 
     def test_simular_nao_copia_dados_nem_troca_link(self):
         r=self.rodar('--migrar-raiz-web')

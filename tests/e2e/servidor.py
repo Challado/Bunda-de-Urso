@@ -59,8 +59,10 @@ def main():
                                check=True,capture_output=True,timeout=15)
 
         if '--com-documentacao' in sys.argv:
+            documento = base / 'natal.html'
+            documento.write_bytes((ROOT/'tests/fixtures/natal_rn/pagina_fixture.html').read_bytes())
             subprocess.run([sys.executable,str(API),'sync','--fonte','natal_rn',
-                            '--arquivo',str(ROOT/'tests/fixtures/natal_rn/pagina_fixture.html')],
+                            '--arquivo',str(documento)],
                            env=ambiente,check=True,capture_output=True,timeout=15)
 
         if '--com-gestao' in sys.argv:
