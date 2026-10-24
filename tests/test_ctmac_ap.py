@@ -78,7 +78,9 @@ class TestCtmacAP(unittest.TestCase):
             res = c.sincronizar(fx("ctmac_macapa_fixture.html"))
             self.assertEqual(res["linhas_recebidas"], 17)
             self.assertEqual(res["criados"], 0)      # nada normalizado
-            self.assertEqual(res["rejeitados"], 17)  # historico: sem destino
+            self.assertEqual(res["rejeitados"], 0)
+            self.assertEqual(res["status"], "documentado")
+            self.assertEqual(res["evidencias_documentais"], res["linhas_recebidas"])
             self.assertEqual(
                 dbmod.scalar(c.conn, "SELECT COUNT(*) FROM REGISTRO_FONTE"), 17)
             self.assertEqual(

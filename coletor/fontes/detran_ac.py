@@ -38,7 +38,7 @@ import re
 import urllib.parse
 
 from coletor import http
-from coletor.base import ColetorBase
+from coletor.fontes.documental import ColetorDocumental
 
 MIME_HTML = "text/html; charset=utf-8"
 
@@ -62,7 +62,10 @@ def _texto(html):
     return " ".join(txt.split())
 
 
-class ColetorDetranAC(ColetorBase):
+class ColetorDetranAC(ColetorDocumental):
+
+    MARCADORES_DOCUMENTAIS = ('detran|departamento estadual de transito',)
+    DESCRICAO_COLETA = 'Portal institucional do Detran-AC; lista estadual de radares não importada.'
 
     FONTE = {
         "nome": "Detran-AC - portal institucional (sem cadastro de radares)",

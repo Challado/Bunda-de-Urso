@@ -37,7 +37,7 @@ import re
 import urllib.parse
 
 from coletor import http
-from coletor.base import ColetorBase
+from coletor.fontes.documental import ColetorDocumental
 
 MIME_HTML = "text/html; charset=utf-8"
 
@@ -73,7 +73,10 @@ def _texto(html):
     return " ".join(txt.split())
 
 
-class ColetorTeresinaPI(ColetorBase):
+class ColetorTeresinaPI(ColetorDocumental):
+
+    MARCADORES_DOCUMENTAIS = ('teresina', 'radar')
+    DESCRICAO_COLETA = 'Notícia histórica da STRANS Teresina; cadastro atual pendente.'
 
     FONTE = {
         "nome": "STRANS Teresina - Localizacao de radares (noticia 2019)",

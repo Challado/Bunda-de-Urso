@@ -84,6 +84,8 @@ def publicar_atomico(origem, destino):
 class ColetorBase(object):
     """Classe-base parametrizada por FONTE/RECURSO (dicts canonicos)."""
 
+    MODO_COLETA = "cadastro"
+
     FONTE = None      # dict com nome, url_institucional, esfera, natureza, organizacao, tipo_organizacao
     RECURSO = None    # dict com nome, url_recurso, formato_origem, dicionario_url, periodicidade_segundos
 
@@ -252,12 +254,16 @@ class ColetorBase(object):
             return False
         ##-- BUNDITA DE URSO #{9} -- Conteudo de uma tentativa rejeitada precisa poder ser reprocessado. ##
         if not dbmod.scalar(self.conn, "SELECT 1 FROM EXECUCAO_COLETA_DETALHE "
-                            "WHERE artefato_id=? AND status='ok' LIMIT 1", (row["id"],)):
+                            "WHERE artefato_id=? AND status IN ('ok','documentado') AND "
+                            "(linhas_validas>0 OR registros_criados>0 OR registros_alterados>0) LIMIT 1", (row["id"],)):
             return False
         hs = [r[0] for r in dbmod.query_all(
             self.conn, "SELECT hash_registro FROM REGISTRO_FONTE "
                        "WHERE artefato_id = ? ORDER BY id", (row["id"],))]
         if not hs:
+            return False
+        if self.MODO_COLETA == "documental" and dbmod.scalar(self.conn,
+                "SELECT COUNT(*) FROM REGISTRO_FONTE WHERE artefato_id=? AND status_validacao<>'documental'", (row["id"],)):
             return False
         return sha256_bytes("".join(sorted(hs)).encode("utf-8")) == \
             self._assinatura(registros)
@@ -299,6 +305,9 @@ class ColetorBase(object):
 
     # -- orquestracao ------------------------------------------------------
     ##-- BUNDITA DE URSO #{9} -- Rejeicoes perdiam a causa e falhas do programa eram publicadas como sucesso. ##
+    def validar_coleta(self, conteudo, registros):
+        """Validacao adicional de paginas por conectores especializados."""
+
     def _rejeitar(self, registro_id, exec_id, codigo, descricao):
         if hasattr(self, "_diario_coleta"):
             self._diario_coleta["erros_validacao"].append({
@@ -326,6 +335,7 @@ class ColetorBase(object):
         atualizados = 0
         rejeitados = 0
         ignorados = 0
+        documentos = 0
         detalhes = []       # por registro aceito: indice/registro/ponto
         pendentes = []      # (idx, reg_id, d) normalizados, ainda nao inseridos
         for idx, raw in enumerate(registros):
@@ -351,6 +361,10 @@ class ColetorBase(object):
             except ValueError as exc:
                 self._rejeitar(reg_id, exec_id, type(exc).__name__, str(exc))
                 rejeitados += 1
+                continue
+            if d is None and self.MODO_COLETA == "documental":
+                documentos += 1
+                self.conn.execute("UPDATE REGISTRO_FONTE SET status_validacao='documental' WHERE id=?", (reg_id,))
                 continue
             if d is None:
                 self._rejeitar(reg_id, exec_id, "registro_nao_normalizavel",
@@ -403,6 +417,7 @@ class ColetorBase(object):
         versao = None
         status = ("erro" if registros and rejeitados == len(registros)
                   else "sem_mudanca" if ignorados == len(registros) and registros
+                  else "documentado" if documentos and documentos + rejeitados == len(registros)
                   else "sem_dados" if not registros else "ok")
         # Publicacao e dados normalizados compartilham a mesma transacao.
         # Um lote vazio/rejeitado nao atesta atualidade nem substitui o snapshot bom.
@@ -422,6 +437,7 @@ class ColetorBase(object):
             "criados": criados, "atualizados": atualizados,
             "rejeitados": rejeitados,
             "ignorados": ignorados,
+            "evidencias_documentais": documentos,
             "detalhes": detalhes,
         }
 
@@ -449,6 +465,7 @@ class ColetorBase(object):
             self._diario_coleta.update(etapa="download_e_leitura", origem=origem)
             atualizacoes.registrar("coleta", self._diario_coleta, fonte=recurso_id)
             conteudo, ext, mime, registros = self.carregar(origem)
+            self.validar_coleta(conteudo, registros)
             self._diario_coleta.update(etapa="normalizacao", recebidos=len(registros), bytes=len(conteudo),
                                       hash_sha256=sha256_bytes(conteudo.encode("utf-8") if isinstance(conteudo, str) else conteudo))
             atualizacoes.registrar("coleta", self._diario_coleta, fonte=recurso_id)
@@ -458,12 +475,16 @@ class ColetorBase(object):
             if self._snapshot_repetido(recurso_id, registros):
                 self.encerrar_execucao(
                     exec_id, "sem_mudanca", http_status=200,
-                    linhas_recebidas=len(registros))
+                    linhas_recebidas=len(registros),
+                    **({"linhas_validas": len(registros), "linhas_rejeitadas": 0,
+                        "registros_criados": 0, "registros_alterados": 0}
+                       if self.MODO_COLETA == "documental" else {}))
                 return {
                     "fonte": self.FONTE["nome"], "recurso_id": recurso_id,
                     "execucao_id": exec_id, "sem_mudanca": True,
                     "linhas_recebidas": len(registros),
                     "criados": 0, "atualizados": 0, "rejeitados": 0,
+                    "evidencias_documentais": len(registros) if self.MODO_COLETA == "documental" else 0,
                 }
             resumo = self._ingerir_registros(
                 conteudo, ext, mime, registros, exec_id, recurso_id,
@@ -473,7 +494,7 @@ class ColetorBase(object):
                 exec_id, resumo["status"], artefato_id=resumo["artefato_id"],
                 erro_codigo="lote_sem_registros_validos" if resumo["status"] == "erro" else None,
                 linhas_recebidas=resumo["linhas_recebidas"],
-                linhas_validas=resumo["criados"] + resumo["atualizados"],
+                linhas_validas=resumo["criados"] + resumo["atualizados"] + resumo["evidencias_documentais"] + resumo["ignorados"],
                 linhas_rejeitadas=resumo["rejeitados"],
                 registros_criados=resumo["criados"],
                 registros_alterados=resumo["atualizados"],
@@ -497,6 +518,8 @@ class ColetorBase(object):
         pipeline do coletor (upsert idempotente) e encerra com os contadores.
         """
         import json as _json
+        if self.MODO_COLETA == "documental":
+            raise ValueError("Coletor documental exige a leitura da publicacao original por sync.")
         config.ensure_dirs()
         dbmod.init_db(self.conn)
         fonte_id, recurso_id = self.garantir_referencias()
@@ -513,7 +536,7 @@ class ColetorBase(object):
                 exec_id, resumo["status"], artefato_id=resumo["artefato_id"],
                 erro_codigo="lote_sem_registros_validos" if resumo["status"] == "erro" else None,
                 linhas_recebidas=resumo["linhas_recebidas"],
-                linhas_validas=resumo["criados"] + resumo["atualizados"],
+                linhas_validas=resumo["criados"] + resumo["atualizados"] + resumo["evidencias_documentais"] + resumo["ignorados"],
                 linhas_rejeitadas=resumo["rejeitados"],
                 registros_criados=resumo["criados"],
                 registros_alterados=resumo["atualizados"],

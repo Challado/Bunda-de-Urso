@@ -32,12 +32,15 @@ import re
 import urllib.parse
 
 from coletor import http
-from coletor.base import ColetorBase
+from coletor.fontes.documental import ColetorDocumental
 
 MIME_HTML = "text/html; charset=utf-8"
 
 
-class ColetorJoinville(ColetorBase):
+class ColetorJoinville(ColetorDocumental):
+
+    MARCADORES_DOCUMENTAIS = ('estudos tecnicos', 'radar|fiscalizacao')
+    DESCRICAO_COLETA = 'Estudos técnicos de Joinville; documentos não são cadastros de radares.'
 
     FONTE = {
         "nome": "Joinville DETRANS - Estudos tecnicos de fiscalizacao eletronica",

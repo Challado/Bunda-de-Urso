@@ -4,7 +4,7 @@
   const numero = n => new Intl.NumberFormat('pt-BR').format(n ?? 0);
   const quantidade = v => v == null ? 'Não informado' : numero(v);
   const nomes = {federal:'Federal',estadual:'Estadual / distrital',municipal:'Municipal',nao_classificado:'Sem classificação'};
-  const estadosLeitura = {ok:'Leitura OK',sem_mudanca:'Sem alteração',erro:'Erro na leitura',em_andamento:'Em andamento',interrompido:'Leitura interrompida',nunca_coletado:'Nunca lido'};
+  const estadosLeitura = {documentado:'Documentação lida',ok:'Leitura OK',sem_mudanca:'Sem alteração',erro:'Erro na leitura',em_andamento:'Em andamento',interrompido:'Leitura interrompida',nunca_coletado:'Nunca lido'};
   const situacoes = {ativo:'Ativo',inativo:'Inativo',manutencao:'Em manutenção',em_instalacao:'Em instalação',suspenso:'Suspenso',desconhecido:'Não informado'};
   const data = s => {
     if (!s) return 'Ainda não registrada';
@@ -66,16 +66,20 @@
       const d=await api('/api/v1/status/coletores');
       $('coletores').replaceChildren(...d.coletores.map(r=>{
         const box=el('details',null,'leitor'),s=el('summary'),u=r.ultima_tentativa;
-        const estado=estadosLeitura[r.estado]||r.estado;
-        s.append(el('span',r.fonte+' — '+r.recurso+' '),el('span',estado,'selo '+(['ok','sem_mudanca'].includes(r.estado)?'ok':['erro','interrompido'].includes(r.estado)?'falha':'espera')));
+        const documental=r.tipo_coleta==='documental';
+        const estado=documental&&r.estado==='sem_mudanca'?'Documentação sem alteração':estadosLeitura[r.estado]||r.estado;
+        s.append(el('span',r.fonte+' — '+r.recurso+' '),el('span',estado,'selo '+(['erro','interrompido'].includes(r.estado)?'falha':documental?'espera':['ok','sem_mudanca'].includes(r.estado)?'ok':'espera')));
+        if(documental)s.append(el('span','Cadastro de radares pendente','selo espera'));
         if(!r.ativo)s.append(el('span','Desativado','selo'));
         if(u?.linhas_rejeitadas>0)s.append(el('span','Com rejeições','selo espera'));
         if(r.leitura_atrasada)s.append(el('span','Leitura atrasada','selo espera'));
-        box.append(s);box.dataset.busca=[r.fonte,r.recurso,nomes[r.esfera],estado,r.estado,!r.ativo?'desativado':'ativo',r.leitura_atrasada?'atrasada':''].join(' ').toLocaleLowerCase('pt-BR');
+        box.append(s);box.dataset.busca=[r.fonte,r.recurso,nomes[r.esfera],estado,r.estado,r.status_integracao,r.descricao_coleta,documental?'cadastro pendente':'',!r.ativo?'desativado':'ativo',r.leitura_atrasada?'atrasada':''].join(' ').toLocaleLowerCase('pt-BR');
         box.append(campos([['Esfera da fonte',nomes[r.esfera]||r.esfera],['Última tentativa',data(u?.iniciada_em)],['Conclusão da tentativa',data(u?.terminada_em)],['Última leitura bem-sucedida',data(r.ultimo_sucesso?.terminada_em)],['Agendamento',!r.ativo?'Desativado':r.agendado?'Automático':'Fora da agenda automática'],['Intervalo entre leituras',r.intervalo_s ? numero(Math.round(r.intervalo_s/60))+' minutos' : 'Não informado'],['Integração',r.status_integracao],['Resposta HTTP',u?.http_status],['Tentativas',u?.tentativas],['Linhas recebidas',u?quantidade(u.linhas_recebidas):null],['Linhas rejeitadas',u?quantidade(u.linhas_rejeitadas):null],['Cadastros criados / alterados',u?quantidade(u.registros_criados)+' / '+quantidade(u.registros_alterados):null]]));
         const ul=el('ul',null,'urls');
         for(const [titulo,url] of [['Página da fonte',r.url_institucional],['Endereço da última tentativa (quando registrado)',r.url_ultima_tentativa],['Recurso cadastrado',r.url_recurso],['Endereço configurado para leitura',r.url_configurada]])if(url){const li=el('li');li.append(el('span',titulo+': '),link(url,url));ul.append(li);}
         box.append(ul);
+        if(r.descricao_coleta)box.append(el('p',r.descricao_coleta,'aviso'));
+        if(documental&&u)box.append(campos([['Registros de documentação aceitos',quantidade(u.linhas_validas)]]));
         if(r.erro_relatorio_coleta)box.append(el('p',typeof r.erro_relatorio_coleta==='string'?r.erro_relatorio_coleta:JSON.stringify(r.erro_relatorio_coleta),'erro'));
         if(u?.erro_codigo||u?.erro_detalhe)box.append(el('p',[u.erro_codigo,u.erro_detalhe].filter(Boolean).join(': '),'erro'));
         if(r.erros?.length){box.append(el('h3','Problemas encontrados na última leitura'));const lista=el('ul',null,'lista');for(const e of r.erros)lista.append(el('li',e.codigo_erro+': '+e.descricao+' ('+e.severidade+')'));box.append(lista);}

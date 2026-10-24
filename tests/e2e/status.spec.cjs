@@ -59,3 +59,27 @@ test('estado: UF sem cadastros e UF inválida',async({page})=>{
   await page.goto('status-estado.html?uf=XX');
   await expect(page.locator('#erro-cobertura')).toContainText('27 siglas');
 });
+
+test.describe('fontes documentais',()=>{
+  test.use({comDocumentacao:true});
+  test('documentos lidos mantêm cadastro pendente e erros continuam vermelhos',async({page})=>{
+    await page.goto('status.html');
+    await page.locator('#filtro-leitores').fill('STTU Natal');
+    const leitor=page.locator('#coletores>.leitor:visible');
+    await expect(leitor).toHaveCount(1);
+    await expect(leitor.locator('summary')).toContainText('Documentação lida');
+    await expect(leitor.locator('summary')).toContainText('Cadastro de radares pendente');
+    await expect(leitor.locator('summary .selo.ok')).toHaveCount(0);
+    await leitor.locator('summary').click();
+    await expect(leitor).toContainText('Registros de documentação aceitos');
+    const doc=await (await page.request.get('api.pse?rota=/api/v1/status/coletores')).json();
+    const natal=doc.resultado.coletores.find(c=>c.conector==='natal_rn');
+    natal.estado='erro';natal.ultima_tentativa.erro_detalhe='Página de origem não reconhecida';
+    await page.route('**/api.pse?**',route=>new URL(route.request().url()).searchParams.get('rota')==='/api/v1/status/coletores'
+      ?route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(doc)}):route.continue());
+    await page.locator('#atualizar').click();
+    await expect(leitor.locator('summary .selo.falha')).toHaveText('Erro na leitura');
+    await leitor.locator('summary').click();
+    await expect(leitor).toContainText('Página de origem não reconhecida');
+  });
+});

@@ -32,7 +32,7 @@ import re
 import urllib.parse
 
 from coletor import http
-from coletor.base import ColetorBase
+from coletor.fontes.documental import ColetorDocumental
 
 MIME_HTML = "text/html; charset=utf-8"
 
@@ -70,7 +70,10 @@ def _texto(html):
     return " ".join(txt.split())
 
 
-class ColetorCuiabaMT(ColetorBase):
+class ColetorCuiabaMT(ColetorDocumental):
+
+    MARCADORES_DOCUMENTAIS = ('fiscalizacao eletronica', 'radar')
+    DESCRICAO_COLETA = 'Notícia histórica de Cuiabá; cadastro atual pendente.'
 
     FONTE = {
         "nome": "Cuiaba SEMOB - Fiscalizacao eletronica (noticia 2015)",

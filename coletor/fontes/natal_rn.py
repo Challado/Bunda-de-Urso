@@ -34,7 +34,7 @@ import re
 import urllib.parse
 
 from coletor import http
-from coletor.base import ColetorBase
+from coletor.fontes.documental import ColetorDocumental
 
 MIME_HTML = "text/html; charset=utf-8"
 
@@ -56,7 +56,10 @@ def _texto(html):
     return " ".join(txt.split())
 
 
-class ColetorNatalRN(ColetorBase):
+class ColetorNatalRN(ColetorDocumental):
+
+    MARCADORES_DOCUMENTAIS = ('sttu|secretaria municipal de mobilidade urbana',)
+    DESCRICAO_COLETA = 'Portal institucional da STTU Natal; lista de radares não importada.'
 
     FONTE = {
         "nome": "STTU Natal - portal institucional (sem cadastro estadual)",

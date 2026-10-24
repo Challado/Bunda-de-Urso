@@ -273,7 +273,27 @@ class ColetorPRFFixos(ColetorBase):
         return dados
 
     def identificador(self, raw):
-        return nz.pick(raw, "IDENTIFICADOR", "Identificador", "id")
+        # Alguns equipamentos inoperantes nao trazem IDENTIFICADOR nem GPS,
+        # mas publicam um codigo proprio em EQUIPAMENTO. Nao e numero de serie.
+        return nz.pick(raw, "IDENTIFICADOR", "Identificador", "id", "EQUIPAMENTO")
+
+    def _snapshot_repetido(self, recurso_id, registros):
+        if not super()._snapshot_repetido(recurso_id, registros):
+            return False
+        # Uma rejeicao antiga agora reconhecivel deve ser tentada novamente,
+        # mesmo que o arquivo oficial nao tenha mudado. Pontos ja ligados
+        # continuam sendo ignorados pelo caminho idempotente da ingestao.
+        for row in self.conn.execute("""
+            SELECT r.payload_original FROM REGISTRO_FONTE r
+            LEFT JOIN VINCULO_REGISTRO_PONTO v ON v.registro_id=r.id
+            WHERE r.artefato_id=(SELECT id FROM ARTEFATO_COLETA
+                WHERE recurso_id=? ORDER BY id DESC LIMIT 1)
+              AND v.registro_id IS NULL
+        """, (recurso_id,)):
+            raw = __import__("json").loads(row["payload_original"])
+            if self.normalizar(0, raw) is not None:
+                return False
+        return True
 
     # -- normalizar --------------------------------------------------------
     def normalizar(self, idx, raw):

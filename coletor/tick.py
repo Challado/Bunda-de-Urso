@@ -62,12 +62,12 @@ def espera_s(intervalo_s, hist):
     if not hist:
         return 0
     ##-- BUNDITA DE URSO #{16} -- Coletas sem mudanca eram contadas como erros e acumulavam backoff. ##
-    if hist[0]["status"] in ("ok", "sem_mudanca"):
+    if hist[0]["status"] in ("ok", "sem_mudanca", "documentado"):
         intervalo = intervalo_s if intervalo_s and intervalo_s > 0 else 0
         return intervalo
     erros = 0
     for h in hist:
-        if h["status"] in ("ok", "sem_mudanca"):
+        if h["status"] in ("ok", "sem_mudanca", "documentado"):
             break
         erros += 1
     fator = min(2 ** max(erros - 1, 0), agenda_mod.BACKOFF_TETO)
@@ -211,7 +211,7 @@ def executar(db_path=None, agora=None, forcar=None, arquivos=None,
                 # gancho NAO derruba a coleta (fica registrado no resultado).
                 spec = item.get("pos_coleta")
                 ##-- BUNDITA DE URSO #{9} -- Nao executar pos-coleta sobre lote vazio ou rejeitado. ##
-                if spec and resumo.get("status", "ok") in ("ok", "sem_mudanca"):
+                if spec and resumo.get("status", "ok") in ("ok", "sem_mudanca", "documentado"):
                     try:
                         resultado["pos_coleta"] = _resolver_pos_coleta(spec)(conn)
                     except Exception as exc:               # noqa: BLE001

@@ -32,7 +32,11 @@ class TestConservacaoFontes(unittest.TestCase):
                                                ("TRECHO_ELEGIVEL", "trechos")):
                             self.assertEqual(db.scalar(con, "SELECT COUNT(*) FROM " + tabela), caso[campo])
                         self.assertEqual(resumo["linhas_recebidas"], caso["recebidos"])
-                        self.assertEqual(resumo["rejeitados"], caso["rejeitados"])
+                        if coletor.MODO_COLETA == "documental":
+                            self.assertEqual(resumo["evidencias_documentais"], caso["rejeitados"])
+                            self.assertEqual(resumo["rejeitados"], 0)
+                        else:
+                            self.assertEqual(resumo["rejeitados"], caso["rejeitados"])
                         gps = sorted([list(r) for r in con.execute(
                             "SELECT pos.latitude, pos.longitude FROM PONTO_FISCALIZACAO p "
                             "JOIN POSICAO_GEOGRAFICA pos ON pos.id=p.posicao_id")])

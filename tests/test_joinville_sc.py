@@ -90,7 +90,9 @@ class TestJoinvilleSC(unittest.TestCase):
             res = c.sincronizar(fx("joinville_estudos_fixture.html"))
             self.assertEqual(res["linhas_recebidas"], 7)
             self.assertEqual(res["criados"], 0)     # nada normalizado
-            self.assertEqual(res["rejeitados"], 7)  # documentos: sem destino
+            self.assertEqual(res["rejeitados"], 0)
+            self.assertEqual(res["status"], "documentado")
+            self.assertEqual(res["evidencias_documentais"], res["linhas_recebidas"])
             # evidencia bruta preservada; nenhum radar/trecho inventado
             self.assertEqual(
                 dbmod.scalar(c.conn,

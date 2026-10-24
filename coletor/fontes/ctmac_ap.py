@@ -25,7 +25,7 @@ import os
 import re
 
 from coletor import http
-from coletor.base import ColetorBase
+from coletor.fontes.documental import ColetorDocumental
 
 MIME_HTML = "text/html; charset=utf-8"
 
@@ -41,7 +41,10 @@ def _texto(fragmento):
     return re.sub(r"\s+", " ", t).strip()
 
 
-class ColetorCtmacAP(ColetorBase):
+class ColetorCtmacAP(ColetorDocumental):
+
+    MARCADORES_DOCUMENTAIS = ('macapa', 'radar')
+    DESCRICAO_COLETA = 'Lista histórica de Macapá; operação atual dos radares não confirmada.'
 
     FONTE = {
         "nome": "CTMac Macapa - Radares (lista de locais, historica)",

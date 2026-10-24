@@ -33,7 +33,7 @@ import re
 import urllib.parse
 
 from coletor import http
-from coletor.base import ColetorBase
+from coletor.fontes.documental import ColetorDocumental
 
 MIME_HTML = "text/html; charset=utf-8"
 
@@ -55,7 +55,10 @@ def _texto(html):
     return " ".join(txt.split())
 
 
-class ColetorDerAL(ColetorBase):
+class ColetorDerAL(ColetorDocumental):
+
+    MARCADORES_DOCUMENTAIS = ('departamento de estradas de rodagem|der.?al',)
+    DESCRICAO_COLETA = 'Canal institucional do DER-AL; lista estadual de radares não publicada nesta página.'
 
     FONTE = {
         "nome": "DER-AL - canal institucional (sem lista de equipamentos)",

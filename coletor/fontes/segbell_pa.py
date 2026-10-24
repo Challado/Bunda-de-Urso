@@ -38,7 +38,7 @@ import re
 import urllib.parse
 
 from coletor import http
-from coletor.base import ColetorBase
+from coletor.fontes.documental import ColetorDocumental
 
 MIME_HTML = "text/html; charset=utf-8"
 
@@ -81,7 +81,10 @@ def _tipo_documento(titulo, url):
     return "documento"
 
 
-class ColetorSEGBELPA(ColetorBase):
+class ColetorSEGBELPA(ColetorDocumental):
+
+    MARCADORES_DOCUMENTAIS = ('portaria', 'radar')
+    DESCRICAO_COLETA = 'Portarias de ativação e desativação de Belém; cadastro dos equipamentos pendente.'
 
     FONTE = {
         "nome": ("SEGBEL Belem - Portarias de ativacao e desativacao de "

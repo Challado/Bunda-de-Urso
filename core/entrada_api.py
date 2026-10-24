@@ -13,7 +13,7 @@ FERRAMENTAS = frozenset((
     "consultar_nomes_pendentes", "corrigir_coordenadas_brasil", "gerar_calibracao",
     "gerar_correcoes_municipio", "gerar_municipios_site", "limpar_calibracao",
     "listar_duplicidades", "preencher_municipio", "radar_admin", "inicializar_banco",
-    "recuperar_posicoes_legadas", "validar_georesolver", "reconciliar_equipamentos",
+    "reprocessar_fontes_corrigidas", "recuperar_posicoes_legadas", "validar_georesolver", "reconciliar_equipamentos",
 ))
 
 

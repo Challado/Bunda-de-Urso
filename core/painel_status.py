@@ -202,9 +202,12 @@ def coletores(conn, agenda=None):
 
 def _leitor(conn, r, chave, item, diario):
     ultima = sucesso = None
+    classe = item.get("conector")
+    modo = getattr(classe, "MODO_COLETA", "cadastro")
     if r["id"] is not None:
         ultima = db.query_one(conn, "SELECT * FROM EXECUCAO_COLETA WHERE recurso_id=? ORDER BY id DESC LIMIT 1", (r["id"],))
-        sucesso = db.query_one(conn, "SELECT * FROM EXECUCAO_COLETA WHERE recurso_id=? AND status IN ('ok','sem_mudanca') ORDER BY id DESC LIMIT 1", (r["id"],))
+        sucessos = "status IN ('documentado','sem_mudanca') AND linhas_validas>0" if modo == "documental" else "status IN ('ok','sem_mudanca')"
+        sucesso = db.query_one(conn, "SELECT * FROM EXECUCAO_COLETA WHERE recurso_id=? AND " + sucessos + " ORDER BY id DESC LIMIT 1", (r["id"],))
     ativo = bool(r["ativo"]) and r["situacao"] == "ativa" and item.get("ativo", True)
     estado = ultima["status"] if ultima else "nunca_coletado"
     diario = diario if isinstance(diario, dict) and ultima and diario.get("execucao_id") == ultima["id"] else {}
@@ -214,7 +217,7 @@ def _leitor(conn, r, chave, item, diario):
     url_lida = origem if isinstance(origem, str) and origem.startswith(("https://", "http://")) else None
     intervalo = item.get("intervalo_s", r["periodicidade_segundos"])
     atraso = None
-    if ativo and ultima and estado in ("ok", "sem_mudanca") and intervalo:
+    if ativo and ultima and estado in ("ok", "sem_mudanca", "documentado") and intervalo:
         try:
             ts = dt.datetime.fromisoformat(ultima["iniciada_em"].replace("Z", "+00:00"))
             if ts.tzinfo is None:
@@ -230,6 +233,7 @@ def _leitor(conn, r, chave, item, diario):
             FROM ERRO_VALIDACAO WHERE execucao_id=? ORDER BY id
         """, (ultima["id"],))]
     return dict(r, conector=chave, agendado=chave is not None, ativo=ativo,
+                tipo_coleta=modo, descricao_coleta=getattr(classe, "DESCRICAO_COLETA", None),
                 intervalo_s=intervalo, estado=estado, leitura_atrasada=atraso,
                 ultima_tentativa=dict(ultima) if ultima else None,
                 ultimo_sucesso=dict(sucesso) if sucesso else None,
