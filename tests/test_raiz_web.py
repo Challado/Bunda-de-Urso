@@ -213,3 +213,20 @@ class TestRaizWeb(unittest.TestCase):
         self.assertIn('15 * * * * /opt/tarefa-web',estado['www-data'])
         self.assertEqual(estado['www-data'].count('# radar-raiz-web'),2)
         self.assertNotIn('runuser',estado['www-data'])
+
+    def test_containers_de_backup_sao_preparados_para_o_usuario_web(self):
+        import pwd
+        from core.raiz_web import _preparar_backups
+        conta=pwd.getpwnam('www-data')
+        historico=self.dados/'backups/raiz-web/antigo.sqlite3'
+        historico.parent.mkdir(parents=True)
+        historico.write_text('preservar backup anterior')
+        historico.chmod(0o600)
+        with patch('core.raiz_web.os.geteuid',return_value=0), patch('core.raiz_web.os.chown') as chown:
+            _preparar_backups(self.dados,conta)
+        self.assertEqual(chown.call_count,2)
+        for pasta in (self.dados/'backups',self.dados/'backups/identidade'):
+            chown.assert_any_call(pasta,conta.pw_uid,conta.pw_gid)
+            self.assertEqual(pasta.stat().st_mode & 0o7777,0o2770)
+        self.assertEqual(historico.read_text(),'preservar backup anterior')
+        self.assertEqual(historico.stat().st_mode & 0o777,0o600)

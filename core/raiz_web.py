@@ -36,6 +36,8 @@ def _json(arquivo, valor):
 def _sem_links(pasta):
     if pasta.is_symlink():
         raise RuntimeError("Destino privado nao pode ser link: " + str(pasta))
+    if (pasta/'backups').is_symlink():
+        raise RuntimeError('Container de backups nao pode ser link: '+str(pasta/'backups'))
     if pasta.exists():
         for base, dirs, arquivos in os.walk(pasta):
             if Path(base) == pasta:
@@ -60,6 +62,18 @@ def _permissoes(pasta, conta):
         if os.geteuid() == 0:
             os.chown(item, conta.pw_uid, conta.pw_gid)
         item.chmod(0o2770 if item.is_dir() else 0o660)
+
+
+def _preparar_backups(dados, conta):
+    # Os arquivos historicos continuam intactos, mas o processo www-data
+    # precisa atravessar/criar os containers usados pelas migracoes da base.
+    for pasta in (dados/'backups', dados/'backups/identidade'):
+        if pasta.is_symlink():
+            raise RuntimeError('Container de backups nao pode ser link: '+str(pasta))
+        pasta.mkdir(parents=True,exist_ok=True,mode=0o2770)
+        if os.geteuid()==0:
+            os.chown(pasta,conta.pw_uid,conta.pw_gid)
+        pasta.chmod(0o2770)
 
 
 def _copiar_dados(origem, destino, banco):
@@ -541,6 +555,7 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
                 raiz.chmod(0o2770)
                 (raiz/'api.pse').chmod(0o770)
                 # Entradas copiadas para dentro de pastas privadas nao sao CGI publicas.
+                _preparar_backups(novo_dados,conta)
                 _comando(raiz,novo_conf,conta,lab,'ferramenta','inicializar_banco')
                 _comando(raiz,novo_conf,conta,lab,'ferramenta','reconciliar_equipamentos','--aplicar')
                 print('RADAR_CONF_DESTINO: '+str(novo_conf),flush=True)
