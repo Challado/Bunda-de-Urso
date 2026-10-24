@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Gera ``web/municipios.json`` para o combo de municipio do mapa.
+"""Gera ``web/resources/municipios.json`` para o combo de municipio do mapa.
 
 Baixa a lista publica de municipios do repositorio
 ``kelvins/municipios-brasileiros`` (JSON com ``codigo_ibge``, ``nome``,
@@ -13,7 +13,7 @@ O download usa ``coletor.http.baixar`` (norma da casa), nao URL chumbada como
 unica opcao.
 
 Uso:
-  python3 tools/gerar_municipios_site.py [--saida web/municipios.json]
+  python3 tools/gerar_municipios_site.py [--saida web/resources/municipios.json]
 """
 import argparse
 import json
@@ -22,12 +22,12 @@ import sys
 
 
 from coletor import http                              # noqa: E402
-from core.config import ROOT                          # noqa: E402
+from core import caminhos
 from core.contexto_api import operacao_local
 
 BASE = ("https://raw.githubusercontent.com/kelvins/"
         "municipios-brasileiros/main/json/")
-SAIDA_PADRAO = os.path.join(ROOT, "web", "municipios.json")
+SAIDA_PADRAO = os.path.join(caminhos.web_raiz(), "resources", "municipios.json")
 
 
 def _json(url):

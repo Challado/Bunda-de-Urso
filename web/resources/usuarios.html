@@ -150,7 +150,7 @@
 <script>
 (function(){
   "use strict";
-  var API = "api.pse";
+  var API = "../api.pse";
   var esc = function(s){ return String(s==null?"":s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); };
 
   function url(rota, query){

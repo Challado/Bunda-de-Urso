@@ -9,7 +9,7 @@ import unittest
 ##-- BUNDITA DE URSO #{23} -- A conservacao no backend nao garante que o mapa percorra todas as paginas. ##
 class TestPaginacaoMapa(unittest.TestCase):
     @unittest.skipUnless(shutil.which("node"), "Node necessario para executar JavaScript do mapa")
-    def test_paginas_cancelamento_e_erros(self):
+    def test_paginas_cancelamento_erros_e_avisos_por_transicao_do_raio(self):
         resultado = subprocess.run(
             [shutil.which("node"), str(Path(__file__).with_suffix(".js"))],
             capture_output=True, text=True, timeout=20)

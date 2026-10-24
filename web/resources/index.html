@@ -192,7 +192,7 @@
 <script>
 (function(){
   "use strict";
-  var API = "api.pse";
+  var API = "../api.pse";
   // Escada de raios: o slider anda em INDICE (0..11), nao em metros, para cobrir
   // de 200 m a 1000 km mantendo o ajuste fino nos valores pequenos.
   var ESCALA = [200, 500, 1000, 2000, 5000, 10000, 20000, 50000,
@@ -248,6 +248,7 @@
   function festa(raio, cobertura){
     var el = document.getElementById("festa");
     if (!el) return;
+    document.getElementById("problema").classList.remove("on");
     var txt = "Nenhum equipamento de fiscalização num raio de <b>" + fmtRaio(raio) + "</b>.<br>";
     if (cobertura === "sem_cobertura"){
       el.querySelector(".msg h2").textContent = "🎈 Nada por aqui…";
@@ -284,15 +285,11 @@
   document.getElementById("festa").addEventListener("click", function(){ this.classList.remove("on"); });
 
   // ---- aviso: apareceu radar no raio (irmao bem menos alegre da festa) ----
-  // Mostra no MAXIMO 1 vez por visita/aba (flag em sessionStorage), para nao
-  // subir a cada consulta com radar.
+  // A consulta decide quando o estado mudou; nao ha bloqueio por visita/aba.
   function problemaCowboy(n, raio){
     var el = document.getElementById("problema");
     if (!el) return;
-    var jaMostrou = false;
-    try { jaMostrou = sessionStorage.getItem("radarCowboy") === "1"; } catch (e) {}
-    if (jaMostrou) return;
-    try { sessionStorage.setItem("radarCowboy", "1"); } catch (e) {}
+    document.getElementById("festa").classList.remove("on");
     el.querySelector(".msg p").innerHTML =
       "Tem <b>" + n + "</b> equipamento(s) de fiscalização num raio de <b>" +
       fmtRaio(raio) + "</b>.<br>Segura a velocidade — radar na área!";
@@ -450,6 +447,7 @@
   // ##-- BUNDITA DE URSO #{23} -- O mapa parava na primeira pagina e respostas antigas podiam substituir uma consulta nova. ##
   var consultaAtual = null;
   var numeroConsulta = 0;
+  var ultimoAviso = null;
 
   function carregarPaginas(url, aoReceber, signal){
     var pontos = [], ids = new Set(), cursores = new Set();
@@ -513,8 +511,12 @@
     }, sinal).then(function(resultado){
       if (numero !== numeroConsulta || sinal.aborted) return;
       var res = resultado.meta, pontos = resultado.pontos, d = resultado.documento;
-      if (pontos.length === 0) festa(raio, res.status);
-      else problemaCowboy(pontos.length, raio);
+      var aviso = pontos.length ? "com_radar" : (res.status === "sem_cobertura" ? "sem_cobertura" : "sem_radar");
+      if (aviso !== ultimoAviso){
+        if (pontos.length === 0) festa(raio, res.status);
+        else problemaCowboy(pontos.length, raio);
+        ultimoAviso = aviso;
+      }
       elBarra.innerHTML = "Snapshot " + escapeHtml(d.consultado_em || "") +
         (pontos.length === 0 ? " — <span class='aviso' style='display:inline-block'>nada no raio informado (isso não afirma que não exista radar: verifique cobertura da região).</span>" : "");
     }).catch(function(e){

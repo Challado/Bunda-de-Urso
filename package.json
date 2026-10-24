@@ -1,6 +1,11 @@
 {
   "name": "radar-brasil-testes-navegador",
   "private": true,
-  "scripts": {"test:e2e": "playwright test"},
-  "devDependencies": {"@playwright/test": "1.58.2"}
+  "scripts": {
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "leaflet": "1.9.4"
+  }
 }

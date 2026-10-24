@@ -221,12 +221,31 @@ def _bloqueios_http(raiz, origem, prefixo, aguardar=0):
         temporario.write_text('sonda privada de configuracao')
         temporario.chmod(0o644)
         criados.append(temporario)
+        generico=raiz/('privado-'+uuid.uuid4().hex+'.json')
+        generico.write_text('{"sonda":"nao publicar"}')
+        generico.chmod(0o644)
+        criados.append(generico)
+        recursos=raiz/'resources'
+        if not recursos.exists():
+            recursos.mkdir(mode=0o755)
+            recursos.chmod(0o755)
+            pastas.append(recursos)
+        executavel=recursos/('sonda-'+uuid.uuid4().hex+'.pse')
+        executavel.write_text('sonda sem permissao de execucao')
+        executavel.chmod(0o644)
+        criados.append(executavel)
+        link=recursos/('sonda-'+uuid.uuid4().hex+'.json')
+        link.symlink_to(generico)
+        criados.append(link)
         limite = time.monotonic() + max(0, aguardar)
         tentativa = 0
+        aprovacoes = 0
         while True:
             tentativa += 1
             try:
-                for rel in ['radar.conf', 'radar.conf.anterior', temporario.name, *(p + '/' + nome for p in PASTAS_PRIVADAS)]:
+                for rel in ['radar.conf', 'radar.conf.anterior', temporario.name, generico.name,
+                            'resources/'+executavel.name, 'resources/'+link.name,
+                            *(p + '/' + nome for p in PASTAS_PRIVADAS)]:
                     url = origem.rstrip('/') + prefixo.rstrip('/') + '/' + urllib.parse.quote(rel)
                     # Nao reutiliza uma resposta em cache de antes da recarga.
                     url += '?radar_sonda=' + uuid.uuid4().hex
@@ -240,8 +259,17 @@ def _bloqueios_http(raiz, origem, prefixo, aguardar=0):
                         exc.close()
                     if codigo not in (403, 404):
                         raise RuntimeError('Protecao HTTP reprovada (%s): %s' % (codigo, rel))
-                break
+                aprovacoes += 1
+                # Na troca dos workers pode haver respostas alternadas entre
+                # configuracoes antiga e nova. Confirma uma segunda passada.
+                if not aguardar or aprovacoes >= 2:
+                    break
+                restante = limite - time.monotonic()
+                if restante <= 0:
+                    raise RuntimeError('Tempo esgotado ao confirmar a estabilidade dos bloqueios HTTP.')
+                time.sleep(min(.25, restante))
             except (RuntimeError, OSError, urllib.error.URLError) as exc:
+                aprovacoes = 0
                 restante = limite - time.monotonic()
                 if restante <= 0:
                     raise
@@ -258,9 +286,9 @@ def _bloqueios_http(raiz, origem, prefixo, aguardar=0):
 def _arquivos(origem):
     for nome in CODIGO:
         yield nome, origem / nome
-    for arquivo in (origem / 'web').iterdir():
-        if arquivo.is_file() and arquivo.suffix in ESTATICOS:
-            yield arquivo.name, arquivo
+    yield 'resources', origem/'web/resources'
+    # O descritor na raiz tambem e usado pela descoberta local de projetos.
+    yield 'projeto.json', origem/'web/resources/projeto.json'
     yield 'api.pse', origem / 'deploy' / 'api.pse'
     for nome in ('README.md', 'LICENSE'):
         yield nome, origem / nome
@@ -362,7 +390,7 @@ def _verificar(origem, raiz, conf, conta, lab, cron=True):
             if conn.execute('PRAGMA integrity_check').fetchone()[0] != 'ok' or conn.execute('PRAGMA foreign_key_check').fetchone():
                 raise RuntimeError('Integridade/referencias reprovadas')
     def permissoes():
-        for arq in (raiz/'api.pse', raiz/'radar.conf', Path(caminhos.data_dir()), Path(caminhos.log_dir()), *(raiz/n for n in CODIGO)):
+        for arq in (raiz/'api.pse', raiz/'radar.conf', raiz/'resources', Path(caminhos.data_dir()), Path(caminhos.log_dir()), *(raiz/n for n in CODIGO)):
             nome = str(arq.relative_to(raiz))
             if not arq.exists() or arq.is_symlink():
                 raise RuntimeError('Ausente ou link inesperado: ' + nome)
@@ -386,7 +414,7 @@ def _verificar(origem, raiz, conf, conta, lab, cron=True):
         if cron:
             checagens.extend(_checagens_cron(raiz.parent, raiz, conta.pw_name, conf))
         checar('nginx.privado', lambda: _bloqueios_http(raiz,caminhos.valor('web','origem')[0],caminhos.web_url()))
-        checar('http.publico', lambda: auditoria.verificar_http(caminhos.valor('web','origem')[0], caminhos.web_url(), raiz/'gestao.html', configuracao_privada=True))
+        checar('http.publico', lambda: auditoria.verificar_http(caminhos.valor('web','origem')[0], caminhos.web_url(), raiz/'resources/gestao.html', configuracao_privada=True))
         def rotacao():
             arquivo = Path('/etc/logrotate.d/openclaw-radar')
             if arquivo.read_text() != auditoria.render_logrotate(origem,Path(caminhos.log_dir())):
@@ -418,7 +446,8 @@ def _manifesto(origem):
             for f in arq.rglob('*'):
                 if f.is_file() and '__pycache__' not in f.parts and f.suffix != '.pyc':
                     rel = nome + '/' + f.relative_to(arq).as_posix()
-                    manifesto[rel] = hashlib.sha256(_conteudo(rel,f)).hexdigest()
+                    if rel != 'resources/projeto.json':
+                        manifesto[rel] = hashlib.sha256(_conteudo(rel,f)).hexdigest()
         elif nome != 'projeto.json':
             manifesto[nome] = hashlib.sha256(_conteudo(nome,arq)).hexdigest()
     return manifesto
@@ -563,6 +592,12 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
                     raise RuntimeError('Clone privado ja existe em outro destino; nenhuma versao sera sobrescrita.')
                 shutil.copytree(clone, novo_dados/'repo-dados', symlinks=True)
                 observacoes.append('Clone local preservado dentro de dados.dir; sincronizacao nao foi ativada.')
+            # Remove somente os estaticos antigos gerenciados pelo aplicativo.
+            for arquivo in (origem/'web/resources').iterdir():
+                legado=raiz/arquivo.name
+                if arquivo.is_file() and arquivo.name!='projeto.json' and (legado.is_file() or legado.is_symlink()):
+                    guardar(legado)
+                    remover(legado)
             for nome,arq in _arquivos(origem):
                 if nome == 'api.pse':
                     continue  # CGI continua respondendo 503 ate terminar a preparacao.
@@ -591,7 +626,8 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
                 descritor=json.loads(projeto.read_text())
                 descritor['url']=caminhos.web_url()
                 _json(projeto,descritor)
-                for pasta in (novo_dados,novos_logs,*(raiz/p for p in CODIGO)):
+                _json(raiz/'resources/projeto.json',descritor)
+                for pasta in (novo_dados,novos_logs,raiz/'resources',*(raiz/p for p in CODIGO)):
                     _permissoes(pasta,conta)
                 for arq in raiz.iterdir():
                     if arq.is_file() and not arq.is_symlink():

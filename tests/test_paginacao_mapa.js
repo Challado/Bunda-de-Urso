@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 const path = require("node:path");
-const html = fs.readFileSync(path.join(__dirname, "../web/index.html"), "utf8");
+const html = fs.readFileSync(path.join(__dirname, "../web/resources/index.html"), "utf8");
 const trecho = html.slice(html.indexOf("  var consultaAtual = null;"),
   html.indexOf("  function usarLocalizacao(){"));
 
@@ -78,6 +78,23 @@ async function main() {
   assert.deepEqual(parcial.avisos, []);
   assert.deepEqual(parcial.festas, []);
   assert.match(parcial.elRes.innerHTML, /HTTP 500/);
-  console.log("Mapa: 7 cenarios de paginacao, cancelamento e erro passaram.");
+  let encontrados=[];
+  const transicoes=contexto(async()=>resposta(encontrados));
+  await transicoes.consultar(0,0,200);
+  await transicoes.consultar(0,0,500);
+  assert.equal(transicoes.festas.length,1);
+  encontrados=['RADAR'];
+  await transicoes.consultar(0,0,1000);
+  encontrados=['RADAR','OUTRO'];
+  await transicoes.consultar(0,0,2000);
+  assert.deepEqual(transicoes.avisos,[1]);
+  encontrados=[];
+  await transicoes.consultar(0,0,500);
+  await transicoes.consultar(0,0,200);
+  assert.equal(transicoes.festas.length,2);
+  encontrados=['RADAR'];
+  await transicoes.consultar(0,0,1000);
+  assert.deepEqual(transicoes.avisos,[1,1]);
+  console.log("Mapa: paginacao, concorrencia e avisos por transicao ao aumentar/diminuir o raio passaram.");
 }
 main().catch(error => {console.error(error); process.exitCode = 1;});

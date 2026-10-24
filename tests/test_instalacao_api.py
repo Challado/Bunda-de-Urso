@@ -317,7 +317,7 @@ class TestInstalacaoAPI(unittest.TestCase):
     def test_verificacao_detecta_arquivo_corrompido_e_reaplicacao_conserta(self):
         instalado = self.instalar(True)
         self.assertEqual(instalado.returncode, 0, instalado.stdout + instalado.stderr)
-        alvo = self.web / "gestao.html"
+        alvo = self.web / "resources/gestao.html"
         alvo.write_text("corrompido")
         cmd = [sys.executable, str(ROOT / "web" / "api.pse"), "instalacao", "--conf", str(self.conf),
                "--laboratorio", str(self.lab), "--verificar"]

@@ -23,7 +23,7 @@ SUFIXOS = (".py", ".pse", ".sh", ".html", ".json", ".service", ".conf", ".logrot
 EXCECOES = {
     ".github/scripts/verificar_caminhos.py": "padroes de deteccao, nao caminhos usados pelo aplicativo",
     "deploy/radar.conf.exemplo": "modelo da configuracao: mostra os caminhos reais",
-    "web/projeto.json": "URL publica da consulta (nao e caminho de arquivo)",
+    "web/resources/projeto.json": "URL publica da consulta (nao e caminho de arquivo)",
 }
 
 # Prefixos de instalacao que ja apareceram espalhados pelo codigo.

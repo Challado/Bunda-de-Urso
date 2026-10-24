@@ -148,7 +148,7 @@ python3 -m unittest discover -s tests
 
 ### Cadastro público
 
-`web/cadastro.html` abre no modo **simplificado**, com apenas latitude,
+`web/resources/cadastro.html` abre no modo **simplificado**, com apenas latitude,
 longitude e velocidade. O modo **expert** acrescenta identificação, tipo,
 município, via, km, sentido, observações e contato; permite município + via
 quando as coordenadas não são conhecidas. Campos ocultos não são enviados.

@@ -15,7 +15,7 @@ import sys
 
 from comum import RAIZ, terminar
 
-WEB = RAIZ / "web"
+WEB = RAIZ / "web" / "resources"
 ATRIBUTO = re.compile(r'(?:href|src)\s*=\s*["\']([^"\']+)["\']')
 LITERAL = re.compile(r'["\'](/api/[^"\']*)["\']')
 VIA_QUERY = re.compile(r"rota=(/api/[^&\"']+)")
@@ -29,7 +29,7 @@ def paginas():
 
 def padroes_api():
     """Rotas que o nucleo realmente atende (literais + /health/...)."""
-    texto = (WEB / "nucleo.py").read_text(encoding="utf-8")
+    texto = (RAIZ / "web" / "nucleo.py").read_text(encoding="utf-8")
     caminhos = set(LITERAL.findall(texto))
     caminhos |= set(re.findall(r'"(/health/[^"]*)"', texto))
     return sorted(caminhos)

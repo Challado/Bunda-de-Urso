@@ -87,6 +87,7 @@ ENDPOINTS_AJUDA = {
     "/api/v1/fontes": ["GET"],
     "/api/v1/fontes/{id}": ["GET"],
     "/api/v1/atualizacoes": ["GET"],
+    "/api/v1/atualizacoes/status": ["GET"],
     "/api/v1/login": ["POST"],
     "/api/v1/logout": ["POST"],
     "/api/v1/minha-senha": ["POST"],
@@ -123,6 +124,7 @@ ENDPOINTS_ADMINISTRATIVOS = {
 }
 
 ENDPOINTS_DESC = {
+    "/api/v1/atualizacoes/status": "Relatorio consolidado das atualizacoes, em JSON e sem acesso ao banco.",
     "/api/v1/status/estados": "Contagem de pontos unicos nas 27 UFs por esfera de fiscalizacao; inclui nao classificados.",
     "/api/v1/status/estados/{uf}": "Detalhes da cobertura por UF, municipios, orgaos, fontes e pontos paginados.",
     "/api/v1/status/coletores": "Todos os leitores, inclusive nunca executados; ultima tentativa, ultimo sucesso, erros e URLs configuradas.",
@@ -167,6 +169,7 @@ ENDPOINTS_DESC = {
 
 # Parametros aplicaveis por endpoint (documentado na ajuda, gerado do codigo).
 ENDPOINTS_PARAMS = {
+    "/api/v1/atualizacoes/status": [],
     "/api/v1/status/estados": [],
     "/api/v1/status/estados/{uf}": ["limite", "depois"],
     "/api/v1/status/coletores": [],
@@ -1141,6 +1144,20 @@ def handle_request(environ, stdin_bytes=b""):
         return _erro(400, "delimitador_invalido", str(exc), campo="delimitador")
 
     # --- endpoints sem banco -------------------------------------------------
+    if caminho.rstrip('/') == '/api/v1/atualizacoes/status':
+        if metodo != 'GET':
+            return _erro(405, 'metodo_nao_permitido', 'Use GET para consultar o relatorio.')
+        if formato != 'json':
+            return _erro(400,'formato_invalido','O relatorio de atualizacoes usa JSON.')
+        from core import atualizacoes, caminhos
+        from pathlib import Path
+        try:
+            estado=json.loads(Path(caminhos.status_atualizacoes()).read_text())
+        except FileNotFoundError:
+            estado={'versao_esquema':1,'operacoes':{},'fontes':{}}
+        except (OSError, ValueError):
+            return _erro(503,'relatorio_indisponivel','O relatorio de atualizacoes esta indisponivel.')
+        return _resp(atualizacoes.limpar(estado))
     if caminho in ("/api/v1/ajuda", "/api/v1/ajuda/"):
         estrutura = ajuda_estrutura()
         try:

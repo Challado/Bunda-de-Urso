@@ -153,8 +153,9 @@ class TestRaizWeb(unittest.TestCase):
         novo,n=proteger_texto(fonte,'/radar/','/srv/www/radar','',raiz_local=True)
         self.assertEqual(n,1)
         self.assertIn('fastcgi_pass unix:/socket;',novo)
-        self.assertIn('location ^~ "/radar/dados/" { return 404; }',novo)
-        self.assertIn('location = "/radar/radar.conf.anterior" { return 404; }',novo)
+        self.assertIn('location ^~ "/radar/" { return 404; }',novo)
+        self.assertIn('location ^~ "/radar/resources/"',novo)
+        self.assertIn('location = "/radar/api.pse"',novo)
         self.assertEqual(proteger_texto(novo,'/radar/','/srv/www/radar','',raiz_local=True)[0],novo)
 
     def test_bloqueio_http_nao_aceita_arquivo_publico_com_200(self):
@@ -179,7 +180,7 @@ class TestRaizWeb(unittest.TestCase):
             return Resposta(200 if len(pedidos)==2 else 404)
         with patch('core.raiz_web.urllib.request.urlopen',side_effect=abrir), patch('core.raiz_web.time.sleep') as pausa:
             _bloqueios_http(self.web,'https://radar.test','/radar/',aguardar=2)
-        pausa.assert_called_once()
+        self.assertGreaterEqual(pausa.call_count,2)
         self.assertTrue(all('radar_sonda=' in p.full_url for p in pedidos))
         self.assertTrue(all(p.get_header('Cache-control')=='no-cache, no-store' for p in pedidos))
         self.assertGreater(len(pedidos),3)

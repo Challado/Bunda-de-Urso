@@ -116,7 +116,7 @@
   </nav>
 </footer>
 <script>
-var API = "api.pse?rota=/api/v1/radares/submeter&formato=json";
+var API = "../api.pse?rota=/api/v1/radares/submeter&formato=json";
 var CAMPOS = ["identificador","tipo_radar","modelo","latitude","longitude","uf","municipio","via","km","velocidade_geral","sentido","observacoes","contato"];
 var form = document.getElementById("form");
 function val(n){ var el = form.elements[n]; return el ? el.value.trim() : ""; }
@@ -282,7 +282,7 @@ function mostrarEnvio(r,mensagem){
 function acompanharEnvio(protocolo,geracao,vez){
   if(geracao!==geracaoEnvio)return;
   var seq=++consultaSeq;
-  var rota="api.pse?rota=/api/v1/radares/envios/"+encodeURIComponent(protocolo);
+  var rota="../api.pse?rota=/api/v1/radares/envios/"+encodeURIComponent(protocolo);
   pedirJSON(rota,{method:"GET",cache:"no-store"},5000).then(function(o){
     if(geracao!==geracaoEnvio || seq!==consultaSeq)return;
     if(o.status===200 && o.body.sucesso){

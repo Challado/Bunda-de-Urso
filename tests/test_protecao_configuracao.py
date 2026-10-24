@@ -3,15 +3,40 @@ import os
 from pathlib import Path
 import shutil
 import socket
+import socketserver
+import struct
 import subprocess
 import tempfile
 import time
+import threading
 import unittest
 import urllib.error
 import urllib.request
 from unittest.mock import patch
 
 from core.protecao_configuracao import planejar, proteger_texto
+
+
+class FastCGITeste(socketserver.BaseRequestHandler):
+    def handle(self):
+        def ler(n):
+            dados=b''
+            while len(dados)<n:
+                parte=self.request.recv(n-len(dados))
+                if not parte:raise EOFError()
+                dados+=parte
+            return dados
+        parametros,corpo=bytearray(),bytearray()
+        while True:
+            _,tipo,identificador,tamanho,padding,_=struct.unpack('!BBHHBB',ler(8))
+            dados=ler(tamanho+padding)[:tamanho]
+            if tipo==4:parametros.extend(dados)
+            if tipo==5:
+                corpo.extend(dados)
+                if not tamanho:break
+        self.server.requisicoes.append((bytes(parametros),bytes(corpo)))
+        for tipo,dados in ((6,b'Content-Type: application/json\r\n\r\n{"status":"ready"}'),(6,b''),(3,bytes(8))):
+            self.request.sendall(struct.pack('!BBHHBB',1,tipo,identificador,len(dados),0,0)+dados)
 
 
 class TestProtecaoConfiguracao(unittest.TestCase):
@@ -47,6 +72,21 @@ class TestProtecaoConfiguracao(unittest.TestCase):
     def test_nginx_real_recarga_legado_e_confirma_todas_as_sondas(self):
         self._nginx_real(raiz_local=True, recarregar=True)
 
+    def test_handler_da_api_nao_e_copiado_de_outro_projeto(self):
+        fonte='server { root /srv/www; location = /outro/api.pse { fastcgi_pass unix:/outro; } location ~ \\.pse$ { fastcgi_pass unix:/radar; } }'
+        novo,_=proteger_texto(fonte,'/radar/','/srv/www/radar','',raiz_local=True)
+        bloco=novo.split('location = "/radar/api.pse"',1)[1].split('}',1)[0]
+        self.assertIn('unix:/radar',bloco)
+        self.assertNotIn('unix:/outro',bloco)
+        self.assertIn('location = /outro/api.pse { fastcgi_pass unix:/outro; }',novo)
+
+    def test_publicacao_tambem_funciona_na_raiz_do_host(self):
+        fonte='server { root /srv/www; location ~ \\.pse$ { fastcgi_pass unix:/radar; } }'
+        novo,_=proteger_texto(fonte,'/','/srv/www','',raiz_local=True)
+        self.assertNotIn('location = ""',novo)
+        self.assertIn('location = "/api.pse"',novo)
+        self.assertIn('location ^~ "/resources/"',novo)
+
     def test_identifica_raiz_com_link_intermediario_sem_server_name(self):
         with tempfile.TemporaryDirectory(prefix='radar-raiz-link-') as pasta:
             base=Path(pasta)
@@ -55,17 +95,23 @@ class TestProtecaoConfiguracao(unittest.TestCase):
             www=base/'www'
             www.mkdir()
             (www/'openclaw').symlink_to(real.parent,target_is_directory=True)
-            fonte='server { server_name _; root "'+str(www)+'"; }'
+            fonte='server { server_name _; root "'+str(www)+'"; location ~ \\.pse$ { fastcgi_pass unix:/socket; } }'
             novo,n=proteger_texto(fonte,'/openclaw/radar/',real,'https://servidor3.test',raiz_local=True)
             self.assertEqual(n,1)
-            self.assertIn('location = "/openclaw/radar/radar.conf.anterior" { return 404; }',novo)
-            self.assertIn('location ^~ "/openclaw/radar/dados/" { return 404; }',novo)
+            self.assertIn('location ^~ "/openclaw/radar/" { return 404; }',novo)
+            self.assertIn('location ^~ "/openclaw/radar/resources/"',novo)
             self.assertEqual(proteger_texto(novo,'/openclaw/radar/',real,'https://servidor3.test',raiz_local=True)[0],novo)
 
     def _nginx_real(self, raiz_local=False, recarregar=False):
         binario = os.environ.get("RADAR_TEST_NGINX") or shutil.which("nginx")
         if not binario:
             self.skipTest("nginx nao instalado (o CI instala o pacote)")
+        backend=socketserver.ThreadingTCPServer(('127.0.0.1',0),FastCGITeste)
+        backend.daemon_threads=True
+        backend.requisicoes=[]
+        self.addCleanup(backend.server_close)
+        self.addCleanup(backend.shutdown)
+        threading.Thread(target=backend.serve_forever,daemon=True).start()
         with tempfile.TemporaryDirectory(prefix="radar-nginx-") as pasta:
             base = Path(pasta)
             web = base / "www" / "radar"
@@ -85,6 +131,17 @@ class TestProtecaoConfiguracao(unittest.TestCase):
                     arquivo.parent.mkdir(parents=True, exist_ok=True)
                     arquivo.write_text("conteudo privado nao deve sair por HTTP")
             (web / "index.html").write_text("pagina publica de teste")
+            if raiz_local:
+                recursos=web/'resources'
+                recursos.mkdir()
+                for nome in ('index.html','detalhe.html','status.css','status.js','municipios.json'):
+                    (recursos/nome).write_text('pagina publica de teste')
+                (recursos/'segredo.json').symlink_to(conf)
+                for nome in ('executar.pse','.oculto.json','config.conf'):
+                    (recursos/nome).write_text('privado')
+                for nome in ('arquivo-novo.json','outro.pse','copia-config.txt'):
+                    (web/nome).write_text('privado')
+                privados += ['arquivo-novo.json','outro.pse','copia-config.txt','resources/executar.pse','resources/.oculto.json','resources/config.conf']
             with socket.socket() as s:
                 s.bind(("127.0.0.1", 0))
                 porta = s.getsockname()[1]
@@ -92,6 +149,10 @@ class TestProtecaoConfiguracao(unittest.TestCase):
             temporarios = " ".join('%s_temp_path "%s";' % (nome, base / nome)
                                    for nome in ("client_body", "proxy", "fastcgi", "uwsgi", "scgi"))
             fonte = fonte.replace("http {", "http { " + temporarios)
+            handler=('location ~ \\.pse$ { fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name; '
+                     'fastcgi_param QUERY_STRING $query_string; fastcgi_param REQUEST_METHOD $request_method; '
+                     'fastcgi_param CONTENT_LENGTH $content_length; fastcgi_pass 127.0.0.1:%d; }'%backend.server_address[1])
+            fonte=fonte.replace('root "%s";'% (base/'www'),'root "%s"; '%(base/'www')+handler)
             protegido, encontrados = proteger_texto(fonte, "/radar/", web, "", raiz_local=raiz_local)
             self.assertEqual(encontrados, 1)
             nginx_conf = base / "nginx.conf"
@@ -131,11 +192,30 @@ class TestProtecaoConfiguracao(unittest.TestCase):
                     if raiz_local:
                         uris += ["/radar/" + rel for rel in privados]
                         uris += ["/radar/dados/%72adar.sqlite3?download=1"]
-                    for uri in uris:
+                        for nome in ('index.html','status.css','status.js','municipios.json'):
+                            with urllib.request.urlopen('http://127.0.0.1:%d/radar/resources/%s'%(porta,nome),timeout=2) as r:
+                                self.assertEqual(r.status,200)
+                        with urllib.request.urlopen('http://127.0.0.1:%d/radar/detalhe.html?id=P-42'%porta,timeout=2) as r:
+                            self.assertTrue(r.url.endswith('/resources/detalhe.html?id=P-42'))
                         with self.assertRaises(urllib.error.HTTPError) as erro:
-                            urllib.request.urlopen("http://127.0.0.1:%d%s" % (porta, uri), timeout=2)
-                        self.assertEqual(erro.exception.code, 404)
+                            urllib.request.urlopen('http://127.0.0.1:%d/radar/resources/segredo.json'%porta,timeout=2)
+                        self.assertIn(erro.exception.code,(403,404))
+                    for uri in uris:
+                        with self.subTest(uri=uri):
+                            with self.assertRaises(urllib.error.HTTPError) as erro:
+                                urllib.request.urlopen("http://127.0.0.1:%d%s" % (porta, uri), timeout=2)
+                            self.assertEqual(erro.exception.code, 404)
                     self.assertEqual(conf.read_text(), "configuracao privada de teste")
+                    if raiz_local:
+                        antes=len(backend.requisicoes)
+                        with urllib.request.urlopen('http://127.0.0.1:%d/radar/api.pse?rota=/health/ready'%porta,timeout=2) as r:
+                            self.assertEqual(r.status,200)
+                        self.assertIn(b'rota=/health/ready',backend.requisicoes[antes][0])
+                        self.assertIn(str(web/'api.pse').encode(),backend.requisicoes[antes][0])
+                        pedido=urllib.request.Request('http://127.0.0.1:%d/radar/api.pse'%porta,data=b'{"teste":true}',headers={'Content-Type':'application/json'})
+                        with urllib.request.urlopen(pedido,timeout=2) as r:self.assertEqual(r.status,200)
+                        self.assertEqual(backend.requisicoes[antes+1][1],b'{"teste":true}')
+                        self.assertEqual(len(backend.requisicoes),antes+2)
                 finally:
                     processo.terminate()
                     processo.wait(timeout=10)

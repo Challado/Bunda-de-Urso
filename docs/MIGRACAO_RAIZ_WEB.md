@@ -39,10 +39,20 @@ logs, tokens, chaves, cache, fila, malha, clone local e temporários resolvem
 simbólicos, são rejeitados. A API de configuração aceita para `banco` somente
 um nome de arquivo e não move a base quando um caminho é editado.
 
-Código, páginas e o próprio `radar.conf` ficam na raiz da aplicação. Auxiliares
+Código e o próprio `radar.conf` ficam na raiz da aplicação. As páginas, CSS,
+JavaScript, imagens e JSON públicos ficam em `resources/`. Auxiliares
 da configuração (lock, backup e auditoria) ficam em `dados.dir/configuracao`.
 O editor consolida seções repetidas e preserva comentários e opções existentes.
 Não há `usuario` ou `grupo` no arquivo: a execução usa a identidade do processo.
+
+O nginx nega por padrão qualquer caminho dentro do prefixo do Radar. Libera
+somente `api.pse` como entrada FastCGI e `resources/` para arquivos estáticos,
+sem executar scripts, seguir links simbólicos ou listar diretórios. Os caminhos
+antigos das páginas redirecionam para `resources/`, preservando parâmetros como
+o ID do radar. O endereço `status-atualizacoes.json` redireciona para a consulta
+do relatório pela API, que lê o JSON dentro de `dados.dir`, sem abrir SQLite.
+As regras são geradas a partir do prefixo/raiz configurados e preservam o
+handler FastCGI existente, sem fixar caminho de socket.
 
 ## Atualizar o servidor
 

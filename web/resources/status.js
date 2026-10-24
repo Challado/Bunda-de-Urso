@@ -18,7 +18,7 @@
     a.target='_blank';a.rel='noopener noreferrer';return a;
   }
   async function api(rota, params={}) {
-    const url=new URL('api.pse',location.href);url.search=new URLSearchParams({rota,...params});
+    const url=new URL('../api.pse',location.href);url.search=new URLSearchParams({rota,...params});
     const abort=new AbortController();const timer=setTimeout(()=>abort.abort(),25000);
     try {
       const r=await fetch(url,{signal:abort.signal,cache:'no-store',headers:{Accept:'application/json'}});

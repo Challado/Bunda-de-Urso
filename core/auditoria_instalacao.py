@@ -143,7 +143,7 @@ def artefatos(origem, dirs, codigo, estaticos):
             yield dirs["codigo"] / rel, conteudo
     for nome in ("README.md", "LICENSE"):
         yield dirs["codigo"] / nome, (origem / nome).read_bytes()
-    for arquivo in sorted((origem / "web").iterdir()):
+    for arquivo in sorted((origem / "web/resources").rglob("*")):
         if not arquivo.is_file() or arquivo.suffix not in estaticos:
             continue
         conteudo = arquivo.read_bytes()
@@ -151,7 +151,9 @@ def artefatos(origem, dirs, codigo, estaticos):
             descritor = json.loads(conteudo)
             descritor["url"] = caminhos.web_url()
             conteudo = (json.dumps(descritor, ensure_ascii=False, indent=2) + "\n").encode()
-        yield dirs["web"] / arquivo.name, conteudo
+        yield dirs["web"] / "resources" / arquivo.relative_to(origem/'web/resources'), conteudo
+        if arquivo.name == 'projeto.json':
+            yield dirs['web']/'projeto.json', conteudo
     api = bootstrap((origem / "deploy" / "api.pse").read_text(), dirs["conf"]).encode()
     yield dirs["web"] / "api.pse", api
     yield dirs["codigo"].parent / "radar-api.pse", api

@@ -303,7 +303,7 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
                 _guardar(sudoers_antigo, backup, indice)
             if not laboratorio:
                 from .protecao_configuracao import planejar
-                plano_nginx = planejar(caminhos.web_url(), dirs["web"], caminhos.valor("web", "origem")[0])
+                plano_nginx = planejar(caminhos.web_url(), dirs["web"], caminhos.valor("web", "origem")[0], raiz_local=True)
                 for arquivo, anterior, novo in plano_nginx:
                     if arquivo.read_text() != anterior:
                         raise RuntimeError("A configuracao do nginx mudou durante a preparacao.")
@@ -495,13 +495,20 @@ def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http=Non
             if os.geteuid() == 0:
                 os.chown(arquivo, -1, grupo)
             arquivo.chmod(0o660)
-        for arquivo in (origem / "web").iterdir():
-            if arquivo.is_file() and arquivo.suffix in ESTATICOS:
-                shutil.copy2(arquivo, dirs["web"] / arquivo.name)
+        recursos=dirs['web']/'resources'
+        if recursos.exists():
+            shutil.rmtree(recursos)
+        shutil.copytree(origem/'web/resources',recursos)
+        for arquivo in recursos.iterdir():
+            legado=dirs['web']/arquivo.name
+            if arquivo.name!='projeto.json' and legado.is_file():
+                legado.unlink()
+        shutil.copy2(recursos/'projeto.json',dirs['web']/'projeto.json')
         projeto = dirs["web"] / "projeto.json"
         descritor = json.loads(projeto.read_text())
         descritor["url"] = caminhos.web_url()
         projeto.write_text(json.dumps(descritor, ensure_ascii=False, indent=2) + "\n")
+        (recursos/'projeto.json').write_text(projeto.read_text())
         # O .pse do deploy e o unico Python publicado no webroot.
         shutil.copy2(origem / "deploy" / "api.pse", dirs["web"] / "api.pse")
         api = dirs["web"] / "api.pse"
@@ -803,7 +810,7 @@ def _diagnosticar(origem, dirs, usuario_web, laboratorio, cron, final=False):
         origem_http = caminhos.valor("web", "origem")[0]
         if origem_http and not laboratorio:
             try:
-                auditoria.verificar_http(origem_http, caminhos.web_url(), dirs["web"] / "gestao.html", configuracao_privada=True)
+                auditoria.verificar_http(origem_http, caminhos.web_url(), dirs["web"] / "resources/gestao.html", configuracao_privada=True)
                 checagens.append({"checagem": "http.publico", "estado": "ok", "detalhe": "API e pagina acessiveis; download direto de radar.conf bloqueado"})
             except Exception as exc:
                 checagens.append({"checagem": "http.publico", "estado": "erro", "detalhe": "Checagem HTTP de API, pagina e configuracao: " + str(exc)[:1000]})
