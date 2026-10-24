@@ -250,6 +250,9 @@ def executar(args, observacoes):
     elif args.aplicar:
         if os.geteuid() != 0 and not lab:
             raise RuntimeError('A primeira etapa prepara nginx/cron/permissoes; execute este .sh como root, sem sudo.')
+        if not lab:
+            from .instalacao import _preparar_servicos
+            _preparar_servicos(observacoes)
         plano = _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, versao, plano, observacoes, novo_dados, novo_banco, novos_logs)
     print(json.dumps(plano, ensure_ascii=False, indent=2))
     if args.relatorio:
