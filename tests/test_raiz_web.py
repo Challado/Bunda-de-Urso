@@ -214,6 +214,87 @@ class TestRaizWeb(unittest.TestCase):
         self.assertEqual(estado['www-data'].count('# radar-raiz-web'),2)
         self.assertNotIn('runuser',estado['www-data'])
 
+    def test_cron_do_servidor3_migra_ambos_e_preserva_sincronizadores(self):
+        from core.raiz_web import _transferir_crons, _checagens_cron
+        externo = '''# Backup remoto do host (infra antiga do root -- nao mexer).
+06  01  *   *   *    /bin/bash /root/scripts/bkpremoto.sh
+*/10 * * * * /usr/bin/python3 /openclaw/bin/hamqsl.py >> /var/log/openclaw/hamqsl/hamqsl.log 2>&1
+*/5 * * * * /usr/bin/python3 /openclaw/bin/cepea_cache.py >> /var/log/openclaw/cepea/cepea.log 2>&1
+*/10 * * * * /usr/bin/python3 /openclaw/bin/prop_dados.py >> /var/log/openclaw/prop/prop.log 2>&1
+*/15 * * * * /usr/bin/python3 /openclaw/bin/hud_faxina.py >> /var/log/openclaw/hud/faxina.log 2>&1
+*/10 * * * * /usr/bin/python3 /openclaw/bin/radar-dados-sync.py >> /var/log/openclaw/radar/dados-sync.log 2>&1
+*/10 * * * * /usr/bin/python3 /openclaw/bin/radar-instaladores-sync.py >> /var/log/openclaw/radar/instaladores-sync.log 2>&1
+'''
+        root=externo+'* * * * * /openclaw/bin/radar-tick.sh\n* * * * * /openclaw/bin/radar-api.pse cron fila\n'
+        for conf in (self.web/'radar.conf', self.conf):
+            with self.subTest(conf=conf):
+                estado={'root':root,'www-data':''}
+                chamadas=[]
+                def ler(usuario=None): return estado[usuario or 'root']
+                def gravar(cmd,**kw):
+                    self.assertEqual(cmd[:2],['crontab','-u'])
+                    chamadas.append(cmd[2])
+                    estado[cmd[2]]=kw['input']
+                    return ''
+                with patch('core.raiz_web.auditoria.ler_crontab',side_effect=ler), patch('core.raiz_web._executar',side_effect=gravar):
+                    antes=_checagens_cron(self.home.parent,self.web,'www-data',conf)
+                    self.assertEqual([c['estado'] for c in antes],['erro','erro'])
+                    _transferir_crons(self.lab,self.home.parent,self.web,'www-data',conf)
+                    self.assertEqual(chamadas[:2],['www-data','root'])
+                    self.assertEqual(estado['root'],externo)
+                    self.assertEqual((self.lab/'crontab-root-anterior.txt').read_text(),root)
+                    self.assertIn('RADAR_CONF='+str(conf),estado['www-data'])
+                    depois=_checagens_cron(self.home.parent,self.web,'www-data',conf)
+                    self.assertEqual([c['estado'] for c in depois],['ok','ok'])
+                    primeiro=dict(estado)
+                    _transferir_crons(self.lab,self.home.parent,self.web,'www-data',conf)
+                    self.assertEqual(estado,primeiro)
+                    estado['www-data']+=estado['www-data'].splitlines()[0]+'\n'
+                    self.assertEqual(_checagens_cron(self.home.parent,self.web,'www-data',conf)[1]['estado'],'erro')
+
+    def test_transferencia_cron_recupera_ambos_se_limpeza_do_root_falhar(self):
+        from core.raiz_web import _transferir_crons
+        anteriores={'root':'* * * * * /openclaw/bin/radar-tick.sh\n','www-data':'15 * * * * /opt/outro\n'}
+        estado=dict(anteriores)
+        falhou=False
+        def ler(usuario=None): return estado[usuario or 'root']
+        def gravar(cmd,**kw):
+            nonlocal falhou
+            if cmd[2]=='root' and not falhou:
+                falhou=True
+                raise RuntimeError('crontab indisponivel')
+            estado[cmd[2]]=kw['input']
+            return ''
+        with patch('core.raiz_web.auditoria.ler_crontab',side_effect=ler), patch('core.raiz_web._executar',side_effect=gravar):
+            with self.assertRaisesRegex(RuntimeError,'crontab indisponivel'):
+                _transferir_crons(self.lab,self.home.parent,self.web,'www-data')
+        self.assertEqual(estado,anteriores)
+
+    def test_auditoria_cron_nao_aceita_crontab_web_ilegivel(self):
+        from core.raiz_web import _checagens_cron
+        def ler(usuario):
+            if usuario=='root': return ''
+            raise RuntimeError('Nao foi possivel ler o crontab de www-data')
+        with patch('core.raiz_web.auditoria.ler_crontab',side_effect=ler):
+            estado=_checagens_cron(self.home.parent,self.web,'www-data')
+        self.assertEqual([c['estado'] for c in estado],['ok','erro'])
+        self.assertIn('www-data',estado[1]['detalhe'])
+
+    def test_verificacao_final_reprova_root_ativo_e_web_sem_tarefas(self):
+        import pwd
+        from core.raiz_web import _verificar
+        conta=pwd.getpwnam('www-data')
+        def ler(usuario):
+            return '* * * * * /openclaw/bin/radar-tick.sh\n' if usuario=='root' else ''
+        with patch('core.raiz_web.auditoria.ler_crontab',side_effect=ler), \
+             patch('core.raiz_web._cgi'), patch('core.raiz_web._comando'), \
+             patch('core.raiz_web._bloqueios_http'), patch('core.raiz_web.auditoria.verificar_http'):
+            checagens=_verificar(ROOT,self.web,self.conf,conta,None)
+            sem_cron=_verificar(ROOT,self.web,self.conf,conta,None,cron=False)
+        crons={c['checagem']:c['estado'] for c in checagens if c['checagem'].startswith('cron.')}
+        self.assertEqual(crons,{'cron.root':'erro','cron.www-data':'erro'})
+        self.assertFalse(any(c['checagem'].startswith('cron.') for c in sem_cron))
+
     def test_containers_de_backup_sao_preparados_para_o_usuario_web(self):
         import pwd
         from core.raiz_web import _preparar_backups

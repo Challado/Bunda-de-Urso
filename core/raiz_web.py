@@ -138,31 +138,52 @@ def _remover_cron(texto, antigo):
     return '\n'.join(linhas) + ('\n' if linhas else '')
 
 
-def _cron(texto, antigo, raiz, usuario):
+def _cron(texto, antigo, raiz, usuario, conf=None):
     linhas = _remover_cron(texto, antigo).splitlines()
     # A identidade vem do dono do crontab; o aplicativo nao seleciona UID/GID.
     comando = ' '.join(shlex.quote(s) for s in (
         'env',
         '-u','RADAR_BRASIL_HOME','-u','RADAR_DATA_DIR','-u','RADAR_DB','-u','RADAR_WEB_ROOT','-u','RADAR_LOG_DIR',
-        'RADAR_CONF='+str(raiz/'radar.conf'), sys.executable, str(raiz / 'api.pse')))
+        'RADAR_CONF='+str(conf or raiz/'radar.conf'), sys.executable, str(raiz / 'api.pse')))
     linhas.extend('* * * * * ' + comando + ' cron ' + tarefa + ' # radar-raiz-web ' + tarefa for tarefa in ('tick', 'fila'))
     return '\n'.join(linhas) + '\n'
 
 
-def _transferir_crons(backup, antigo, raiz, usuario):
-    root = auditoria.ler_crontab()
+def _checagens_cron(antigo, raiz, usuario, conf=None, final=True):
+    checagens = []
+    for nome in ('root', usuario):
+        try:
+            atual = auditoria.ler_crontab(nome)
+            esperado = (_remover_cron(atual, antigo) if nome == 'root'
+                        else _cron(atual, antigo, raiz, usuario, conf))
+            correto = atual == esperado
+            detalhe = ('nenhuma tarefa de coleta/fila do Radar no root' if nome == 'root'
+                       else 'coleta e fila pela API, uma passada por minuto como '+usuario)
+            if not correto:
+                detalhe = ('ainda ha tarefas de coleta/fila do Radar no root' if nome == 'root'
+                           else 'coleta/fila ausentes, duplicadas ou com comando divergente')
+            checagens.append(dict(checagem='cron.'+nome, estado='ok' if correto else 'erro' if final else 'atualizar', detalhe=detalhe))
+        except (OSError, RuntimeError) as exc:
+            checagens.append(dict(checagem='cron.'+nome, estado='erro', detalhe=str(exc)))
+    return checagens
+
+
+def _transferir_crons(backup, antigo, raiz, usuario, conf=None):
+    if pwd.getpwnam(usuario).pw_uid == 0:
+        raise RuntimeError('O cron do Radar deve pertencer a um usuario sem privilegios.')
+    root = auditoria.ler_crontab('root')
     web = auditoria.ler_crontab(usuario)
     anteriores = {'root': root, usuario: web}
     for nome, conteudo in anteriores.items():
         (backup / ('crontab-' + nome + '-anterior.txt')).write_text(conteudo)
-    esperado = _cron(web, antigo, raiz, usuario)
+    esperado = _cron(web, antigo, raiz, usuario, conf)
     try:
         _executar(['crontab', '-u', usuario, '-'], input=esperado)
         if auditoria.ler_crontab(usuario) != esperado:
             raise RuntimeError('Crontab do usuario web diverge do esperado')
         limpo = _remover_cron(root, antigo)
-        _executar(['crontab', '-'], input=limpo)
-        if auditoria.ler_crontab() != limpo:
+        _executar(['crontab', '-u', 'root', '-'], input=limpo)
+        if auditoria.ler_crontab('root') != limpo:
             raise RuntimeError('Cron do Radar ainda permanece no root')
     except BaseException:
         for nome, conteudo in anteriores.items():
@@ -295,7 +316,7 @@ def executar(args, observacoes):
                  observacoes=observacoes)
     if args.verificar:
         with _usar_conf(novo_conf):
-            plano['checagens'] = _verificar(origem, raiz, novo_conf, conta, lab)
+            plano['checagens'] = _verificar(origem, raiz, novo_conf, conta, lab, cron=not args.sem_cron)
         plano['sucesso'] = all(c['estado']=='ok' for c in plano['checagens'])
     elif args.aplicar:
         if os.geteuid() != 0 and not lab:
@@ -311,7 +332,7 @@ def executar(args, observacoes):
     return 0 if plano['sucesso'] else 1
 
 
-def _verificar(origem, raiz, conf, conta, lab):
+def _verificar(origem, raiz, conf, conta, lab, cron=True):
     checagens = []
     def checar(nome, acao):
         try:
@@ -345,6 +366,8 @@ def _verificar(origem, raiz, conf, conta, lab):
     checar('api.prontidao', lambda: _cgi(raiz/'api.pse', conf, '/health/ready', usuario))
     checar('configuracao.gravacao', lambda: _comando(raiz, conf, conta, lab, 'configuracao','verificar-web'))
     if not lab:
+        if cron:
+            checagens.extend(_checagens_cron(raiz.parent, raiz, conta.pw_name, conf))
         checar('nginx.privado', lambda: _bloqueios_http(raiz,caminhos.valor('web','origem')[0],caminhos.web_url()))
         checar('http.publico', lambda: auditoria.verificar_http(caminhos.valor('web','origem')[0], caminhos.web_url(), raiz/'gestao.html', configuracao_privada=True))
         def rotacao():
@@ -582,7 +605,7 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
                     cron_anterior=_transferir_crons(backup, home.parent, raiz, conta.pw_name)
                     observacoes.append('Agendamentos do Radar transferidos do root para '+conta.pw_name+'.')
                 plano.update(modo='aplicacao',backup=str(backup),referencias_cache_atualizadas=referencias,
-                             checagens=_verificar(origem,raiz,novo_conf,conta,lab))
+                             checagens=_verificar(origem,raiz,novo_conf,conta,lab,cron=not args.sem_cron))
                 plano['sucesso']=all(c['estado']=='ok' for c in plano['checagens'])
                 if not plano['sucesso']:
                     raise RuntimeError('Checagem final reprovada: '+json.dumps(plano['checagens'],ensure_ascii=False))

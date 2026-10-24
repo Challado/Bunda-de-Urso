@@ -75,6 +75,14 @@ identidade por configuração. O instalador prepara permissões para o usuário 
 atualiza logrotate e testa a API com essa identidade. Logrotate usa o proprietário
 e grupo reais da pasta de logs, sem campos de identidade no `radar.conf`.
 
+A transferência também ocorre ao atualizar o layout antigo, sem exigir
+`--migrar-raiz-web`. A checagem final e `--verificar` conferem separadamente
+`cron.root` e `cron.www-data`: não pode restar coletor/fila no root e devem
+existir exatamente as duas entradas atualizadas no usuário web. Uma falha de
+leitura ou escrita reprova a instalação; os dois crontabs têm backup.
+`--sem-cron` desativa explicitamente essa gestão. Os sincronizadores privados
+do servidor3 permanecem separados, sem alterações.
+
 Relatórios e logs ficam em `dados.dir/atualizacoes` e `dados.dir/logs` (ou na
 subpasta de logs configurada). `status-atualizacoes.json` publica o consolidado
 pelo link conhecido. Backups anteriores permanecem nas origens para recuperação.

@@ -291,6 +291,7 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
     logrotate = (laboratorio / "etc" if laboratorio else Path("/etc")) / "logrotate.d" / "openclaw-radar"
     sudoers_antigo = (laboratorio / "etc" if laboratorio else Path("/etc")) / "sudoers.d" / "radar-configuracao"
     nginx_alterado = False
+    cron_anterior = None
     with open(dirs["dados"] / "instalacao.lock", "a") as trava:
         fcntl.flock(trava, fcntl.LOCK_EX | fcntl.LOCK_NB)
         try:
@@ -380,14 +381,9 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
                           env=_ambiente(dirs["conf"]))
                 _cgi(dirs["web"] / "api.pse", dirs["conf"], "/health/ready", usuario=usuario_web)
             if cron and not laboratorio:
-                atual = auditoria.ler_crontab()
-                (backup / "crontab-anterior.txt").write_text(atual)
-                esperado = _cron_tick(atual, wrapper)
-                _executar(["crontab", "-"], input=esperado)
-                if auditoria.ler_crontab() != esperado:
-                    raise RuntimeError("Crontab gravado diverge do esperado.")
-                if atual != esperado:
-                    observacoes.append("Cron do coletor e da fila ajustado para uma passada independente por minuto; outras rotinas preservadas.")
+                from .raiz_web import _transferir_crons
+                cron_anterior = _transferir_crons(backup, dirs["codigo"].parent, dirs["web"], usuario_web, dirs["conf"])
+                observacoes.append("Coleta e fila transferidas do root para o crontab de " + usuario_web + "; outras rotinas preservadas.")
             relatorio = _diagnosticar(origem, dirs, usuario_web, laboratorio, cron, final=True)
             relatorio["backup"] = str(backup)
             relatorio["observacoes"] = list(observacoes)
@@ -414,8 +410,9 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
             if nginx_alterado:
                 _executar(["nginx", "-t"])
                 _executar(["systemctl", "reload", "nginx"])
-            if not laboratorio and (backup / "crontab-anterior.txt").is_file():
-                _recuperar_cron(backup / "crontab-anterior.txt", wrapper)
+            if not laboratorio and cron_anterior is not None:
+                for nome in cron_anterior:
+                    _recuperar_cron(backup / ("crontab-" + nome + "-anterior.txt"), wrapper, nome)
             observacoes.append("Falha: arquivos anteriores recuperados; banco preservado. Pastas preparadas podem permanecer.")
             relatorio = relatorio or {"sucesso": False, "erro": str(exc), "backup": str(backup)}
             relatorio.update(observacoes=list(observacoes), recuperacao_automatica=True)
@@ -625,7 +622,7 @@ def _instalar(args, observacoes):
     dirs = _validar_layout(origem, args.conf.absolute(), lab)
     atualizacoes.evento("layout.validado", destinos={k: str(v) for k, v in dirs.items()})
     if args.restaurar:
-        return _recuperar(args.restaurar, dirs, lab)
+        return _recuperar(args.restaurar, dirs, lab, args.usuario_web)
     print(json.dumps({"acao": "aplicar" if args.aplicar else "simular",
                       "destinos": {k: str(v) for k, v in dirs.items()},
                       "usuario_web": args.usuario_web,
@@ -687,7 +684,7 @@ def _esquema_compativel_com_backup(backup, banco):
     return True
 
 
-def _recuperar(backup, dirs, laboratorio):
+def _recuperar(backup, dirs, laboratorio, usuario_web="www-data"):
     if not laboratorio and os.geteuid() != 0:
         raise RuntimeError("Execute a recuperacao como root.")
     backup = backup.resolve(strict=True)
@@ -718,18 +715,23 @@ def _recuperar(backup, dirs, laboratorio):
         cron_antigo = backup / "crontab-anterior.txt"
         if not laboratorio and cron_antigo.is_file():
             _recuperar_cron(cron_antigo, dirs["codigo"].parent / "radar-tick.sh")
+        if not laboratorio:
+            for nome in ('root', usuario_web):
+                arquivo = backup / ('crontab-' + nome + '-anterior.txt')
+                if arquivo.is_file():
+                    _recuperar_cron(arquivo, dirs["codigo"].parent / "radar-tick.sh", nome)
     print("Codigo, paginas, wrappers e configuracao restaurados. Banco atual preservado. Backup: " + str(backup))
     return 0
 
 
-def _recuperar_cron(cron_antigo, wrapper):
-    atual = auditoria.ler_crontab()
+def _recuperar_cron(cron_antigo, wrapper, usuario="root"):
+    atual = auditoria.ler_crontab(usuario)
     # Recupera somente a linha do coletor, preservando outros projetos.
     def chama_tick(linha):
         return auditoria.comando_coletor(linha, wrapper) or auditoria.comando_fila(linha)
     linhas = [l for l in atual.splitlines() if not chama_tick(l)]
     linhas.extend(l for l in cron_antigo.read_text().splitlines() if chama_tick(l))
-    _executar(["crontab", "-"], input="\n".join(linhas) + "\n")
+    _executar(["crontab", "-u", usuario, "-"], input="\n".join(linhas) + "\n")
 
 
 def _preparar_servicos(observacoes=None):
@@ -782,14 +784,8 @@ def _diagnosticar(origem, dirs, usuario_web, laboratorio, cron, final=False):
     checagens.append({"checagem": "diretorios", "estado": "erro" if final and pastas else "atualizar" if pastas else "ok",
                       "detalhe": "Criar/ajustar: " + ", ".join(pastas) if pastas else "pastas operacionais e permissoes corretas"})
     if cron and not laboratorio and shutil.which("crontab"):
-        atual = auditoria.ler_crontab()
-        esperado = _cron_tick(atual, dirs["codigo"].parent / "radar-tick.sh")
-        checagens.append({"checagem": "cron.coletor", "estado": "ok" if atual == esperado else "erro" if final else "atualizar",
-                          "detalhe": "coletor e fila independentes, uma passada por minuto; rotinas externas preservadas"})
-        fila_esperada = "* * * * * " + shlex.quote(str(dirs["codigo"].parent / "radar-api.pse")) + " cron fila"
-        linhas_fila = [l for l in atual.splitlines() if auditoria.comando_fila(l)]
-        checagens.append({"checagem":"cron.fila", "estado":"ok" if linhas_fila == [fila_esperada] else "erro" if final else "atualizar",
-                          "detalhe":"processamento de cadastros independente da coleta, uma passada por minuto"})
+        from .raiz_web import _checagens_cron
+        checagens.extend(_checagens_cron(dirs["codigo"].parent, dirs["web"], usuario_web, dirs["conf"], final))
     if final:
         api = dirs["web"] / "api.pse"
         try:

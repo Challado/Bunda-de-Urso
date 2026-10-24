@@ -85,7 +85,7 @@ def ler_crontab(usuario=None):
         return res.stdout
     if res.returncode == 1 and "no crontab for" in res.stderr.lower():
         return ""
-    raise RuntimeError("Nao foi possivel ler o crontab de root; nenhuma linha deve ser sobrescrita.")
+    raise RuntimeError("Nao foi possivel ler o crontab de " + (usuario or "root") + "; nenhuma linha deve ser sobrescrita.")
 
 
 def fixar_conf(texto, conf):
