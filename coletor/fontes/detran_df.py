@@ -56,6 +56,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from core import caminhos
 
 from coletor import http
 from coletor.base import ColetorBase
@@ -179,7 +180,7 @@ class ColetorDetranDF(ColetorBase):
                 "WAF F5 desta fonte exige navegador e nao ha Chromium/Chrome "
                 "headless instalado (instale 'chromium'): %s" % dados_url)
         lista = dados_url.rsplit("/", 1)[0] + "/index.html"
-        with tempfile.TemporaryDirectory(prefix="detran_df_") as perfil:
+        with tempfile.TemporaryDirectory(prefix="detran_df_", dir=caminhos.temporarios()) as perfil:
             _dump_dom(navegador, lista, perfil)          # passo 1: sessao F5
             bruto = _dump_dom(navegador, dados_url, perfil)   # passo 2: dados
         texto = _texto_do_pre(bruto)

@@ -2,13 +2,15 @@
 """Parametros do Radar Brasil.
 
 Caminhos NAO sao decididos aqui: vem da porta unica ``core.caminhos``
-(ambiente -> /etc/radar-brasil/radar.conf -> padrao do checkout). Este modulo
+(arquivo selecionado por RADAR_CONF/constante -> padroes documentados). Este modulo
 apenas reexporta o que o resto do codigo ja conhece e guarda os parametros que
 nao sao caminho. Nada depende de rede em tempo de requisicao da API.
 """
 import os
 
 from core import caminhos
+
+caminhos.validar_operacionais()
 
 # Raiz do repositorio = diretorio pai de core/
 ROOT = caminhos.ROOT
@@ -34,30 +36,16 @@ DEFAULT_LIMITE = 100
 MIN_LIMITE = 1
 MAX_LIMITE = 1000
 
-# Ingestao (escrita) via API: token NUNCA no codigo. Resolvido, nesta ordem:
-#   1. variavel de ambiente RADAR_API_TOKEN;
-#   2. arquivo indicado por RADAR_API_TOKEN_FILE;
-#   3. arquivo padrao /etc/radar-brasil/api_token (se existir).
-# Sem token configurado a escrita fica DESABILITADA e a API responde 401.
-API_TOKEN_ENV = "RADAR_API_TOKEN"
-API_TOKEN_FILE_ENV = "RADAR_API_TOKEN_FILE"
+# Credencial de ingestao: somente o arquivo configurado, dentro de dados.dir.
 API_TOKEN_FILE_PADRAO = caminhos.token_arquivo()
 
 
 def token_ingestao():
-    """Token de escrita configurado (env -> arquivo), ou "" se nao houver."""
-    tok = (os.environ.get(API_TOKEN_ENV) or "").strip()
-    if tok:
-        return tok
-    for caminho in [caminhos.token_arquivo()]:
-        try:
-            with open(caminho, "r", encoding="utf-8") as f:
-                texto = f.read().strip()
-        except OSError:
-            continue
-        if texto:
-            return texto
-    return ""
+    try:
+        with open(caminhos.token_arquivo(), "r", encoding="utf-8") as entrada:
+            return entrada.read().strip()
+    except OSError:
+        return ""
 
 
 # Ingestao via API: tamanho maximo do corpo aceito (protege o CGI).

@@ -1,90 +1,87 @@
-# Instalação com configuração na raiz
+# Configuração e instalação do Radar Brasil
 
-A primeira etapa reúne código, páginas, configuração, dados e logs na raiz web
-que já está declarada em `[web] raiz` do `radar.conf` existente. O código não
-contém o caminho de instalação do servidor. O arquivo de exemplo usa caminhos
-relativos; ele não deve substituir a configuração de uma base existente.
+A API seleciona **um único arquivo**: `RADAR_CONF`, quando informada, ou a
+constante `CONF_PADRAO` da entrada. Na instalação, o padrão é o `radar.conf`
+ao lado de `api.pse`. Não procura automaticamente outro arquivo e não aceita
+sobreposição de valores por `RADAR_DB`, `RADAR_DATA_DIR`, `RADAR_LOG_DIR`,
+`OLLAMA_URL` ou outras variáveis antigas. Credenciais vêm dos arquivos locais.
 
-No repositório privado atualizado, execute como root, sem sudo:
+## Raiz dos dados
 
-```sh
-bash instalar-servidor3.sh --migrar-raiz-web             # simula
-bash instalar-servidor3.sh --migrar-raiz-web --aplicar  # migra
+```ini
+[instalacao]
+home = /caminho/da/aplicacao
+
+[dados]
+dir = /caminho/da/aplicacao/dados
+banco = radar.sqlite3
+
+[web]
+raiz = /caminho/da/aplicacao
+url = /prefixo/publico/
+origem = https://exemplo.invalid
+
+[logs]
+dir = logs
+
+[api]
+token_arquivo = api_token
+
+[assistente]
+habilitado = 0
+chave_arquivo = assistente_chave
 ```
 
-Se necessário, acrescente `--conf /caminho/ao/radar.conf` para selecionar a
-configuração de origem. Sem override, o shell procura junto ao próprio script,
-no diretório atual e, para instalações anteriores, no local legado em `/etc`.
-Ele baixa o código público atual e executa a instalação pela API local.
+Os caminhos de implantação acima são exemplos, nunca valores fixados no código.
+`dados.dir` relativo resolve contra a pasta do arquivo de configuração. Banco,
+logs, tokens, chaves, cache, fila, malha, clone local e temporários resolvem
+**dentro de `dados.dir`**. Caminhos que escapem dessa raiz, inclusive por links
+simbólicos, são rejeitados. A API de configuração aceita para `banco` somente
+um nome de arquivo e não move a base quando um caminho é editado.
 
-## Resultado
+Código, páginas e o próprio `radar.conf` ficam na raiz da aplicação. Auxiliares
+da configuração (lock, backup e auditoria) ficam em `dados.dir/configuracao`.
+O editor consolida seções repetidas e preserva comentários e opções existentes.
+Não há `usuario` ou `grupo` no arquivo: a execução usa a identidade do processo.
 
-```text
-<web.raiz>/
-  radar.conf
-  api.pse
-  *.html, *.css, *.js, projeto.json
-  core/, coletor/, web/, sql/, config/, deploy/, tools/
-  dados/
-    radar.sqlite3
-    raw/, staging/, calibracao/, fila-cadastros/
-    segredos/api_token, segredos/assistente_chave
-    atualizacoes/status.json
-  logs/
-  status-atualizacoes.json -> dados/atualizacoes/status.json
-```
+## Atualizar o servidor
 
-A configuração efetiva torna-se um arquivo regular na raiz, com `home = .`,
-`web.raiz = .`, `dados.dir = dados`, `dados.banco = dados/radar.sqlite3` e
-`logs.dir = logs`. As opções e comentários existentes são preservados; limites
-ausentes recebem os padrões da aplicação. A IA continua opcional. Chaves ficam
-em arquivos separados na pasta privada de segredos. O ambiente explícito ainda
-tem precedência; o instalador limpa overrides de caminhos ao chamar a API.
-
-O aplicativo e seus dados ficam com o usuário CGI (`www-data` por padrão).
-Pastas usam 2770, arquivos 0660 e a entrada executável 0770. O painel continua
-salvando a configuração pela API, agora no arquivo local. Os caminhos são
-relativos **à pasta do radar.conf**, nunca ao diretório do terminal.
-
-## O que o script faz
-
-- Valida o banco existente, impede sobrescrever duas bases divergentes e mantém
-  as origens antigas. Não cria uma base vazia para substituir a produção.
-- Instala bloqueios nginx para configuração e auxiliares, dados, logs e fontes
-  internos. Valida sintaxe, recarrega e testa por HTTP com arquivos de prova,
-  antes de copiar dados privados. Exige `[web] origem` ou `--origem-http`.
-- Pausa as entradas gerenciadas, aguarda as travas de coleta e fila, faz backup
-  SQLite consistente (incluindo dados em WAL), copia fila/cache/segredos/logs e
-  ajusta referências dos artefatos ao novo cache. IDs e decisões são preservados.
-- Copia somente fontes/assets gerenciados; nunca troca/apaga a raiz inteira.
-- Executa migrações e checagens pela API, como o usuário CGI. O nginx mantém o
-  handler CGI existente. Não cria serviço root nem cron de atualização.
-- Ajusta cron de coleta/fila para baixar privilégios com `runuser` antes de
-  carregar fontes graváveis pelo CGI. Entradas antigas recebem encaminhadores
-  de compatibilidade com a mesma queda de privilégios. Outras rotinas são
-  preservadas, inclusive sincronizadores específicos do servidor.
-- Cria ou atualiza logrotate com a pasta de logs e usuário da configuração.
-- Registra JSON da checagem, backup e logs. O shell continua executando o
-  reprocessamento das fontes corrigidas depois da instalação.
-
-Backups anteriores ficam na origem; não são duplicados junto à base migrada.
-A migração registra o backup em `<dados de origem>/backups/raiz-web/<data>/`.
-Há recuperação de arquivos/configuração para falhas anteriores à publicação.
-Depois de liberar a API nova, preserva a instalação e a base para não perder
-novos envios; uma reprovação fica no relatório e deve ser corrigida por uma
-reaplicação. Nunca restaura automaticamente um banco antigo sobre dados novos.
-
-## Próximas execuções
+No checkout privado, como root, sem sudo:
 
 ```sh
+git pull --ff-only
 bash instalar-servidor3.sh --aplicar
-bash instalar-servidor3.sh --verificar
 ```
 
-O shell reconhece o arquivo da raiz a partir da configuração antiga. Também é
-possível indicar diretamente `--conf /caminho/da/raiz/radar.conf`. O instalador
-antigo não será usado para substituir a árvore contendo a base.
+Para a primeira migração da instalação antiga, acrescente `--migrar-raiz-web`.
+`--conf ARQUIVO` escolhe a configuração de origem explicitamente. `--verificar`
+confere a instalação. A preparação do sistema operacional continua local; não
+existe serviço root ou cron de atualização remota.
 
-Essa etapa prepara a execução e escrita como www-data. O acionamento remoto
-de `updater.psp` ainda depende da implementação descrita em
-[PROPOSTA_UPDATER.md](PROPOSTA_UPDATER.md).
+O instalador baixa o código público e executa a instalação pela API local. Ele
+protege configuração e pastas privadas no nginx, testa os bloqueios por HTTP,
+pausa as entradas, aguarda os coletores e faz backup SQLite consistente.
+
+Se o banco **já estiver em `dados.dir`**, ele é usado nesse local: não é trocado
+por uma base vazia ou uma cópia antiga. IDs, decisões e fila são preservados.
+Logs, tokens, chaves e caches legados são migrados para a raiz de dados, e os
+caminhos dos artefatos são corrigidos. A leitura de destinos antigos só existe
+no contexto da migração local; nunca é liberada por variável de ambiente ou HTTP.
+
+Os agendamentos de coleta e processamento da fila são transferidos do crontab
+do root para o crontab do **www-data**. Jobs de outros sistemas são preservados
+nos dois crontabs. O cron executa a API como seu próprio usuário, sem selecionar
+identidade por configuração. O instalador prepara permissões para o usuário CGI,
+atualiza logrotate e testa a API com essa identidade. Logrotate usa o proprietário
+e grupo reais da pasta de logs, sem campos de identidade no `radar.conf`.
+
+Relatórios e logs ficam em `dados.dir/atualizacoes` e `dados.dir/logs` (ou na
+subpasta de logs configurada). `status-atualizacoes.json` publica o consolidado
+pelo link conhecido. Backups anteriores permanecem nas origens para recuperação.
+Falhas anteriores à publicação recuperam arquivos/configuração; depois de
+publicar a API, a instalação nova é preservada para não perder envios recebidos.
+Consulte o relatório e reaplique após corrigir a causa. Nunca há restauração
+automática de um banco antigo sobre dados novos.
+
+O acionamento remoto de `updater.psp` continua descrito em
+[PROPOSTA_UPDATER.md](PROPOSTA_UPDATER.md); esta etapa prepara a instalação.

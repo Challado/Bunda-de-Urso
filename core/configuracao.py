@@ -114,6 +114,8 @@ def _validar(valores):
             _erro(422, "valor_invalido", "Use texto de uma linha, ate 2048 caracteres.")
         if texto != texto.strip() or '"' in texto or "'" in texto:
             _erro(422, "valor_invalido", "Nao use aspas ou espacos nas extremidades.")
+        if par == ("dados", "banco") and texto and not caminhos._LEGADO.get() and (Path(texto).name != texto or "\\" in texto or texto in (".", "..")):
+            _erro(422, "caminho_invalido", "dados.banco aceita somente o nome do arquivo dentro de dados.dir.")
         if texto and par in NUMEROS:
             minimo, maximo = NUMEROS[par]
             if not texto.isdecimal() or not minimo <= int(texto) <= maximo:
@@ -148,68 +150,95 @@ def _validar(valores):
 
 
 def _editar(texto, alteracoes):
-    """Preserva comentarios e valores existentes; acrescenta somente o pedido."""
-    pendentes = dict(alteracoes)
-    linhas, secao = [], None
-    for linha in texto.splitlines(keepends=True):
+    """Uma secao por nome, ultima chave prevalece, comentarios preservados."""
+    secoes, inicio, secao = {}, [], None
+    for linha in texto.splitlines():
         limpo = linha.strip()
         if limpo.startswith("[") and limpo.endswith("]"):
             secao = limpo[1:-1].strip().lower()
+            secoes.setdefault(secao, {"comentarios": [], "valores": {}})
+        elif secao is None:
+            inicio.append(linha)
         elif limpo and not limpo.startswith(("#", ";")) and "=" in limpo:
-            chave = limpo.split("=", 1)[0].strip().lower()
-            par = secao, chave
-            if par in pendentes:
-                linha = "%s = %s\n" % (chave, pendentes.pop(par))
-        linhas.append(linha)
-    for secao in caminhos.SECOES:
-        novos = [(chave, valor) for (s, chave), valor in pendentes.items() if s == secao]
-        if novos:
-            linhas.append("\n[%s]\n" % secao)
-            linhas.extend("%s = %s\n" % item for item in novos)
-    return "".join(linhas)
+            chave, valor = limpo.split("=", 1)
+            chave = chave.strip().lower()
+            if (secao, chave) not in (("instalacao", "usuario"), ("instalacao", "grupo")):
+                secoes[secao]["valores"][chave] = valor.strip()
+        elif limpo:
+            secoes[secao]["comentarios"].append(linha)
+    for (secao, chave), valor in alteracoes.items():
+        if (secao, chave) in (("instalacao", "usuario"), ("instalacao", "grupo")):
+            continue
+        secoes.setdefault(secao, {"comentarios": [], "valores": {}})["valores"][chave] = valor
+    while inicio and not inicio[-1].strip():
+        inicio.pop()
+    linhas = inicio
+    for secao, itens in secoes.items():
+        if linhas:
+            linhas.append("")
+        linhas.extend(("[" + secao + "]", *itens["comentarios"]))
+        linhas.extend((chave + " = " + str(valor)).rstrip() for chave, valor in itens["valores"].items())
+    return "\n".join(linhas).rstrip() + "\n"
 
 
 def _validar_destinos(alteracoes):
-    # Evita perder o acesso por uma edicao acidental. Nunca cria/move o banco.
-    consultas = {("instalacao", "home"): caminhos.home,
-                 ("dados", "dir"): caminhos.data_dir,
-                 ("dados", "banco"): caminhos.banco,
-                 ("web", "raiz"): caminhos.web_raiz,
-                 ("logs", "dir"): caminhos.log_dir}
-    efetivos = {par: alteracoes.get(par) or obter() for par, obter in consultas.items()}
-    existentes = caminhos._ler_conf()[0]
-    if ("dados", "dir") in alteracoes and not alteracoes[("dados", "dir")]:
-        efetivos[("dados", "dir")] = os.path.join(caminhos.ROOT, "dados")
-    if (("dados", "banco") in alteracoes and not alteracoes[("dados", "banco")]) or (
-            ("dados", "dir") in alteracoes and not existentes.get(("dados", "banco")) and
-            ("dados", "banco") not in alteracoes):
-        efetivos[("dados", "banco")] = os.path.join(efetivos[("dados", "dir")], "radar.sqlite3")
-    efetivos[("api", "token_arquivo")] = alteracoes.get(("api", "token_arquivo")) or caminhos.token_arquivo()
-    for par, texto in efetivos.items():
-        if par not in alteracoes and not (par == ("dados", "banco") and ("dados", "dir") in alteracoes):
+    # Valida a configuracao proposta antes de tocar no arquivo ou nos dados.
+    dados = alteracoes.get(("dados", "dir")) or caminhos.data_dir()
+    dados = Path(caminhos._absoluto(dados, caminhos.conf_path())).resolve()
+    operacionais = {("dados", "banco"): "radar.sqlite3", ("logs", "dir"): "logs",
+                    ("api", "token_arquivo"): "api_token", ("assistente", "chave_arquivo"): "assistente_chave",
+                    ("geografia", "malha"): "", ("sincronizacao", "clone"): ""}
+    # Conferir tambem valores que nao foram editados: mudar dados.dir nao pode
+    # deixar um token/log/malha absoluto apontando para a antiga raiz.
+    for par, padrao in operacionais.items():
+        texto = alteracoes.get(par, caminhos.valor(*par, padrao)[0]) or padrao
+        if not texto:
             continue
-        destino = Path(caminhos._absoluto(texto, caminhos.conf_path()))
-        if not destino.exists():
-            _erro(422, "destino_ausente", "%s.%s: prepare o destino no servidor antes de salvar." % par)
+        try:
+            token = caminhos._LEGADO.set(False)
+            try:
+                caminhos.dentro_dados(texto, ".".join(par), base=dados)
+            finally:
+                caminhos._LEGADO.reset(token)
+        except ValueError as exc:
+            _erro(422, "destino_fora_dados", str(exc))
+    especiais = {("instalacao", "home"): caminhos.home, ("web", "raiz"): caminhos.web_raiz}
+    for par, valor in alteracoes.items():
+        if par not in CAMINHOS:
+            continue
+        if par == ("dados", "dir"):
+            destino = dados
+        elif par in especiais:
+            if not valor:
+                _erro(422, "destino_invalido", "O destino do codigo/site nao pode ser apagado.")
+            destino = Path(caminhos._absoluto(valor, caminhos.conf_path()))
+        else:
+            if not valor:
+                continue
+            if par == ("dados", "banco") and (Path(valor).name != valor or "\\" in valor or valor in (".", "..")):
+                _erro(422, "caminho_invalido", "dados.banco deve conter apenas o nome do arquivo.")
+            try:
+                # A API de configuracao sempre aplica as regras estritas, mesmo
+                # quando chamada por uma ferramenta local de manutencao.
+                token = caminhos._LEGADO.set(False)
+                try:
+                    destino = Path(caminhos.dentro_dados(valor, ".".join(par), base=dados))
+                finally:
+                    caminhos._LEGADO.reset(token)
+            except ValueError as exc:
+                _erro(422, "destino_fora_dados", str(exc))
+        if par != ("dados", "banco") and not destino.exists():
+            _erro(422, "destino_ausente", ".".join(par) + ": prepare o destino antes de salvar.")
         if par == ("dados", "banco") and not destino.is_file():
-            _erro(422, "destino_invalido", "O banco deve ser um arquivo existente.")
-        if par in (("dados", "dir"), ("web", "raiz"), ("logs", "dir")) and not destino.is_dir():
-            _erro(422, "destino_invalido", "O destino deve ser um diretorio existente.")
-        if par == ("instalacao", "home") and not (destino / "core" / "entrada_api.py").is_file():
-            _erro(422, "destino_invalido", "O destino do codigo deve conter core/entrada_api.py.")
+            _erro(422, "destino_ausente", "O banco deve existir dentro de dados.dir; a configuracao nao move arquivos.")
+        if par == ("instalacao", "home") and not (destino / "core/entrada_api.py").is_file():
+            _erro(422, "destino_invalido", "O codigo deve conter core/entrada_api.py.")
         if par == ("web", "raiz") and not (destino / "api.pse").is_file():
-            _erro(422, "destino_invalido", "O webroot deve conter api.pse.")
-    web = Path(caminhos._absoluto(efetivos[("web", "raiz")], caminhos.conf_path())).resolve()
-    local = (Path(caminhos.conf_path()).absolute() == web / "radar.conf" and
-             Path(caminhos.home()).resolve() == web)
-    for par in (("dados", "dir"), ("dados", "banco"), ("api", "token_arquivo")):
-        texto = efetivos.get(par, caminhos.token_arquivo())
-        destino = Path(caminhos._absoluto(texto, caminhos.conf_path())).resolve()
-        privado = any(destino.is_relative_to(web / pasta) for pasta in ("dados", "logs"))
-        if destino.is_relative_to(web) and not (local and privado):
-            _erro(422, "destino_publico", "Dados e segredos devem ficar fora do webroot.")
-    if ("instalacao", "home") in alteracoes and not alteracoes[("instalacao", "home")]:
-        _erro(422, "destino_invalido", "O caminho do codigo nao pode ser apagado pelo painel.")
+            _erro(422, "destino_invalido", "O site deve conter api.pse.")
+    if ("dados", "dir") in alteracoes:
+        nome = alteracoes.get(("dados", "banco")) or Path(caminhos.banco()).name
+        if not (dados / nome).is_file():
+            _erro(422, "destino_ausente", "O banco deve estar no novo dados.dir antes de salvar.")
 
 
 def salvar(dados, autor="local", web=False):
@@ -233,7 +262,9 @@ def salvar(dados, autor="local", web=False):
     arq = _arquivo(web)
     try:
         # Lock persistente: jamais remover, pois isso criaria travas independentes.
-        fd = os.open(str(arq) + ".lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o660)
+        auxiliares = Path(caminhos.dentro_dados("configuracao", "configuracao"))
+        auxiliares.mkdir(parents=True, exist_ok=True)
+        fd = os.open(auxiliares / "radar.conf.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o660)
         with os.fdopen(fd, "a") as trava:
             _permissao_auxiliar(trava.fileno(), arq.stat().st_gid)
             fcntl.flock(trava, fcntl.LOCK_EX)
@@ -259,7 +290,7 @@ def salvar(dados, autor="local", web=False):
                     saida.write(novo)
                     saida.flush()
                     os.fsync(saida.fileno())
-                backup = arq.with_name("radar.conf.anterior")
+                backup = auxiliares / "radar.conf.anterior"
                 if backup.is_symlink():
                     _erro(422, "configuracao_invalida", "Backup nao pode ser link simbolico.")
                 # Backup e metadados da alteracao nao ficam no webroot.
@@ -273,7 +304,7 @@ def salvar(dados, autor="local", web=False):
                              "autor": autor, "revisao_anterior": dados["revisao"],
                              "revisao_nova": _revisao(novo),
                              "chaves": sorted(dados["alteracoes"])}
-                fd_a = os.open(str(arq) + ".auditoria.jsonl", os.O_CREAT | os.O_APPEND | os.O_WRONLY | os.O_NOFOLLOW, 0o660)
+                fd_a = os.open(auxiliares / "radar.conf.auditoria.jsonl", os.O_CREAT | os.O_APPEND | os.O_WRONLY | os.O_NOFOLLOW, 0o660)
                 with os.fdopen(fd_a, "a", encoding="utf-8") as registro:
                     _permissao_auxiliar(registro.fileno(), info.st_gid)
                     registro.write(json.dumps(auditoria, ensure_ascii=False) + "\n")

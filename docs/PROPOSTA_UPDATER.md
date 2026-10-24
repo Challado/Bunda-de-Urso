@@ -78,7 +78,7 @@ por `radar.conf` e `core.caminhos`.
 ```
 
 O `radar.conf` fica junto aos scripts. `home = .`, `web.raiz = .`,
-`dados.dir = dados`, `dados.banco = dados/radar.sqlite3` e `logs.dir = logs`.
+`dados.dir = dados`, `dados.banco = radar.sqlite3` e `logs.dir = logs` (dentro de `dados.dir`).
 Todo caminho relativo se resolve contra a pasta do arquivo, independentemente
 do diretório atual do processo. A instalação não substitui essa raiz inteira.
 A preparação root está em [MIGRACAO_RAIZ_WEB.md](MIGRACAO_RAIZ_WEB.md):

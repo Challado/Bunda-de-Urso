@@ -22,22 +22,11 @@ def ativo(funcao=None):
 
 
 def arquivo_chave():
-    valor = caminhos.valor("assistente", "chave_arquivo")[0]
-    base = Path(caminhos.conf_path()).absolute().parent
-    if base == Path(caminhos.home()).resolve() == Path(caminhos.web_raiz()).resolve():
-        base = Path(caminhos.data_dir()) / "segredos"
-    arq = Path(caminhos.caminho("assistente", "chave_arquivo")) if valor else base / "assistente_chave"
+    arq = Path(caminhos.caminho("assistente", "chave_arquivo", "assistente_chave"))
     protegidos = {Path(caminhos.conf_path()).resolve(), Path(caminhos.banco()).resolve(),
                   Path(caminhos.token_arquivo()).resolve()}
-    web = Path(caminhos.web_raiz()).resolve()
-    local = Path(caminhos.conf_path()).absolute() == web / "radar.conf" and Path(caminhos.home()).resolve() == web
-    privado = (local and Path(caminhos.data_dir()).resolve().is_relative_to(web / "dados")
-               and arq.resolve().is_relative_to(Path(caminhos.data_dir()).resolve() / "segredos"))
-    if (not arq.is_absolute() or arq.resolve() in protegidos or
-            (arq.resolve().is_relative_to(web) and not privado) or
-            (arq.resolve().is_relative_to(Path(caminhos.home()).resolve()) and not privado) or
-            arq.name.startswith("radar.conf")):
-        raise GovernancaError(422, "chave_invalida", "A chave deve ficar em arquivo privado, separado de fontes e configuracao.")
+    if arq.resolve() in protegidos or arq.name.startswith("radar.conf"):
+        raise GovernancaError(422, "chave_invalida", "A chave deve ficar em arquivo separado dentro de dados.dir.")
     return arq
 
 
@@ -49,8 +38,8 @@ def status():
     return {"habilitado": ativo(), "provedor": caminhos.valor("assistente", "provedor")[0],
             "modelo": caminhos.valor("assistente", "modelo")[0],
             "url": caminhos.valor("assistente", "url")[0],
-            "chave_configurada": bool(os.environ.get("RADAR_IA_API_KEY")) or presente,
-            "chave_por_ambiente": bool(os.environ.get("RADAR_IA_API_KEY")),
+            "chave_configurada": presente,
+            "chave_por_ambiente": False,
             "funcoes": {f: ativo(f) for f in FUNCOES}, "alternativa_sem_ia": True}
 
 
@@ -64,8 +53,6 @@ def salvar_chave(dados):
 def _salvar_chave(dados):
     if not isinstance(dados, dict) or set(dados) not in ({"chave"}, {"remover"}):
         raise GovernancaError(422, "chave_invalida", "Informe a chave ou remover=true.")
-    if os.environ.get("RADAR_IA_API_KEY"):
-        raise GovernancaError(409, "chave_por_ambiente", "A chave esta configurada no ambiente do servidor.")
     arq = arquivo_chave()
     if arq.is_symlink() or arq.exists() and not arq.is_file():
         raise GovernancaError(422, "chave_invalida", "O arquivo da chave deve ser regular.")
@@ -77,13 +64,12 @@ def _salvar_chave(dados):
         chave = dados["chave"]
         if not isinstance(chave, str) or not 8 <= len(chave) <= 4096 or any(not 33 <= ord(c) <= 126 for c in chave):
             raise GovernancaError(422, "chave_invalida", "Use uma chave de 8..4096 caracteres, sem espacos ou quebras de linha.")
-        if not arq.parent.is_dir():
-            raise GovernancaError(422, "chave_invalida", "Prepare o diretorio da chave no servidor.")
+        arq.parent.mkdir(parents=True, exist_ok=True, mode=0o770)
         fd, tmp = tempfile.mkstemp(prefix=".chave-ia-", dir=arq.parent)
         try:
             with os.fdopen(fd, "w") as saida:
                 os.fchmod(saida.fileno(), 0o660)
-                os.fchown(saida.fileno(), -1, Path(caminhos.conf_path()).stat().st_gid)
+                os.fchown(saida.fileno(), -1, os.getegid())
                 saida.write(chave)
                 saida.flush()
                 os.fsync(saida.fileno())
@@ -94,14 +80,12 @@ def _salvar_chave(dados):
 
 
 def _chave():
-    chave = (os.environ.get("RADAR_IA_API_KEY") or "").strip()
-    if not chave:
-        arq = arquivo_chave()
-        fd = os.open(arq, os.O_RDONLY | os.O_NOFOLLOW)
-        with os.fdopen(fd, "r") as entrada:
-            if not stat.S_ISREG(os.fstat(entrada.fileno()).st_mode):
-                return ""
-            chave = entrada.read(4097).strip()
+    arq = arquivo_chave()
+    fd = os.open(arq, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(fd, "r") as entrada:
+        if not stat.S_ISREG(os.fstat(entrada.fileno()).st_mode):
+            return ""
+        chave = entrada.read(4097).strip()
     return chave if 8 <= len(chave) <= 4096 and all(33 <= ord(c) <= 126 for c in chave) else ""
 
 

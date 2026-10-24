@@ -365,8 +365,7 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
                 _cgi(api, dirs["conf"], "/api/v1/ajuda")
                 _executar([sys.executable, str(api), "configuracao", "mostrar"], env=_ambiente(dirs["conf"]))
                 shutil.copy2(origem / "deploy" / "api.pse", entrada_cron)
-                entrada_cron.write_text(entrada_cron.read_text().replace("#!/usr/bin/env python3", "#!" + sys.executable, 1).replace(
-                    'CONF_PADRAO = "/etc/radar-brasil/radar.conf"', 'CONF_PADRAO = ' + repr(str(dirs["conf"])), 1))
+                entrada_cron.write_text(auditoria.bootstrap(entrada_cron.read_text(), dirs["conf"]))
                 entrada_cron.chmod(0o755)
                 shutil.copy2(origem / "deploy" / "radar-tick.sh", wrapper)
                 # O interpretador testado e fixado apenas no bootstrap do cron.
@@ -437,8 +436,7 @@ def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http=Non
         for nome in ("README.md", "LICENSE"):
             shutil.copy2(origem / nome, nova / nome)
         bootstrap_local = nova / "web" / "api.pse"
-        bootstrap_local.write_text(bootstrap_local.read_text().replace(
-            'CONF_PADRAO = "/etc/radar-brasil/radar.conf"', 'CONF_PADRAO = ' + repr(str(dirs["conf"])), 1))
+        bootstrap_local.write_text(auditoria.fixar_conf(bootstrap_local.read_text(), dirs["conf"]))
         _executar([sys.executable, "-m", "compileall", "-q", str(nova)])
         _permissoes(nova, grupo)
         versao = _executar(["git", "-C", str(origem), "rev-parse", "HEAD"]).strip()
@@ -510,8 +508,7 @@ def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http=Non
         # O .pse do deploy e o unico Python publicado no webroot.
         shutil.copy2(origem / "deploy" / "api.pse", dirs["web"] / "api.pse")
         api = dirs["web"] / "api.pse"
-        api.write_text(api.read_text().replace("#!/usr/bin/env python3", "#!" + sys.executable, 1).replace(
-            'CONF_PADRAO = "/etc/radar-brasil/radar.conf"', 'CONF_PADRAO = ' + repr(str(dirs["conf"])), 1))
+        api.write_text(auditoria.bootstrap(api.read_text(), dirs["conf"]))
         for arquivo in dirs["web"].iterdir():
             if arquivo.is_file() and arquivo.suffix in (".py", ".pyc"):
                 raise RuntimeError("Remova fontes Python antigos do webroot antes de instalar: " + arquivo.name)

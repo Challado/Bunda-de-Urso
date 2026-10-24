@@ -30,8 +30,10 @@ def main(argv=None):
             from .assistencia import main as assistir
             return assistir(argumentos[1:])
         if argumentos[:1] == ["instalacao"]:
-            from .instalacao import main as instalar
-            return instalar(argumentos[1:])
+            from . import caminhos
+            with caminhos.migracao_local():
+                from .instalacao import main as instalar
+                return instalar(argumentos[1:])
         if argumentos[:1] == ["configuracao"]:
             from .configuracao import main as configurar
             return configurar(argumentos[1:])

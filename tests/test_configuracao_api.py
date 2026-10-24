@@ -76,17 +76,17 @@ class TestConfiguracaoAPI(unittest.TestCase):
         resultado = subprocess.run([sys.executable, "-c", script, str(ROOT / "web" / "api.pse"), "configuracao", "salvar-web", "--conf", str(self.conf)],
                                   env=self.env, input=json.dumps(payload), capture_output=True, text=True, timeout=15)
         self.assertEqual(resultado.returncode, 0, resultado.stdout + resultado.stderr)
-        self.assertEqual(self.conf.with_name("radar.conf.anterior").read_bytes(), anterior)
+        self.assertEqual((self.dados / "configuracao/radar.conf.anterior").read_bytes(), anterior)
         self.assertIn("# comentario mantido", self.conf.read_text())
         self.assertEqual(self.conf.stat().st_mode & 0o777, 0o660)
         self.assertTrue((self.web / "radar.conf").is_symlink())
         self.assertEqual((self.web / "radar.conf").read_bytes(), self.conf.read_bytes())
         for sufixo in (".lock", ".anterior", ".auditoria.jsonl"):
-            self.assertEqual(Path(str(self.conf) + sufixo).stat().st_mode & 0o777, 0o660)
+            self.assertEqual((self.dados / "configuracao" / ("radar.conf" + sufixo)).stat().st_mode & 0o777, 0o660)
         verificar = subprocess.run([sys.executable, "-c", "from core import config; print(config.SUBMISSAO_LIMITE, config.API_MAX_BODY)"],
                                   cwd=ROOT, env=self.env, text=True, capture_output=True, check=True)
         self.assertEqual(verificar.stdout.strip(), "7 16384")
-        self.assertEqual(json.loads(Path(str(self.conf) + ".auditoria.jsonl").read_text())["chaves"],
+        self.assertEqual(json.loads((self.dados / "configuracao/radar.conf.auditoria.jsonl").read_text())["chaves"],
                          ["api.max_body", "governanca.submissao_limite"])
 
     def test_revisao_antiga_nao_sobrescreve_outra_edicao(self):
@@ -112,15 +112,14 @@ class TestConfiguracaoAPI(unittest.TestCase):
             with self.subTest(valores=valores):
                 with self.assertRaises(governanca.GovernancaError):
                     configuracao.salvar(self.alteracao(**valores))
-        self.assertFalse(self.conf.with_name("radar.conf.anterior").exists())
+        self.assertFalse((self.dados / "configuracao/radar.conf.anterior").exists())
 
-    def test_override_real_de_ambiente_e_explicito_e_bloqueia_gravacao_enganosa(self):
+    def test_ambiente_nao_sobrepoe_configuracao(self):
         with patch.dict(os.environ, RADAR_API_MAX_BODY="32768"):
             item = next(i for i in configuracao.consultar()["itens"] if i["chave"] == "max_body")
-            self.assertEqual(item["efetivo"], "32768")
-            with self.assertRaises(governanca.GovernancaError) as erro:
-                configuracao.salvar(self.alteracao(**{"api.max_body": "65536"}))
-        self.assertEqual(erro.exception.codigo, "configuracao_sobreposta")
+            self.assertEqual(item["efetivo"], "8388608")
+            configuracao.salvar(self.alteracao(**{"api.max_body": "65536"}))
+            self.assertEqual(caminhos.inteiro("api", "max_body"), 65536)
 
     def test_api_put_salva_pelo_link_sem_processo_externo(self):
         payload = self.alteracao(**{"governanca.submissao_limite": "10"})

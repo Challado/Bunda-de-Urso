@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """Caminhos: ninguem decide instalacao por conta propria.
 
-O codigo pergunta a ``core.caminhos`` (ambiente -> /etc/radar-brasil/radar.conf
--> padrao do checkout). Caminho absoluto de instalacao escrito na mao e o que
+O codigo pergunta a ``core.caminhos`` (RADAR_CONF ou constante -> radar.conf
+-> padroes documentados). Caminho absoluto de instalacao escrito na mao e o que
 faz um script "mudar de diretorio" sem ninguem pedir: reprova aqui.
 
 Ignorados de proposito:
@@ -51,7 +51,7 @@ def analisar(rel, texto):
             if achado:
                 problemas.append(
                     "%s:%d: caminho fixo '%s' (%s) — use core.caminhos "
-                    "ou /etc/radar-brasil/radar.conf" % (rel, numero, achado.group(0), motivo))
+                    "ou radar.conf" % (rel, numero, achado.group(0), motivo))
                 break
     return problemas
 
@@ -71,7 +71,7 @@ def main():
         except (OSError, UnicodeDecodeError):
             continue
         problemas.extend(analisar(rel, texto))
-    return terminar(problemas, "Caminhos: todos vem de core.caminhos (/etc/radar-brasil/radar.conf).")
+    return terminar(problemas, "Caminhos: core.caminhos usa somente o radar.conf selecionado.")
 
 
 if __name__ == "__main__":

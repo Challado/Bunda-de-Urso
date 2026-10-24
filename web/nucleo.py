@@ -549,8 +549,7 @@ def _rota(environ):
 def _token_escrita(environ):
     """Valida o token de escrita (cabecalho X-Api-Token).
 
-    O token NUNCA mora no codigo: vem de RADAR_API_TOKEN (ambiente), de
-    RADAR_API_TOKEN_FILE (arquivo) ou do padrao /etc/radar-brasil/api_token.
+    O token vem somente de api.token_arquivo no radar.conf, dentro de dados.dir.
     Sem token configurado a escrita fica DESABILITADA e a resposta e 401
     (falha segura). A comparacao e em tempo constante (hmac.compare_digest).
 
@@ -612,7 +611,7 @@ def _ingestao_radares(environ, stdin_bytes):
     ok, codigo = _token_escrita(environ)
     if not ok:
         msg = ("token de escrita nao configurado no servidor "
-               "(RADAR_API_TOKEN / RADAR_API_TOKEN_FILE)"
+               "(api.token_arquivo no radar.conf)"
                if codigo == "ingestao_desabilitada" else
                "token ausente ou invalido no cabecalho X-Api-Token")
         return _erro(401, codigo, msg, campo="X-Api-Token")

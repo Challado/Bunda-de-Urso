@@ -5,52 +5,45 @@ Todo caminho de instalacao (codigo, banco, dados brutos, calibracao, web, logs
 e espelho de dados) e resolvido AQUI. Nenhum modulo, conector, script de
 manutencao, entrada CGI ou arquivo de deploy decide caminho por conta propria.
 
-Ordem de resolucao, do mais forte para o mais fraco:
-
-  1. variavel de ambiente (RADAR_BRASIL_HOME, RADAR_DATA_DIR, RADAR_DB, ...);
-  2. arquivo de configuracao ``/etc/radar-brasil/radar.conf`` (ou o indicado em
-     ``RADAR_CONF``), editavel por quem administra o servidor;
-  3. padrao relativo ao proprio checkout -- assim o repositorio roda em
-     qualquer maquina (desenvolvimento, CI) sem configuracao nenhuma.
-
-O arquivo de configuracao NAO e obrigatorio: sem ele nada quebra. Com ele, a
-instalacao fica explicita, num lugar so, em vez de espalhada pelo codigo.
+Somente RADAR_CONF seleciona o arquivo; sem ela usa CONF_PADRAO junto aos
+scripts. Todos os parametros vem desse arquivo, com padroes documentados para
+chaves ausentes. Outras variaveis de ambiente nao alteram a configuracao.
+Banco, logs, cache, fila, tokens, chaves e malhas ficam dentro de dados.dir.
 
 Nunca escreva caminho absoluto de producao no codigo. Se precisar de um
 caminho, peca a esta porta. O verificador
 ``.github/scripts/verificar_caminhos.py`` reprova quem desobedecer.
 """
 import os
+from contextlib import contextmanager
+from contextvars import ContextVar
+from pathlib import Path
+
+_LEGADO = ContextVar("radar_migracao_local", default=False)
+
+
+@contextmanager
+def migracao_local():
+    """Somente o instalador local pode ler destinos antigos para migra-los."""
+    token = _LEGADO.set(True)
+    try:
+        yield
+    finally:
+        _LEGADO.reset(token)
+
 
 # Raiz do checkout = diretorio pai de core/
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-CONF_PADRAO = "/etc/radar-brasil/radar.conf"
+CONF_PADRAO = os.path.join(ROOT, "radar.conf")
 CONF_ENV = "RADAR_CONF"
 
 # (secao, chave) -> variavel de ambiente que tem precedencia.
-_ENV = {
-    ("instalacao", "home"): "RADAR_BRASIL_HOME",
-    ("dados", "dir"): "RADAR_DATA_DIR",
-    ("dados", "banco"): "RADAR_DB",
-    ("web", "raiz"): "RADAR_WEB_ROOT",
-    ("web", "url"): "RADAR_WEB_URL",
-    ("logs", "dir"): "RADAR_LOG_DIR",
-    ("sincronizacao", "clone"): "RADAR_SYNC_CLONE",
-    ("sincronizacao", "remoto"): "RADAR_SYNC_REMOTO",
-    ("api", "token_arquivo"): "RADAR_API_TOKEN_FILE",
-    ("api", "max_body"): "RADAR_API_MAX_BODY",
-    ("api", "proxies_confiaveis"): "RADAR_TRUSTED_PROXIES",
-    ("coleta", "max_bytes"): "RADAR_MAX_BYTES",
-    ("geografia", "malha"): "RADAR_MALHA",
-    ("assistente", "url"): "OLLAMA_URL",
-    ("assistente", "modelo"): "OLLAMA_MODELO",
-    ("assistente", "habilitado"): "RADAR_IA_HABILITADA",
-}
+_ENV = {}  # Somente RADAR_CONF seleciona o arquivo; valores vem do .conf.
 
 # Secoes/chaves conhecidas -- usado pelo exemplo, pelo verificador e pelo help.
 SECOES = {
-    "instalacao": ("home", "usuario", "grupo"),
+    "instalacao": ("home",),
     "dados": ("dir", "banco"),
     "web": ("raiz", "url", "origem"),
     "logs": ("dir",),
@@ -66,9 +59,6 @@ SECOES = {
                    "submissao_limite", "submissao_janela_segundos",
                    "sessao_ttl_segundos", "gov_iteracoes"),
 }
-for _nome in SECOES["governanca"]:
-    _ENV[("governanca", _nome)] = "RADAR_GOV_" + _nome.upper()
-
 # Apenas valores de instalacao. Segredos continuam em arquivos separados.
 PADROES = {
     ("web", "origem"): "",
@@ -109,11 +99,7 @@ _CACHE = {"chave": None, "valores": {}, "problemas": []}
 
 def conf_path():
     """Caminho do arquivo de configuracao em uso."""
-    explicito = (os.environ.get(CONF_ENV) or "").strip()
-    if explicito:
-        return os.path.abspath(explicito)
-    local = os.path.join(ROOT, "radar.conf")
-    return local if os.path.isfile(local) else CONF_PADRAO
+    return os.path.abspath((os.environ.get(CONF_ENV) or "").strip() or CONF_PADRAO)
 
 
 def existe_conf():
@@ -167,12 +153,12 @@ def _ler_conf():
                             "%s:%d: chave antes de qualquer secao"
                             % (caminho, numero))
                         continue
+                    if (secao, nome) in (("instalacao", "usuario"), ("instalacao", "grupo")) and _LEGADO.get():
+                        continue
                     if secao in SECOES and nome not in SECOES[secao]:
                         problemas.append(
                             "%s:%d: chave desconhecida [%s] %s"
                             % (caminho, numero, secao, nome))
-                    if not valor:
-                        continue
                     if (secao, nome) in valores:
                         problemas.append("%s:%d: chave repetida [%s] %s"
                                          % (caminho, numero, secao, nome))
@@ -208,16 +194,7 @@ def _absoluto(valor, origem):
 
 
 def valor(secao, chave, padrao="", env=None):
-    """Valor cru de (secao, chave) e de onde ele veio.
-
-    Devolve ``(valor, origem)``; ``origem`` e "ambiente (VAR)", o caminho do
-    arquivo de configuracao ou "padrao".
-    """
-    nome_env = env if env is not None else _ENV.get((secao, chave))
-    if nome_env:
-        do_ambiente = (os.environ.get(nome_env) or "").strip()
-        if do_ambiente:
-            return do_ambiente, "ambiente (%s)" % nome_env
+    """Valor do arquivo selecionado ou padrao; ambiente nao sobrepoe valores."""
     conf, _ = _ler_conf()
     do_arquivo = conf.get((secao, chave))
     if do_arquivo:
@@ -232,18 +209,37 @@ def inteiro(secao, chave):
         return int(PADROES[(secao, chave)])
 
 
+def dentro_dados(texto, secao="arquivo", base=None):
+    """Resolve dados relativos a dados.dir e impede escapes, inclusive por links."""
+    raiz = Path(base or data_dir()).resolve()
+    valor_ = os.path.expanduser(str(texto).strip())
+    candidato = Path(valor_)
+    if not candidato.is_absolute():
+        candidato = raiz / candidato
+        if _LEGADO.get():
+            anterior = Path(_base_conf()) / valor_
+            if not candidato.exists() and anterior.exists():
+                candidato = anterior
+    destino = candidato.resolve()
+    if not _LEGADO.get() and (destino == raiz or not destino.is_relative_to(raiz)):
+        raise ValueError(secao + ": o destino deve ficar dentro de [dados] dir.")
+    return str(destino)
+
+
 def token_arquivo():
-    base = _base_conf()
-    if os.path.abspath(conf_path()) == os.path.join(home(), "radar.conf") and home() == web_raiz():
-        base = os.path.join(data_dir(), "segredos")
-    return caminho("api", "token_arquivo", os.path.join(base, "api_token"))
+    return caminho("api", "token_arquivo", "api_token")
 
 
 def caminho(secao, chave, padrao="", env=None):
     """Igual a ``valor()``, porem devolvendo caminho absoluto normalizado."""
     bruto, origem = valor(secao, chave, padrao, env)
     if not bruto:
+        bruto = padrao
+    if not bruto:
         return ""
+    if (secao, chave) in {("dados", "banco"), ("logs", "dir"), ("api", "token_arquivo"),
+                          ("assistente", "chave_arquivo"), ("geografia", "malha"), ("sincronizacao", "clone")}:
+        return dentro_dados(bruto, secao + "." + chave)
     return _absoluto(bruto, origem)
 
 
@@ -262,28 +258,32 @@ def data_dir():
 
 def banco():
     """Banco SQLite de producao (ou de trabalho, sem configuracao)."""
-    padrao = os.path.join(data_dir(), "radar.sqlite3")
-    return caminho("dados", "banco", padrao)
+    bruto, _ = valor("dados", "banco", "radar.sqlite3")
+    # Aceita o caminho absoluto antigo somente se continuar dentro de dados.dir;
+    # novas gravacoes de configuracao armazenam apenas o nome do arquivo.
+    if not _LEGADO.get() and not os.path.isabs(bruto) and ("/" in bruto or "\\" in bruto or bruto in (".", "..")):
+        raise ValueError("dados.banco: informe somente o nome do arquivo dentro de dados.dir.")
+    return dentro_dados(bruto, "dados.banco")
 
 
 def bruto():
     """Cache imutavel de arquivos baixados (um por sha256)."""
-    return os.path.join(data_dir(), "raw")
+    return dentro_dados("raw", "raw")
 
 
 def staging():
     """Banco em construcao, antes da publicacao atomica."""
-    return os.path.join(data_dir(), "staging")
+    return dentro_dados("staging", "staging")
 
 
 def calibracao():
     """Ancoras km->coordenada geradas a partir do banco."""
-    return os.path.join(data_dir(), "calibracao")
+    return dentro_dados("calibracao", "calibracao")
 
 
 def log_dir():
     """Diretorio dos logs do radar (tick, dados-sync)."""
-    return caminho("logs", "dir", os.path.join(data_dir(), "log"))
+    return caminho("logs", "dir", "logs")
 
 
 def web_raiz():
@@ -337,12 +337,12 @@ def ensure_dirs():
 
 def fila_cadastros(dados_dir=None):
     """Fila fora do webroot, no diretorio de dados definido pelo radar.conf."""
-    return os.path.join(dados_dir or data_dir(), "fila-cadastros")
+    return dentro_dados("fila-cadastros", "fila", base=dados_dir)
 
 
 def status_atualizacoes():
     """Estado persistente; fica fora da arvore substituida e do webroot."""
-    return os.path.join(data_dir(), "atualizacoes", "status.json")
+    return dentro_dados("atualizacoes/status.json", "status")
 
 
 def log_atualizacoes():
@@ -351,3 +351,20 @@ def log_atualizacoes():
 
 def link_atualizacoes():
     return os.path.join(home(), "status-atualizacoes.json")
+
+
+def temporarios():
+    """Temporarios operacionais privados, inclusive perfis do navegador e OCR."""
+    pasta = dentro_dados("temporarios", "temporarios")
+    os.makedirs(pasta, mode=0o770, exist_ok=True)
+    return pasta
+
+
+def validar_operacionais():
+    """Todos os destinos de dados sao conferidos antes de atender requisicoes."""
+    banco()
+    log_dir()
+    token_arquivo()
+    caminho("assistente", "chave_arquivo", "assistente_chave")
+    caminho("geografia", "malha")
+    sync_clone()

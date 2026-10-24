@@ -82,7 +82,7 @@ def proteger_texto(texto, prefixo, webroot, origem, raiz_local=False):
                                "web", "deploy", "tools", ".git", ".github", ".updater")]
         regras.append(("^~", prefixo.rstrip("/") + "/.radar-"))
         regras += [("=", prefixo.rstrip("/") + "/" + nome)
-                   for nome in ("radar.conf.lock", "radar.conf.anterior", "radar.conf.auditoria.jsonl",
+                   for nome in ("radar.conf.lock", "radar.conf.anterior", "radar.conf.auditoria.jsonl", "api_token", "assistente_chave",
                                 "VERSAO", "README.md", "LICENSE", "arquivos-instalados.json")]
         # Reanalisa depois da insercao do bloqueio radar.conf.
         blocos, _ = _analisar(texto)

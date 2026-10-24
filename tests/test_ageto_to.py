@@ -83,6 +83,9 @@ class TestAGETO(unittest.TestCase):
             env = {k: v for k, v in os.environ.items() if k not in
                    ("REQUEST_METHOD", "GATEWAY_INTERFACE", "QUERY_STRING", "PATH_INFO")}
             env.update(RADAR_DB=str(Path(pasta) / "radar.sqlite3"), RADAR_DATA_DIR=pasta)
+            conf = Path(pasta) / "radar.conf"
+            conf.write_text("[dados]\ndir = %s\nbanco = radar.sqlite3\n" % pasta)
+            env["RADAR_CONF"] = str(conf)
             with closing(db.connect(env["RADAR_DB"])) as conn:
                 municipios_to(conn)
             comando = [sys.executable, str(ROOT / "web/api.pse"), "sync", "--fonte", "ageto_to",

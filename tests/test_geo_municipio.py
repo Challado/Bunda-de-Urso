@@ -118,16 +118,16 @@ class TestMalhaArquivo(unittest.TestCase):
                 "geometry": {"type": "Polygon", "coordinates": QUADRADO}}]}
             with open(caminho, "w", encoding="utf-8") as f:
                 json.dump(fc, f)
-            antigo = os.environ.get("RADAR_MALHA")
-            os.environ["RADAR_MALHA"] = caminho
-            try:
+            from unittest.mock import patch
+            with patch.dict(os.environ, RADAR_MALHA=caminho):
+                self.assertGreaterEqual(len(geo.carregar_malha()), 5570)
+            conf = os.path.join(tmp, "radar.conf")
+            with open(conf, "w") as entrada:
+                entrada.write("[dados]\ndir = %s\n[geografia]\nmalha = m.geojson\n" % tmp)
+            with patch.dict(os.environ, RADAR_CONF=conf):
                 m = geo.carregar_malha()
                 self.assertEqual(len(m), 1)
-            finally:
-                if antigo is None:
-                    os.environ.pop("RADAR_MALHA", None)
-                else:
-                    os.environ["RADAR_MALHA"] = antigo
+
 
 
 class TestCadastroMunicipios(unittest.TestCase):

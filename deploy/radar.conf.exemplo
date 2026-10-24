@@ -6,11 +6,13 @@
 #   LOCAL:  radar.conf na raiz da instalacao (www-data:www-data, 0660)
 #   OUTRO:  RADAR_CONF=/caminho/alternativo (util para teste)
 #
-# Precedencia: variavel de ambiente > este arquivo > padrao do checkout.
+# RADAR_CONF seleciona o arquivo. Somente este arquivo fornece os parametros.
 # Sem este arquivo nada quebra — o programa usa os diretorios do proprio
 # repositorio (bom para desenvolvimento e CI).
 #
-# Caminho relativo e resolvido contra a pasta DESTE arquivo.
+# dados.dir relativo resolve contra a pasta DESTE arquivo.
+# Banco, logs, tokens, chaves, malha e clone ficam sempre dentro de dados.dir.
+# Seus caminhos relativos resolvem contra dados.dir; escapes sao recusados.
 # Depois de editar, confira o que o programa entendeu:
 #
 #     python3 /caminho/do/codigo/web/api.pse configuracao mostrar
@@ -20,16 +22,14 @@
 # E o diretorio que o cron, o nginx e os scripts usam como referencia.
 home = .
 
-# Dono esperado do codigo e contas da rotacao de logs (diretiva su do logrotate).
-usuario = www-data
-grupo = www-data
+# A identidade vem do processo que executa o aplicativo; nao ha usuario/grupo aqui.
 
 [dados]
 # Diretorio de dados: banco, arquivos brutos (raw/), staging/ e calibracao/.
 dir = dados
 
 # Banco SQLite de producao. Vazio = <dir>/radar.sqlite3
-banco = dados/radar.sqlite3
+banco = radar.sqlite3
 
 [web]
 # Webroot servido pelo nginx/fcgiwrap (onde mora o api.pse instalado).
@@ -45,7 +45,7 @@ origem =
 dir = logs
 
 [api]
-token_arquivo = dados/segredos/api_token
+token_arquivo = api_token
 max_body = 8388608
 proxies_confiaveis =
 
@@ -77,7 +77,7 @@ url = http://127.0.0.1:11434
 modelo = gemma4:26b
 # Externo: URL base HTTPS, ex. https://api.openai.com/v1, e o modelo contratado.
 # A chave e gravada separadamente pelo painel; nunca coloque o valor neste arquivo.
-# Vazio usa assistente_chave ao lado do radar.conf. Alternativa: RADAR_IA_API_KEY.
+# Vazio usa assistente_chave dentro de dados.dir. Nao aceita chave por ambiente.
 chave_arquivo =
 timeout = 20
 max_entrada = 20000

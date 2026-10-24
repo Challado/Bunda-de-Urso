@@ -15,6 +15,7 @@ import socket
 import struct
 import subprocess
 import tempfile
+from core import caminhos
 import time
 import urllib.parse
 
@@ -254,7 +255,7 @@ def baixar_xlsx(url, timeout=None, mostrar_tabela=False):
     if not navegador:
         raise http.ErroFonte("Exportacao publica requer Chromium/Chrome; instale chromium ou use --arquivo com o XLSX exportado")
     prazo = time.monotonic() + (timeout or max(60, config.DEFAULT_TIMEOUT * 3))
-    with tempfile.TemporaryDirectory(prefix="radar-exportacao-") as pasta:
+    with tempfile.TemporaryDirectory(prefix="radar-exportacao-", dir=caminhos.temporarios()) as pasta:
         perfil, downloads = Path(pasta) / "perfil", Path(pasta) / "downloads"
         downloads.mkdir()
         cmd = [navegador, "--headless=new", "--no-sandbox", "--disable-gpu",

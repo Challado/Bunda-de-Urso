@@ -5,20 +5,15 @@
 Mesmo contrato do arquivo instalado no webroot (``deploy/api.pse``): CGI entra
 pelo despachante comum ``core.entrada_api``; no terminal abre o console.
 
-Caminho do codigo: ``RADAR_BRASIL_HOME`` ou [instalacao] home em
-``/etc/radar-brasil/radar.conf``; sem configuracao, o proprio checkout.
+RADAR_CONF seleciona o arquivo; CONF_PADRAO aponta ao radar.conf deste checkout.
+O checkout fornece o codigo novo ao instalador; parametros vem somente do arquivo.
 """
 import os
 import sys
 
-CONF_PADRAO = "/etc/radar-brasil/radar.conf"
-# Configuracao junto aos scripts; /etc permanece somente para instalacoes antigas.
-_aqui = os.path.dirname(os.path.abspath(__file__))
-_locais = (_aqui, os.path.dirname(_aqui)) if os.path.basename(_aqui) == "web" else (_aqui,)
-_local = next((os.path.join(p, "radar.conf") for p in _locais
-               if os.path.isfile(os.path.join(p, "radar.conf"))), CONF_PADRAO)
+CONF_PADRAO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "radar.conf")
 if not (os.environ.get("RADAR_CONF") or "").strip():
-    os.environ["RADAR_CONF"] = _local
+    os.environ["RADAR_CONF"] = CONF_PADRAO
 
 
 def _conf(secao, chave):
@@ -47,7 +42,7 @@ def _conf(secao, chave):
 # Ordem aqui e diferente da do arquivo instalado: este vive DENTRO do checkout,
 # entao o proprio checkout vem antes do .conf (teste/desenvolvimento nunca
 # importa, por acidente, o codigo de producao da maquina).
-_raiz = os.environ.get("RADAR_BRASIL_HOME")
+_raiz = None
 if not _raiz:
     _aqui = os.path.dirname(os.path.abspath(__file__))
     for _cand in (_aqui, os.path.dirname(_aqui)):
@@ -58,7 +53,7 @@ if not _raiz:
     _raiz = _conf("instalacao", "home")
 if not _raiz:
     sys.exit("Radar Brasil: caminho do codigo nao configurado. "
-             "Defina [instalacao] home em %s ou RADAR_BRASIL_HOME." % CONF_PADRAO)
+             "Defina [instalacao] home em %s." % CONF_PADRAO)
 
 # Bootstrap resolve somente o codigo. Dados e demais opcoes pertencem ao core.
 if not os.path.isabs(_raiz):

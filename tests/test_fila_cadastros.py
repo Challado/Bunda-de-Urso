@@ -167,7 +167,9 @@ class TestFilaCadastros(suporte.BaseGov):
 
     def test_api_local_em_outro_processo_consome_o_json(self):
         r=self.receber()
-        env={**os.environ,'RADAR_DATA_DIR':config.DATA_DIR,'RADAR_DB':config.DB_PATH}
+        conf=Path(config.DATA_DIR)/'radar.conf'
+        conf.write_text('[dados]\ndir = '+config.DATA_DIR+'\nbanco = '+Path(config.DB_PATH).name+'\n')
+        env={**os.environ,'RADAR_CONF':str(conf)}
         for k in ('REQUEST_METHOD','GATEWAY_INTERFACE'):
             env.pop(k,None)
         p=subprocess.run([sys.executable,str(Path(__file__).resolve().parents[1]/'web'/'api.pse'),'fila','processar'],

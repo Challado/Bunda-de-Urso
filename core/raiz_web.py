@@ -83,29 +83,78 @@ def _copiar_dados(origem, destino, banco):
 
 
 def _rebase_cache(banco, anterior, novo):
+    """Recupera referencias inclusive quando o operador ja moveu apenas o banco."""
     alterados = 0
     with closing(db.connect(banco)) as conn:
-        if conn.execute("SELECT 1 FROM sqlite_master WHERE name='ARTEFATO_COLETA'").fetchone():
-            for linha in conn.execute('SELECT id, caminho_cache FROM ARTEFATO_COLETA').fetchall():
-                arq = Path(linha['caminho_cache'])
-                if arq.is_absolute() and arq.is_relative_to(anterior):
-                    destino = novo / arq.relative_to(anterior)
-                    conn.execute('UPDATE ARTEFATO_COLETA SET caminho_cache=? WHERE id=?', (str(destino), linha['id']))
-                    alterados += 1
-            conn.commit()
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='ARTEFATO_COLETA'").fetchone():
+            return 0
+        for linha in conn.execute('SELECT id, caminho_cache, hash_sha256 FROM ARTEFATO_COLETA').fetchall():
+            arq = Path(linha['caminho_cache'])
+            if arq.is_absolute() and arq.is_relative_to(novo):
+                continue
+            if arq.is_absolute() and arq.is_relative_to(anterior):
+                destino = novo / arq.relative_to(anterior)
+            else:
+                digest = linha['hash_sha256']
+                if len(digest) != 64 or any(c not in '0123456789abcdef' for c in digest):
+                    raise RuntimeError('Artefato com hash invalido; cache nao foi realocado.')
+                sufixo = arq.name[len(digest):] if arq.name.startswith(digest) else arq.suffix or '.bin'
+                destino = novo / 'raw' / digest[:2] / (digest + sufixo)
+                # Apenas a migracao local le caches antigos, e somente arquivos
+                # imutaveis identificados pelo hash. O runtime jamais usa a origem.
+                if arq.name.startswith(digest) and arq.is_file() and not arq.is_symlink():
+                    h = hashlib.sha256()
+                    with arq.open('rb') as entrada:
+                        for bloco in iter(lambda: entrada.read(1024*1024), b''):
+                            h.update(bloco)
+                    if h.hexdigest() != digest:
+                        raise RuntimeError('Hash do cache antigo diverge; arquivo nao copiado.')
+                    destino.parent.mkdir(parents=True,exist_ok=True)
+                    if not destino.exists():
+                        shutil.copy2(arq,destino)
+            conn.execute('UPDATE ARTEFATO_COLETA SET caminho_cache=? WHERE id=?', (str(destino), linha['id']))
+            alterados += 1
+        conn.commit()
     return alterados
 
 
-def _cron(texto, antigo, raiz, usuario):
+def _remover_cron(texto, antigo):
     linhas = [l for l in texto.splitlines()
               if not auditoria.comando_coletor(l, antigo / 'radar-tick.sh') and not auditoria.comando_fila(l) and '# radar-raiz-web ' not in l]
-    # A queda de privilegio acontece ANTES de interpretar qualquer codigo gravavel pelo CGI.
+    return '\n'.join(linhas) + ('\n' if linhas else '')
+
+
+def _cron(texto, antigo, raiz, usuario):
+    linhas = _remover_cron(texto, antigo).splitlines()
+    # A identidade vem do dono do crontab; o aplicativo nao seleciona UID/GID.
     comando = ' '.join(shlex.quote(s) for s in (
-        shutil.which('runuser') or 'runuser', '-u', usuario, '--', 'env',
+        'env',
         '-u','RADAR_BRASIL_HOME','-u','RADAR_DATA_DIR','-u','RADAR_DB','-u','RADAR_WEB_ROOT','-u','RADAR_LOG_DIR',
         'RADAR_CONF='+str(raiz/'radar.conf'), sys.executable, str(raiz / 'api.pse')))
     linhas.extend('* * * * * ' + comando + ' cron ' + tarefa + ' # radar-raiz-web ' + tarefa for tarefa in ('tick', 'fila'))
     return '\n'.join(linhas) + '\n'
+
+
+def _transferir_crons(backup, antigo, raiz, usuario):
+    root = auditoria.ler_crontab()
+    web = auditoria.ler_crontab(usuario)
+    anteriores = {'root': root, usuario: web}
+    for nome, conteudo in anteriores.items():
+        (backup / ('crontab-' + nome + '-anterior.txt')).write_text(conteudo)
+    esperado = _cron(web, antigo, raiz, usuario)
+    try:
+        _executar(['crontab', '-u', usuario, '-'], input=esperado)
+        if auditoria.ler_crontab(usuario) != esperado:
+            raise RuntimeError('Crontab do usuario web diverge do esperado')
+        limpo = _remover_cron(root, antigo)
+        _executar(['crontab', '-'], input=limpo)
+        if auditoria.ler_crontab() != limpo:
+            raise RuntimeError('Cron do Radar ainda permanece no root')
+    except BaseException:
+        for nome, conteudo in anteriores.items():
+            _executar(['crontab', '-u', nome, '-'], input=conteudo)
+        raise
+    return anteriores
 
 
 def _bloqueios_http(raiz, origem, prefixo):
@@ -166,29 +215,16 @@ def _arquivos(origem):
 
 
 def _conf_nova(texto, conta, origem_http, raiz, novo_dados, novo_banco, novos_logs, malha=False):
-    alteracoes = {('instalacao','home'): '.', ('instalacao','usuario'): conta.pw_name,
-                  ('instalacao','grupo'): grp.getgrgid(conta.pw_gid).gr_name,
-                  ('web','raiz'): '.', ('dados','dir'): novo_dados.relative_to(raiz).as_posix(),
-                  ('dados','banco'): novo_banco.relative_to(raiz).as_posix(), ('logs','dir'): novos_logs.relative_to(raiz).as_posix(),
-                  ('api','token_arquivo'): (novo_dados/'segredos/api_token').relative_to(raiz).as_posix(),
-                  ('assistente','chave_arquivo'): (novo_dados/'segredos/assistente_chave').relative_to(raiz).as_posix()}
+    alteracoes = {('instalacao','home'): str(raiz), ('web','raiz'): str(raiz),
+                  ('dados','dir'): str(novo_dados), ('dados','banco'): novo_banco.name,
+                  ('logs','dir'): novos_logs.relative_to(novo_dados).as_posix(),
+                  ('api','token_arquivo'): 'api_token', ('assistente','chave_arquivo'): 'assistente_chave'}
     if malha:
-        alteracoes['geografia','malha'] = (novo_dados/'geografia/malha.json').relative_to(raiz).as_posix()
+        alteracoes['geografia','malha'] = 'geografia/malha.json'
+    if caminhos.sync_clone():
+        alteracoes['sincronizacao','clone'] = 'repo-dados'
     if origem_http and not caminhos.valor('web','origem')[0]:
         alteracoes['web','origem'] = origem_http
-    local = Path(caminhos.conf_path()).absolute() == raiz / 'radar.conf'
-    if local:
-        # Uma reaplicacao respeita os caminhos escolhidos na configuracao local.
-        for par in (('api','token_arquivo'), ('assistente','chave_arquivo'), ('geografia','malha')):
-            alteracoes.pop(par, None)
-    else:
-        clone = caminhos.sync_clone()
-        if clone:
-            alteracoes['sincronizacao','clone'] = os.path.relpath(clone, raiz)
-        malha_original = caminhos.caminho('geografia','malha')
-        if malha_original and not malha:
-            alteracoes['geografia','malha'] = os.path.relpath(malha_original, raiz)
-    # Completa limites, IA desligada por padrao e outras opcoes sem trocar valores existentes.
     texto = _editar(texto, auditoria.opcoes_faltantes(texto))
     return _editar(texto, alteracoes)
 
@@ -208,9 +244,11 @@ def executar(args, observacoes):
     home = Path(caminhos.home()).resolve()
     novo_conf = raiz / 'radar.conf'
     local = conf == novo_conf and home == raiz
-    novo_dados, novo_banco, novos_logs = (dados, banco, logs) if local else (raiz/'dados', raiz/'dados/radar.sqlite3', raiz/'logs')
-    if local and not (dados.is_relative_to(raiz/'dados') and banco.is_relative_to(raiz/'dados') and logs.is_relative_to(raiz/'logs')):
-        raise RuntimeError('No layout web, dados e banco devem ficar sob dados/ e logs sob logs/, pastas protegidas no nginx.')
+    novo_dados = dados if local else raiz/'dados'
+    novo_banco = novo_dados / banco.name
+    novos_logs = logs if logs.is_relative_to(novo_dados) else novo_dados/'logs'
+    if local and not (dados.is_relative_to(raiz/'dados') and banco.is_relative_to(raiz/'dados') and novos_logs.is_relative_to(novo_dados)):
+        raise RuntimeError('No layout web, os dados devem ficar na pasta privada dados/; logs tambem ficam dentro de dados.dir.')
     conta = pwd.getpwnam(args.usuario_web)
     if not args.laboratorio and conta.pw_uid == 0:
         raise RuntimeError('O usuario da aplicacao deve ser sem privilegios, como www-data.')
@@ -230,8 +268,6 @@ def executar(args, observacoes):
         raise RuntimeError('Ja existe radar.conf na raiz; selecione-o com --conf para evitar duas configuracoes.')
     if dados != novo_dados and novo_dados.exists() and any(novo_dados.iterdir()):
         raise RuntimeError('Dados nos dois destinos: recusa sobrescrever uma base existente.')
-    if logs != novos_logs and novos_logs.exists() and any(novos_logs.iterdir()):
-        raise RuntimeError('Logs nos dois destinos: recusa sobrescrever historico existente.')
     for pasta in (dados, logs, *(raiz / p for p in PASTAS_PRIVADAS)):
         _sem_links(pasta)
     if banco.is_relative_to(raiz) and banco != novo_banco and not banco.is_relative_to(novo_dados):
@@ -433,28 +469,40 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
             if logs!=novos_logs:
                 copiou_logs=True
                 if logs.exists():
-                    shutil.copytree(logs,novos_logs,dirs_exist_ok=True)
+                    novos_logs.mkdir(parents=True,exist_ok=True)
+                    for arquivo in logs.rglob('*'):
+                        alvo = novos_logs / arquivo.relative_to(logs)
+                        if arquivo.is_dir():
+                            alvo.mkdir(parents=True,exist_ok=True)
+                        else:
+                            if alvo.exists():
+                                alvo = alvo.with_name(alvo.name + '.anterior-' + agora)
+                            shutil.copy2(arquivo,alvo)
                 else:
                     (novos_logs).mkdir(exist_ok=True)
                     observacoes.append('Diretorio de logs ausente; criado com valor relativo logs.')
-            segredos=novo_dados/'segredos'
+            segredos=novo_dados
             segredos.mkdir(parents=True,exist_ok=True)
             from .assistente_ia import arquivo_chave
-            local = conf == raiz/'radar.conf'
             token_original, chave_original = Path(caminhos.token_arquivo()), arquivo_chave()
-            secretos=((token_original,token_original if local else segredos/'api_token'),
-                      (chave_original,chave_original if local else segredos/'assistente_chave'))
+            secretos=((token_original,novo_dados/'api_token'), (chave_original,novo_dados/'assistente_chave'))
             for antigo,novo in secretos:
                 if antigo.exists() and antigo.resolve()!=novo.resolve():
                     if novo.exists() and antigo.read_bytes()!=novo.read_bytes():
                         raise RuntimeError('Segredo divergente no destino: '+novo.name)
                     shutil.copy2(antigo,novo)
             malha=caminhos.caminho('geografia','malha')
-            if not local and malha and Path(malha).is_file():
+            if malha and Path(malha).is_file():
                 destino=novo_dados/'geografia/malha.json'
                 destino.parent.mkdir(exist_ok=True)
                 if Path(malha).resolve()!=destino:
                     shutil.copy2(malha,destino)
+            clone = caminhos.sync_clone()
+            if clone and Path(clone).is_dir() and Path(clone).resolve() != novo_dados/'repo-dados':
+                if (novo_dados/'repo-dados').exists():
+                    raise RuntimeError('Clone privado ja existe em outro destino; nenhuma versao sera sobrescrita.')
+                shutil.copytree(clone, novo_dados/'repo-dados', symlinks=True)
+                observacoes.append('Clone local preservado dentro de dados.dir; sincronizacao nao foi ativada.')
             for nome,arq in _arquivos(origem):
                 if nome == 'api.pse':
                     continue  # CGI continua respondendo 503 ate terminar a preparacao.
@@ -476,7 +524,7 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
             (raiz/'radar.conf').write_text(texto)
             (raiz/'VERSAO').write_text(versao+'\n')
             _json(raiz/'arquivos-instalados.json',_manifesto(origem))
-            referencias=_rebase_cache(novo_banco,dados,novo_dados) if dados!=novo_dados else 0
+            referencias=_rebase_cache(novo_banco,dados,novo_dados)
             novo_conf=raiz/'radar.conf'
             with _usar_conf(novo_conf):
                 projeto=raiz/'projeto.json'
@@ -516,12 +564,8 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
                 rotacao.write_text(auditoria.render_logrotate(origem,novos_logs))
                 rotacao.chmod(0o644)
                 if not lab and not args.sem_cron:
-                    cron_anterior=auditoria.ler_crontab()
-                    (backup/'crontab-anterior.txt').write_text(cron_anterior)
-                    cron_esperado=_cron(cron_anterior,home.parent,raiz,conta.pw_name)
-                    _executar(['crontab','-'],input=cron_esperado)
-                    if auditoria.ler_crontab() != cron_esperado:
-                        raise RuntimeError('Crontab gravado diverge do esperado')
+                    cron_anterior=_transferir_crons(backup, home.parent, raiz, conta.pw_name)
+                    observacoes.append('Agendamentos do Radar transferidos do root para '+conta.pw_name+'.')
                 plano.update(modo='aplicacao',backup=str(backup),referencias_cache_atualizadas=referencias,
                              checagens=_verificar(origem,raiz,novo_conf,conta,lab))
                 plano['sucesso']=all(c['estado']=='ok' for c in plano['checagens'])
@@ -548,11 +592,10 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
             # Remove copias privadas ANTES de desfazer as protecoes do nginx.
             if transferidos and (novo_dados).exists():
                 shutil.rmtree(novo_dados)
-            if copiou_logs and (novos_logs).exists():
-                shutil.rmtree(novos_logs)
             restaurar()
             if cron_anterior is not None:
-                _executar(['crontab','-'],input=cron_anterior)
+                for usuario, conteudo in cron_anterior.items():
+                    _executar(['crontab','-u',usuario,'-'],input=conteudo)
             if alterou_nginx:
                 _executar(['nginx','-t'])
                 _executar(['systemctl','reload','nginx'])

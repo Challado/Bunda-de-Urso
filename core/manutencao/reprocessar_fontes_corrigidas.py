@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from coletor.agenda import AGENDA_PADRAO
-from core import atualizacoes, config, db
+from core import atualizacoes, config, db, caminhos
 from core.contexto_api import operacao_local
 
 
@@ -38,8 +38,8 @@ def reprocessar(conn):
         if not pendente:
             resultados.append(dict(fonte=chave, estado='ja_corrigido'))
             continue
-        arquivo = Path(artefato['caminho_cache'])
         try:
+            arquivo = Path(caminhos.dentro_dados(artefato['caminho_cache'], 'artefato.caminho_cache'))
             if not arquivo.is_file():
                 resultados.append(dict(fonte=chave, estado='pendente', motivo='Cache ausente; aguarda a proxima coleta da origem.'))
                 continue

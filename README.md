@@ -1,5 +1,11 @@
 # BUNDA DE URSO
 
+
+Configuração atual: só `RADAR_CONF` seleciona o arquivo. Banco, logs, tokens,
+chaves, fila e cache ficam dentro de `[dados] dir`; `banco = radar.sqlite3`
+é apenas o nome do arquivo. A configuração não contém usuário/grupo e a
+instalação transfere os agendamentos do Radar ao crontab do `www-data`.
+
 A instalação com `radar.conf` junto aos scripts e caminhos relativos está
 descrita em [Migração para a raiz web](docs/MIGRACAO_RAIZ_WEB.md). A migração
 é feita pelo instalador privado, preservando o banco e preparando www-data.

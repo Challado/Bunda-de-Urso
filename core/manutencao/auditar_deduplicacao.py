@@ -10,6 +10,7 @@ from pathlib import Path
 import sqlite3
 import sys
 import tempfile
+from core import caminhos
 
 
 from core import consultas, db, dedup
@@ -117,7 +118,7 @@ def auditar(caminho, salvar_copia=None):
     destino = Path(salvar_copia).resolve() if salvar_copia else None
     if destino and (destino == origem or destino.exists()):
         raise ValueError("a copia deve ser um arquivo novo, diferente da origem")
-    with tempfile.TemporaryDirectory(prefix="bundita-auditoria-") as pasta:
+    with tempfile.TemporaryDirectory(prefix="bundita-auditoria-", dir=caminhos.temporarios()) as pasta:
         copia = db.connect(str(Path(pasta, "radar.sqlite3")))
         try:
             fonte = dbmod.connect(origem.as_uri() + "?mode=ro", uri=True)

@@ -59,11 +59,11 @@ class TestSemConfiguracao(BaseCaminhos):
     def test_descobre_conf_na_raiz_e_preserva_override_explicito(self):
         local = self.dir / "radar.conf"
         local.write_text("[instalacao]\nhome = .\n[web]\nraiz = .\n[dados]\ndir = dados\n")
-        with patch.object(caminhos, "ROOT", str(self.dir)):
+        with patch.object(caminhos, "ROOT", str(self.dir)), patch.object(caminhos, "CONF_PADRAO", str(local)):
             os.environ.pop("RADAR_CONF")
             self.assertEqual(caminhos.conf_path(), str(local))
             self.assertEqual(caminhos.home(), str(self.dir))
-            self.assertEqual(caminhos.token_arquivo(), str(self.dir / "dados/segredos/api_token"))
+            self.assertEqual(caminhos.token_arquivo(), str(self.dir / "dados/api_token"))
             os.environ["RADAR_CONF"] = str(self.dir / "outra.conf")
             self.assertEqual(caminhos.conf_path(), str(self.dir / "outra.conf"))
 
@@ -84,12 +84,12 @@ class TestArquivo(BaseCaminhos):
             [dados]
             dir = /servico/dados
             [logs]
-            dir = /servico/log
+            dir = logs
         """)
         self.assertEqual(caminhos.home(), "/opt/radar")
         self.assertEqual(caminhos.data_dir(), "/servico/dados")
         self.assertEqual(caminhos.banco(), "/servico/dados/radar.sqlite3")
-        self.assertEqual(caminhos.log_dir(), "/servico/log")
+        self.assertEqual(caminhos.log_dir(), "/servico/dados/logs")
         self.assertEqual(caminhos.problemas(), [])
 
     def test_banco_explicito_ganha_do_dir(self):
@@ -98,7 +98,8 @@ class TestArquivo(BaseCaminhos):
             dir = /servico/dados
             banco = /outro/lugar/radar.sqlite3
         """)
-        self.assertEqual(caminhos.banco(), "/outro/lugar/radar.sqlite3")
+        with self.assertRaises(ValueError):
+            caminhos.banco()
 
     def test_banco_vazio_cai_no_dir(self):
         self.escrever("""
@@ -121,8 +122,8 @@ class TestArquivo(BaseCaminhos):
             dir = /servico/dados
         """)
         os.environ["RADAR_DATA_DIR"] = "/tmp/outro"
-        self.assertEqual(caminhos.data_dir(), "/tmp/outro")
-        self.assertEqual(caminhos.banco(), "/tmp/outro/radar.sqlite3")
+        self.assertEqual(caminhos.data_dir(), "/servico/dados")
+        self.assertEqual(caminhos.banco(), "/servico/dados/radar.sqlite3")
 
     def test_chave_desconhecida_vira_problema_sem_derrubar(self):
         self.escrever("""
@@ -144,11 +145,11 @@ class TestArquivo(BaseCaminhos):
             [web]
             url = /radar/
             [sincronizacao]
-            clone = /dados/clone
+            clone = clone
             remoto = https://exemplo/repo.git
         """)
         self.assertEqual(caminhos.web_url(), "/radar/")
-        self.assertEqual(caminhos.sync_clone(), "/dados/clone")
+        self.assertEqual(caminhos.sync_clone(), str(ROOT / "dados/clone"))
         self.assertEqual(caminhos.sync_remoto(), "https://exemplo/repo.git")
 
     def test_espelho_nao_configurado_e_vazio(self):

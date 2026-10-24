@@ -9,7 +9,7 @@ from coletor import tick
 from coletor.fontes.boavista_rr import ColetorBoaVistaRR
 from coletor.fontes.natal_rn import ColetorNatalRN
 from coletor.fontes.prf import ColetorPRFFixos
-from core import config, db, painel_status
+from core import config, db, painel_status, caminhos
 from core.manutencao.reprocessar_fontes_corrigidas import reprocessar
 
 FIX = Path(__file__).parent/'fixtures'
@@ -22,6 +22,8 @@ class CorrecaoFontesTest(unittest.TestCase):
         pasta=self.tmp.name
         self.cfg=patch.multiple(config,DATA_DIR=pasta,RAW_DIR=pasta+'/raw',STAGING_DIR=pasta+'/staging',DB_PATH=pasta+'/radar.sqlite3')
         self.cfg.start();self.addCleanup(self.cfg.stop)
+        self.caminhos=patch.object(caminhos,'data_dir',return_value=pasta)
+        self.caminhos.start();self.addCleanup(self.caminhos.stop)
         self.con=db.connect();self.addCleanup(self.con.close)
         self.sem_rede=patch('coletor.http.baixar',side_effect=AssertionError('Reprocessamento nao pode baixar fontes'))
         self.sem_rede.start();self.addCleanup(self.sem_rede.stop)

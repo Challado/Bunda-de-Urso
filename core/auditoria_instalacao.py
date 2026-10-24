@@ -4,6 +4,7 @@ import json
 import os
 import grp
 import pwd
+import re
 from pathlib import Path
 import shlex
 import shutil
@@ -49,7 +50,7 @@ def comando_coletor(linha, wrapper):
     if not comando:
         return False
     executavel = Path(comando[0]).name
-    permitidos = {"radar-tick.sh", "radar-api.pse", "api.pse", "sh", "bash", "env",
+    permitidos = {"radar-tick.sh", "radar-api.pse", "api.pse", "sh", "bash", "env", "runuser",
                   "flock", "timeout", "nice", "cd"}
     if executavel not in permitidos and not executavel.startswith("python"):
         return False
@@ -70,9 +71,9 @@ def comando_coletor(linha, wrapper):
     return False
 
 
-def ler_crontab():
+def ler_crontab(usuario=None):
     env = dict(os.environ, LC_ALL="C")
-    res = subprocess.run(["crontab", "-l"], capture_output=True, text=True,
+    res = subprocess.run(["crontab", *(["-u", usuario] if usuario else []), "-l"], capture_output=True, text=True,
                          env=env, timeout=15)
     from . import atualizacoes
     # Cron pode conter comandos de outros projetos com credenciais. Seu texto
@@ -87,20 +88,19 @@ def ler_crontab():
     raise RuntimeError("Nao foi possivel ler o crontab de root; nenhuma linha deve ser sobrescrita.")
 
 
+def fixar_conf(texto, conf):
+    return re.sub(r"^CONF_PADRAO = .+$", lambda _: "CONF_PADRAO = " + repr(str(conf)), texto, count=1, flags=re.M)
+
+
 def bootstrap(texto, conf):
-    return texto.replace("#!/usr/bin/env python3", "#!" + sys.executable, 1).replace(
-        'CONF_PADRAO = "/etc/radar-brasil/radar.conf"', 'CONF_PADRAO = ' + repr(str(conf)), 1)
+    return fixar_conf(texto.replace("#!/usr/bin/env python3", "#!" + sys.executable, 1), conf)
 
 
 def render_logrotate(origem, logs):
     diretorio = str(logs).replace("\\", "\\\\").replace('"', '\\"')
-    conta = pwd.getpwuid(os.geteuid())
-    gid = Path(logs).stat().st_gid if Path(logs).exists() else conta.pw_gid
-    usuario = caminhos.valor("instalacao", "usuario", conta.pw_name)[0]
-    grupo = caminhos.valor("instalacao", "grupo", grp.getgrgid(gid).gr_name)[0]
-    # Alem de conferir as contas, impede injetar diretivas no modelo.
-    pwd.getpwnam(usuario)
-    grp.getgrnam(grupo)
+    info = Path(logs).stat() if Path(logs).exists() else None
+    usuario = pwd.getpwuid(info.st_uid if info else os.geteuid()).pw_name
+    grupo = grp.getgrgid(info.st_gid if info else os.getegid()).gr_name
     return ((origem / "deploy" / "openclaw-radar.logrotate").read_text()
             .replace("@RADAR_LOG_DIR@", diretorio)
             .replace("@RADAR_LOG_USUARIO@", usuario)
@@ -139,9 +139,7 @@ def artefatos(origem, dirs, codigo, estaticos):
             conteudo = arquivo.read_bytes()
             if str(rel) == "web/api.pse":
                 # O bootstrap interno conserva seu shebang original.
-                conteudo = conteudo.decode().replace(
-                    'CONF_PADRAO = "/etc/radar-brasil/radar.conf"',
-                    'CONF_PADRAO = ' + repr(str(dirs["conf"])), 1).encode()
+                conteudo = fixar_conf(conteudo.decode(), dirs["conf"]).encode()
             yield dirs["codigo"] / rel, conteudo
     for nome in ("README.md", "LICENSE"):
         yield dirs["codigo"] / nome, (origem / nome).read_bytes()
@@ -250,7 +248,7 @@ def comando_fila(linha):
     if not comando:
         return False
     nome = Path(comando[0]).name
-    if nome not in ('api.pse', 'radar-api.pse', 'env', 'flock', 'timeout', 'nice') and not nome.startswith('python'):
+    if nome not in ('api.pse', 'radar-api.pse', 'env', 'runuser', 'flock', 'timeout', 'nice') and not nome.startswith('python'):
         return False
     if any(Path(p).name in ('radar-dados-sync.py','radar-base-sync.py') for p in comando):
         return False

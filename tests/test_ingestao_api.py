@@ -145,7 +145,7 @@ class TestPostRadares(BaseUpsert):
     def test_escrita_sem_token_configurado_e_401(self):
         # sem RADAR_API_TOKEN no ambiente, a escrita fica desabilitada.
         with mock.patch.dict(os.environ, {}, clear=False):
-            os.environ.pop(config.API_TOKEN_ENV, None)
+            os.environ.pop("RADAR_API_TOKEN", None)
             corpo = json.dumps([_radar("E-1")]).encode("utf-8")
             status, _h, resp = self._req(corpo)
         self.assertEqual(status, 401)
@@ -153,8 +153,7 @@ class TestPostRadares(BaseUpsert):
                          "ingestao_desabilitada")
 
     def test_escrita_com_token_valido_grava(self):
-        with mock.patch.dict(os.environ,
-                             {config.API_TOKEN_ENV: "segredo-teste"}):
+        with mock.patch.object(config, "token_ingestao", return_value="segredo-teste"):
             corpo = json.dumps([_radar("E-1")]).encode("utf-8")
             status, _h, resp = self._req(corpo, token="segredo-teste")
         self.assertEqual(status, 200)
@@ -170,16 +169,14 @@ class TestPostRadares(BaseUpsert):
             con.close()
 
     def test_escrita_com_token_errado_e_401(self):
-        with mock.patch.dict(os.environ,
-                             {config.API_TOKEN_ENV: "segredo-teste"}):
+        with mock.patch.object(config, "token_ingestao", return_value="segredo-teste"):
             corpo = json.dumps([_radar("E-1")]).encode("utf-8")
             status, _h, resp = self._req(corpo, token="errado")
         self.assertEqual(status, 401)
         self.assertEqual(_doc(resp)["erro"]["codigo"], "nao_autorizado")
 
     def test_escrita_reusa_mesmo_ponto_via_api(self):
-        with mock.patch.dict(os.environ,
-                             {config.API_TOKEN_ENV: "segredo-teste"}):
+        with mock.patch.object(config, "token_ingestao", return_value="segredo-teste"):
             c1 = json.dumps([_radar("E-1", velocidade_geral=60)]).encode("utf-8")
             s1, _h, r1 = self._req(c1, token="segredo-teste")
             c2 = json.dumps([_radar("E-1", velocidade_geral=80)]).encode("utf-8")

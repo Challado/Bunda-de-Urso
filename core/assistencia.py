@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from core import caminhos
 import urllib.parse
 import uuid
 
@@ -232,7 +233,7 @@ def _ocr_local(arquivo):
     if not shutil.which("pdftoppm") or not shutil.which("tesseract"):
         return ""
     try:
-        with tempfile.TemporaryDirectory(prefix="radar-ocr-") as pasta:
+        with tempfile.TemporaryDirectory(prefix="radar-ocr-", dir=caminhos.temporarios()) as pasta:
             prefixo = str(Path(pasta) / "pagina")
             subprocess.run(["pdftoppm", "-f", "1", "-l", "3", "-scale-to", "1800", "-png", str(arquivo), prefixo],
                            check=True, capture_output=True, timeout=8)

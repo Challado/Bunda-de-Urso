@@ -26,7 +26,9 @@ class TestEntradaApi(unittest.TestCase):
         self.banco = self.pasta / "radar.sqlite3"
         self.env = {k: v for k, v in os.environ.items()
                     if k not in ("GATEWAY_INTERFACE", "REQUEST_METHOD", "PATH_INFO", "QUERY_STRING")}
-        self.env.update(RADAR_DB=str(self.banco), RADAR_DATA_DIR=str(self.pasta))
+        conf = self.pasta / "radar.conf"
+        conf.write_text("[instalacao]\nhome = %s\n[dados]\ndir = %s\nbanco = %s\n" % (ROOT, self.pasta, self.banco.name))
+        self.env["RADAR_CONF"] = str(conf)
 
     def executar(self, *args, entrada="web/api.pse", env=None, stdin=None):
         return subprocess.run([sys.executable, str(ROOT / entrada), *args], cwd=ROOT,

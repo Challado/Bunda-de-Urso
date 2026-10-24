@@ -24,7 +24,7 @@ class RelatoriosTest(unittest.TestCase):
         (self.home / "core").mkdir(parents=True)
         self.conf = self.pasta / "radar.conf"
         self.conf.write_text("[instalacao]\nhome = %s\n[dados]\ndir = %s\nbanco = %s\n[logs]\ndir = %s\n" % (
-            self.home, self.pasta / "dados", self.pasta / "dados/radar.sqlite3", self.pasta / "logs"))
+            self.home, self.pasta / "dados", self.pasta / "dados/radar.sqlite3", self.pasta / "dados/logs"))
         self.env = {k: v for k, v in os.environ.items() if not k.startswith("RADAR_") and k not in ("REQUEST_METHOD", "GATEWAY_INTERFACE")}
         self.env["RADAR_CONF"] = str(self.conf)
         ambiente = patch.dict(os.environ, self.env, clear=True)

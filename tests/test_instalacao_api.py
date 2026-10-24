@@ -50,7 +50,7 @@ class TestInstalacaoAPI(unittest.TestCase):
         self.conf = self.lab / "etc" / "radar" / "radar.conf"
         self.conf.parent.mkdir(parents=True)
         self.conf.write_text("# configuracao do servidor\n[instalacao]\nhome = %s\n[dados]\ndir = %s\nbanco = %s\n[web]\nraiz = %s\nurl = /teste/\n[logs]\ndir = %s\n" %
-                             (self.home, self.dados, self.banco, self.web, self.lab / "logs"))
+                             (self.home, self.dados, self.banco, self.web, self.dados / "logs"))
         self.env = {k: v for k, v in os.environ.items() if not k.startswith("RADAR_") and k not in ("REQUEST_METHOD", "GATEWAY_INTERFACE")}
         self.env["RADAR_CONF"] = str(self.conf)
         self.externo = self.home.parent / "radar-dados-sync.py"
@@ -99,7 +99,7 @@ class TestInstalacaoAPI(unittest.TestCase):
         wrapper = self.home.parent / "radar-tick.sh"
         ensaio = subprocess.run(["sh", str(wrapper), "--help"], env=self.env, capture_output=True, text=True, timeout=15)
         self.assertEqual(ensaio.returncode, 0, ensaio.stderr)
-        self.assertTrue((self.lab / "logs" / "tick.log").is_file())
+        self.assertTrue((self.dados / "logs" / "tick.log").is_file())
 
     def test_recuperacao_explicita_preserva_banco(self):
         resultado = self.instalar(True)
@@ -219,14 +219,14 @@ class TestInstalacaoAPI(unittest.TestCase):
         regra = self.lab / "etc" / "logrotate.d" / "openclaw-radar"
         esperado = regra.read_bytes()
         shutil.rmtree(regra.parent)
-        shutil.rmtree(self.lab / "logs")
+        shutil.rmtree(self.dados / "logs")
         self.dados.chmod(0o700)
         for nome in ("raw", "staging", "calibracao"):
             shutil.rmtree(self.dados / nome)
         r = self.instalar(True)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertEqual(regra.read_bytes(), esperado)
-        for pasta in (self.lab / "logs", self.dados / "raw", self.dados / "staging", self.dados / "calibracao"):
+        for pasta in (self.dados / "logs", self.dados / "raw", self.dados / "staging", self.dados / "calibracao"):
             self.assertEqual(pasta.stat().st_mode & 0o7777, 0o2770)
         self.assertIn("Regra do logrotate criada", r.stdout)
         self.assertIn("Diretorio criado", r.stdout)
@@ -260,10 +260,10 @@ class TestInstalacaoAPI(unittest.TestCase):
         self.assertTrue((self.web / "radar.conf").is_symlink())
 
     def test_perfil_completa_config_parcial_sem_mudar_valores_existentes(self):
-        logs = self.lab / "novos" / "pais" / "logs"
+        logs = self.dados / "novos" / "pais" / "logs"
         perfil = self.lab / "perfil.conf"
-        perfil.write_text(self.conf.read_text().replace(str(self.lab / "logs"), str(logs)).replace(str(self.banco), str(self.lab / "banco-errado.sqlite3")))
-        self.conf.write_text(self.conf.read_text().replace("banco = " + str(self.banco) + "\n", "").replace("[logs]\ndir = " + str(self.lab / "logs") + "\n", "") + "[coleta]\ntimeout = 95\n[web]\norigem =\n")
+        perfil.write_text(self.conf.read_text().replace(str(self.dados / "logs"), str(logs)).replace(str(self.banco), str(self.lab / "banco-errado.sqlite3")))
+        self.conf.write_text(self.conf.read_text().replace("banco = " + str(self.banco) + "\n", "").replace("[logs]\ndir = " + str(self.dados / "logs") + "\n", "") + "[coleta]\ntimeout = 95\n[web]\norigem =\n")
         extras = ("--perfil-conf", str(perfil))
         antes = {p: p.read_bytes() for p in self.lab.rglob("*") if p.is_file()}
         r = self.instalar(extras=extras)

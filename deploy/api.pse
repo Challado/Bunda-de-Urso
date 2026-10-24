@@ -22,20 +22,15 @@ Este mesmo arquivo serve a DOIS mundos:
        ./api.pse ajuda
 
 O radar.conf ao lado desta entrada define os caminhos, relativos a sua pasta.
-Instalacoes anteriores ainda podem usar a configuracao em /etc.
+RADAR_CONF pode selecionar outro arquivo; nao ha busca automatica ou overrides.
 Nenhum caminho de producao pertence a este arquivo.
 """
 import os
 import sys
 
-CONF_PADRAO = "/etc/radar-brasil/radar.conf"
-# Configuracao junto aos scripts; /etc permanece somente para instalacoes antigas.
-_aqui = os.path.dirname(os.path.abspath(__file__))
-_locais = (_aqui, os.path.dirname(_aqui)) if os.path.basename(_aqui) == "web" else (_aqui,)
-_local = next((os.path.join(p, "radar.conf") for p in _locais
-               if os.path.isfile(os.path.join(p, "radar.conf"))), CONF_PADRAO)
+CONF_PADRAO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "radar.conf")
 if not (os.environ.get("RADAR_CONF") or "").strip():
-    os.environ["RADAR_CONF"] = _local
+    os.environ["RADAR_CONF"] = CONF_PADRAO
 
 
 def _conf(secao, chave):
@@ -61,7 +56,7 @@ def _conf(secao, chave):
     return ""
 
 
-_raiz = os.environ.get("RADAR_BRASIL_HOME") or _conf("instalacao", "home")
+_raiz = _conf("instalacao", "home")
 if not _raiz:
     # Sem configuracao: o checkout desta instalacao (webroot dentro do projeto).
     _aqui = os.path.dirname(os.path.abspath(__file__))
@@ -71,7 +66,7 @@ if not _raiz:
             break
 if not _raiz:
     sys.exit("Radar Brasil: caminho do codigo nao configurado. "
-             "Defina [instalacao] home em %s ou RADAR_BRASIL_HOME." % CONF_PADRAO)
+             "Defina [instalacao] home em %s." % CONF_PADRAO)
 
 # Bootstrap resolve somente o codigo. Dados e demais opcoes pertencem ao core.
 if not os.path.isabs(_raiz):
