@@ -29,7 +29,7 @@ def main():
                     k not in ('REQUEST_METHOD','GATEWAY_INTERFACE','QUERY_STRING','PATH_INFO')}
         ambiente.update(RADAR_CONF=str(conf), PYTHONDONTWRITEBYTECODE='1')
         fixture = base / 'oficial.json'
-        oficial = {'Codigo':'E2E-OFICIAL', 'Latitude':-24.9556,
+        oficial = {'Codigo':'E2E-OFICIAL', 'UF':'PR', 'Municipio':'Cascavel', 'CodigoIBGE':'4104808', 'Latitude':-24.9556,
             'Longitude':-53.4552, 'Rodovia':'BR-277', 'Km':580.5, 'VelocidadeLeves':80}
         if '--correspondencia-cadastral' in sys.argv:
             dados_reais=json.loads((ROOT/'tests'/'fixtures'/'novos'/'correspondencia_e604.json').read_text())

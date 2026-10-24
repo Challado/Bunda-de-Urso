@@ -400,3 +400,6 @@ A configuração da instalação pode ser consultada no painel **Administração
 Configuração** ou em `api.pse configuracao mostrar`. O painel salva os parâmetros
 operacionais pela API; caminhos e credenciais são administrados pela mesma API no
 terminal. Atualizações preservam o arquivo do servidor. Veja `docs/CONFIGURACAO.md`.
+
+A página de status por UF e dos leitores é acessada diretamente, sem link na
+home. Consulte [o funcionamento e as regras de contagem](docs/STATUS.md).

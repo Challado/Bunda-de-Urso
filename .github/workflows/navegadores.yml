@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   cadastro:
-    name: Cadastro e detalhe (${{ matrix.browser }})
+    name: Cadastro, detalhe e status (${{ matrix.browser }})
     # Playwright 1.58.2 suporta 24.04; ubuntu-latest migrou para 26.04.
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -50,7 +50,7 @@ jobs:
           else
             npx playwright install --with-deps ${{ matrix.browser }}
           fi
-      - name: Cadastro e detalhe, API CGI e banco temporário (desktop e tela estreita)
+      - name: Cadastro, detalhe e status, API CGI e banco temporário (desktop e tela estreita)
         run: npx playwright test --project="${{ matrix.browser }}-*"
       - name: Relatório, capturas e rastreamentos
         if: always()

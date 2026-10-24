@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Status do Radar Brasil — Radar Brasil</title>
+<link rel="stylesheet" href="status.css">
+<script src="status.js" defer>
+</script>
+</head>
+<body data-pagina="status">
+<header>
+<img src="bunda-de-urso.png" alt="">
+<div>
+<h1>Status do Radar Brasil</h1>
+<p>Cobertura por estado e acompanhamento das leituras.</p>
+</div>
+</header>
+<main>
+<div class="barra">
+<p class="suave" id="atualizado" role="status">Carregando cobertura…</p>
+<button id="atualizar" type="button">Atualizar status</button>
+</div>
+<p id="erro-cobertura" class="erro" role="alert" hidden>
+</p>
+<section aria-labelledby="titulo-cobertura" class="painel">
+<h2 id="titulo-cobertura">Radares cadastrados por estado</h2>
+<p class="suave">Os 26 estados e o Distrito Federal, em ordem alfabética. Abra um estado para consultar seus detalhes em outra aba.</p>
+<div id="totais" class="numeros">
+</div>
+<div class="tabWrap" tabindex="0" role="region" aria-label="Contagem de radares nas 27 UFs">
+<table id="tabela-estados">
+<caption>Pontos de fiscalização únicos, por esfera responsável.</caption>
+<thead>
+<tr>
+<th scope="col">Nº</th>
+<th scope="col">Estado</th>
+<th scope="col" class="quantidade">Federais</th>
+<th scope="col" class="quantidade">Estaduais</th>
+<th scope="col" class="quantidade">Municipais</th>
+<th scope="col" class="quantidade">Sem classificação</th>
+<th scope="col" class="quantidade">Total</th>
+</tr>
+</thead>
+<tbody id="estados">
+</tbody>
+<tfoot id="total-estados">
+</tfoot>
+</table>
+</div>
+<p id="sem-uf" class="aviso" hidden>
+</p>
+<details>
+<summary>Como os números são calculados</summary>
+<p id="criterio">
+</p>
+</details>
+</section>
+<details class="painel" id="leituras" open>
+<summary>Status das leituras <span id="total-leitores" class="selo">
+</span>
+</summary>
+<p class="suave">Última tentativa e última leitura bem-sucedida de cada recurso. “Sem alteração” também é uma leitura concluída. A página consulta o histórico local; atualizar esta tela não dispara downloads.</p>
+<p id="atualizado-leitores" role="status">Carregando leitores…</p>
+<p id="erro-leitores" class="erro" role="alert" hidden>
+</p>
+<label class="filtro">Filtrar leitores por nome, esfera ou situação<input type="search" id="filtro-leitores" placeholder="Ex.: DNIT, municipal, erro">
+</label>
+<p id="resumo-leitores" class="suave">
+</p>
+<div id="coletores">
+</div>
+</details>
+</main>
+<footer class="rodape-site">
+<nav aria-label="Links do projeto">
+<a href="https://github.com/Challado/Bunda-de-Urso" target="_blank" rel="noopener noreferrer">Código no GitHub</a>
+<a href="https://servidor.lucas.inf.br/site/contato" target="_blank" rel="noopener noreferrer">Contato</a>
+</nav>
+</footer>
+</body>
+</html>

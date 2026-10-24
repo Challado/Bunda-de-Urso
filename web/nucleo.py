@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core import config
 from core import db as dbmod
 from core import consultas
+from core import painel_status
 from core import geo
 from core import governanca
 from core.serializers import serialize, is_valido, FORMATOS
@@ -65,10 +66,14 @@ PARAMS = [
     ("ponto_id", "string", False, "P-<n>", "filtra /api/v1/trafego por ponto"),
     ("limite", "inteiro", False, "1..1000", "itens por pagina (padrao 100)"),
     ("cursor", "string", False, "opaco", "cursor estavel de paginacao"),
+    ("depois", "inteiro", False, ">=0", "ultimo ID numerico exibido no status do estado"),
     ("versao_esquema", "string", False, "string", "versao de contrato"),
 ]
 
 ENDPOINTS_AJUDA = {
+    "/api/v1/status/estados": ["GET"],
+    "/api/v1/status/estados/{uf}": ["GET"],
+    "/api/v1/status/coletores": ["GET"],
     "/api/v1/radares": ["GET", "POST"],
     "/api/v1/radares/submeter": ["POST"],
     "/api/v1/radares/envios/{protocolo}": ["GET"],
@@ -118,6 +123,9 @@ ENDPOINTS_ADMINISTRATIVOS = {
 }
 
 ENDPOINTS_DESC = {
+    "/api/v1/status/estados": "Contagem de pontos unicos nas 27 UFs por esfera de fiscalizacao; inclui nao classificados.",
+    "/api/v1/status/estados/{uf}": "Detalhes da cobertura por UF, municipios, orgaos, fontes e pontos paginados.",
+    "/api/v1/status/coletores": "Todos os leitores, inclusive nunca executados; ultima tentativa, ultimo sucesso, erros e URLs configuradas.",
     "/api/v1/gestao/radar/{id}/cruzar": "Recruza contribuicao ativa, inclusive verificada, com fontes oficiais locais; gera sugestoes auditadas.",
     "/api/v1/gestao/cruzamentos": "Recruza contribuicoes ativas em lotes de ate 20, com cursor e teto por ID; exige moderador.",
     "/api/v1/radares": "Pontos de fiscalizacao (radar instalado) num raio.",
@@ -159,6 +167,9 @@ ENDPOINTS_DESC = {
 
 # Parametros aplicaveis por endpoint (documentado na ajuda, gerado do codigo).
 ENDPOINTS_PARAMS = {
+    "/api/v1/status/estados": [],
+    "/api/v1/status/estados/{uf}": ["limite", "depois"],
+    "/api/v1/status/coletores": [],
     "/api/v1/radares": ["lat", "lon", "raio", "formato", "delimitador",
                         "detalhado", "incluir_inativos", "incluir_incertos",
                         "incluir_trechos", "incluir_operacoes", "tipo_radar",
@@ -1167,6 +1178,27 @@ def handle_request(environ, stdin_bytes=b""):
         gov = _dispatch_governanca(conn, caminho, metodo, environ, stdin_bytes)
         if gov is not None:
             return gov
+
+        if caminho.rstrip("/") in ("/api/v1/status/estados", "/api/v1/status/coletores") or caminho.startswith("/api/v1/status/estados/"):
+            if metodo != "GET":
+                return _erro(405, "metodo_nao_permitido", "Use GET para consultar o status.")
+            if formato != "json":
+                return _erro(400, "formato_invalido", "O painel de status usa JSON.")
+            if caminho.rstrip("/") == "/api/v1/status/coletores":
+                resultado = painel_status.coletores(conn)
+            else:
+                uf = caminho[len("/api/v1/status/estados"):].strip("/").upper() or None
+                limite = _param_limite(params)
+                try:
+                    depois = int(params.get("depois", 0))
+                    if depois < 0 or limite is None:
+                        raise ValueError()
+                except (TypeError, ValueError):
+                    return _erro(422, "paginacao_invalida", "limite 1..1000 e depois inteiro nao negativo.")
+                if uf is not None and uf not in painel_status.NOMES:
+                    return _erro(422, "uf_invalida", "Informe uma das 27 siglas de UF.")
+                resultado = painel_status.cobertura(conn, uf, limite, depois)
+            return _resp({"sucesso": True, "resultado": resultado}, extra_headers={"Cache-Control": "no-store"})
 
         if caminho in ("/api/v1/status", "/api/v1/status/"):
             st = consultas.status_base(conn)

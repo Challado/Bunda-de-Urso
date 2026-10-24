@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Detalhes do estado — Radar Brasil</title>
+<link rel="stylesheet" href="status.css">
+<script src="status.js" defer>
+</script>
+</head>
+<body data-pagina="status-estado">
+<header>
+<img src="bunda-de-urso.png" alt="">
+<div>
+<h1>Detalhes do estado</h1>
+<p>Cobertura e fontes dos radares cadastrados.</p>
+</div>
+</header>
+<main>
+<div class="barra">
+<a href="status.html">← Todos os estados e leituras</a>
+<button id="atualizar" type="button">Atualizar estado</button>
+</div>
+<p id="atualizado" class="suave" role="status">Carregando estado…</p>
+<p id="erro-cobertura" class="erro" role="alert" hidden>
+</p>
+<section class="painel" id="detalhes-estado" hidden>
+<h2 id="nome-estado">
+</h2>
+<div id="totais" class="numeros">
+</div>
+<details>
+<summary>Como os números são calculados</summary>
+<p id="criterio">
+</p>
+</details>
+</section>
+<div class="duas-colunas" id="resumos-estado" hidden>
+<section class="painel">
+<h2>Municípios</h2>
+<ul id="municipios" class="lista">
+</ul>
+</section>
+<section class="painel">
+<h2>Órgãos responsáveis ou publicadores</h2>
+<p class="suave">Um ponto pode ter mais de um órgão associado.</p>
+<ul id="organizacoes" class="lista">
+</ul>
+</section>
+</div>
+<details class="painel" id="fontes-estado" hidden open>
+<summary>Fontes dos cadastros</summary>
+<p class="suave">Inclui fontes de verificação metrológica. Um ponto pode constar em várias fontes.</p>
+<ul id="fontes" class="lista">
+</ul>
+</details>
+<section class="painel" id="radar-estado" hidden>
+<h2>Radares do estado</h2>
+<div class="tabWrap" tabindex="0" role="region" aria-label="Radares do estado">
+<table id="tabela-pontos">
+<thead>
+<tr>
+<th scope="col">Ponto</th>
+<th scope="col">Esfera</th>
+<th scope="col">Município</th>
+<th scope="col">Via / km</th>
+<th scope="col">Situação</th>
+<th scope="col">Órgão / fonte</th>
+</tr>
+</thead>
+<tbody id="pontos">
+</tbody>
+</table>
+</div>
+<div class="paginacao">
+<button id="mais" type="button" hidden>Carregar mais radares</button>
+<span id="progresso" role="status">
+</span>
+</div>
+</section>
+</main>
+<footer class="rodape-site">
+<nav aria-label="Links do projeto">
+<a href="https://github.com/Challado/Bunda-de-Urso" target="_blank" rel="noopener noreferrer">Código no GitHub</a>
+<a href="https://servidor.lucas.inf.br/site/contato" target="_blank" rel="noopener noreferrer">Contato</a>
+</nav>
+</footer>
+</body>
+</html>

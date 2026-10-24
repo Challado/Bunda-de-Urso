@@ -67,11 +67,11 @@ def main():
     if not padroes:
         return terminar(["nao extrai rota nenhuma de web/nucleo.py (parser quebrado)"], "")
 
-    for pagina in paginas():
+    for pagina in paginas() + sorted(WEB.glob("*.js")):
         texto = pagina.read_text(encoding="utf-8")
         nome = pagina.name
 
-        if 'name="viewport"' not in texto:
+        if pagina.suffix == '.html' and 'name="viewport"' not in texto:
             problemas.append('%s: falta <meta name="viewport">' % nome)
 
         for alvo in ATRIBUTO.findall(texto):
