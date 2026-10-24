@@ -31,7 +31,8 @@ def arquivo_chave():
                   Path(caminhos.token_arquivo()).resolve()}
     web = Path(caminhos.web_raiz()).resolve()
     local = Path(caminhos.conf_path()).absolute() == web / "radar.conf" and Path(caminhos.home()).resolve() == web
-    privado = local and arq.resolve().is_relative_to(web / "dados" / "segredos")
+    privado = (local and Path(caminhos.data_dir()).resolve().is_relative_to(web / "dados")
+               and arq.resolve().is_relative_to(Path(caminhos.data_dir()).resolve() / "segredos"))
     if (not arq.is_absolute() or arq.resolve() in protegidos or
             (arq.resolve().is_relative_to(web) and not privado) or
             (arq.resolve().is_relative_to(Path(caminhos.home()).resolve()) and not privado) or

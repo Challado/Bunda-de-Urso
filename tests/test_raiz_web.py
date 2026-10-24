@@ -95,6 +95,22 @@ class TestRaizWeb(unittest.TestCase):
         self.assertEqual(r.returncode,0,r.stderr)
         self.assertIn('"ready"',r.stdout)
 
+    def test_reaplicacao_respeita_banco_e_logs_reconfigurados(self):
+        r=self.rodar('--migrar-raiz-web','--aplicar')
+        self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+        novo=self.web/'radar.conf'
+        (self.web/'dados/radar.sqlite3').rename(self.web/'dados/producao.sqlite3')
+        log=self.web/'logs/tick.log'
+        (self.web/'logs/diario').mkdir()
+        log.rename(self.web/'logs/diario/tick.log')
+        novo.write_text(novo.read_text().replace('banco = dados/radar.sqlite3','banco = dados/producao.sqlite3').replace('dir = logs','dir = logs/diario'))
+        r=self.rodar('--aplicar',conf=novo)
+        self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+        self.assertIn('banco = dados/producao.sqlite3',novo.read_text())
+        self.assertIn('dir = logs/diario',novo.read_text())
+        self.assertFalse((self.web/'dados/radar.sqlite3').exists())
+        self.assertEqual((self.web/'logs/diario/tick.log').read_text(),'historico anterior\n')
+
     def test_destino_com_outro_banco_nao_e_sobrescrito(self):
         (self.web/'dados').mkdir()
         sentinela=self.web/'dados/radar.sqlite3'
