@@ -110,11 +110,6 @@ def main():
                 if not url.path.startswith(PREFIXO+'/'):
                     return self.send_error(404)
                 nome=url.path[len(PREFIXO)+1:]
-                if nome=='':
-                    self.send_response(302)
-                    self.send_header('Location',PREFIXO+'/resources/'+(nome or 'index.html')+('?' + url.query if url.query else ''))
-                    self.end_headers()
-                    return
                 if not nome.startswith('resources/'):
                     return self.send_error(404)
                 self.path=self.path[len(PREFIXO):]

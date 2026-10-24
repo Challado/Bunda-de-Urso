@@ -141,8 +141,7 @@ def _publicacao_texto(texto, prefixo, webroot, origem):
         regras=[INICIO_PUBLICACAO,
                 'location = '+json.dumps(api)+' {\n'+handlers[i]+'\n}']
         if base:
-            regras.append('location = '+json.dumps(base)+' { return 302 '+json.dumps(base+'/$is_args$args')+'; }')
-        regras.append('location = '+json.dumps(base+'/')+' { return 302 '+json.dumps(base+'/resources/index.html$is_args$args')+'; }')
+            regras.append('location = '+json.dumps(base)+' { return 404; }')
         regras.append('location ^~ '+json.dumps(base+'/resources/')+' {\n'
                       '    alias '+json.dumps(str(Path(webroot).resolve()/'resources')+'/')+';\n'
                       '    autoindex off;\n    disable_symlinks on;\n'

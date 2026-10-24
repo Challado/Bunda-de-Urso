@@ -49,7 +49,8 @@ O nginx nega por padrão qualquer caminho dentro do prefixo do Radar. Libera
 somente `api.pse` como entrada FastCGI e `resources/` para arquivos estáticos,
 sem executar scripts, seguir links simbólicos ou listar diretórios. Não existem
 aliases dos endereços antigos: as páginas são acessadas em `resources/` e os
-endereços antigos retornam 404. A home aponta a `resources/index.html`. O relatório
+endereços antigos retornam 404. A entrada é `resources/index.html`, sem nenhum
+redirecionamento da raiz. O descritor do projeto aponta diretamente a essa página. O relatório
 é consultado em `api.pse?rota=/api/v1/atualizacoes/status`, que lê o JSON dentro
 de `dados.dir`, sem abrir SQLite.
 As regras são geradas a partir do prefixo/raiz configurados e preservam o

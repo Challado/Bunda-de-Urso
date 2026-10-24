@@ -296,6 +296,11 @@ def web_url():
     return valor("web", "url", "/")[0]
 
 
+def web_inicio():
+    """Pagina publica real, sem depender de aliases ou redirecionamentos."""
+    return web_url().rstrip('/') + '/resources/index.html'
+
+
 def sync_clone():
     """Clone local do repositorio privado de dados (vazio = nao configurado)."""
     return caminho("sincronizacao", "clone", "")

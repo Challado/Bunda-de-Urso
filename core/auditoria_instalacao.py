@@ -149,7 +149,7 @@ def artefatos(origem, dirs, codigo, estaticos):
         conteudo = arquivo.read_bytes()
         if arquivo.name == "projeto.json":
             descritor = json.loads(conteudo)
-            descritor["url"] = caminhos.web_url()
+            descritor["url"] = caminhos.web_inicio()
             conteudo = (json.dumps(descritor, ensure_ascii=False, indent=2) + "\n").encode()
         yield dirs["web"] / "resources" / arquivo.relative_to(origem/'web/resources'), conteudo
         if arquivo.name == 'projeto.json':

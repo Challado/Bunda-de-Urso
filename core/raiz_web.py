@@ -243,7 +243,7 @@ def _bloqueios_http(raiz, origem, prefixo, aguardar=0):
         while True:
             tentativa += 1
             try:
-                for rel in ['radar.conf', 'radar.conf.anterior', temporario.name, generico.name,
+                for rel in ['', 'radar.conf', 'radar.conf.anterior', temporario.name, generico.name,
                             'resources/'+executavel.name, 'resources/'+link.name,
                             'index.html','cadastro.html','detalhe.html','gestao.html','usuarios.html',
                             'status.html','status-estado.html','projeto.json','status-atualizacoes.json',
@@ -260,7 +260,7 @@ def _bloqueios_http(raiz, origem, prefixo, aguardar=0):
                         codigo = exc.code
                         exc.close()
                     if codigo not in (403, 404):
-                        raise RuntimeError('Protecao HTTP reprovada (%s): %s' % (codigo, rel))
+                        raise RuntimeError('Protecao HTTP reprovada (%s): %s' % (codigo, rel or '/'))
                 aprovacoes += 1
                 # Na troca dos workers pode haver respostas alternadas entre
                 # configuracoes antiga e nova. Confirma uma segunda passada.
@@ -629,7 +629,7 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
             with _usar_conf(novo_conf):
                 projeto=raiz/'projeto.json'
                 descritor=json.loads(projeto.read_text())
-                descritor['url']=caminhos.web_url()
+                descritor['url']=caminhos.web_inicio()
                 _json(projeto,descritor)
                 _json(raiz/'resources/projeto.json',descritor)
                 for pasta in (novo_dados,novos_logs,raiz/'resources',*(raiz/p for p in CODIGO)):

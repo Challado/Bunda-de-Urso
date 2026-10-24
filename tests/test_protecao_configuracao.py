@@ -190,7 +190,8 @@ class TestProtecaoConfiguracao(unittest.TestCase):
                     limite = time.monotonic() + 5
                     while True:
                         try:
-                            with urllib.request.urlopen("http://127.0.0.1:%d/radar/" % porta, timeout=1) as r:
+                            entrada='/radar/resources/index.html' if raiz_local else '/radar/'
+                            with urllib.request.urlopen("http://127.0.0.1:%d%s" % (porta,entrada), timeout=1) as r:
                                 self.assertEqual(r.read(), b"pagina publica de teste")
                             break
                         except urllib.error.URLError:
@@ -214,13 +215,17 @@ class TestProtecaoConfiguracao(unittest.TestCase):
                             with urllib.request.urlopen('http://127.0.0.1:%d/radar/resources/%s'%(porta,nome),timeout=2) as r:
                                 self.assertEqual(r.status,200)
                         uris += ['/radar/'+p for p in ('index.html','detalhe.html?id=P-42','cadastro.html','gestao.html','usuarios.html','status.html','status-estado.html','projeto.json','status-atualizacoes.json')]
+                        uris += ['/radar','/radar/']
                         with self.assertRaises(urllib.error.HTTPError) as erro:
                             urllib.request.urlopen('http://127.0.0.1:%d/radar/resources/segredo.json'%porta,timeout=2)
                         self.assertIn(erro.exception.code,(403,404))
+                    class SemRedirecionar(urllib.request.HTTPRedirectHandler):
+                        def redirect_request(self,*args,**kwargs):return None
+                    cliente=urllib.request.build_opener(SemRedirecionar())
                     for uri in uris:
                         with self.subTest(uri=uri):
                             with self.assertRaises(urllib.error.HTTPError) as erro:
-                                urllib.request.urlopen("http://127.0.0.1:%d%s" % (porta, uri), timeout=2)
+                                cliente.open("http://127.0.0.1:%d%s" % (porta, uri), timeout=2)
                             self.assertEqual(erro.exception.code, 404)
                     self.assertEqual(conf.read_text(), "configuracao privada de teste")
                     if raiz_local:

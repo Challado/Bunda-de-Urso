@@ -506,7 +506,7 @@ def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http=Non
         shutil.copy2(recursos/'projeto.json',dirs['web']/'projeto.json')
         projeto = dirs["web"] / "projeto.json"
         descritor = json.loads(projeto.read_text())
-        descritor["url"] = caminhos.web_url()
+        descritor["url"] = caminhos.web_inicio()
         projeto.write_text(json.dumps(descritor, ensure_ascii=False, indent=2) + "\n")
         (recursos/'projeto.json').write_text(projeto.read_text())
         # O .pse do deploy e o unico Python publicado no webroot.
