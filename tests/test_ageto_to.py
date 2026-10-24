@@ -88,8 +88,10 @@ class TestAGETO(unittest.TestCase):
             env["RADAR_CONF"] = str(conf)
             with closing(db.connect(env["RADAR_DB"])) as conn:
                 municipios_to(conn)
+            entrada = Path(pasta) / "ageto.pdf"
+            entrada.write_bytes(PDF.read_bytes())
             comando = [sys.executable, str(ROOT / "web/api.pse"), "sync", "--fonte", "ageto_to",
-                       "--arquivo", str(PDF)]
+                       "--arquivo", str(entrada)]
             primeira = subprocess.run(comando, env=env, cwd=ROOT, capture_output=True, text=True, timeout=30)
             self.assertEqual(primeira.returncode, 0, primeira.stderr)
             resumo = json.loads(primeira.stdout)

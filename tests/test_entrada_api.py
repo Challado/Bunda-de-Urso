@@ -36,7 +36,9 @@ class TestEntradaApi(unittest.TestCase):
                               text=True, timeout=20)
 
     def test_cliente_sync_passa_pela_api_e_cgi_consulta_o_resultado(self):
-        result = self.executar("--fonte", "antt", "--arquivo", "tests/fixtures/antt_radares_fixture.json",
+        fixture = self.pasta / "antt.json"
+        fixture.write_bytes((ROOT / "tests/fixtures/antt_radares_fixture.json").read_bytes())
+        result = self.executar("--fonte", "antt", "--arquivo", str(fixture),
                                entrada="coletor/sync.py")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertGreater(json.loads(result.stdout)["criados"], 0)
@@ -50,6 +52,13 @@ class TestEntradaApi(unittest.TestCase):
                 headers, body = response.stdout.replace("\r\n", "\n").split("\n\n", 1)
                 self.assertIn("200", headers)
                 self.assertEqual(json.loads(body)["resultado"]["pontos"][0]["id"], "P-1")
+
+    def test_configuracao_selecionada_ausente_nao_usa_outra_base(self):
+        env=dict(self.env,RADAR_CONF=str(self.pasta/'inexistente.conf'))
+        r=subprocess.run([sys.executable,str(ROOT/'web/api.pse'),'pendentes'],env=env,capture_output=True,text=True,timeout=15)
+        self.assertEqual(r.returncode,2)
+        self.assertIn('configuracao nao encontrada',r.stderr)
+        self.assertFalse(self.banco.exists())
 
     def test_admin_legado_e_console_usam_a_mesma_api(self):
         result = self.executar("criar-admin", "admin-teste", entrada="tools/radar_admin.py",

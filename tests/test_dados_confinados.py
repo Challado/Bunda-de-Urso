@@ -68,3 +68,19 @@ class DadosConfinados(unittest.TestCase):
         self.assertNotIn('usuario =',novo)
         self.assertNotIn('grupo =',novo)
         self.assertEqual(configuracao._editar(novo,{}),novo)
+
+    def test_api_local_nao_pode_abrir_banco_fora_de_dados_nem_por_uri(self):
+        from core import db
+        from core.contexto_api import atendimento_local
+        fora=self.base/'fora.sqlite3'
+        with atendimento_local(), patch.object(config,'DATA_DIR',str(self.dados)):
+            with self.assertRaises(ValueError):db.connect(fora)
+            with self.assertRaises(ValueError):db.connect(fora.as_uri()+'?mode=rwc',uri=True)
+        self.assertFalse(fora.exists())
+
+    def test_importacao_local_pela_api_recusa_arquivo_fora_de_dados(self):
+        import subprocess,sys
+        root=Path(__file__).resolve().parents[1]
+        r=subprocess.run([sys.executable,str(root/'web/api.pse'),'sync','--fonte','antt','--arquivo',str(root/'tests/fixtures/antt_radares_fixture.json')],env=dict(os.environ,RADAR_CONF=str(self.conf)),capture_output=True,text=True,timeout=20)
+        self.assertNotEqual(r.returncode,0)
+        self.assertIn('dentro de [dados] dir',r.stderr+r.stdout)

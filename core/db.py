@@ -8,9 +8,10 @@ parametrizado.
 import os
 import sqlite3
 from pathlib import Path
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, urlsplit, unquote
 
-from . import config
+from . import config, caminhos
+from .contexto_api import _LOCAL
 from . import domains as _domains
 
 
@@ -18,6 +19,15 @@ def connect(path=None, *, uri=False):
     """Abre conexao SQLite com foreign_keys=ON e Row factory."""
     path = path or config.DB_PATH
     path = os.fspath(path)
+    if _LOCAL.get() and not caminhos._LEGADO.get() and path != ":memory:":
+        if uri:
+            partes = urlsplit(path)
+            if partes.scheme != "file" or partes.netloc not in ("", "localhost"):
+                raise ValueError("O banco deve ser um arquivo local dentro de dados.dir.")
+            destino = caminhos.dentro_dados(unquote(partes.path), "banco", base=config.DATA_DIR)
+            path = Path(destino).as_uri() + ("?" + partes.query if partes.query else "")
+        else:
+            path = caminhos.dentro_dados(path, "banco", base=config.DATA_DIR)
     readonly = uri and parse_qs(urlsplit(path).query).get("mode") == ["ro"]
     if path != ":memory:" and not uri:
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)

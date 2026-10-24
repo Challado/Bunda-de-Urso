@@ -18,7 +18,8 @@ import traceback
 
 from core import config
 from core import db as dbmod
-from core import atualizacoes
+from core import atualizacoes, caminhos
+from core.contexto_api import _LOCAL
 
 
 def agora_utc():
@@ -464,6 +465,8 @@ class ColetorBase(object):
         try:
             self._diario_coleta.update(etapa="download_e_leitura", origem=origem)
             atualizacoes.registrar("coleta", self._diario_coleta, fonte=recurso_id)
+            if _LOCAL.get() and not caminhos._LEGADO.get() and not str(origem).startswith(("https://", "http://")):
+                origem = caminhos.dentro_dados(os.path.abspath(origem), "arquivo de importacao", base=config.DATA_DIR)
             conteudo, ext, mime, registros = self.carregar(origem)
             self.validar_coleta(conteudo, registros)
             self._diario_coleta.update(etapa="normalizacao", recebidos=len(registros), bytes=len(conteudo),

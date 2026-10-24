@@ -184,12 +184,12 @@ class TestNormalizacaoRelacional(apoio.BaseDedup):
             alvo = Path(pasta)/'base.sqlite3'
             with contextlib.closing(db.connect(alvo)) as copia:
                 self.con.backup(copia)
-            with atendimento_local(), patch('core.caminhos.data_dir',return_value=pasta), contextlib.redirect_stdout(io.StringIO()) as saida:
+            with atendimento_local(), patch('core.config.DATA_DIR',pasta), patch('core.caminhos.data_dir',return_value=pasta), contextlib.redirect_stdout(io.StringIO()) as saida:
                 self.assertEqual(reconciliar_equipamentos.main(['--db',str(alvo)]),0)
                 self.assertEqual(json.loads(saida.getvalue())['modo'],'simulacao')
             with contextlib.closing(db.connect_readonly(alvo)) as c:
                 self.assertEqual(db.scalar(c,'SELECT COUNT(*) FROM EQUIPAMENTO'),2)
-            with atendimento_local(), patch('core.caminhos.data_dir',return_value=pasta), contextlib.redirect_stdout(io.StringIO()) as saida:
+            with atendimento_local(), patch('core.config.DATA_DIR',pasta), patch('core.caminhos.data_dir',return_value=pasta), contextlib.redirect_stdout(io.StringIO()) as saida:
                 self.assertEqual(reconciliar_equipamentos.main(['--db',str(alvo),'--aplicar']),0)
                 backup = json.loads(saida.getvalue())['backup']
             with contextlib.closing(db.connect_readonly(backup)) as c:

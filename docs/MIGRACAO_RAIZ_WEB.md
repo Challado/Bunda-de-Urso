@@ -85,3 +85,11 @@ automática de um banco antigo sobre dados novos.
 
 O acionamento remoto de `updater.psp` continua descrito em
 [PROPOSTA_UPDATER.md](PROPOSTA_UPDATER.md); esta etapa prepara a instalação.
+
+Se o arquivo selecionado não existir, a API recusa a execução (503 no CGI),
+sem procurar outra configuração ou criar uma base em outro lugar. A preparação
+local com um perfil explícito ainda pode criar o arquivo inicial.
+
+A API local também recusa `--db` e arquivos de importação fora de `dados.dir`.
+O bootstrap copia uma planilha fornecida pelo operador para `dados.dir/staging`
+antes de chamar a importação; a cópia temporária é removida depois do sucesso.

@@ -180,8 +180,10 @@ class CadastrosPublicosTest(unittest.TestCase):
                 conn.commit()
             for chave, total in CONTAGENS.items():
                 cls = FONTES[chave]
+                entrada = Path(temp) / (chave + "." + cls.FORMATO)
+                entrada.write_bytes((PASTA / entrada.name).read_bytes())
                 comando = [sys.executable, str(ROOT / "web/api.pse"), "sync", "--fonte", chave,
-                    "--arquivo", str(PASTA / (chave + "." + cls.FORMATO)), "--db", str(banco), "--sem-publicar"]
+                    "--arquivo", str(entrada), "--db", str(banco), "--sem-publicar"]
                 with self.subTest(chave=chave):
                     p = subprocess.run(comando, capture_output=True, text=True, env=env, timeout=120)
                     self.assertEqual(p.returncode, 0, p.stderr + p.stdout)

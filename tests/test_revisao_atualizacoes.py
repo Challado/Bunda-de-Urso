@@ -55,7 +55,7 @@ class RevisaoRelatoriosTest(unittest.TestCase):
 
     def test_tick_importa_erro_anterior_ao_diario_e_preserva_detalhamento_novo(self):
         self.assertEqual(self.api("ferramenta", "inicializar_banco").returncode, 0)
-        ruim = self.pasta / "invalido.json"
+        ruim = self.pasta / "dados/invalido.json"
         ruim.write_text("{nao e json")
         self.assertNotEqual(self.api("sync", "--fonte", "antt", "--arquivo", str(ruim)).returncode, 0)
         from core import caminhos

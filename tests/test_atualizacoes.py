@@ -86,7 +86,8 @@ class RelatoriosTest(unittest.TestCase):
     def test_coleta_real_pela_api_registra_contadores_hash_e_erro_completo(self):
         r = self.api("ferramenta", "inicializar_banco")
         self.assertEqual(r.returncode, 0, r.stderr)
-        arquivo = next((ROOT / "tests/fixtures").glob("antt*.json"))
+        arquivo = self.pasta / "dados/importacao.json"
+        arquivo.write_bytes(next((ROOT / "tests/fixtures").glob("antt*.json")).read_bytes())
         r = self.api("sync", "--fonte", "antt", "--arquivo", str(arquivo))
         self.assertEqual(r.returncode, 0, r.stderr)
         fonte = next(iter(self.estado()["fontes"].values()))
@@ -96,7 +97,7 @@ class RelatoriosTest(unittest.TestCase):
         self.assertTrue(fonte["erros_validacao"])
         self.assertEqual(len(fonte["hash_sha256"]), 64)
         primeiro = json.loads(Path(fonte["arquivo_relatorio"]).read_text())
-        ruim = self.pasta / "invalido.json"
+        ruim = self.pasta / "dados/invalido.json"
         ruim.write_text("{json invalido")
         r = self.api("sync", "--fonte", "antt", "--arquivo", str(ruim))
         self.assertNotEqual(r.returncode, 0)

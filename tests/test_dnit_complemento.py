@@ -130,8 +130,10 @@ class DNITComplementoTest(unittest.TestCase):
                 conn.commit()
 
             def importar(fonte, arquivo):
+                entrada = Path(temp) / Path(arquivo).name
+                entrada.write_bytes(Path(arquivo).read_bytes())
                 p = subprocess.run([sys.executable, str(ROOT / 'web/api.pse'), 'sync', '--fonte', fonte,
-                    '--arquivo', str(arquivo), '--db', str(banco), '--sem-publicar'],
+                    '--arquivo', str(entrada), '--db', str(banco), '--sem-publicar'],
                     capture_output=True, text=True, env=env, timeout=120)
                 self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
                 return json.loads(p.stdout)

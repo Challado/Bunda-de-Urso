@@ -15,6 +15,16 @@ CONF_PADRAO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 if not (os.environ.get("RADAR_CONF") or "").strip():
     os.environ["RADAR_CONF"] = CONF_PADRAO
 
+# Um arquivo selecionado ausente nunca aciona outra configuracao ou outra base.
+_cgi = bool(os.environ.get("GATEWAY_INTERFACE") or os.environ.get("REQUEST_METHOD"))
+_criar_configuracao = not _cgi and sys.argv[1:2] == ["instalacao"] and "--perfil-conf" in sys.argv
+if not os.path.isfile(os.environ["RADAR_CONF"]) and not _criar_configuracao:
+    if os.environ.get("GATEWAY_INTERFACE") or os.environ.get("REQUEST_METHOD"):
+        print('Status: 503 Service Unavailable\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-store\r\n\r\n{"erro":{"codigo":"configuracao_ausente","mensagem":"O arquivo de configuracao selecionado nao foi encontrado."}}')
+    else:
+        print("Radar Brasil: configuracao nao encontrada: " + os.environ["RADAR_CONF"], file=sys.stderr)
+    raise SystemExit(2)
+
 
 def _conf(secao, chave):
     """Le uma chave do .conf sem depender de nada (o core ainda nao existe aqui)."""
