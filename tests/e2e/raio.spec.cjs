@@ -7,7 +7,7 @@ test('raio avisa em cada mudança entre nenhum radar e radar encontrado',async({
   await page.route('https://*.tile.openstreetmap.org/**',r=>r.fulfill({status:204}));
   await page.addInitScript(()=>sessionStorage.setItem('radarCowboy','1'));
   // O equipamento da fixture fica a aproximadamente 620 m deste centro.
-  await page.goto('index.html?lat=-24.95&lon=-53.4552&raio=200');
+  await page.goto('resources/index.html?lat=-24.95&lon=-53.4552&raio=200');
   await expect(page.locator('#festa')).toBeVisible();
   await expect(page).toHaveURL(/\/resources\/index.html\?/);
   await page.evaluate(()=>{

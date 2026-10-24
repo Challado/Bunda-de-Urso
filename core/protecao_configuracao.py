@@ -7,8 +7,6 @@ import subprocess
 import urllib.parse
 
 TOKEN = re.compile(r'''\#[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[{};]|(?:\\.|\$\{[^}]*\}|[^\s{};\#'"\\])+''')
-PAGINAS = ('index.html', 'cadastro.html', 'detalhe.html', 'gestao.html',
-           'usuarios.html', 'status.html', 'status-estado.html')
 INICIO_PUBLICACAO = '# radar: inicio publicacao resources'
 FIM_PUBLICACAO = '# radar: fim publicacao resources'
 SNIPPET_RADAR = '/etc/nginx/snippets/radar-brasil.conf'
@@ -145,9 +143,6 @@ def _publicacao_texto(texto, prefixo, webroot, origem):
         if base:
             regras.append('location = '+json.dumps(base)+' { return 302 '+json.dumps(base+'/$is_args$args')+'; }')
         regras.append('location = '+json.dumps(base+'/')+' { return 302 '+json.dumps(base+'/resources/index.html$is_args$args')+'; }')
-        for pagina in (*PAGINAS,'projeto.json'):
-            regras.append('location = '+json.dumps(base+'/'+pagina)+' { return 302 '+json.dumps(base+'/resources/'+pagina+'$is_args$args')+'; }')
-        regras.append('location = '+json.dumps(base+'/status-atualizacoes.json')+' { return 302 '+json.dumps(api+'?rota=/api/v1/atualizacoes/status')+'; }')
         regras.append('location ^~ '+json.dumps(base+'/resources/')+' {\n'
                       '    alias '+json.dumps(str(Path(webroot).resolve()/'resources')+'/')+';\n'
                       '    autoindex off;\n    disable_symlinks on;\n'

@@ -33,7 +33,7 @@ async function detalhe(request,id){
 }
 
 test('simplificado envia três campos, salva e consulta sem alterar o oficial',async({page,request})=>{
-  await page.goto('cadastro.html');
+  await page.goto('resources/cadastro.html');
   await expect(page.locator('#camposExpert')).toBeHidden();
   await expect(page.locator('input:visible:not([type=radio])')).toHaveCount(3);
   await preencher(page);
@@ -56,7 +56,7 @@ test('simplificado envia três campos, salva e consulta sem alterar o oficial',a
 });
 
 test('expert aceita município e via; campos ocultos não vazam no simplificado',async({page})=>{
-  await page.goto('cadastro.html');
+  await page.goto('resources/cadastro.html');
   await page.getByRole('radio',{name:'Expert',exact:true}).check();
   await campo(page,'municipio').fill('Cascavel');await campo(page,'uf').fill('PR');
   await campo(page,'via').fill('BR-999');await campo(page,'km').fill('10,5');
@@ -71,7 +71,7 @@ test('expert aceita município e via; campos ocultos não vazam no simplificado'
 
 test('validação local impede envios incompletos ou inválidos',async({page})=>{
   let pedidos=0;page.on('request',r=>{if(r.method()==='POST')pedidos++;});
-  await page.goto('cadastro.html');await page.locator('#bt').click();
+  await page.goto('resources/cadastro.html');await page.locator('#bt').click();
   await expect(page.locator('#res')).toContainText('Informe latitude, longitude e velocidade');
   await preencher(page,'abc','-53','60');await page.locator('#bt').click();
   await expect(page.locator('#res')).toContainText('latitude e longitude válidas');
@@ -84,14 +84,14 @@ test('GPS negado mantém o envio manual disponível',async({page})=>{
   await page.addInitScript(()=>Object.defineProperty(navigator,'geolocation',{value:{
     getCurrentPosition:(_ok,erro)=>erro({code:1}),
   }}));
-  await page.goto('cadastro.html');await page.locator('#btGeo').click();
+  await page.goto('resources/cadastro.html');await page.locator('#btGeo').click();
   await expect(page.locator('#geoInfo')).toContainText('negada');
   await preencher(page);await enviar(page);
   await expect(page.locator('#res')).toContainText('Cadastro recebido');
 });
 
 test('falha de rede libera o botão, preserva os campos e permite tentar de novo',async({page,context})=>{
-  await page.goto('cadastro.html');await preencher(page);
+  await page.goto('resources/cadastro.html');await preencher(page);
   await context.setOffline(true);await page.locator('#bt').click();
   await expect(page.locator('#res')).toContainText('Não foi possível confirmar');
   await expect(page.locator('#bt')).toBeEnabled();
@@ -102,7 +102,7 @@ test('falha de rede libera o botão, preserva os campos e permite tentar de novo
 
 test('erro HTTP não prende o formulário nem anuncia sucesso',async({page})=>{
   await page.route(ROTA,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({sucesso:false,erro:{mensagem:'Serviço temporariamente indisponível'}})}));
-  await page.goto('cadastro.html');await preencher(page);await page.locator('#bt').click();
+  await page.goto('resources/cadastro.html');await preencher(page);await page.locator('#bt').click();
   await expect(page.locator('#res')).toContainText('HTTP 503');
   await expect(page.locator('#res')).not.toContainText('Cadastro recebido');
   await expect(page.locator('#bt')).toBeEnabled();
@@ -125,7 +125,7 @@ for(const temAbort of [true,false]){
       }
       await route.continue();
     });
-    await page.goto('cadastro.html');await preencher(page);await page.locator('#bt').click();
+    await page.goto('resources/cadastro.html');await preencher(page);await page.locator('#bt').click();
     const primeiro=await gravado;
     expect(primeiro.resultado.protocolo).toMatch(/^[a-f0-9]{32}$/);
     await expect(page.locator('#bt')).toHaveText('Enviando…');
@@ -154,7 +154,7 @@ for(const temAbort of [true,false]){
 test.describe('fila sem processamento imediato',()=>{
   test.use({processarFila:false});
   test('ACK mostra protocolo sem anunciar radar pronto e retoma pelo link',async({page,request})=>{
-    await page.goto('cadastro.html');await preencher(page);
+    await page.goto('resources/cadastro.html');await preencher(page);
     const [r]=await Promise.all([
       page.waitForResponse(r=>r.url().includes('radares/submeter')&&r.request().method()==='POST'),
       page.locator('#bt').click(),
@@ -166,7 +166,7 @@ test.describe('fila sem processamento imediato',()=>{
     await expect(page.locator('#res a[href*="detalhe.html"]')).toHaveCount(0);
     await expect(page.locator('#bt')).toBeEnabled();
     expect((await envio(request,protocolo)).estado).toBe('recebido');
-    await page.goto('cadastro.html?envio='+protocolo);
+    await page.goto('resources/cadastro.html?envio='+protocolo);
     await expect(page.locator('#res')).toContainText(protocolo);
     await expect(page.locator('#res')).toContainText('Aguardando processamento');
     const salvo=await page.evaluate(()=>JSON.parse(localStorage.getItem('radar.envio')));
@@ -174,20 +174,20 @@ test.describe('fila sem processamento imediato',()=>{
     expect(salvo.protocolo).toBe(protocolo);
   });
   test('protocolo inexistente não é anunciado como recebido',async({page})=>{
-    await page.goto('cadastro.html?envio='+'f'.repeat(32));
+    await page.goto('resources/cadastro.html?envio='+'f'.repeat(32));
     await expect(page.locator('#res')).toContainText('Protocolo não encontrado');
     await expect(page.locator('#res')).not.toContainText('Envio recebido e salvo');
   });
   test('armazenamento bloqueado não impede envio nem consulta pelo link',async({page})=>{
     await page.addInitScript(()=>Object.defineProperty(window,'localStorage',{get(){throw new Error('bloqueado');}}));
-    await page.goto('cadastro.html');await preencher(page);
+    await page.goto('resources/cadastro.html');await preencher(page);
     const [r]=await Promise.all([
       page.waitForResponse(r=>r.url().includes('radares/submeter')&&r.request().method()==='POST'),
       page.locator('#bt').click(),
     ]);
     const protocolo=(await r.json()).resultado.protocolo;
     await expect(page.locator('#res')).toContainText('Envio recebido e salvo');
-    await page.goto('cadastro.html?envio='+protocolo);
+    await page.goto('resources/cadastro.html?envio='+protocolo);
     await expect(page.locator('#res')).toContainText('Aguardando processamento');
   });
 });

@@ -245,6 +245,8 @@ def _bloqueios_http(raiz, origem, prefixo, aguardar=0):
             try:
                 for rel in ['radar.conf', 'radar.conf.anterior', temporario.name, generico.name,
                             'resources/'+executavel.name, 'resources/'+link.name,
+                            'index.html','cadastro.html','detalhe.html','gestao.html','usuarios.html',
+                            'status.html','status-estado.html','projeto.json','status-atualizacoes.json',
                             *(p + '/' + nome for p in PASTAS_PRIVADAS)]:
                     url = origem.rstrip('/') + prefixo.rstrip('/') + '/' + urllib.parse.quote(rel)
                     # Nao reutiliza uma resposta em cache de antes da recarga.

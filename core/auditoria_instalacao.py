@@ -225,7 +225,7 @@ def verificar_http(origem, prefixo, pagina, configuracao_privada=False):
     saude = json.loads(baixar("/api.pse?rota=/health/ready"))
     if saude.get("status") != "ready":
         raise RuntimeError("A URL publica nao retornou a prontidao da API.")
-    if baixar("/gestao.html") != pagina.read_bytes():
+    if baixar("/resources/gestao.html") != pagina.read_bytes():
         raise RuntimeError("O nginx nao esta servindo a pagina atualizada neste endereco.")
     if configuracao_privada:
         try:

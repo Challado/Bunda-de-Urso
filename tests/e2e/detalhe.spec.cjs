@@ -21,7 +21,7 @@ test('detalhe usa equipamento comum às fontes e preserva suas publicações',as
   expect(original.equipamentos[0].id).toBe(equipamento.id);
   expect(original.equipamentos[0].verificacoes_metrologicas).toHaveLength(1);
   await page.route('https://unpkg.com/**',r=>r.abort());
-  await page.goto('detalhe.html?id=P-1');
+  await page.goto('resources/detalhe.html?id=P-1');
   await expect(page.locator('#metrologia')).toContainText('Há publicação do Inmetro/PSIE');
   await expect(page.locator('#metrologia')).toContainText('24/06/2027');
   await expect(page.locator('details.fonte')).toHaveCount(2);
@@ -59,7 +59,7 @@ test.describe('radar sem série na ANTT',()=>{
       {id_registro_original:'EPI016',dados_publicados:{...prf,ESTADO:'OPERANTE'},coletado_em:'2026-10-21T17:00:00Z'}]});
     await page.route('**/api.pse?**',r=>r.fulfill({json:resposta}));
     await page.route('https://unpkg.com/**',r=>r.abort());
-    await page.goto('detalhe.html?id=P-1');
+    await page.goto('resources/detalhe.html?id=P-1');
     await expect(page.locator('#metrologia')).toContainText('Foi encontrado um registro compatível no Inmetro');
     await expect(page.locator('#metrologia')).toContainText('FSC110-0811');
     await expect(page.locator('#metrologia')).toContainText('16415173');
@@ -102,7 +102,7 @@ test('avisa sobre posição estimada e limites divergentes sem esconder valores 
   p.conflitos=[{campo:'limite_velocidade',categoria:'leves',faixa_id:'F-1',valores_kmh:[60,80]}];
   await page.route('**/api.pse?**',r=>r.fulfill({json:resposta}));
   await page.route('https://unpkg.com/**',r=>r.abort());
-  await page.goto('detalhe.html?id=P-1');
+  await page.goto('resources/detalhe.html?id=P-1');
   await expect(page.locator('#principal')).toContainText('Localização aproximada');
   await expect(page.locator('#principal')).toContainText('60 e 80 km/h');
   await expect(page.locator('.resumo')).toContainText('Limites de velocidade divergentes');
@@ -119,7 +119,7 @@ test('observações antigas da Goinfra viram campos sem perder identificadores o
   ponto.equipamentos[0].observacoes='Inspeção: consultar https://exemplo.org/doc; manter placa <img src=x onerror="window.falhou=true">';
   await page.route('**/api.pse?**',r=>r.fulfill({json:resposta}));
   await page.route('https://unpkg.com/**',r=>r.abort());
-  await page.goto('detalhe.html?id=P-1');
+  await page.goto('resources/detalhe.html?id=P-1');
   const observacoes=page.locator('section.secao').filter({has:page.locator(':scope > h2',{hasText:/^Observações$/})});
   await expect(observacoes.locator('.campo')).toHaveCount(13);
   for(const [nome,valor] of [

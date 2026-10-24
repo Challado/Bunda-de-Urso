@@ -143,7 +143,7 @@ class TestProtecaoConfiguracao(unittest.TestCase):
             if raiz_local:
                 recursos=web/'resources'
                 recursos.mkdir()
-                for nome in ('index.html','detalhe.html','status.css','status.js','municipios.json'):
+                for nome in ('index.html','detalhe.html','cadastro.html','gestao.html','usuarios.html','status.html','status-estado.html','status.css','status.js','municipios.json','projeto.json'):
                     (recursos/nome).write_text('pagina publica de teste')
                 (recursos/'segredo.json').symlink_to(conf)
                 for nome in ('executar.pse','.oculto.json','config.conf'):
@@ -213,8 +213,7 @@ class TestProtecaoConfiguracao(unittest.TestCase):
                         for nome in ('index.html','status.css','status.js','municipios.json'):
                             with urllib.request.urlopen('http://127.0.0.1:%d/radar/resources/%s'%(porta,nome),timeout=2) as r:
                                 self.assertEqual(r.status,200)
-                        with urllib.request.urlopen('http://127.0.0.1:%d/radar/detalhe.html?id=P-42'%porta,timeout=2) as r:
-                            self.assertTrue(r.url.endswith('/resources/detalhe.html?id=P-42'))
+                        uris += ['/radar/'+p for p in ('index.html','detalhe.html?id=P-42','cadastro.html','gestao.html','usuarios.html','status.html','status-estado.html','projeto.json','status-atualizacoes.json')]
                         with self.assertRaises(urllib.error.HTTPError) as erro:
                             urllib.request.urlopen('http://127.0.0.1:%d/radar/resources/segredo.json'%porta,timeout=2)
                         self.assertIn(erro.exception.code,(403,404))

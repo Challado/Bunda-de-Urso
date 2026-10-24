@@ -347,6 +347,9 @@ class TestInstalacaoAPI(unittest.TestCase):
                 if self.path == "/radar/radar.conf" and self.configuracao_privada:
                     self.send_error(404)
                     return
+                if not self.path.startswith('/radar/api.pse?') and self.path not in ('/radar/resources/gestao.html','/radar/radar.conf'):
+                    self.send_error(404)
+                    return
                 self.send_response(200)
                 self.end_headers()
                 self.wfile.write(b'{"status":"ready"}' if self.path.startswith("/radar/api.pse?") else conteudo)

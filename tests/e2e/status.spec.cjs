@@ -1,7 +1,7 @@
 const {test,expect}=require('./fixtures.cjs');
 
 test('status: 27 UFs, detalhes em nova aba, leitores e recolhimento',async({page})=>{
-  await page.goto('status.html');
+  await page.goto('resources/status.html');
   await expect(page.locator('#estados tr')).toHaveCount(27);
   await expect(page.locator('#estados tr').first()).toContainText('Acre');
   await expect(page.locator('#estados tr').last()).toContainText('Tocantins');
@@ -41,7 +41,7 @@ test('status: falha de API informa erro e permite tentar novamente',async({page}
     if(url.searchParams.get('rota')==='/api/v1/status/estados')return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({sucesso:false,erro:{mensagem:'Banco indisponível'}})});
     return route.continue();
   });
-  await page.goto('status.html');
+  await page.goto('resources/status.html');
   await expect(page.locator('#erro-cobertura')).toContainText('Banco indisponível');
   await expect(page.locator('#atualizar')).toBeEnabled();
   await page.unroute('**/api.pse?**');
@@ -51,19 +51,19 @@ test('status: falha de API informa erro e permite tentar novamente',async({page}
 });
 
 test('estado: UF sem cadastros e UF inválida',async({page})=>{
-  await page.goto('status-estado.html?uf=AC');
+  await page.goto('resources/status-estado.html?uf=AC');
   await expect(page.locator('#nome-estado')).toHaveText('Acre (AC)');
   await expect(page.locator('#progresso')).toContainText('0 de 0');
   await expect(page.locator('#mais')).toBeHidden();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
-  await page.goto('status-estado.html?uf=XX');
+  await page.goto('resources/status-estado.html?uf=XX');
   await expect(page.locator('#erro-cobertura')).toContainText('27 siglas');
 });
 
 test.describe('fontes documentais',()=>{
   test.use({comDocumentacao:true});
   test('documentos lidos mantêm cadastro pendente e erros continuam vermelhos',async({page})=>{
-    await page.goto('status.html');
+    await page.goto('resources/status.html');
     await page.locator('#filtro-leitores').fill('STTU Natal');
     const leitor=page.locator('#coletores>.leitor:visible');
     await expect(leitor).toHaveCount(1);
