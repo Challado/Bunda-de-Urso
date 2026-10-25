@@ -22,6 +22,7 @@ CAMINHOS = {("instalacao", "home"), ("dados", "dir"), ("dados", "banco"),
             ("web", "raiz"), ("logs", "dir"), ("sincronizacao", "clone"),
             ("api", "token_arquivo"), ("geografia", "malha")}
 CAMINHOS.add(("assistente", "chave_arquivo"))
+CAMINHOS.add(("traseiro", "tokens_arquivo"))
 NUMEROS = {**{("governanca", k): (1, 1000000000)
               for k in caminhos.SECOES["governanca"]},
            ("api", "max_body"): (1024, 67108864),
@@ -32,6 +33,13 @@ NUMEROS = {**{("governanca", k): (1, 1000000000)
            ("governanca", "gov_iteracoes"): (200000, 2000000)}
 NUMEROS.update({("interface", "mapa_min_percentual"): (10, 90),
                 ("interface", "mapa_min_altura_px"): (120, 600)})
+NUMEROS.update({('traseiro',k):limites for k,limites in {
+    'habilitado':(0,1),'intervalo_segundos':(1,2592000),'inatividade_numero':(1,36500),
+    'lote':(1,1000),'max_bytes':(65536,8388608),'max_pendentes':(1,1000000),
+    'max_instancias':(1,1000),'pares_por_tick':(1,100),'fontes_por_tick':(1,100),'timeout':(1,120),
+    'sondagem_segundos':(60,31536000),
+    'parada_programada':(0,1),'parar_em_segundos':(0,315360000),'retornar_em_segundos':(0,315360000),
+}.items()})
 NUMEROS.update({("assistente", k): limites for k, limites in {
     "habilitado": (0, 1), "timeout": (1, 60), "max_entrada": (1000, 60000),
     "max_saida_tokens": (128, 4096), "max_chamadas": (1, 100),
@@ -43,6 +51,7 @@ NUMEROS.update({("cadastro", k): limites for k, limites in {
 }.items()})
 EDITAVEIS_WEB = set(NUMEROS) | {("api", "proxies_confiaveis"),
                               ("assistente", "provedor"), ("assistente", "url"), ("assistente", "modelo")}
+EDITAVEIS_WEB.update({('traseiro',k) for k in ('nome','api_url','acesso','pares','inatividade_tipo')})
 
 
 def _erro(status, codigo, mensagem):
@@ -110,6 +119,21 @@ def consultar(web=False):
 
 
 def _validar(valores):
+    if any(secao=='traseiro' for secao,chave in valores) or ('api','max_body') in valores:
+        from . import traseiro
+        efetivos={k:valores.get(('traseiro',k),caminhos.valor('traseiro',k)[0]) for k in caminhos.SECOES['traseiro']}
+        if efetivos['acesso'] not in ('livre','tokens') or efetivos['inatividade_tipo'] not in ('dias','tentativas'):
+            _erro(422,'traseiro_configuracao_invalida','Use acesso=livre|tokens e inatividade_tipo=dias|tentativas.')
+        if efetivos['habilitado']=='1' and int(valores.get(('api','max_body')) or caminhos.valor('api','max_body')[0])<65536:
+            _erro(422,'traseiro_corpo_pequeno','A rede exige api.max_body de pelo menos 65536 bytes.')
+        try:
+            parada=int(efetivos['parada_programada']); inicio=int(efetivos['parar_em_segundos']); fim=int(efetivos['retornar_em_segundos'])
+            if (not parada and (inicio or fim)) or (parada and fim and fim<=inicio):
+                raise ValueError()
+        except (ValueError,TypeError):
+            _erro(422,'traseiro_pausa_invalida','Parada cancelada exige prazos zerados; retorno deve ser posterior a parada ou zero para nao retornar.')
+        for u in filter(None,[efetivos['api_url']]+[s.strip() for s in efetivos['pares'].split(',')]):
+            traseiro.url_publica(u,api=True)
     for par, texto in valores.items():
         if not isinstance(texto, str) or len(texto) > 2048 or any(
                 ord(c) < 32 or ord(c) == 127 for c in texto):
@@ -192,6 +216,7 @@ def _validar_destinos(alteracoes):
     operacionais = {("dados", "banco"): "radar.sqlite3", ("logs", "dir"): "logs",
                     ("api", "token_arquivo"): "api_token", ("assistente", "chave_arquivo"): "assistente_chave",
                     ("geografia", "malha"): "", ("sincronizacao", "clone"): ""}
+    operacionais[('traseiro','tokens_arquivo')]='traseiro_tokens.json'
     # Conferir tambem valores que nao foram editados: mudar dados.dir nao pode
     # deixar um token/log/malha absoluto apontando para a antiga raiz.
     for par, padrao in operacionais.items():

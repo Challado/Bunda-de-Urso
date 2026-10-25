@@ -1,0 +1,284 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Challado/Bunda-de-Urso/main/web/resources/intercambio-v1.schema.json",
+  "title": "Intercambio de Instancias v1",
+  "description": "Contrato generico de metadados, disponibilidade e lotes; tipos de documento sao adaptadores negociados.",
+  "$defs": {
+    "Configuracao": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intervalo_segundos",
+        "lote",
+        "max_bytes",
+        "parada_programada",
+        "parar_em_segundos",
+        "retornar_em_segundos",
+        "anuncio_id"
+      ],
+      "properties": {
+        "intervalo_segundos": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2592000
+        },
+        "lote": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "max_bytes": {
+          "type": "integer",
+          "minimum": 65536,
+          "maximum": 8388608
+        },
+        "parada_programada": {
+          "type": "boolean"
+        },
+        "parar_em_segundos": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 315360000
+        },
+        "retornar_em_segundos": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 315360000
+        },
+        "anuncio_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        }
+      }
+    },
+    "Identidade": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "uuid",
+        "nome",
+        "api_url",
+        "aplicacao",
+        "protocolo",
+        "configuracao",
+        "capacidades"
+      ],
+      "properties": {
+        "uuid": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "nome": {
+          "type": "string",
+          "maxLength": 120,
+          "minLength": 1
+        },
+        "api_url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "aplicacao": {
+          "type": "string",
+          "maxLength": 120,
+          "minLength": 1
+        },
+        "protocolo": {
+          "const": {
+            "nome": "intercambio-instancias",
+            "versao": 1
+          }
+        },
+        "configuracao": {
+          "$ref": "#/$defs/Configuracao"
+        },
+        "capacidades": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tipos_evento"
+          ],
+          "properties": {
+            "tipos_evento": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              "maxItems": 32,
+              "uniqueItems": true
+            }
+          }
+        }
+      }
+    },
+    "Evento": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "uuid",
+        "origem",
+        "tipo",
+        "chave",
+        "revisao",
+        "acao",
+        "documento"
+      ],
+      "properties": {
+        "uuid": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "origem": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tipo": {
+          "type": "string",
+          "maxLength": 120,
+          "minLength": 1
+        },
+        "chave": {
+          "type": "string",
+          "maxLength": 160,
+          "minLength": 1
+        },
+        "revisao": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "acao": {
+          "enum": [
+            "publicar",
+            "retirar"
+          ]
+        },
+        "documento": {
+          "type": "object"
+        }
+      }
+    },
+    "Pedido": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eventos",
+        "depois",
+        "limite"
+      ],
+      "properties": {
+        "eventos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Evento"
+          },
+          "maxItems": 1000
+        },
+        "depois": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "limite": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      }
+    },
+    "Resultado": {
+      "type": "object",
+      "properties": {
+        "recebidos": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "novos": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "repetidos": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cursor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mais": {
+          "type": "boolean"
+        },
+        "eventos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Evento"
+          }
+        },
+        "instancias": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identidade"
+          }
+        },
+        "adiado": {
+          "type": "boolean"
+        },
+        "pausado": {
+          "type": "boolean"
+        },
+        "intervalo_segundos": {
+          "type": "integer"
+        },
+        "retornar_em_segundos": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "Resposta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sucesso",
+        "rede",
+        "resultado"
+      ],
+      "properties": {
+        "sucesso": {
+          "const": true
+        },
+        "rede": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "consultado",
+            "consultante"
+          ],
+          "properties": {
+            "consultado": {
+              "$ref": "#/$defs/Identidade"
+            },
+            "consultante": {
+              "$ref": "#/$defs/Identidade"
+            }
+          }
+        },
+        "resultado": {
+          "$ref": "#/$defs/Resultado"
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Pedido"
+    },
+    {
+      "$ref": "#/$defs/Resposta"
+    }
+  ]
+}

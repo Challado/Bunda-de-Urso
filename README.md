@@ -1,5 +1,7 @@
 # BUNDA DE URSO
 
+**Documentação:** [API e exportação — JSON, NDJSON, XML, TXT, DIF e EDIFACT](docs/API_E_EXPORTACAO.md) · [Rede e intercâmbio](docs/INTERCAMBIO_INSTANCIAS.md) · [Histórico](CHANGELOG.md)
+
 
 Configuração atual: só `RADAR_CONF` seleciona o arquivo. Banco, logs, tokens,
 chaves, fila e cache ficam dentro de `[dados] dir`; `banco = radar.sqlite3`
@@ -13,7 +15,7 @@ descrita em [Migração para a raiz web](docs/MIGRACAO_RAIZ_WEB.md). A migraçã
 
 [![Validação](https://github.com/Challado/Bunda-de-Urso/actions/workflows/testes.yml/badge.svg)](https://github.com/Challado/Bunda-de-Urso/actions/workflows/testes.yml)
 
-[Acessar Radar Brasil](https://servidor3.lucas.inf.br/openclaw/radar/) · [Código no GitHub](https://github.com/Challado/Bunda-de-Urso)
+[Histórico de alterações](CHANGELOG.md) · [Acessar Radar Brasil](https://servidor3.lucas.inf.br/openclaw/radar/) · [Código no GitHub](https://github.com/Challado/Bunda-de-Urso)
 
 ![Bunda de Urso — a bunda do urso com o radar tatuado](docs/bunda-de-urso.png)
 
@@ -192,6 +194,8 @@ O tipo de equipamento (fixo, portátil), a função (controlador, redutor), o se
 
 ## API e formatos
 
+**[Guia completo de consulta e exportação](docs/API_E_EXPORTACAO.md)**: exemplos de `/radares`, NDJSON linha a linha, 32 colunas TXT, paginação e download de todas as páginas.
+
 A API web (arquivo `.pse`: **nginx + fcgiwrap + Python**, explicado acima) oferece consultas por latitude, longitude e raio (até **1000 km**); identificação do equipamento; UF, rodovia e quilômetro; além de fontes, atualizações, situação do serviço, operações, trechos e tráfego.
 
 Os endpoints da API são:
@@ -199,7 +203,7 @@ Os endpoints da API são:
 - `/api/v1/radares`
 - `/api/v1/radares/{id}`
 - `/api/v1/radares/busca`
-- `/api/v1/equipamentos` e `/api/v1/equipamentos/{id}`
+- `/api/v1/equipamentos/{id}`
 - `/api/v1/fontes` e `/api/v1/fontes/{id}`
 - `/api/v1/atualizacoes`
 - `/api/v1/operacoes`
@@ -281,6 +285,10 @@ O serviço publicado responde em:
 
 ## Instalação e operação
 
+Rede de radares: [TRASEIRO DE URSO](docs/TRASEIRO_DE_URSO.md).
+Integração com outros sistemas: [protocolo de Intercâmbio de Instâncias](docs/INTERCAMBIO_INSTANCIAS.md), com cliente independente e JSON Schema.
+
+
 A especificação funcional é o `ESPECIFICACAO_v1.1.txt`; a referência técnica do código está em `docs/README_TECNICO.md`, `docs/LOCALIZADOR_GEOGRAFICO_V1_4.md`, `docs/CRUZAMENTO_DE_CAMPOS.md` e `docs/REQUISITOS_VIGENTES_2026-10-10.md`.
 
 Sem pip, sem instalação: basta ter Python 3. Gera as DDLs, sincroniza uma fonte e serve a API:
@@ -314,15 +322,10 @@ python3 -m unittest discover -s tests
 
 O ambiente web requer Nginx, fcgiwrap, Python e permissão controlada de acesso ao banco local. Antes de colocar em produção, testar autenticação administrativa, configurações, permissões, atualização, formatos e recuperação de falhas.
 
-## Situação real do desenvolvimento
-
-O projeto implementa a **ESPECIFICACAO_v1.1.txt (10/10/2026)**: coletor/sincronizador, API `.pse`, esquema relacional de **78 tabelas base**, resolvedor geográfico, serializadores em seis formatos, documentação e testes automatizados locais (stdlib `unittest`). Os testes locais não equivalem à homologação das coletas reais em todo o Brasil.
-
-**Ainda precisam de trabalho e validação:** integração e importação real de todas as fontes federais, estaduais e municipais; resolução das coordenadas ausentes; homologação de cada formato e SGBD utilizado; verificação de qualidade e atualização de cada órgão; aferição da cobertura nacional; avaliação de licenças para redistribuição de cada conjunto de dados.
-
-O projeto não deve divulgar percentuais de cobertura, contagens nacionais ou precisão de localização sem medi-los efetivamente. Equipamentos sem coordenada comprovada continuam no inventário para investigação — porque apagar o que não sabemos localizar seria a pior lamúria de todas: esconder o problema debaixo do tapete.
-
 ## Validação automática (CI)
+
+Os testes de [layouts e interações](docs/TESTES_LAYOUTS.md) cobrem celular, tablet e PC nos três motores, incluindo a gestão da rede.
+
 
 O workflow **Navegadores** testa o cadastro em Firefox e Chromium, com desktop
 e tela estreita/toque, CGI e SQLite reais. Inclui rede indisponível, prazo de
@@ -413,14 +416,3 @@ terminal. Atualizações preservam o arquivo do servidor. Veja `docs/CONFIGURACA
 
 A página de status por UF e dos leitores é acessada diretamente, sem link na
 home. Consulte [o funcionamento e as regras de contagem](docs/STATUS.md).
-
-### Layouts e interações no CI
-
-Celular e tablet deixam a página rolar normalmente, com todos os radares abaixo
-do mapa. No PC, o mapa e a lista se ajustam à tela, com painel recolhível quando necessário.
-
-O workflow **Layouts e interacoes** valida 18 perfis de celular, tablet e PC em
-Chromium, Firefox e WebKit, com 432 verificações de rolagem, clique/toque,
-navegação, cadastro e altura do mapa. Roda automaticamente em push/main e PR,
-além de permitir acionamento manual. Relatórios, screenshots, medidas e traces
-ficam nos artefatos por 14 dias. Veja [a matriz e os cenários](docs/TESTES_LAYOUTS.md).

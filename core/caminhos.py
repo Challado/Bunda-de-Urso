@@ -47,6 +47,9 @@ SECOES = {
     "dados": ("dir", "banco"),
     "web": ("raiz", "url", "origem"),
     "interface": ("mapa_min_percentual", "mapa_min_altura_px"),
+    "traseiro": ("habilitado", "nome", "api_url", "acesso", "tokens_arquivo", "pares",
+                 "intervalo_segundos", "parada_programada", "parar_em_segundos", "retornar_em_segundos", "inatividade_tipo", "inatividade_numero",
+                 "lote", "max_bytes", "max_pendentes", "max_instancias", "pares_por_tick", "fontes_por_tick", "sondagem_segundos", "timeout"),
     "logs": ("dir",),
     "sincronizacao": ("clone", "remoto"),
     "api": ("token_arquivo", "max_body", "proxies_confiaveis"),
@@ -62,6 +65,26 @@ SECOES = {
 }
 # Apenas valores de instalacao. Segredos continuam em arquivos separados.
 PADROES = {
+    ("traseiro", "habilitado"): "0",
+    ("traseiro", "nome"): "TRASEIRO DE URSO",
+    ("traseiro", "api_url"): "",
+    ("traseiro", "acesso"): "tokens",
+    ("traseiro", "tokens_arquivo"): "traseiro_tokens.json",
+    ("traseiro", "pares"): "",
+    ("traseiro", "intervalo_segundos"): "300",
+    ("traseiro", "parada_programada"): "0",
+    ("traseiro", "parar_em_segundos"): "0",
+    ("traseiro", "retornar_em_segundos"): "0",
+    ("traseiro", "inatividade_tipo"): "tentativas",
+    ("traseiro", "inatividade_numero"): "5",
+    ("traseiro", "lote"): "100",
+    ("traseiro", "max_bytes"): "2097152",
+    ("traseiro", "max_pendentes"): "10000",
+    ("traseiro", "max_instancias"): "100",
+    ("traseiro", "pares_por_tick"): "4",
+    ("traseiro", "fontes_por_tick"): "1",
+    ("traseiro", "sondagem_segundos"): "86400",
+    ("traseiro", "timeout"): "15",
     ("interface", "mapa_min_percentual"): "50",
     ("interface", "mapa_min_altura_px"): "180",
     ("web", "origem"): "",
@@ -241,7 +264,7 @@ def caminho(secao, chave, padrao="", env=None):
     if not bruto:
         return ""
     if (secao, chave) in {("dados", "banco"), ("logs", "dir"), ("api", "token_arquivo"),
-                          ("assistente", "chave_arquivo"), ("geografia", "malha"), ("sincronizacao", "clone")}:
+                          ("traseiro", "tokens_arquivo"), ("assistente", "chave_arquivo"), ("geografia", "malha"), ("sincronizacao", "clone")}:
         return dentro_dados(bruto, secao + "." + chave)
     return _absoluto(bruto, origem)
 
@@ -373,6 +396,7 @@ def validar_operacionais():
     banco()
     log_dir()
     token_arquivo()
+    caminho("traseiro", "tokens_arquivo")
     caminho("assistente", "chave_arquivo", "assistente_chave")
     caminho("geografia", "malha")
     sync_clone()

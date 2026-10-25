@@ -10,9 +10,10 @@ const test = base.extend({
   comMetrologia: [false, {option:true}],
   comGestao: [false, {option:true}],
   comDocumentacao: [false, {option:true}],
+  comTraseiro: [false, {option:true}],
   credenciaisGestao: async ({},use)=>use({login:'gestao-e2e',senha:randomUUID()+'aA1'}),
-  radarServer: async ({processarFila,comMetrologia,comGestao,comDocumentacao,credenciaisGestao},use) => {
-    const child=spawn(process.env.RADAR_TEST_PYTHON || 'python3', [path.join(__dirname,'servidor.py'),...(processarFila?[]:['--sem-fila']),...(comMetrologia?['--com-metrologia']:[]),...(comMetrologia==='cadastral'?['--correspondencia-cadastral']:[]),...(comGestao?['--com-gestao']:[]),...(comDocumentacao?['--com-documentacao']:[])], {stdio:['ignore','pipe','pipe'],env:{...process.env,...(comGestao?{RADAR_TEST_ADMIN_SENHA:credenciaisGestao.senha}:{})}});
+  radarServer: async ({processarFila,comMetrologia,comGestao,comDocumentacao,comTraseiro,credenciaisGestao},use) => {
+    const child=spawn(process.env.RADAR_TEST_PYTHON || 'python3', [path.join(__dirname,'servidor.py'),...(processarFila?[]:['--sem-fila']),...(comMetrologia?['--com-metrologia']:[]),...(comMetrologia==='cadastral'?['--correspondencia-cadastral']:[]),...(comGestao?['--com-gestao']:[]),...(comDocumentacao?['--com-documentacao']:[]),...(comTraseiro?['--com-traseiro']:[])], {stdio:['ignore','pipe','pipe'],env:{...process.env,...(comGestao?{RADAR_TEST_ADMIN_SENHA:credenciaisGestao.senha}:{})}});
     let stderr='';child.stderr.on('data',chunk=>{stderr+=chunk.toString();});
     const lines=readline.createInterface({input:child.stdout});
     let timer;

@@ -38,7 +38,7 @@ def main(argv=None):
             from .configuracao import main as configurar
             return configurar(argumentos[1:])
         if argumentos[:1] == ["cron"]:
-            if argumentos[1:2] not in (["tick"], ["fila"]):
+            if argumentos[1:2] not in (["tick"], ["fila"], ["traseiro"]):
                 print("Operacao de cron desconhecida.", file=sys.stderr)
                 return 2
             from . import caminhos
@@ -48,7 +48,11 @@ def main(argv=None):
                 sys.stderr.flush()
                 os.dup2(log.fileno(), 1)
                 os.dup2(log.fileno(), 2)
-                argumentos = (["fila", "processar"] if argumentos[1] == "fila" else argumentos[1:])
+                argumentos = (["fila", "processar"] if argumentos[1] == "fila" else
+                              ["traseiro", "sincronizar"] if argumentos[1] == "traseiro" else argumentos[1:])
+        if argumentos[:1] == ["traseiro"]:
+            from .traseiro_console import main as traseiro
+            return traseiro(argumentos[1:])
         if argumentos[:1] == ["fila"]:
             from .fila_cadastros import main as fila
             return fila(argumentos[1:])

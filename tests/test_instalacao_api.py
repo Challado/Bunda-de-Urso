@@ -179,7 +179,7 @@ class TestInstalacaoAPI(unittest.TestCase):
                   "* * * * * echo /antigo/bin/radar-tick.sh",
                   "# * * * * * /antigo/bin/radar-tick.sh"]
         novo = _cron_tick("\n".join(linhas) + "\n", wrapper)
-        self.assertEqual(novo.splitlines(), linhas[-2:] + ["* * * * * " + str(wrapper), "* * * * * " + str(wrapper.with_name("radar-api.pse")) + " cron fila"])
+        self.assertEqual(novo.splitlines(), linhas[-2:] + ["* * * * * " + str(wrapper), "* * * * * " + str(wrapper.with_name("radar-api.pse")) + " cron fila", "* * * * * " + str(wrapper.with_name("radar-api.pse")) + " cron traseiro"])
 
     def test_cron_fila_independente_e_diretorio_preservado_ao_atualizar(self):
         wrapper = self.home.parent / "radar-tick.sh"

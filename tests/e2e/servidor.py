@@ -25,6 +25,9 @@ def main():
         conf = base / 'radar.conf'
         conf.write_text('[instalacao]\nhome = %s\n[dados]\ndir = %s\nbanco = %s\n[governanca]\nsubmissao_limite = 100\n' %
                         (ROOT, base, base / 'radar.sqlite3'))
+        if '--com-traseiro' in sys.argv:
+            with conf.open('a') as f:
+                f.write('[web]\norigem = https://local.example.org\nurl = /openclaw/radar/\n[traseiro]\nhabilitado = 1\nacesso = livre\nintervalo_segundos = 1\n')
         ambiente = {k:v for k,v in os.environ.items() if not k.startswith(('RADAR_', 'OLLAMA_')) and
                     k not in ('REQUEST_METHOD','GATEWAY_INTERFACE','QUERY_STRING','PATH_INFO')}
         ambiente.update(RADAR_CONF=str(conf), PYTHONDONTWRITEBYTECODE='1')
@@ -122,6 +125,8 @@ def main():
                 if urlsplit(self.path).path != PREFIXO+'/api.pse':
                     return self.send_error(404)
                 return self.api()
+
+            do_PATCH = do_POST
 
         parar = threading.Event()
         def consumir_fila():

@@ -129,6 +129,7 @@
     <nav class="abas">
       <button data-aba="pendentes" class="on">Pendentes</button>
       <button data-aba="radar">Radar</button>
+      <button data-aba="traseiro">TRASEIRO DE URSO</button>
       <button data-aba="cruzamentos" hidden>Cruzamentos</button>
       <button data-aba="bloqueios">Bloqueios</button>
       <button data-aba="tokens">Tokens</button>
@@ -136,6 +137,29 @@
       <button data-aba="assistente" hidden>Assistência</button>
       <a href="usuarios.html">Usuários &rarr;</a>
     </nav>
+
+    <section id="aba-traseiro" class="aba" hidden>
+      <h2>TRASEIRO DE URSO</h2>
+      <p>Rede de instâncias do Bunda de Urso. As posições recebidas aguardam conferência
+      nesta fila separada. Validar publica a posição no cadastro oficial desta instância,
+      preservando a origem da rede. Fontes ensinadas ficam desativadas até autorização local.</p>
+      <button id="trRecarregar" type="button" class="sec">Recarregar rede</button>
+      <p id="trMensagem" role="status" aria-live="polite"></p>
+      <div id="trResumo"></div>
+      <details open><summary>Instâncias e disponibilidade</summary><div id="trInstancias"></div></details>
+      <details open><summary>Cadastros da rede</summary><div id="trCadastros"></div>
+        <button id="trMaisCadastros" type="button" class="sec">Próximos cadastros</button></details>
+      <details><summary>Fontes ensinadas</summary><div id="trFontes"></div>
+        <button id="trMaisFontes" type="button" class="sec">Próximas fontes</button>
+        <form id="trEnsinar" hidden>
+          <h3>Ensinar uma fonte à rede</h3>
+          <label>Identificador estável da fonte <input name="chave" required maxlength="160"></label>
+          <label>Receita JSON (URL pública e mapeamento de colunas)
+            <textarea name="receita" rows="9" required maxlength="32768" style="width:100%;max-width:100%"></textarea></label>
+          <button type="submit">Compartilhar fonte desativada</button>
+        </form>
+      </details>
+    </section>
 
     <section id="aba-configuracao" class="aba" hidden>
       <p class="aviso">As configurações ficam no servidor e são preservadas nas atualizações.
@@ -280,6 +304,7 @@
   </div>
 </div>
 
+<script src="resources/traseiro.js"></script>
 <script>
 (function(){
   "use strict";
@@ -411,6 +436,7 @@
     if (nome === "tokens" && ehAdmin()) carregarTokens();
     if (nome === "configuracao" && ehAdmin()) carregarConfiguracao();
     if (nome === "assistente" && ehAdmin()) carregarAssistente();
+    if (nome === "traseiro") RadarTraseiro.carregar({req:req,esc:esc,ehAdmin:ehAdmin,ehModerador:ehModerador});
   }
   abas.forEach(function(b){ b.addEventListener("click", function(){ trocarAba(b.getAttribute("data-aba")); }); });
 

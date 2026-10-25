@@ -17,7 +17,7 @@ for(const browserName of ['chromium','firefox','webkit']){
   }
 }
 module.exports=defineConfig(base,{
-  testMatch:'**/layouts.responsivo.spec.cjs',
+  testMatch:['**/layouts.responsivo.spec.cjs','**/traseiro.spec.cjs'],
   testIgnore:[],
   timeout:45000,
   outputDir:'test-results-layouts',

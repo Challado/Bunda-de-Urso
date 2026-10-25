@@ -265,12 +265,13 @@ def _cron_tick(texto, wrapper):
     linhas = []
     for linha in texto.splitlines():
         # Troca somente a linha ativa que chama exatamente este wrapper.
-        if auditoria.comando_coletor(linha, wrapper) or auditoria.comando_fila(linha):
+        if auditoria.comando_coletor(linha, wrapper) or auditoria.comando_fila(linha) or auditoria.comando_mesh(linha):
             continue
         linhas.append(linha)
     # O wrapper nao contem caminhos variaveis de dados ou log.
     linhas.append("* * * * * " + shlex.quote(str(wrapper)))
     linhas.append("* * * * * " + shlex.quote(str(wrapper.with_name("radar-api.pse"))) + " cron fila")
+    linhas.append("* * * * * " + shlex.quote(str(wrapper.with_name("radar-api.pse"))) + " cron traseiro")
     return "\n".join(linhas) + "\n"
 
 

@@ -17,6 +17,7 @@ serve a web (CGI) e o terminal:
     ./api.pse excluir-usuario <login>     # exclui em definitivo (pede confirmacao)
     ./api.pse tokens | bloqueios | historico P-1130
     ./api.pse ajuda
+    ./api.pse traseiro --help    # rede mesh e intercambio entre sistemas
 
 Usa a MESMA camada do app (core.governanca) — o console e o proprio app, nao
 um caminho paralelo para o banco.

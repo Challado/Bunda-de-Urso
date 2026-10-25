@@ -106,3 +106,36 @@ max_pendentes = 10000
 lote = 20
 tentativas = 5
 retencao_dias = 30
+
+# TRASEIRO DE URSO - rede mesh. Nao consulta nada enquanto habilitado=0.
+[traseiro]
+habilitado = 0
+nome = TRASEIRO DE URSO
+# Vazio deriva de web.origem + web.url + api.pse. Use HTTPS publico.
+api_url =
+# livre ou tokens. Tokens/chaves nunca sao enviados no bloco publico.
+acesso = tokens
+tokens_arquivo = traseiro_tokens.json
+# APIs iniciais separadas por virgula; novos pares sao descobertos pela rede.
+pares =
+# Intervalo minimo que OS OUTROS devem esperar para consultar ESTA instancia.
+intervalo_segundos = 300
+# O tipo seleciona EXCLUSIVAMENTE um criterio, usando o mesmo numero.
+inatividade_tipo = tentativas
+inatividade_numero = 5
+# Prazos contados uma vez ao armar/alterar a programacao; nao a cada consulta.
+# Com parada_programada=1: parar daqui N s, retornar daqui M s.
+# Retorno 0 significa nao voltar. Instancia parada nao pode consultar pares.
+# Para cancelar, desative a programacao e zere os dois prazos.
+parada_programada = 0
+parar_em_segundos = 0
+retornar_em_segundos = 0
+lote = 100
+max_bytes = 2097152
+max_pendentes = 10000
+max_instancias = 100
+pares_por_tick = 4
+fontes_por_tick = 1
+# Servidor inativo por falha pode ser sondado; parada anunciada nunca e sondada.
+sondagem_segundos = 86400
+timeout = 15

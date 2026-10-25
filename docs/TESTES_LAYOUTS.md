@@ -2,7 +2,7 @@
 
 O workflow `Layouts e interacoes` roda em cada push no main, pull request e
 acionamento manual. A matriz é definida em `tests/e2e/resolucoes.cjs`:
-18 perfis × 3 motores × 8 testes = **432 verificações**, distribuídas em nove
+18 perfis × 3 motores × 9 testes = **486 verificações**, distribuídas em nove
 jobs (navegador × celular/tablet/PC). Cada grupo continua mesmo se outro falhar.
 Não usa dados, credenciais, nginx ou banco da produção.
 
@@ -104,3 +104,7 @@ npx playwright test --config=playwright.layouts.config.cjs --project="chromium-t
 ```
 
 Os testes não configuram o servidor de produção nem precisam ser executados lá.
+
+A matriz inclui a gestao do TRASEIRO DE URSO: cadastro separado, validacao local,
+publicacao e receita de fonte inicialmente desativada. O protocolo generico
+e exercitado tambem por cliente independente, sem dependencias do Radar.

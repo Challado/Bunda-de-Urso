@@ -135,7 +135,7 @@ def _rebase_cache(banco, anterior, novo):
 
 def _remover_cron(texto, antigo):
     linhas = [l for l in texto.splitlines()
-              if not auditoria.comando_coletor(l, antigo / 'radar-tick.sh') and not auditoria.comando_fila(l) and '# radar-raiz-web ' not in l]
+              if not auditoria.comando_coletor(l, antigo / 'radar-tick.sh') and not auditoria.comando_fila(l) and not auditoria.comando_mesh(l) and '# radar-raiz-web ' not in l]
     return '\n'.join(linhas) + ('\n' if linhas else '')
 
 
@@ -146,7 +146,7 @@ def _cron(texto, antigo, raiz, usuario, conf=None):
         'env',
         '-u','RADAR_BRASIL_HOME','-u','RADAR_DATA_DIR','-u','RADAR_DB','-u','RADAR_WEB_ROOT','-u','RADAR_LOG_DIR',
         'RADAR_CONF='+str(conf or raiz/'radar.conf'), sys.executable, str(raiz / 'api.pse')))
-    linhas.extend('* * * * * ' + comando + ' cron ' + tarefa + ' # radar-raiz-web ' + tarefa for tarefa in ('tick', 'fila'))
+    linhas.extend('* * * * * ' + comando + ' cron ' + tarefa + ' # radar-raiz-web ' + tarefa for tarefa in ('tick', 'fila', 'traseiro'))
     return '\n'.join(linhas) + '\n'
 
 
@@ -158,8 +158,8 @@ def _checagens_cron(antigo, raiz, usuario, conf=None, final=True):
             esperado = (_remover_cron(atual, antigo) if nome == 'root'
                         else _cron(atual, antigo, raiz, usuario, conf))
             correto = atual == esperado
-            detalhe = ('nenhuma tarefa de coleta/fila do Radar no root' if nome == 'root'
-                       else 'coleta e fila pela API, uma passada por minuto como '+usuario)
+            detalhe = ('nenhuma tarefa de coleta/fila/rede do Radar no root' if nome == 'root'
+                       else 'coleta, fila e rede independentes pela API, uma passada por minuto como '+usuario)
             if not correto:
                 detalhe = ('ainda ha tarefas de coleta/fila do Radar no root' if nome == 'root'
                            else 'coleta/fila ausentes, duplicadas ou com comando divergente')

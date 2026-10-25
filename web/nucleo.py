@@ -71,6 +71,8 @@ PARAMS = [
 ]
 
 ENDPOINTS_AJUDA = {
+    "/api/v1/intercambio/identidade": ["GET"],
+    "/api/v1/intercambio/trocar": ["POST"],
     "/api/v1/interface": ["GET"],
     "/api/v1/status/estados": ["GET"],
     "/api/v1/status/estados/{uf}": ["GET"],
@@ -99,6 +101,12 @@ ENDPOINTS_AJUDA = {
 }
 
 ENDPOINTS_ADMINISTRATIVOS = {
+    "/api/v1/gestao/traseiro": ["GET"],
+    "/api/v1/gestao/traseiro/cadastros": ["GET"],
+    "/api/v1/gestao/traseiro/cadastros/{id}": ["POST"],
+    "/api/v1/gestao/traseiro/fontes": ["GET", "POST"],
+    "/api/v1/gestao/traseiro/fontes/{id}": ["PATCH"],
+    "/api/v1/gestao/traseiro/instancias/{uuid}": ["PATCH"],
     "/api/v1/gestao/assistente": ["GET", "POST"],
     "/api/v1/gestao/assistente/chave": ["PUT", "DELETE"],
     "/api/v1/gestao/assistente/relatorios/{id}": ["GET"],
@@ -125,6 +133,8 @@ ENDPOINTS_ADMINISTRATIVOS = {
 }
 
 ENDPOINTS_DESC = {
+    "/api/v1/intercambio/identidade": "Identidade e limites publicos da rede; exige cabecalho X-Interchange-Info e token se configurado.",
+    "/api/v1/intercambio/trocar": "Registro automatico e troca bidirecional de um lote; negocia intervalo e pausas; dados recebidos aguardam validacao local.",
     "/api/v1/interface": "Limites publicos de altura do mapa definidos no radar.conf, sem acesso ao banco.",
     "/api/v1/atualizacoes/status": "Relatorio consolidado das atualizacoes, em JSON e sem acesso ao banco.",
     "/api/v1/status/estados": "Contagem de pontos unicos nas 27 UFs por esfera de fiscalizacao; inclui nao classificados.",
@@ -1204,6 +1214,10 @@ def handle_request(environ, stdin_bytes=b""):
                      "banco local ausente ou nao inicializado")
 
     try:
+        from web.traseiro import atender as atender_traseiro
+        mesh = atender_traseiro(conn, caminho.rstrip('/'), metodo, environ, stdin_bytes)
+        if mesh is not None:
+            return mesh
         gov = _dispatch_governanca(conn, caminho, metodo, environ, stdin_bytes)
         if gov is not None:
             return gov
