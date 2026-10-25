@@ -153,9 +153,10 @@ class TestRaizWeb(unittest.TestCase):
         novo,n=proteger_texto(fonte,'/radar/','/srv/www/radar','',raiz_local=True)
         self.assertEqual(n,1)
         self.assertIn('fastcgi_pass unix:/socket;',novo)
-        self.assertIn('location ^~ "/radar/" { return 404; }',novo)
+        self.assertIn('location "/radar/" { return 404; }',novo)
         self.assertIn('location ^~ "/radar/resources/"',novo)
-        self.assertIn('location = "/radar/api.pse"',novo)
+        self.assertNotIn('location = "/radar/api.pse"',novo)
+        self.assertEqual(novo.count('fastcgi_pass'),1)
         self.assertEqual(proteger_texto(novo,'/radar/','/srv/www/radar','',raiz_local=True)[0],novo)
 
     def test_bloqueio_http_nao_aceita_arquivo_publico_com_200(self):

@@ -88,31 +88,27 @@ def proteger_texto(texto, prefixo, webroot, origem, raiz_local=False):
 
 
 def _publicacao_texto(texto, prefixo, webroot, origem):
-    """Duas areas publicas: API exata e arquivos estaticos em resources/."""
+    """Mantem o CGI generico .pse e publica estaticos somente em resources/."""
     original=texto
     base = prefixo.rstrip('/')
     api = base+'/api.pse'
     blocos, diretivas = _analisar(texto)
-    handlers = {}
-    def atende_api(bloco):
+    handlers = set()
+    def atende_scripts_pse(bloco):
         palavras=bloco['palavras'][1:]
-        if palavras[:1]==['=']:
-            return palavras[1:]==[api]
         if palavras[:1] in (['~'],['~*']):
-            try:return bool(re.search(palavras[1],api,re.I if palavras[0]=='~*' else 0))
+            try:
+                flags=re.I if palavras[0]=='~*' else 0
+                return all(re.search(palavras[1],uri,flags) for uri in (api,base+'/novo-programa.pse'))
             except re.error:return False
-        if palavras[:1]==['^~']:
-            return len(palavras)>1 and api.startswith(palavras[1])
-        return bool(palavras and api.startswith(palavras[0]))
+        return False
     for i, servidor in enumerate(b for b in blocos if b['palavras']==['server']):
         candidatos = [b for b in blocos if b['pai'] is servidor and b['palavras'][:1]==['location']
-                      and atende_api(b)
+                      and atende_scripts_pse(b)
                       and any(d['pai'] is b and d['palavras'][:1]==['fastcgi_pass'] for d in diretivas)]
-        candidatos.sort(key=lambda b:b['palavras']!=['location','=',api])
         if candidatos:
-            b=candidatos[0]
-            handlers[i]=texto[b['abertura']:b['fim']-1].strip()
-    # O template CGI e preservado antes de retirar a secao gerenciada anterior.
+            handlers.add(i)
+    # O handler generico do operador permanece fora da secao gerenciada.
     texto=re.sub(re.escape(INICIO_PUBLICACAO)+r'.*?'+re.escape(FIM_PUBLICACAO),'',texto,flags=re.S)
     texto,encontrados=proteger_texto(texto,prefixo,webroot,origem,raiz_local=False)
     blocos,diretivas=_analisar(texto)
@@ -131,15 +127,14 @@ def _publicacao_texto(texto, prefixo, webroot, origem):
         if not any(b['palavras']==['location','=',base+'/radar.conf'] for b in locais):
             continue
         if i not in handlers:
-            raise RuntimeError('Nao foi encontrado o handler FastCGI .pse do radar; nenhuma regra sera aplicada.')
+            raise RuntimeError('Nao foi encontrado o handler FastCGI generico .pse do radar; nenhuma regra sera aplicada.')
         # Assume a publicacao deste prefixo; mantem os outros projetos do server.
         for local in locais:
             palavras=local['palavras'][1:]
             caminho=palavras[1] if palavras[:1] in (['='],['^~'],['~'],['~*']) and len(palavras)>1 else palavras[0]
             if caminho==base or caminho.startswith(base+'/'):
                 alteracoes.append((local['inicio'],local['fim'],''))
-        regras=[INICIO_PUBLICACAO,
-                'location = '+json.dumps(api)+' {\n'+handlers[i]+'\n}']
+        regras=[INICIO_PUBLICACAO]
         if base:
             regras.append('location = '+json.dumps(base)+' { return 404; }')
         regras.append('location ^~ '+json.dumps(base+'/resources/')+' {\n'
@@ -148,7 +143,8 @@ def _publicacao_texto(texto, prefixo, webroot, origem):
                       '    if ($uri ~ "(?:^|/)\\\\.") { return 404; }\n'
                       '    if ($uri !~* "\\\\.(?:html|css|js|json|png|ico|svg|jpg|jpeg|webp|woff|woff2)$") { return 404; }\n'
                       '}')
-        regras.extend(['location ^~ '+json.dumps(base+'/')+' { return 404; }',FIM_PUBLICACAO])
+        # Sem ^~: as expressoes regulares do server, inclusive .pse, sao avaliadas.
+        regras.extend(['location '+json.dumps(base+'/')+' { return 404; }',FIM_PUBLICACAO])
         alteracoes.append((servidor['abertura'],servidor['abertura'],'\n    '+'\n    '.join(regras)+'\n'))
     for inicio,fim,valor in sorted(alteracoes,reverse=True):
         texto=texto[:inicio]+valor+texto[fim:]

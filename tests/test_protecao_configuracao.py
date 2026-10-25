@@ -72,19 +72,25 @@ class TestProtecaoConfiguracao(unittest.TestCase):
     def test_nginx_real_recarga_legado_e_confirma_todas_as_sondas(self):
         self._nginx_real(raiz_local=True, recarregar=True)
 
-    def test_handler_da_api_nao_e_copiado_de_outro_projeto(self):
+    def test_handler_generico_e_preservado_sem_criar_excecao_para_api(self):
         fonte='server { root /srv/www; location = /outro/api.pse { fastcgi_pass unix:/outro; } location ~ \\.pse$ { fastcgi_pass unix:/radar; } }'
         novo,_=proteger_texto(fonte,'/radar/','/srv/www/radar','',raiz_local=True)
-        bloco=novo.split('location = "/radar/api.pse"',1)[1].split('}',1)[0]
-        self.assertIn('unix:/radar',bloco)
-        self.assertNotIn('unix:/outro',bloco)
+        self.assertNotIn('location = "/radar/api.pse"',novo)
+        self.assertEqual(novo.count('fastcgi_pass unix:/radar;'),1)
+        self.assertIn('location "/radar/" { return 404; }',novo)
         self.assertIn('location = /outro/api.pse { fastcgi_pass unix:/outro; }',novo)
+
+    def test_exige_handler_generico_em_vez_de_copiar_excecao_antiga(self):
+        fonte='server { root /srv/www; location = /radar/api.pse { fastcgi_pass unix:/radar; } }'
+        with self.assertRaisesRegex(RuntimeError,'generico .pse'):
+            proteger_texto(fonte,'/radar/','/srv/www/radar','',raiz_local=True)
 
     def test_publicacao_tambem_funciona_na_raiz_do_host(self):
         fonte='server { root /srv/www; location ~ \\.pse$ { fastcgi_pass unix:/radar; } }'
         novo,_=proteger_texto(fonte,'/','/srv/www','',raiz_local=True)
         self.assertNotIn('location = ""',novo)
-        self.assertIn('location = "/api.pse"',novo)
+        self.assertNotIn('location = "/api.pse"',novo)
+        self.assertIn('location "/" { return 404; }',novo)
         self.assertIn('location ^~ "/resources/"',novo)
 
     def test_include_do_operador_preserva_o_bloco_original_inteiro(self):
@@ -93,7 +99,7 @@ class TestProtecaoConfiguracao(unittest.TestCase):
         self.assertEqual(n,1)
         self.assertEqual(novo,fonte)
 
-    def test_nginx_real_com_snippet_preserva_vhost_e_publica_apenas_resources_api(self):
+    def test_nginx_real_com_snippet_preserva_vhost_e_handler_generico(self):
         self._nginx_real(raiz_local=True, usar_snippet=True)
 
     def test_identifica_raiz_com_link_intermediario_sem_server_name(self):
@@ -107,7 +113,7 @@ class TestProtecaoConfiguracao(unittest.TestCase):
             fonte='server { server_name _; root "'+str(www)+'"; location ~ \\.pse$ { fastcgi_pass unix:/socket; } }'
             novo,n=proteger_texto(fonte,'/openclaw/radar/',real,'https://servidor3.test',raiz_local=True)
             self.assertEqual(n,1)
-            self.assertIn('location ^~ "/openclaw/radar/" { return 404; }',novo)
+            self.assertIn('location "/openclaw/radar/" { return 404; }',novo)
             self.assertIn('location ^~ "/openclaw/radar/resources/"',novo)
             self.assertEqual(proteger_texto(novo,'/openclaw/radar/',real,'https://servidor3.test',raiz_local=True)[0],novo)
 
@@ -132,7 +138,7 @@ class TestProtecaoConfiguracao(unittest.TestCase):
             else:
                 (web / "radar.conf").symlink_to(conf)
             privados = ["dados/radar.sqlite3", "dados/raw/original.json", "dados/segredos/api_token",
-                        "logs/tick.log", "core/entrada_api.py", "web/api.pse", "deploy/api.pse",
+                        "logs/tick.log", "core/entrada_api.py",
                         "radar.conf.anterior", "radar.conf.lock", "sql/schema.sqlite.sql", ".radar-temporario-privado"]
             if raiz_local:
                 for rel in privados:
@@ -148,9 +154,9 @@ class TestProtecaoConfiguracao(unittest.TestCase):
                 (recursos/'segredo.json').symlink_to(conf)
                 for nome in ('executar.pse','.oculto.json','config.conf'):
                     (recursos/nome).write_text('privado')
-                for nome in ('arquivo-novo.json','outro.pse','copia-config.txt'):
+                for nome in ('arquivo-novo.json','copia-config.txt'):
                     (web/nome).write_text('privado')
-                privados += ['arquivo-novo.json','outro.pse','copia-config.txt','resources/executar.pse','resources/.oculto.json','resources/config.conf']
+                privados += ['arquivo-novo.json','copia-config.txt','resources/executar.pse','resources/.oculto.json','resources/config.conf']
             with socket.socket() as s:
                 s.bind(("127.0.0.1", 0))
                 porta = s.getsockname()[1]
@@ -237,7 +243,14 @@ class TestProtecaoConfiguracao(unittest.TestCase):
                         pedido=urllib.request.Request('http://127.0.0.1:%d/radar/api.pse'%porta,data=b'{"teste":true}',headers={'Content-Type':'application/json'})
                         with urllib.request.urlopen(pedido,timeout=2) as r:self.assertEqual(r.status,200)
                         self.assertEqual(backend.requisicoes[antes+1][1],b'{"teste":true}')
-                        self.assertEqual(len(backend.requisicoes),antes+2)
+                        # Um script novo usa o mesmo handler, sem alterar a configuracao.
+                        (web/'outro.pse').write_text('script adicionado depois da partida do nginx')
+                        with urllib.request.urlopen('http://127.0.0.1:%d/radar/outro.pse?novo=1'%porta,timeout=2) as r:
+                            self.assertEqual(r.status,200)
+                            self.assertEqual(r.read(),b'{"status":"ready"}')
+                        self.assertIn(str(web/'outro.pse').encode(),backend.requisicoes[antes+2][0])
+                        self.assertIn(b'novo=1',backend.requisicoes[antes+2][0])
+                        self.assertEqual(len(backend.requisicoes),antes+3)
                 finally:
                     processo.terminate()
                     processo.wait(timeout=10)

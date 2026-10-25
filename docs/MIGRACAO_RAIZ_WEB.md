@@ -45,9 +45,11 @@ da configuração (lock, backup e auditoria) ficam em `dados.dir/configuracao`.
 O editor consolida seções repetidas e preserva comentários e opções existentes.
 Não há `usuario` ou `grupo` no arquivo: a execução usa a identidade do processo.
 
-O nginx nega por padrão qualquer caminho dentro do prefixo do Radar. Libera
-somente `api.pse` como entrada FastCGI e `resources/` para arquivos estáticos,
-sem executar scripts, seguir links simbólicos ou listar diretórios. Não existem
+O nginx mantém o handler FastCGI genérico `.pse` do server, sem exceções por
+nome de script. O bloqueio geral do prefixo usa `location` sem `^~`, permitindo
+que esse handler execute `api.pse` e novos scripts `.pse`. Os demais arquivos
+são negados, exceto os estáticos de `resources/`, onde não se executam scripts,
+não se seguem links simbólicos e não se listam diretórios. Não existem
 aliases dos endereços antigos: as páginas são acessadas em `resources/` e os
 endereços antigos retornam 404. A entrada é `resources/index.html`, sem nenhum
 redirecionamento da raiz. O descritor do projeto aponta diretamente a essa página. O relatório
@@ -109,8 +111,7 @@ leitura ou escrita reprova a instalação; os dois crontabs têm backup.
 do servidor3 permanecem separados, sem alterações.
 
 Relatórios e logs ficam em `dados.dir/atualizacoes` e `dados.dir/logs` (ou na
-subpasta de logs configurada). `status-atualizacoes.json` publica o consolidado
-pelo link conhecido. Backups anteriores permanecem nas origens para recuperação.
+subpasta de logs configurada). A rota `api.pse?rota=/api/v1/atualizacoes/status` publica o consolidado. Backups anteriores permanecem nas origens para recuperação.
 Falhas anteriores à publicação recuperam arquivos/configuração; depois de
 publicar a API, a instalação nova é preservada para não perder envios recebidos.
 Consulte o relatório e reaplique após corrigir a causa. Nunca há restauração
