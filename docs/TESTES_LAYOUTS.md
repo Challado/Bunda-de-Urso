@@ -12,6 +12,13 @@ Dimensões em pixels CSS; densidade e toque são emulados. O Firefox recebe o
 viewport e o toque, pois Playwright não oferece o modo isMobile nesse motor.
 WebKit testa o motor usado pelo Safari, sem representar um iPhone físico.
 
+Celulares e tablets usam **rolagem normal da página**, com a lista inteira abaixo
+do mapa, sem painel recolhível nem rolagem vertical dentro da lista. Isso vale
+para larguras até 1023 px e dispositivos cujo ponteiro principal é de toque,
+incluindo tablets em paisagem. O mapa usa a porcentagem configurada da altura da
+tela (50% por padrão), até 480 px, respeitando a altura mínima configurada.
+No PC, permanece o ajuste para caber na tela e a lista recolhível quando necessário.
+
 | Grupo | Perfil | Viewport | Densidade | Toque |
 | --- | --- | --- | --- | --- |
 | celular | compacto | 320 × 568 | 2 | sim |
@@ -36,9 +43,11 @@ WebKit testa o motor usado pelo Safari, sem representar um iPhone físico.
 ## O que reprova a execução
 
 - Conteúdo vazando horizontalmente, mapa abaixo do mínimo ou rolagem da página
-  nas telas onde o conteúdo deveria caber.
-- Lista longa sem rolagem, rolagem da lista movendo a página por trás, último
-  radar inacessível, falha ao recolher/abrir ou perda de registros.
+  no PC, onde o conteúdo deveria caber.
+- Lista mobile com rolagem vertical interna ou recolhida, página que não rola
+  por gesto/teclado, último radar inacessível ou perda de registros.
+- Lista do PC sem rolagem, rolagem da lista movendo a página por trás ou falha
+  ao recolher/abrir.
 - Falha ao clicar/tocar em Consultar, Usar minha localização, Mostrar radares
   aqui, envio simplificado, links de detalhes ou estados do status.
 - Cadastro sem HTTP 202/protocolo, fila sem processamento, detalhes inacessíveis
@@ -52,7 +61,7 @@ WebKit testa o motor usado pelo Safari, sem representar um iPhone físico.
   resultados antigos ou sem possibilidade de tentar novamente.
 - Erro JavaScript não tratado na página.
 
-O gesto de arrastar a lista é enviado como toque nativo ao Chromium em celulares
+O gesto de rolar a página é enviado como toque nativo ao Chromium em celulares
 e tablets. Os demais casos exercitam roda do mouse e teclado. WebKit mobile não
 oferece roda do mouse no Playwright: nele a rolagem é exercitada por eventos reais
 de teclado, mantendo a emulação mobile e os testes de toque nos controles.
@@ -72,7 +81,7 @@ rede externa. Os fluxos funcionais completos anteriores continuam no workflow
 Cada job publica `layouts-<navegador>-<grupo>-<tentativa>`, retido por 14 dias, contendo:
 
 - relatório HTML com cada teste e perfil;
-- screenshots dos cenários e medidas em JSON, mesmo quando passam;
+- screenshots dos cenários em pixels CSS e medidas em JSON, mesmo quando passam;
 - captura de tela e trace Playwright quando falham;
 - resumo completo em `test-results-layouts/resumo.json`.
 

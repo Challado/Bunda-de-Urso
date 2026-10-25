@@ -7,7 +7,8 @@ async function semOverflowHorizontal(page){
   await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
 }
 async function capturar(page,info,nome){
-  await page.screenshot({path:info.outputPath(nome+'.png'),fullPage:true});
+  // Lista mobile inteira pode ultrapassar o limite de imagem do WebKit em DPR 3.
+  await page.screenshot({path:info.outputPath(nome+'.png'),fullPage:true,scale:'css'});
   await info.attach(nome+'-medidas',{body:Buffer.from(JSON.stringify({tela:tela(info),...(await medidas(page))},null,2)),contentType:'application/json'});
 }
 async function estabilizarRolagem(lista){
@@ -24,6 +25,26 @@ async function estabilizarRolagem(lista){
     }
     requestAnimationFrame(quadro);
   }));
+}
+async function rolarPagina(page,browserName,info){
+  if(browserName==='chromium'&&tela(info).toque){
+    const cdp=await page.context().newCDPSession(page);
+    try{
+      const y=Math.round(page.viewportSize().height*.75);
+      await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:4,y}]});
+      for(let passo=1;passo<=8;passo++){
+        await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:4,y:y-120*passo/8}]});
+        await new Promise(resolve=>setTimeout(resolve,16));
+      }
+      await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    }finally{await cdp.detach();}
+  }else if(browserName==='webkit'&&tela(info).toque){
+    await page.touchscreen.tap(4,4);
+    await page.keyboard.press('PageDown');
+  }else{
+    await page.mouse.move(4,4);
+    await page.mouse.wheel(0,450);
+  }
 }
 async function rolarLista(page,browserName,info){
   const lista=page.locator('#resultado');
@@ -79,8 +100,30 @@ test('um radar, controles e links cabem na largura e preservam mapa legivel',asy
   await capturar(page,info,'home-um-radar');
 });
 
-test('lista longa rola de verdade, permite teclado e recolhe sem perder radares',async({page,browserName},info)=>{
+test('lista longa rola na pagina mobile ou na regiao do PC sem perder radares',async({page,browserName},info)=>{
   await preparar(page,60);
+  if(tela(info).rolaPagina){
+    await expect(page.locator('#painelResultados')).not.toHaveClass(/recolhivel/);
+    await expect(page.locator('#tituloResultados')).toBeHidden();
+    await expect(page.locator('#resultado')).not.toHaveAttribute('tabindex');
+    const m=await medidas(page);
+    expect(m.mapa).toBeGreaterThanOrEqual(Math.max(180,Math.min(480,m.tela*.5))-1);
+    expect(m.pagina).toBeGreaterThan(m.tela);
+    expect(m.conteudo).toBeLessThanOrEqual(m.lista+1);
+    await page.locator('#resultado').evaluate(el=>el.scrollIntoView({block:'start'}));
+    const antes=await page.evaluate(()=>scrollY);
+    await rolarPagina(page,browserName,info);
+    await expect.poll(()=>page.evaluate(()=>scrollY)).toBeGreaterThan(antes);
+    const ultimo=page.locator('#resultado tbody tr').last();
+    await ultimo.locator('a').scrollIntoViewIfNeeded();
+    await expect(ultimo.locator('a')).toBeInViewport();
+    await ultimo.locator('td').last().scrollIntoViewIfNeeded();
+    await expect(ultimo.locator('td').last()).toBeInViewport();
+    await expect(page.locator('#resultado tbody tr')).toHaveCount(60);
+    await semOverflowHorizontal(page);
+    await capturar(page,info,'home-lista-pagina-mobile');
+    return;
+  }
   await expect(page.locator('#painelResultados')).toHaveClass(/recolhivel/);
   await expect.poll(async()=>{const m=await medidas(page);return m.conteudo>m.lista;}).toBe(true);
   await semOverflowHorizontal(page);
@@ -114,14 +157,11 @@ test('lista longa rola de verdade, permite teclado e recolhe sem perder radares'
 
 test('pagina so rola quando necessario e rodape permanece alcancavel',async({page,browserName},info)=>{
   await preparar(page,60);
-  if(browserName==='webkit'&&tela(info).toque){
-    await page.touchscreen.tap(4,4);
-    await page.keyboard.press('PageDown');
-  }else{
-    await page.mouse.move(4,4);
-    await page.mouse.wheel(0,450);
-  }
-  if(tela(info).rolaPagina)await expect.poll(()=>page.evaluate(()=>scrollY)).toBeGreaterThan(0);
+  // O gesto ocorre nos resultados, fora da area interativa de arrastar o mapa.
+  if(tela(info).rolaPagina)await page.locator('#resultado').evaluate(el=>el.scrollIntoView({block:'start'}));
+  const antes=await page.evaluate(()=>scrollY);
+  await rolarPagina(page,browserName,info);
+  if(tela(info).rolaPagina)await expect.poll(()=>page.evaluate(()=>scrollY)).toBeGreaterThan(antes);
   else await expect.poll(()=>page.evaluate(()=>scrollY)).toBe(0);
   const contato=page.getByRole('link',{name:'Contato',exact:true});
   await contato.scrollIntoViewIfNeeded();
@@ -155,7 +195,8 @@ test('orientacao, viewport reduzido e configuracao personalizada recalculam o ma
   await preparar(page,60,{mapa_min_percentual:65,mapa_min_altura_px:220});
   for(const tamanho of [{width:original.height,height:original.width},{width:original.width,height:Math.max(300,Math.floor(original.height*.55))},original]){
     await page.setViewportSize(tamanho);
-    await expect.poll(async()=>{const m=await medidas(page);return Math.abs(m.mapa-Math.max(220,m.util*.65))<2;}).toBe(true);
+    await expect.poll(async()=>{const m=await medidas(page);return Math.abs(m.mapa-Math.max(220,m.natural?Math.min(480,m.tela*.65):m.util*.65))<2;}).toBe(true);
+    if((await medidas(page)).natural)await expect(page.locator('#painelResultados')).not.toHaveClass(/recolhivel/);
     await expect(page.locator('#resultado tbody tr')).toHaveCount(60);
     await semOverflowHorizontal(page);
   }
@@ -164,7 +205,7 @@ test('orientacao, viewport reduzido e configuracao personalizada recalculam o ma
 
 test('falhas da configuracao e consulta mantem controles e recuperacao funcionais',async({page},info)=>{
   const estado=await preparar(page,60,null);
-  await expect.poll(async()=>{const m=await medidas(page);return Math.abs(m.mapa-Math.max(180,m.util*.5))<2;}).toBe(true);
+  await expect.poll(async()=>{const m=await medidas(page);return Math.abs(m.mapa-Math.max(180,m.natural?Math.min(480,m.tela*.5):m.util*.5))<2;}).toBe(true);
   estado.erroConsulta=true;
   await acionar(page.locator('#btConsultar'),info);
   await expect(page.locator('#resultado')).toContainText('Erro de rede');
@@ -174,7 +215,8 @@ test('falhas da configuracao e consulta mantem controles e recuperacao funcionai
   estado.erroConsulta=false;
   await acionar(page.locator('#btConsultar'),info);
   await expect(page.locator('#resultado tbody tr')).toHaveCount(60);
-  await expect(page.locator('#painelResultados')).toHaveClass(/recolhivel/);
+  if(tela(info).rolaPagina)await expect(page.locator('#painelResultados')).not.toHaveClass(/recolhivel/);
+  else await expect(page.locator('#painelResultados')).toHaveClass(/recolhivel/);
   await semOverflowHorizontal(page);
 });
 

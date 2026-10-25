@@ -9,25 +9,33 @@
     var fixos=[document.querySelector('header'),document.getElementById('controles'),
       document.getElementById('legenda'),document.getElementById('barra'),document.querySelector('footer')];
     var config={mapa_min_percentual:50,mapa_min_altura_px:180};
+    // Telas estreitas e dispositivos de toque usam a rolagem natural da pagina.
+    var fluxoPagina=global.matchMedia('(max-width: 1023px), (pointer: coarse)');
     var pendente=false,ultimaAbertura=painel.open,alturaAnterior=0;
     function ajustar(){
       pendente=false;
       var aberto=painel.open;
-      var rolagemAnterior=resultado.scrollTop;
       // Mede a lista inteira mesmo quando recolhida ou com rolagem interna.
       painel.open=true;
-      resultado.style.maxHeight='none';
-      var alturaLista=resultado.getBoundingClientRect().height;
+      // scrollHeight mede o conteudo sem retirar o limite nem interromper um gesto.
+      var alturaLista=resultado.scrollHeight+resultado.offsetHeight-resultado.clientHeight;
       var alturaTela=global.visualViewport?global.visualViewport.height:global.innerHeight;
       var fixo=fixos.reduce(function(total,el){return total+(el?el.getBoundingClientRect().height:0);},0);
       var util=Math.max(0,alturaTela-fixo-2);
       var minimo=Math.max(config.mapa_min_altura_px,util*config.mapa_min_percentual/100);
       var linhas=resultado.querySelectorAll('tbody tr').length;
-      var recolhivel=linhas>0&&alturaLista>util-minimo;
+      var natural=fluxoPagina.matches;
+      var recolhivel=!natural&&linhas>0&&alturaLista>util-minimo;
       painel.classList.toggle('recolhivel',recolhivel);
       titulo.textContent='Radares encontrados ('+linhas+')';
       var alturaMapa;
-      if(recolhivel){
+      if(natural){
+        painel.open=true;
+        resultado.style.maxHeight='none';
+        resultado.removeAttribute('tabindex');
+        // Nao espreme o mapa para acomodar a lista: os resultados seguem abaixo.
+        alturaMapa=Math.max(config.mapa_min_altura_px,Math.min(480,alturaTela*config.mapa_min_percentual/100));
+      }else if(recolhivel){
         painel.open=aberto;
         var cabecalho=titulo.getBoundingClientRect().height;
         resultado.style.maxHeight=Math.floor(Math.max(96,util-minimo-cabecalho))+'px';
@@ -35,14 +43,12 @@
         alturaMapa=aberto?minimo:Math.max(minimo,util-cabecalho);
       }else{
         painel.open=true;
+        resultado.style.maxHeight='none';
         resultado.removeAttribute('tabindex');
         alturaMapa=Math.max(minimo,util-alturaLista);
       }
       alturaMapa=Math.max(1,Math.floor(alturaMapa));
       mapa.style.height=alturaMapa+'px';
-      // A medicao sem maxHeight remove o overflow e zera scrollTop no navegador.
-      // Restaura a leitura depois de recompor o tamanho definitivo da lista.
-      resultado.scrollTop=rolagemAnterior;
       if(alturaMapa!==alturaAnterior){
         alturaAnterior=alturaMapa;
         opcoes.mapa.invalidateSize({pan:true,animate:false,debounceMoveend:true});
@@ -61,6 +67,7 @@
       fixos.concat([resultado]).forEach(function(el){if(el)observador.observe(el);});
     }
     global.addEventListener('resize',agendar);
+    fluxoPagina.addEventListener('change',agendar);
     global.addEventListener('load',agendar);
     if(global.visualViewport)global.visualViewport.addEventListener('resize',agendar);
     if(document.fonts&&document.fonts.ready)document.fonts.ready.then(agendar);

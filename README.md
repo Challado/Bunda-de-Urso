@@ -416,6 +416,9 @@ home. Consulte [o funcionamento e as regras de contagem](docs/STATUS.md).
 
 ### Layouts e interações no CI
 
+Celular e tablet deixam a página rolar normalmente, com todos os radares abaixo
+do mapa. No PC, o mapa e a lista se ajustam à tela, com painel recolhível quando necessário.
+
 O workflow **Layouts e interacoes** valida 18 perfis de celular, tablet e PC em
 Chromium, Firefox e WebKit, com 432 verificações de rolagem, clique/toque,
 navegação, cadastro e altura do mapa. Roda automaticamente em push/main e PR,

@@ -27,7 +27,8 @@ async function preparar(page,quantidade,config={mapa_min_percentual:50,mapa_min_
 async function medidas(page){return page.evaluate(()=>{
   const painel=document.querySelector('#painelResultados'),r=document.querySelector('#resultado');
   const fixos=['header','#controles','#legenda','#barra','footer'].reduce((n,s)=>n+document.querySelector(s).getBoundingClientRect().height,0);
-  return {mapa:document.querySelector('#mapa').getBoundingClientRect().height,util:innerHeight-fixos-2,
+  return {natural:matchMedia('(max-width: 1023px), (pointer: coarse)').matches,
+    mapa:document.querySelector('#mapa').getBoundingClientRect().height,util:innerHeight-fixos-2,
     pagina:document.documentElement.scrollHeight,tela:innerHeight,lista:r.clientHeight,conteudo:r.scrollHeight,aberto:painel.open};
 });}
 
