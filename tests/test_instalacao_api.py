@@ -317,7 +317,7 @@ class TestInstalacaoAPI(unittest.TestCase):
     def test_verificacao_detecta_arquivo_corrompido_e_reaplicacao_conserta(self):
         instalado = self.instalar(True)
         self.assertEqual(instalado.returncode, 0, instalado.stdout + instalado.stderr)
-        alvo = self.web / "resources/gestao.html"
+        alvo = self.web / "gestao.html"
         alvo.write_text("corrompido")
         cmd = [sys.executable, str(ROOT / "web" / "api.pse"), "instalacao", "--conf", str(self.conf),
                "--laboratorio", str(self.lab), "--verificar"]
@@ -341,13 +341,15 @@ class TestInstalacaoAPI(unittest.TestCase):
         conteudo = b"pagina atual"
         pagina = self.lab / "gestao.html"
         pagina.write_bytes(conteudo)
+        home = self.lab / 'index.html'
+        home.write_bytes(conteudo)
         class Handler(BaseHTTPRequestHandler):
             configuracao_privada = True
             def do_GET(self):
                 if self.path == "/radar/radar.conf" and self.configuracao_privada:
                     self.send_error(404)
                     return
-                if not self.path.startswith('/radar/api.pse?') and self.path not in ('/radar/resources/gestao.html','/radar/radar.conf'):
+                if not self.path.startswith('/radar/api.pse?') and self.path not in ('/radar/','/radar/gestao.html','/radar/radar.conf'):
                     self.send_error(404)
                     return
                 self.send_response(200)
@@ -360,7 +362,11 @@ class TestInstalacaoAPI(unittest.TestCase):
         thread.start()
         try:
             origem = "http://127.0.0.1:%d" % servidor.server_port
-            auditoria_instalacao.verificar_http(origem, "/radar/", pagina, configuracao_privada=True)
+            auditoria_instalacao.verificar_http(origem, "/radar/", pagina, configuracao_privada=True, pagina_inicial=home)
+            home.write_bytes(b'home desatualizada')
+            with self.assertRaisesRegex(RuntimeError, 'pagina inicial atualizada'):
+                auditoria_instalacao.verificar_http(origem, '/radar/', pagina, pagina_inicial=home)
+            home.write_bytes(conteudo)
             Handler.configuracao_privada = False
             with self.assertRaisesRegex(RuntimeError, "baixar a configuracao"):
                 auditoria_instalacao.verificar_http(origem, "/radar/", pagina, configuracao_privada=True)

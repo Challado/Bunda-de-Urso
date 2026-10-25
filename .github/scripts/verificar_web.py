@@ -15,7 +15,7 @@ import sys
 
 from comum import RAIZ, terminar
 
-WEB = RAIZ / "web" / "resources"
+WEB = RAIZ / "web"
 ATRIBUTO = re.compile(r'(?:href|src)\s*=\s*["\']([^"\']+)["\']')
 LITERAL = re.compile(r'["\'](/api/[^"\']*)["\']')
 VIA_QUERY = re.compile(r"rota=(/api/[^&\"']+)")
@@ -67,7 +67,7 @@ def main():
     if not padroes:
         return terminar(["nao extrai rota nenhuma de web/nucleo.py (parser quebrado)"], "")
 
-    for pagina in paginas() + sorted(WEB.glob("*.js")):
+    for pagina in paginas() + sorted((WEB / "resources").glob("*.js")):
         texto = pagina.read_text(encoding="utf-8")
         nome = pagina.name
 

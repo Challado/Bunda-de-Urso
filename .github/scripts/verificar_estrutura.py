@@ -17,7 +17,7 @@ OBRIGATORIOS = [
     "README.md",
     "LICENSE",
     "web/api.pse",
-    "web/resources/index.html",
+    "web/index.html",
     "web/nucleo.py",
     "core/db.py",
     "core/caminhos.py",

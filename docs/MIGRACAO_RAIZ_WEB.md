@@ -39,8 +39,9 @@ logs, tokens, chaves, cache, fila, malha, clone local e temporários resolvem
 simbólicos, são rejeitados. A API de configuração aceita para `banco` somente
 um nome de arquivo e não move a base quando um caminho é editado.
 
-Código e o próprio `radar.conf` ficam na raiz da aplicação. As páginas, CSS,
-JavaScript, imagens e JSON públicos ficam em `resources/`. Auxiliares
+Código, `radar.conf` e páginas HTML ficam na raiz da aplicação. A home é
+`web.url` (por exemplo, `/openclaw/radar/`), servindo `index.html` sem redirecionar
+para `resources/`. CSS, JavaScript, imagens e JSON públicos ficam em `resources/`. Auxiliares
 da configuração (lock, backup e auditoria) ficam em `dados.dir/configuracao`.
 Os envios aguardam processamento em `dados.dir/fila-cadastros`; essa fila pode
 ficar dentro da raiz do site, protegida pelo mesmo bloqueio HTTP dos dados.
@@ -50,11 +51,10 @@ Não há `usuario` ou `grupo` no arquivo: a execução usa a identidade do proce
 O nginx mantém o handler FastCGI genérico `.pse` do server, sem exceções por
 nome de script. O bloqueio geral do prefixo usa `location` sem `^~`, permitindo
 que esse handler execute `api.pse` e novos scripts `.pse`. Os demais arquivos
-são negados, exceto os estáticos de `resources/`, onde não se executam scripts,
+são negados, exceto as páginas HTML da raiz e os estáticos de `resources/`, onde não se executam scripts,
 não se seguem links simbólicos e não se listam diretórios. Não existem
-aliases dos endereços antigos: as páginas são acessadas em `resources/` e os
-endereços antigos retornam 404. A entrada é `resources/index.html`, sem nenhum
-redirecionamento da raiz. O descritor do projeto aponta diretamente a essa página. O relatório
+redirecionamentos para páginas em `resources/`: as páginas são acessadas
+diretamente na raiz. O descritor do projeto aponta para a home do site. O relatório
 é consultado em `api.pse?rota=/api/v1/atualizacoes/status`, que lê o JSON dentro
 de `dados.dir`, sem abrir SQLite.
 A configuração do nginx pertence ao operador. O instalador não edita seus

@@ -255,9 +255,9 @@ estão descritas em `docs/CORRECOES_BUNDITA_DE_URSO.md`.
 A configuração operacional mora em `[governanca]` do `radar.conf`, fora do checkout; o esquema aditivo da
 camada em `sql/migracoes/`. Detalhes e exemplos `curl` em `docs/GOVERNANCA.md`.
 
-O **painel HTML** mora em `web/resources/gestao.html` (login, fila de pendentes, detalhe/verificar/
+O **painel HTML** mora em `web/gestao.html` (login, fila de pendentes, detalhe/verificar/
 editar/desabilitar/remover, histórico, correspondências, bloqueios, tokens e troca de
-senha) e `web/resources/usuarios.html` (usuários e tokens). É HTML/CSS/JS vanilla, sem CDN, e fala
+senha) e `web/usuarios.html` (usuários e tokens). É HTML/CSS/JS vanilla, sem CDN, e fala
 só pela API (`api.pse?rota=...`) com o cookie de sessão — nunca lê o banco direto. O que a
 tela mostra acompanha o escopo do login (contribuidor = leitura; moderador = moderação;
 admin = bloqueios/tokens/usuários).

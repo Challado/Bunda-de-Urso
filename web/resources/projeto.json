@@ -1,7 +1,7 @@
 {
  "nome": "Radar Brasil",
  "descricao": "Consulta de radares de velocidade por localizacao (lat/lon + raio, ou municipio): mapa Leaflet/OSM sobre os dados oficiais ja coletados (INMETRO/PSIE, ANTT, PRF, DERs e fontes municipais) — velocidade, sentido, km e verificacao metrologica. Coletor proprio (tick de minuto em minuto) + API api.pse.",
- "url": "./index.html",
+ "url": "./",
  "icone": "",
  "tags": [
   "radar",

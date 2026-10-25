@@ -117,14 +117,14 @@
   .rodape-site nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px 24px}
   .rodape-site a{display:inline-flex;align-items:center;min-height:40px;color:var(--azul);text-underline-offset:3px}
 </style>
-<link rel="icon" href="favicon.ico" sizes="any">
-<link rel="icon" type="image/png" href="favicon-32.png" sizes="32x32">
-<link rel="icon" type="image/png" href="favicon-16.png" sizes="16x16">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="resources/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="resources/favicon-32.png" sizes="32x32">
+<link rel="icon" type="image/png" href="resources/favicon-16.png" sizes="16x16">
+<link rel="apple-touch-icon" href="resources/apple-touch-icon.png">
 </head>
 <body>
 <header>
-  <img class="logo" src="bunda-de-urso.png" alt="Bundita de Urso — a base do Bunda de urso">
+  <img class="logo" src="resources/bunda-de-urso.png" alt="Bundita de Urso — a base do Bunda de urso">
   <div class="cabTxt">
     <h1>Radar Brasil — consulta por localização</h1>
     <nav class="nav">
@@ -192,7 +192,7 @@
 <script>
 (function(){
   "use strict";
-  var API = "../api.pse";
+  var API = "api.pse";
   // Escada de raios: o slider anda em INDICE (0..11), nao em metros, para cobrir
   // de 200 m a 1000 km mantendo o ajuste fino nos valores pequenos.
   var ESCALA = [200, 500, 1000, 2000, 5000, 10000, 20000, 50000,
@@ -569,7 +569,7 @@
       .replace(/[\u0300-\u036f]/g, "").toLowerCase();
   }
 
-  fetch("municipios.json").then(function(r){ return r.json(); }).then(function(lista){
+  fetch("resources/municipios.json").then(function(r){ return r.json(); }).then(function(lista){
     MUNICIPIOS = lista || [];
     for (var i=0;i<MUNICIPIOS.length;i++){          // chaves de busca prontas
       MUNICIPIOS[i].n0 = semAcento(MUNICIPIOS[i].n);

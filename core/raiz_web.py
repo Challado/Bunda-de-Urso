@@ -243,10 +243,9 @@ def _bloqueios_http(raiz, origem, prefixo, aguardar=0):
         while True:
             tentativa += 1
             try:
-                for rel in ['', 'radar.conf', 'radar.conf.anterior', temporario.name, generico.name,
+                for rel in ['radar.conf', 'radar.conf.anterior', temporario.name, generico.name,
                             'resources/'+executavel.name, 'resources/'+link.name,
-                            'index.html','cadastro.html','detalhe.html','gestao.html','usuarios.html',
-                            'status.html','status-estado.html','projeto.json','status-atualizacoes.json',
+                            'projeto.json','status-atualizacoes.json',
                             *(p + '/' + nome for p in PASTAS_PRIVADAS)]:
                     url = origem.rstrip('/') + prefixo.rstrip('/') + '/' + urllib.parse.quote(rel)
                     # Nao reutiliza uma resposta em cache de antes da recarga.
@@ -289,6 +288,8 @@ def _arquivos(origem):
     for nome in CODIGO:
         yield nome, origem / nome
     yield 'resources', origem/'web/resources'
+    for pagina in sorted((origem/'web').glob('*.html')):
+        yield pagina.name, pagina
     # O descritor na raiz tambem e usado pela descoberta local de projetos.
     yield 'projeto.json', origem/'web/resources/projeto.json'
     yield 'api.pse', origem / 'deploy' / 'api.pse'
@@ -416,7 +417,7 @@ def _verificar(origem, raiz, conf, conta, lab, cron=True):
         if cron:
             checagens.extend(_checagens_cron(raiz.parent, raiz, conta.pw_name, conf))
         checar('nginx.privado', lambda: _bloqueios_http(raiz,caminhos.valor('web','origem')[0],caminhos.web_url()))
-        checar('http.publico', lambda: auditoria.verificar_http(caminhos.valor('web','origem')[0], caminhos.web_url(), raiz/'resources/gestao.html', configuracao_privada=True))
+        checar('http.publico', lambda: auditoria.verificar_http(caminhos.valor('web','origem')[0], caminhos.web_url(), raiz/'gestao.html', configuracao_privada=True, pagina_inicial=raiz/'index.html'))
         def rotacao():
             arquivo = Path('/etc/logrotate.d/openclaw-radar')
             if arquivo.read_text() != auditoria.render_logrotate(origem,Path(caminhos.log_dir())):

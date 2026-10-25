@@ -298,7 +298,7 @@ def web_url():
 
 def web_inicio():
     """Pagina publica real, sem depender de aliases ou redirecionamentos."""
-    return web_url().rstrip('/') + '/resources/index.html'
+    return web_url().rstrip('/') + '/'
 
 
 def sync_clone():

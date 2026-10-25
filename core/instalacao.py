@@ -491,6 +491,8 @@ def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http=Non
             legado=dirs['web']/arquivo.name
             if arquivo.name!='projeto.json' and legado.is_file():
                 legado.unlink()
+        for pagina in (origem/'web').glob('*.html'):
+            shutil.copy2(pagina, dirs['web']/pagina.name)
         shutil.copy2(recursos/'projeto.json',dirs['web']/'projeto.json')
         projeto = dirs["web"] / "projeto.json"
         descritor = json.loads(projeto.read_text())
@@ -793,7 +795,7 @@ def _diagnosticar(origem, dirs, usuario_web, laboratorio, cron, final=False):
         origem_http = caminhos.valor("web", "origem")[0]
         if origem_http and not laboratorio:
             try:
-                auditoria.verificar_http(origem_http, caminhos.web_url(), dirs["web"] / "resources/gestao.html", configuracao_privada=True)
+                auditoria.verificar_http(origem_http, caminhos.web_url(), dirs["web"] / "gestao.html", configuracao_privada=True, pagina_inicial=dirs["web"] / "index.html")
                 checagens.append({"checagem": "http.publico", "estado": "ok", "detalhe": "API e pagina acessiveis; download direto de radar.conf bloqueado"})
             except Exception as exc:
                 checagens.append({"checagem": "http.publico", "estado": "erro", "detalhe": "Checagem HTTP de API, pagina e configuracao: " + str(exc)[:1000]})

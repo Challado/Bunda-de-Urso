@@ -7,7 +7,7 @@ async function preparar(page,request,credenciais,local={latitude:-23.55,longitud
   const envio=await request.post(rota('/api/v1/radares/submeter'),{data:local});
   expect(envio.status()).toBe(201);
   const id=(await envio.json()).resultado.cadastros[0].id;
-  await page.goto('resources/gestao.html');
+  await page.goto('gestao.html');
   await page.locator('#formLogin [name=login]').fill(credenciais.login);
   await page.locator('#formLogin [name=senha]').fill(credenciais.senha);
   await page.locator('#btLogin').click();
@@ -25,7 +25,7 @@ test('remover limpa a tela e a fila e impede a página pública de continuar exi
   await expect(page.locator('#btRemover')).toBeVisible();
   const publico=await context.newPage();
   await publico.route('https://unpkg.com/**',r=>r.abort());
-  await publico.goto(baseURL+'resources/detalhe.html?id='+id);
+  await publico.goto(baseURL+'detalhe.html?id='+id);
   await expect(publico.locator('#principal .resumo')).toContainText(id);
   await page.bringToFront();
   await page.locator('#btRemover').click();

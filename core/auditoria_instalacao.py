@@ -154,6 +154,8 @@ def artefatos(origem, dirs, codigo, estaticos):
         yield dirs["web"] / "resources" / arquivo.relative_to(origem/'web/resources'), conteudo
         if arquivo.name == 'projeto.json':
             yield dirs['web']/'projeto.json', conteudo
+    for pagina in sorted((origem / "web").glob("*.html")):
+        yield dirs["web"] / pagina.name, pagina.read_bytes()
     api = bootstrap((origem / "deploy" / "api.pse").read_text(), dirs["conf"]).encode()
     yield dirs["web"] / "api.pse", api
     yield dirs["codigo"].parent / "radar-api.pse", api
@@ -208,7 +210,7 @@ def ambiente_servidor(laboratorio=False):
     return resultados
 
 
-def verificar_http(origem, prefixo, pagina, configuracao_privada=False):
+def verificar_http(origem, prefixo, pagina, configuracao_privada=False, pagina_inicial=None):
     url = urllib.parse.urlsplit(origem)
     if url.scheme not in ("http", "https") or not url.netloc or url.username or url.password or url.query or url.fragment or url.path not in ("", "/"):
         raise RuntimeError("web.origem invalida: use somente http(s)://host[:porta].")
@@ -225,8 +227,10 @@ def verificar_http(origem, prefixo, pagina, configuracao_privada=False):
     saude = json.loads(baixar("/api.pse?rota=/health/ready"))
     if saude.get("status") != "ready":
         raise RuntimeError("A URL publica nao retornou a prontidao da API.")
-    if baixar("/resources/gestao.html") != pagina.read_bytes():
+    if baixar("/gestao.html") != pagina.read_bytes():
         raise RuntimeError("O nginx nao esta servindo a pagina atualizada neste endereco.")
+    if pagina_inicial is not None and baixar("/") != pagina_inicial.read_bytes():
+        raise RuntimeError("O endereco principal nao esta servindo a pagina inicial atualizada.")
     if configuracao_privada:
         try:
             with urllib.request.urlopen(base + "/radar.conf", timeout=15):

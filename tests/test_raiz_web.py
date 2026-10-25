@@ -79,6 +79,15 @@ class TestRaizWeb(unittest.TestCase):
         self.assertEqual([c.args[0] for c in executar.call_args_list], [['nginx', '-t']])
         self.assertEqual(nginx.read_text(), 'configuracao exclusiva do operador')
 
+    def test_instalacao_publica_paginas_na_raiz_e_apenas_apoio_em_resources(self):
+        r = self.rodar('--migrar-raiz-web', '--aplicar')
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue((self.web/'index.html').is_file())
+        self.assertTrue((self.web/'gestao.html').is_file())
+        self.assertFalse(list((self.web/'resources').glob('*.html')))
+        self.assertTrue((self.web/'resources/bunda-de-urso.png').is_file())
+        self.assertEqual(json.loads((self.web/'projeto.json').read_text())['url'], '/radar/')
+
     def test_simular_nao_copia_dados_nem_troca_link(self):
         r=self.rodar('--migrar-raiz-web')
         self.assertEqual(r.returncode,0,r.stdout+r.stderr)

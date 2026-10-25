@@ -110,7 +110,10 @@ def main():
                 if not url.path.startswith(PREFIXO+'/'):
                     return self.send_error(404)
                 nome=url.path[len(PREFIXO)+1:]
-                if not nome.startswith('resources/'):
+                if nome == '':
+                    self.path=PREFIXO+'/index.html'+('?' + url.query if url.query else '')
+                    nome='index.html'
+                if not nome.startswith('resources/') and nome not in {p.name for p in (ROOT/'web').glob('*.html')}:
                     return self.send_error(404)
                 self.path=self.path[len(PREFIXO):]
                 return super().do_GET()

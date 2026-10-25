@@ -101,17 +101,17 @@
   .rodape-site nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px 24px}
   .rodape-site a{display:inline-flex;align-items:center;min-height:40px;color:var(--azul);text-underline-offset:3px}
 </style>
-<link rel="icon" href="favicon.ico" sizes="any">
-<link rel="icon" type="image/png" href="favicon-32.png" sizes="32x32">
-<link rel="icon" type="image/png" href="favicon-16.png" sizes="16x16">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="resources/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="resources/favicon-32.png" sizes="32x32">
+<link rel="icon" type="image/png" href="resources/favicon-16.png" sizes="16x16">
+<link rel="apple-touch-icon" href="resources/apple-touch-icon.png">
 </head>
 <body>
 <header>
-  <img class="logo" src="bunda-de-urso.png" alt="Bundita de Urso — a base do Bunda de urso">
+  <img class="logo" src="resources/bunda-de-urso.png" alt="Bundita de Urso — a base do Bunda de urso">
   <div class="cabTxt">
     <h1 id="titulo">Radar — detalhes</h1>
-    <div class="sub">Dados do radar separados por fonte. Clique no nome de uma fonte para recolher ou expandir seus dados. &nbsp;·&nbsp; <a href="index.html">&larr; voltar à consulta por localização</a></div>
+    <div class="sub">Dados do radar separados por fonte. Clique no nome de uma fonte para recolher ou expandir seus dados. &nbsp;·&nbsp; <a href="./">&larr; voltar à consulta por localização</a></div>
     <nav class="nav">
       <a href="cadastro.html">Cadastrar radar</a>
       <a href="gestao.html">Administração</a>
@@ -134,7 +134,7 @@
 <script>
 (function(){
   "use strict";
-  var API = "../api.pse";
+  var API = "api.pse";
 
   // ---- rotulos amigaveis para as chaves da API (fallback = chave bonitinha) ----
   var LABELS = {
@@ -478,7 +478,7 @@
   var principal = document.getElementById("principal");
 
   function semId(msg){
-    principal.innerHTML = "<div class='err'>" + msg + "<br><br><a href='index.html'>&larr; voltar à consulta por localização</a></div>";
+    principal.innerHTML = "<div class='err'>" + msg + "<br><br><a href='./'>&larr; voltar à consulta por localização</a></div>";
   }
 
   var qp = new URLSearchParams(location.search);
