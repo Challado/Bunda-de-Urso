@@ -3,6 +3,7 @@ from contextlib import closing
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 from unittest.mock import patch
@@ -44,6 +45,41 @@ class TestFilaCadastros(suporte.BaseGov):
         self.assertEqual(arquivo.parent.stat().st_mode & 0o7777,0o2770)
         with closing(db.connect_readonly(config.DB_PATH)) as conn:
             self.assertEqual(db.scalar(conn,'SELECT count(*) FROM PONTO_FISCALIZACAO'),0)
+
+    def test_cadastro_e_worker_com_dados_dentro_da_raiz_web(self):
+        web = Path(config.DATA_DIR) / 'site'
+        dados = web / 'dados'
+        dados.mkdir(parents=True)
+        banco = dados / 'radar.sqlite3'
+        shutil.copyfile(config.DB_PATH, banco)
+        conf = web / 'radar.conf'
+        conf.write_text('[dados]\ndir = dados\nbanco = radar.sqlite3\n[web]\nraiz = .\n')
+        with patch.object(config, 'DATA_DIR', str(dados)), patch.object(config, 'DB_PATH', str(banco)), \
+             patch.object(fila.caminhos, 'web_raiz', return_value=str(web)):
+            with patch.object(nucleo, '_conn', side_effect=AssertionError('ACK sem SQLite')):
+                r = self.receber()
+            arquivo = dados / 'fila-cadastros/pendentes' / (r['protocolo'] + '.json')
+            self.assertTrue(arquivo.is_file())
+            self.assertEqual(arquivo.stat().st_mode & 0o777, 0o660)
+            env = {k:v for k,v in os.environ.items() if k not in ('REQUEST_METHOD', 'GATEWAY_INTERFACE')}
+            env['RADAR_CONF'] = str(conf)
+            processo = subprocess.run(
+                [sys.executable, str(Path(__file__).resolve().parents[1] / 'web/api.pse'), 'cron', 'fila'],
+                env=env, capture_output=True, text=True, timeout=15)
+            self.assertEqual(processo.returncode, 0, processo.stdout + processo.stderr)
+            self.assertEqual(fila.consultar(r['protocolo'])['estado'], 'processado')
+            with closing(db.connect_readonly(banco)) as conn:
+                self.assertEqual(db.scalar(conn, 'SELECT count(*) FROM PONTO_FISCALIZACAO'), 1)
+
+    def test_fila_nao_escapa_de_dados_por_link_simbolico(self):
+        externo = Path(config.DATA_DIR).parent / (Path(config.DATA_DIR).name + '-externo')
+        externo.mkdir()
+        self.addCleanup(externo.rmdir)
+        (Path(config.DATA_DIR) / 'fila-cadastros').symlink_to(externo, target_is_directory=True)
+        status, _, corpo = self.pedir()
+        self.assertEqual(status, 503)
+        self.assertFalse(corpo['sucesso'])
+        self.assertEqual(list(externo.iterdir()), [])
 
     def test_reenvio_usa_o_mesmo_protocolo_antes_e_depois_do_processamento(self):
         r=self.receber()

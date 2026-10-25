@@ -12,10 +12,12 @@ Sem confirmação de gravação, os campos permanecem preenchidos para tentar no
 
 ## Arquivos e garantias
 
-Os arquivos ficam em `<dados.dir>/fila-cadastros/`, fora da pasta web. O caminho
-vem de `radar.conf`; no perfil do servidor3 é
-`/var/lib/radar-brasil/fila-cadastros/`. Diretórios usam 2770 e arquivos 0660,
-com o grupo do CGI. O JSON contém dados originais e procedência: exige o mesmo
+Os arquivos ficam em `<dados.dir>/fila-cadastros/`. O caminho vem de `radar.conf`
+e não pode escapar de `dados.dir`, inclusive por links simbólicos. Na instalação
+com tudo na raiz do site, a fila fica em `dados/fila-cadastros/`, dentro do
+diretório da aplicação, com acesso direto por HTTP bloqueado pelo nginx.
+Não é necessário mover os dados para fora do site. Diretórios usam 2770 e
+arquivos 0660, com o grupo do CGI. O JSON contém dados originais e procedência: exige o mesmo
 cuidado de acesso e backup do banco, e não deve ser publicado no repositório.
 
 O recebimento grava um temporário, sincroniza arquivo, faz a troca atômica e
@@ -70,10 +72,10 @@ continuam de onde pararam. A espera de nova tentativa cresce de 60 s até 1 h.
 Comandos locais, usando o Python da instalação:
 
 ```sh
-python3 /openclaw/bin/radar/web/api.pse fila processar
-python3 /openclaw/bin/radar/web/api.pse fila consultar --protocolo PROTOCOLO
-python3 /openclaw/bin/radar/web/api.pse fila reprocessar --protocolo PROTOCOLO
-python3 /openclaw/bin/radar/web/api.pse fila verificar
+python3 ./api.pse fila processar
+python3 ./api.pse fila consultar --protocolo PROTOCOLO
+python3 ./api.pse fila reprocessar --protocolo PROTOCOLO
+python3 ./api.pse fila verificar
 ```
 
 Reprocessar exige revisar a causa e mantém as mesmas regras da ingestão; não

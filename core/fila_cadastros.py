@@ -38,9 +38,9 @@ def _fsync_dir(diretorio):
 
 
 def _preparar():
+    # core.caminhos confina a fila a dados.dir, inclusive ao resolver links.
+    # No layout raiz_web, dados/ e privado pelo nginx mesmo estando no webroot.
     raiz = pasta()
-    if raiz.resolve().is_relative_to(Path(caminhos.web_raiz()).resolve()):
-        _erro(503, 'fila_insegura', 'A fila deve ficar fora da pasta web.')
     for d in (raiz, *(raiz / nome for nome in PASTAS)):
         if d.is_symlink():
             _erro(503, 'fila_insegura', 'A fila exige diretorios regulares.')

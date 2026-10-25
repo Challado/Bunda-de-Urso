@@ -42,6 +42,8 @@ um nome de arquivo e não move a base quando um caminho é editado.
 Código e o próprio `radar.conf` ficam na raiz da aplicação. As páginas, CSS,
 JavaScript, imagens e JSON públicos ficam em `resources/`. Auxiliares
 da configuração (lock, backup e auditoria) ficam em `dados.dir/configuracao`.
+Os envios aguardam processamento em `dados.dir/fila-cadastros`; essa fila pode
+ficar dentro da raiz do site, protegida pelo mesmo bloqueio HTTP dos dados.
 O editor consolida seções repetidas e preserva comentários e opções existentes.
 Não há `usuario` ou `grupo` no arquivo: a execução usa a identidade do processo.
 

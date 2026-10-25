@@ -341,12 +341,12 @@ def ensure_dirs():
 
 
 def fila_cadastros(dados_dir=None):
-    """Fila fora do webroot, no diretorio de dados definido pelo radar.conf."""
+    """Fila confinada ao diretorio de dados definido pelo radar.conf."""
     return dentro_dados("fila-cadastros", "fila", base=dados_dir)
 
 
 def status_atualizacoes():
-    """Estado persistente; fica fora da arvore substituida e do webroot."""
+    """Estado persistente em dados.dir, preservado durante atualizacoes."""
     return dentro_dados("atualizacoes/status.json", "status")
 
 

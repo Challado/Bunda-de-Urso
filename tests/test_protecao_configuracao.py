@@ -138,6 +138,7 @@ class TestProtecaoConfiguracao(unittest.TestCase):
             else:
                 (web / "radar.conf").symlink_to(conf)
             privados = ["dados/radar.sqlite3", "dados/raw/original.json", "dados/segredos/api_token",
+                        "dados/fila-cadastros/pendentes/pedido.json",
                         "logs/tick.log", "core/entrada_api.py",
                         "radar.conf.anterior", "radar.conf.lock", "sql/schema.sqlite.sql", ".radar-temporario-privado"]
             if raiz_local:
