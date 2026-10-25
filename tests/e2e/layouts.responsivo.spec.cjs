@@ -10,6 +10,21 @@ async function capturar(page,info,nome){
   await page.screenshot({path:info.outputPath(nome+'.png'),fullPage:true});
   await info.attach(nome+'-medidas',{body:Buffer.from(JSON.stringify({tela:tela(info),...(await medidas(page))},null,2)),contentType:'application/json'});
 }
+async function estabilizarRolagem(lista){
+  await lista.evaluate(el=>new Promise((resolve,reject)=>{
+    let anterior=el.scrollTop,estavel=0;
+    const limite=performance.now()+5000;
+    function quadro(){
+      const atual=el.scrollTop;
+      estavel=Math.abs(atual-anterior)<.5?estavel+1:0;
+      anterior=atual;
+      if(estavel>=4)return resolve();
+      if(performance.now()>limite)return reject(new Error('Rolagem nao estabilizou apos o gesto'));
+      requestAnimationFrame(quadro);
+    }
+    requestAnimationFrame(quadro);
+  }));
+}
 async function rolarLista(page,browserName,info){
   const lista=page.locator('#resultado');
   await lista.scrollIntoViewIfNeeded();
@@ -37,6 +52,7 @@ async function rolarLista(page,browserName,info){
     await page.mouse.wheel(0,350);
   }
   await expect.poll(()=>lista.evaluate(el=>el.scrollTop)).toBeGreaterThan(10);
+  await estabilizarRolagem(lista);
   // Rolar a lista nao deve mover a pagina por tras dela.
   await expect.poll(()=>page.evaluate(()=>scrollY)).toBe(antes);
 }
@@ -78,9 +94,10 @@ test('lista longa rola de verdade, permite teclado e recolhe sem perder radares'
   const antes=await lista.evaluate(el=>el.scrollTop);
   // Recalcular a altura nao pode jogar o leitor de volta ao inicio da lista.
   await page.evaluate(()=>new Promise(resolve=>{window.dispatchEvent(new Event('resize'));requestAnimationFrame(()=>requestAnimationFrame(resolve));}));
-  await expect.poll(()=>lista.evaluate(el=>el.scrollTop)).toBe(antes);
+  await expect.poll(async()=>Math.abs(await lista.evaluate(el=>el.scrollTop)-antes)).toBeLessThanOrEqual(1);
   await page.keyboard.press('PageDown');
   await expect.poll(()=>lista.evaluate(el=>el.scrollTop)).toBeGreaterThan(antes);
+  await estabilizarRolagem(lista);
   // Ultimo cadastro continua alcancavel pela rolagem da regiao.
   const ultimo=lista.locator('tbody tr').last();
   await ultimo.locator('a').scrollIntoViewIfNeeded();

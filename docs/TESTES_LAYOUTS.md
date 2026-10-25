@@ -56,6 +56,8 @@ O gesto de arrastar a lista é enviado como toque nativo ao Chromium em celulare
 e tablets. Os demais casos exercitam roda do mouse e teclado. WebKit mobile não
 oferece roda do mouse no Playwright: nele a rolagem é exercitada por eventos reais
 de teclado, mantendo a emulação mobile e os testes de toque nos controles.
+Os gestos aguardam a rolagem nativa estabilizar antes de comparar a posição de
+leitura, com tolerância de um pixel para arredondamento entre motores.
 As medidas de layout são verificadas sobre o DOM real, sem simular scrollTop
 como substituto da interação do usuário.
 
