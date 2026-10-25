@@ -3,6 +3,7 @@ const chromiumLaunch = process.env.RADAR_TEST_CHROMIUM ? {executablePath:process
 module.exports = defineConfig({
   testDir: './tests/e2e',
   testMatch: '**/*.spec.cjs',
+  testIgnore: '**/layouts.responsivo.spec.cjs',
   fullyParallel: false,
   workers: 1,
   retries: 0,

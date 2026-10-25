@@ -19,3 +19,5 @@ dados/
 node_modules/
 playwright-report/
 test-results/
+playwright-layout-report/
+test-results-layouts/

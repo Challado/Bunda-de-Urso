@@ -1,0 +1,50 @@
+name: Layouts e interacoes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: layouts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  responsivo:
+    name: ${{ matrix.browser }} / ${{ matrix.dispositivo }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        browser: [chromium, firefox, webkit]
+        dispositivo: [celular, tablet, pc]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Instalar navegador e dependencias
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Layouts, rolagem, cliques, toque e navegacao
+        run: npx playwright test --config=playwright.layouts.config.cjs --project="${{ matrix.browser }}-${{ matrix.dispositivo }}-*"
+      - name: Relatorio de cada tela, capturas e traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: layouts-${{ matrix.browser }}-${{ matrix.dispositivo }}-${{ github.run_attempt }}
+          path: |
+            playwright-layout-report/
+            test-results-layouts/
+          retention-days: 14
+          if-no-files-found: error

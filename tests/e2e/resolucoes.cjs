@@ -1,0 +1,21 @@
+// Pixels CSS; densidade e toque sao emulados, sem representar aparelho fisico.
+module.exports=[
+  {nome:'compacto',grupo:'celular',width:320,height:568,dpr:2,toque:true,rolaPagina:true},
+  {nome:'pequeno',grupo:'celular',width:360,height:640,dpr:3,toque:true,rolaPagina:true},
+  {nome:'padrao',grupo:'celular',width:390,height:844,dpr:3,toque:true,rolaPagina:false},
+  {nome:'grande',grupo:'celular',width:412,height:915,dpr:2.625,toque:true,rolaPagina:false},
+  {nome:'paisagem',grupo:'celular',width:844,height:390,dpr:3,toque:true,rolaPagina:true},
+  {nome:'paisagem-grande',grupo:'celular',width:915,height:412,dpr:2.625,toque:true,rolaPagina:true},
+  {nome:'compacto',grupo:'tablet',width:600,height:960,dpr:2,toque:true,rolaPagina:false},
+  {nome:'retrato',grupo:'tablet',width:768,height:1024,dpr:2,toque:true,rolaPagina:false},
+  {nome:'retrato-grande',grupo:'tablet',width:820,height:1180,dpr:2,toque:true,rolaPagina:false},
+  {nome:'paisagem',grupo:'tablet',width:1024,height:768,dpr:2,toque:true,rolaPagina:false},
+  {nome:'paisagem-grande',grupo:'tablet',width:1180,height:820,dpr:2,toque:true,rolaPagina:false},
+  {nome:'pequeno',grupo:'pc',width:1024,height:768,dpr:1,toque:false,rolaPagina:false},
+  {nome:'notebook',grupo:'pc',width:1280,height:720,dpr:1,toque:false,rolaPagina:false},
+  {nome:'notebook-hd',grupo:'pc',width:1366,height:768,dpr:1,toque:false,rolaPagina:false},
+  {nome:'hidpi',grupo:'pc',width:1440,height:900,dpr:2,toque:false,rolaPagina:false},
+  {nome:'full-hd',grupo:'pc',width:1920,height:1080,dpr:1,toque:false,rolaPagina:false},
+  {nome:'qhd',grupo:'pc',width:2560,height:1440,dpr:1,toque:false,rolaPagina:false},
+  {nome:'4k',grupo:'pc',width:3840,height:2160,dpr:1,toque:false,rolaPagina:false},
+];

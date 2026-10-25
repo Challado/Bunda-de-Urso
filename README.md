@@ -413,3 +413,11 @@ terminal. Atualizações preservam o arquivo do servidor. Veja `docs/CONFIGURACA
 
 A página de status por UF e dos leitores é acessada diretamente, sem link na
 home. Consulte [o funcionamento e as regras de contagem](docs/STATUS.md).
+
+### Layouts e interações no CI
+
+O workflow **Layouts e interacoes** valida 18 perfis de celular, tablet e PC em
+Chromium, Firefox e WebKit, com 432 verificações de rolagem, clique/toque,
+navegação, cadastro e altura do mapa. Roda automaticamente em push/main e PR,
+além de permitir acionamento manual. Relatórios, screenshots, medidas e traces
+ficam nos artefatos por 14 dias. Veja [a matriz e os cenários](docs/TESTES_LAYOUTS.md).
