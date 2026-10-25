@@ -13,6 +13,7 @@
     function ajustar(){
       pendente=false;
       var aberto=painel.open;
+      var rolagemAnterior=resultado.scrollTop;
       // Mede a lista inteira mesmo quando recolhida ou com rolagem interna.
       painel.open=true;
       resultado.style.maxHeight='none';
@@ -39,6 +40,9 @@
       }
       alturaMapa=Math.max(1,Math.floor(alturaMapa));
       mapa.style.height=alturaMapa+'px';
+      // A medicao sem maxHeight remove o overflow e zera scrollTop no navegador.
+      // Restaura a leitura depois de recompor o tamanho definitivo da lista.
+      resultado.scrollTop=rolagemAnterior;
       if(alturaMapa!==alturaAnterior){
         alturaAnterior=alturaMapa;
         opcoes.mapa.invalidateSize({pan:true,animate:false,debounceMoveend:true});

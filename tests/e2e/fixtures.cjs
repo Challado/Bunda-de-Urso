@@ -35,9 +35,16 @@ const test = base.extend({
     }
   },
   baseURL: async ({radarServer},use) => use(radarServer),
-  semErrosJavaScript: [async ({page},use) => {
-    const errors=[];page.on('pageerror',e=>errors.push(e.message));
-    await use();expect(errors).toEqual([]);
+  semErrosJavaScript: [async ({page,context},use) => {
+    const errors=[],observadas=new Set();
+    function observar(aba){
+      if(observadas.has(aba))return;
+      observadas.add(aba);
+      aba.on('pageerror',e=>errors.push(e.message));
+    }
+    observar(page);context.on('page',observar);
+    try{await use();}finally{context.off('page',observar);}
+    expect(errors).toEqual([]);
   }, {auto:true}],
 });
 module.exports={test,expect};

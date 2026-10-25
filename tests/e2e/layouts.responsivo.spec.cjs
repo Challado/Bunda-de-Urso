@@ -32,7 +32,8 @@ async function rolarLista(page,browserName,info){
     await lista.focus();
     await page.keyboard.press('PageDown');
   }else{
-    await page.mouse.move(pos.x+pos.width/2,y);
+    await lista.hover({position:{x:pos.width/2,y:pos.height/2}});
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     await page.mouse.wheel(0,350);
   }
   await expect.poll(()=>lista.evaluate(el=>el.scrollTop)).toBeGreaterThan(10);
@@ -75,6 +76,9 @@ test('lista longa rola de verdade, permite teclado e recolhe sem perder radares'
   const lista=page.locator('#resultado');
   await lista.focus();
   const antes=await lista.evaluate(el=>el.scrollTop);
+  // Recalcular a altura nao pode jogar o leitor de volta ao inicio da lista.
+  await page.evaluate(()=>new Promise(resolve=>{window.dispatchEvent(new Event('resize'));requestAnimationFrame(()=>requestAnimationFrame(resolve));}));
+  await expect.poll(()=>lista.evaluate(el=>el.scrollTop)).toBe(antes);
   await page.keyboard.press('PageDown');
   await expect.poll(()=>lista.evaluate(el=>el.scrollTop)).toBeGreaterThan(antes);
   // Ultimo cadastro continua alcancavel pela rolagem da regiao.

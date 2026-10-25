@@ -45,6 +45,7 @@ WebKit testa o motor usado pelo Safari, sem representar um iPhone físico.
   ou popup do estado que não abre.
 - Aviso que não muda ao passar de radares para nenhum radar e de volta, ou aviso
   repetido quando a categoria da busca permanece a mesma.
+- Lista que perde a posição de leitura ao recalcular o tamanho.
 - Layout que não se recompõe após orientação, redução do viewport (incluindo o
   espaço ocupado por teclado virtual) ou restauração do tamanho.
 - Falha da configuração pública ou da consulta deixando controles presos,
