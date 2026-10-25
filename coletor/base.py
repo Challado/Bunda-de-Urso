@@ -53,6 +53,18 @@ def sha256_file(path):
     return h.hexdigest()
 
 
+def _validar_origem_local(origem):
+    """Valida cada arquivo sem converter listas de URLs em caminhos locais."""
+    if isinstance(origem, (list, tuple)):
+        return type(origem)(_validar_origem_local(item) for item in origem)
+    if origem is None:
+        return None  # O conector descobre os recursos publicados.
+    referencia = os.fspath(origem)
+    if referencia.startswith(("https://", "http://")):
+        return origem
+    return caminhos.dentro_dados(os.path.abspath(referencia), "arquivo de importacao", base=config.DATA_DIR)
+
+
 class CacheImutavel(object):
     """Cache de arquivos brutos por sha256 (uma copia por conteudo)."""
 
@@ -465,8 +477,8 @@ class ColetorBase(object):
         try:
             self._diario_coleta.update(etapa="download_e_leitura", origem=origem)
             atualizacoes.registrar("coleta", self._diario_coleta, fonte=recurso_id)
-            if _LOCAL.get() and not caminhos._LEGADO.get() and not str(origem).startswith(("https://", "http://")):
-                origem = caminhos.dentro_dados(os.path.abspath(origem), "arquivo de importacao", base=config.DATA_DIR)
+            if _LOCAL.get() and not caminhos._LEGADO.get():
+                origem = _validar_origem_local(origem)
             conteudo, ext, mime, registros = self.carregar(origem)
             self.validar_coleta(conteudo, registros)
             self._diario_coleta.update(etapa="normalizacao", recebidos=len(registros), bytes=len(conteudo),

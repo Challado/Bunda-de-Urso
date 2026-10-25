@@ -11,6 +11,7 @@ conexao de clientes nao-navegador.  Por isso o modulo TENTA primeiro
 dubles (sem subir navegador).
 """
 import os
+import subprocess
 import unittest
 from unittest import mock
 
@@ -147,6 +148,38 @@ class TestDetranDFContornoWaf(unittest.TestCase):
                                   return_value=None):
             with self.assertRaises(http.ErroFonte):
                 ColetorDetranDF().carregar(ColetorDetranDF.URL_DADOS_FALLBACK)
+
+    def test_http_200_com_html_em_vez_da_lista_tenta_navegador(self):
+        with open(JS, encoding='utf-8') as arquivo:
+            texto = arquivo.read()
+        with mock.patch.object(http, 'baixar', return_value=_resp('<html>Erro</html>')), \
+             mock.patch.object(ColetorDetranDF, '_texto_via_navegador', return_value=texto) as navegador:
+            self.assertEqual(len(ColetorDetranDF().carregar(ColetorDetranDF.URL_DADOS_FALLBACK)[3]), 407)
+        navegador.assert_called_once()
+
+    def test_bloqueio_do_navegador_com_nome_do_arquivo_nao_passa_por_lista(self):
+        bloqueio = '<html><title>Request Rejected</title><body>equipamentos.js</body></html>'
+        with mock.patch.object(detran_df, '_achar_navegador', return_value='/usr/bin/chromium'), \
+             mock.patch.object(detran_df, '_dump_dom', return_value=bloqueio):
+            with self.assertRaisesRegex(http.ErroFonte, 'Request Rejected'):
+                ColetorDetranDF._texto_via_navegador(ColetorDetranDF.URL_DADOS_FALLBACK)
+
+    def test_erro_do_navegador_preserva_as_duas_causas(self):
+        with mock.patch.object(http, 'baixar', side_effect=http.ErroFonte('HTTP 503')), \
+             mock.patch.object(ColetorDetranDF, '_texto_via_navegador', side_effect=http.ErroFonte('codigo 1: sem permissao')):
+            with self.assertRaisesRegex(http.ErroFonte, 'HTTP 503.*codigo 1: sem permissao'):
+                ColetorDetranDF().carregar(ColetorDetranDF.URL_DADOS_FALLBACK)
+
+    def test_falha_do_processo_chromium_informa_codigo_e_stderr(self):
+        resultado = subprocess.CompletedProcess([], 1, b'', b'Permission denied')
+        with mock.patch.object(detran_df.subprocess, 'run', return_value=resultado):
+            with self.assertRaisesRegex(http.ErroFonte, 'codigo 1.*Permission denied'):
+                detran_df._dump_dom('chromium', ColetorDetranDF.URL_DADOS_FALLBACK, '/perfil')
+
+    def test_timeout_do_chromium_e_registrado_com_a_url(self):
+        with mock.patch.object(detran_df.subprocess, 'run', side_effect=subprocess.TimeoutExpired('chromium', 90)):
+            with self.assertRaisesRegex(http.ErroFonte, 'excedeu 90 segundos.*equipamentos.js'):
+                detran_df._dump_dom('chromium', ColetorDetranDF.URL_DADOS_FALLBACK, '/perfil')
 
 
 class TestDetranDFSync(unittest.TestCase):

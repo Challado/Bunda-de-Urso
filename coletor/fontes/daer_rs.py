@@ -179,20 +179,21 @@ class ColetorDAERRS(ColetorBase):
             juntas = _norm(" ".join(linha))
             if not any((c or "").strip() for c in linha):
                 continue
-            if periodo is None and juntas.startswith("PERIODO"):
-                periodo = " ".join(c.strip() for c in linha if c.strip())
-            if unidade is None and re.match(r"^(CRBM|CPRV)", juntas) \
+            if re.match(r"^(CRBM|CPRV)", juntas) \
                     and re.search(r"\d", juntas):
                 unidade = " ".join(c.strip() for c in linha if c.strip())
-            if cab_idx is None and "RODOVIA" in juntas and "KM INICIAL" in juntas:
+                periodo = None
+                cab_idx = None
+                continue
+            if juntas.startswith("PERIODO"):
+                periodo = " ".join(c.strip() for c in linha if c.strip())
+                cab_idx = None
+                continue
+            if "RODOVIA" in juntas and "KM INICIAL" in juntas:
                 cab_idx = [_norm(c) for c in linha]
                 cabecalho = [c.strip() for c in linha]
                 continue
             if cab_idx is not None:
-                if not any((c or "").strip() for c in linha):
-                    # fim do bloco: volta a procurar o proximo cabecalho
-                    cab_idx = None
-                    continue
                 d = _registro(cab_idx, cabecalho, linha)
                 if d is not None:
                     if periodo:
@@ -313,7 +314,7 @@ def _dedup(registros):
     out = []
     for d in registros:
         chave = (d.get("rodovia"), d.get("km_inicial"), d.get("km_final"),
-                 d.get("fracao"), d.get("velocidade"))
+                 d.get("fracao"), d.get("velocidade"), d.get("periodo"), d.get("unidade"))
         if chave in vistos:
             continue
         vistos.add(chave)

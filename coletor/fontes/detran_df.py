@@ -94,8 +94,16 @@ def _dump_dom(navegador, url, perfil, timeout=90):
            "--hide-scrollbars", "--no-first-run",
            "--no-default-browser-check", "--user-data-dir=%s" % perfil,
            "--virtual-time-budget=15000", "--dump-dom", url]
-    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                          timeout=timeout)
+    try:
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        raise http.ErroFonte('Navegador excedeu %s segundos ao abrir %s' % (timeout, url)) from exc
+    if proc.returncode:
+        detalhe = proc.stderr.decode('utf-8', 'replace').strip()[-2000:]
+        raise http.ErroFonte('Navegador terminou com codigo %s em %s: %s' % (proc.returncode, url, detalhe))
+    if not proc.stdout.strip():
+        raise http.ErroFonte('Navegador nao produziu conteudo em %s' % url)
     return proc.stdout.decode("utf-8", "replace")
 
 
@@ -184,9 +192,11 @@ class ColetorDetranDF(ColetorBase):
             _dump_dom(navegador, lista, perfil)          # passo 1: sessao F5
             bruto = _dump_dom(navegador, dados_url, perfil)   # passo 2: dados
         texto = _texto_do_pre(bruto)
-        if "equipamentos" not in texto:
+        if not cls._extrair_registros(texto):
+            titulo = re.search(r'<title[^>]*>(.*?)</title>', bruto, re.I | re.S)
+            detalhe = re.sub(r'\s+', ' ', html.unescape(titulo.group(1))).strip()[:180] if titulo else 'sem lista de equipamentos'
             raise http.ErroFonte(
-                "contorno de navegador nao devolveu a lista: %s" % dados_url)
+                "contorno de navegador nao devolveu lista valida (%s): %s" % (detalhe, dados_url))
         return texto
 
     # -- carregar ----------------------------------------------------------
@@ -201,10 +211,18 @@ class ColetorDetranDF(ColetorBase):
             try:
                 conteudo, _headers, _final = http.baixar(url)
                 texto = conteudo.decode("utf-8", "replace")
-            except (http.ErroFonte, OSError):
+                if not self._extrair_registros(texto):
+                    raise http.ErroFonte('Resposta HTTP sem lista valida de equipamentos: %s' % url)
+            except (http.ErroFonte, OSError) as erro_http:
                 # WAF F5 reseta cliente nao-navegador -> contorno de navegador
-                texto = self._texto_via_navegador(url)
-        return texto, ".js", MIME_JS, self._extrair_registros(texto)
+                try:
+                    texto = self._texto_via_navegador(url)
+                except (http.ErroFonte, OSError) as erro_browser:
+                    raise http.ErroFonte('Download HTTP falhou: %s; navegador falhou: %s' % (erro_http, erro_browser)) from erro_browser
+        registros = self._extrair_registros(texto)
+        if not registros:
+            raise http.ErroFonte('Fonte Detran-DF sem lista valida de equipamentos; coleta recusada.')
+        return texto, ".js", MIME_JS, registros
 
     # -- parsing -----------------------------------------------------------
     @staticmethod

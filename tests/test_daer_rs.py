@@ -5,6 +5,7 @@ Nenhum teste acessa a rede: usam a fixture CSV local e substituem
 ``coletor.http.baixar`` por um duble na verificacao da descoberta.
 """
 import os
+from pathlib import Path
 import unittest
 from unittest import mock
 
@@ -12,6 +13,7 @@ from coletor import http
 from coletor.fontes.daer_rs import ColetorDAERRS
 from core import config
 from core import db as dbmod
+from core.contexto_api import atendimento_local
 import tests.common as common
 
 FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
@@ -59,6 +61,17 @@ class TestDAERRS(unittest.TestCase):
         self.assertAlmostEqual(d["km_fim"], 148.0)
         self.assertEqual(d["sentido"], "crescente")
         self.assertIn("CRBM/CPRv", d["criterio_inclusao"])
+
+    def test_planilhas_concatenadas_preservam_unidade_periodo_e_cabecalhos(self):
+        primeiro = ('CRBM - 1º BRBM\nPeríodo: outubro de 2026\n'
+                    'Rodovia,Km inicial,Km final\nRSC 153,138,148\n')
+        segundo = ('CPRv - 3º BPRv BM\nPeríodo: agosto de 2025\n'
+                   'Km final,Rodovia,Km inicial\n148,RSC 153,138\n')
+        registros = ColetorDAERRS._parse_csv(primeiro + segundo)
+        self.assertEqual(len(registros), 2)
+        self.assertEqual([r['unidade'] for r in registros], ['CRBM - 1º BRBM', 'CPRv - 3º BPRv BM'])
+        self.assertEqual([r['periodo'] for r in registros], ['Período: outubro de 2026', 'Período: agosto de 2025'])
+        self.assertTrue(all(r['rodovia'] == 'RSC 153' and r['km_inicial'] == '138' for r in registros))
 
     def test_normalizar_reverso_ordena_km_e_marca_sentido(self):
         c = ColetorDAERRS()
@@ -155,6 +168,44 @@ class TestDAERRS(unittest.TestCase):
             self.assertEqual(
                 dbmod.scalar(c.conn,
                              "SELECT COUNT(*) FROM PONTO_FISCALIZACAO"), 0)
+        finally:
+            c.conn.close()
+
+    def test_api_local_sincroniza_lista_de_urls_sem_tratar_como_arquivo(self):
+        for tipo in (list, tuple):
+            with self.subTest(tipo=tipo):
+                common.ambiente_temporario()
+                conteudo = Path(fx('daer_rs_trechos_fixture.csv')).read_bytes()
+                urls = tipo(['https://docs.google.com/spreadsheets/d/X/export?format=csv'])
+                c = ColetorDAERRS(db_path=config.DB_PATH)
+                try:
+                    with atendimento_local(), mock.patch.object(http, 'baixar', return_value=_resp(conteudo)) as baixar:
+                        resumo = c.sincronizar(urls, publicar=False)
+                    self.assertEqual(resumo['criados'], 74)
+                    baixar.assert_called_once_with(urls[0])
+                finally:
+                    c.conn.close()
+
+    def test_api_local_sem_arquivo_permite_descoberta(self):
+        common.ambiente_temporario()
+        conteudo = Path(fx('daer_rs_trechos_fixture.csv')).read_bytes()
+        urls = ['https://docs.google.com/spreadsheets/d/X/export?format=csv']
+        c = ColetorDAERRS(db_path=config.DB_PATH)
+        try:
+            with atendimento_local(), mock.patch.object(c, 'resolver_planilhas', return_value=urls), \
+                 mock.patch.object(http, 'baixar', return_value=_resp(conteudo)):
+                self.assertEqual(c.sincronizar(None, publicar=False)['criados'], 74)
+        finally:
+            c.conn.close()
+
+    def test_lista_com_arquivo_externo_e_recusada_antes_de_baixar(self):
+        common.ambiente_temporario()
+        c = ColetorDAERRS(db_path=config.DB_PATH)
+        try:
+            with atendimento_local(), mock.patch.object(http, 'baixar') as baixar:
+                with self.assertRaisesRegex(ValueError, 'dentro de'):
+                    c.sincronizar(['https://exemplo.org/publicacao.csv', fx('daer_rs_trechos_fixture.csv')])
+            baixar.assert_not_called()
         finally:
             c.conn.close()
 
