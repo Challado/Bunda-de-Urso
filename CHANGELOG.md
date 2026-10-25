@@ -1,5 +1,12 @@
 # Histórico de alterações
 
+## Home, navegação e mapas
+
+- Ícone do urso retorna à home em todas as páginas.
+- Consulta concluída mostra somente o snapshot, sem resumo técnico de cobertura ou contagens redundantes.
+- Links para OpenStreetMap, Google Maps, Street View, Bing Mapas e Streetside no local consultado e nos marcadores, compartilhando os destinos com os detalhes.
+- Validação de navegação, coordenadas dos links e busca vazia incluída nos testes de navegador e na matriz de layouts do GitHub Actions.
+
 ## Documentação da API e organização do GitHub
 
 - Guia destacado de consulta/exportação, incluindo NDJSON, paginação, XML, TXT, DIF e EDIFACT.

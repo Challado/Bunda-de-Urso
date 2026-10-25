@@ -71,8 +71,6 @@
   .origem-publicacao{margin-top:10px;font-size:13px}
   .origem-publicacao > summary{cursor:pointer;color:var(--azul);padding:6px 0}
   .corpo a{color:var(--azul);overflow-wrap:anywhere}
-  .links-mapas{display:flex;flex-wrap:wrap;gap:8px 14px}
-  .links-mapas a{color:var(--azul)}
   .mapas-principais{margin:6px 0 14px}
   .consolidado > .corpo > .explicacao{margin-top:0}
   .rodape{margin-top:18px;font-size:12.5px;color:#6b7280}
@@ -105,10 +103,11 @@
 <link rel="icon" type="image/png" href="resources/favicon-32.png" sizes="32x32">
 <link rel="icon" type="image/png" href="resources/favicon-16.png" sizes="16x16">
 <link rel="apple-touch-icon" href="resources/apple-touch-icon.png">
+<link rel="stylesheet" href="resources/navegacao.css">
 </head>
 <body>
 <header>
-  <img class="logo" src="resources/bunda-de-urso.png" alt="Bundita de Urso — a base do Bunda de urso">
+  <a class="inicio" href="./" aria-label="Voltar à home" title="Voltar à home"><img class="logo" src="resources/bunda-de-urso.png" alt="Bundita de Urso — a base do Bunda de urso"></a>
   <div class="cabTxt">
     <h1 id="titulo">Radar — detalhes</h1>
     <div class="sub">Dados do radar separados por fonte. Clique no nome de uma fonte para recolher ou expandir seus dados. &nbsp;·&nbsp; <a href="./">&larr; voltar à consulta por localização</a></div>
@@ -131,6 +130,7 @@
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="resources/links-mapas.js"></script>
 <script>
 (function(){
   "use strict";
@@ -246,27 +246,7 @@
     return esc(VALORES[s] || s);
   }
   function ehObjeto(v){ return v && typeof v === "object"; }
-  function linksMapas(latitude, longitude){
-    function coordenada(v){
-      if (typeof v === "number") return v;
-      if (typeof v !== "string") return NaN;
-      var s = v.trim().replace(",", ".");
-      return /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(s) ? Number(s) : NaN;
-    }
-    var lat = coordenada(latitude), lon = coordenada(longitude);
-    if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return "";
-    var posicao = encodeURIComponent(lat + "," + lon);
-    var links = [
-      ["https://www.openstreetmap.org/?mlat=" + lat + "&mlon=" + lon + "#map=18/" + lat + "/" + lon, "OpenStreetMap"],
-      ["https://www.google.com/maps/search/?api=1&query=" + posicao, "Google Maps"],
-      ["https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=" + posicao, "Street View"],
-      ["https://www.bing.com/maps?cp=" + lat + "~" + lon + "&lvl=18&style=r", "Bing Mapas"],
-      ["https://www.bing.com/maps?cp=" + lat + "~" + lon + "&lvl=18&style=x", "Bing Streetside"]
-    ];
-    return "<span class='links-mapas'>" + links.map(function(link){
-      return "<a href='" + esc(link[0]) + "' target='_blank' rel='noopener noreferrer'>" + link[1] + "</a>";
-    }).join("") + "</span>";
-  }
+  var linksMapas = window.RadarMapas.links;
   // Distancias legiveis: abaixo de 1 km em metros; de 1 km pra cima em km.
   function fmtDist(m){
     m = Number(m);

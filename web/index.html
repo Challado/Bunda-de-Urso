@@ -30,6 +30,7 @@
   button.sec{background:#5b6472}
   .ctrlAqui button{background:#fff;color:var(--azul);border:2px solid rgba(0,0,0,.25);border-radius:6px;padding:7px 10px;font:600 13px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;cursor:pointer;box-shadow:0 1px 5px rgba(0,0,0,.4);white-space:nowrap}
   .ctrlAqui button:hover{background:#eef3f9}
+  #mapaBox.popup-aberto .ctrlAqui,#mapaBox.popup-aberto #dicaAqui{visibility:hidden}
   #dicaAqui{display:none;position:absolute;left:50%;transform:translateX(-50%);bottom:12px;z-index:1100;background:rgba(18,80,143,.94);color:#fff;border:0;border-radius:20px;padding:8px 14px;font:600 13px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3)}
   #dicaAqui.on{display:block}
   button:disabled{opacity:.55;cursor:default}
@@ -44,7 +45,6 @@
   .tabWrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
   th,td{border-bottom:1px solid var(--borda);padding:6px 8px;text-align:left;vertical-align:top}
   th{background:var(--cinza);position:sticky;top:0}
-  .pill{display:inline-block;background:#e8eef6;color:var(--azul);border-radius:10px;padding:1px 8px;font-size:12px}
   #legenda{padding:6px 16px 0;font-size:12.5px;color:#4a4a55;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
   #legenda .lg{display:inline-flex;align-items:center;gap:6px}
   #legenda i{width:14px;height:14px;border-radius:50%;border:2px solid #000;display:inline-block}
@@ -122,10 +122,11 @@
 <link rel="icon" type="image/png" href="resources/favicon-32.png" sizes="32x32">
 <link rel="icon" type="image/png" href="resources/favicon-16.png" sizes="16x16">
 <link rel="apple-touch-icon" href="resources/apple-touch-icon.png">
+<link rel="stylesheet" href="resources/navegacao.css">
 </head>
 <body>
 <header>
-  <img class="logo" src="resources/bunda-de-urso.png" alt="Bundita de Urso — a base do Bunda de urso">
+  <a class="inicio" href="./" aria-label="Voltar à home" title="Voltar à home"><img class="logo" src="resources/bunda-de-urso.png" alt="Bundita de Urso — a base do Bunda de urso"></a>
   <div class="cabTxt">
     <h1>Radar Brasil — consulta por localização</h1>
     <nav class="nav">
@@ -155,6 +156,7 @@
 <div id="legenda" aria-label="legenda das cores">
   <span class="lg"><i style="background:#ffe08a;border-color:#c0392b"></i> fonte oficial</span>
   <span class="lg"><i style="background:#c4b5fd;border-color:#6d28d9"></i> nossa base (Bundita de Urso)</span>
+  <nav id="mapasConsulta" aria-label="Mapas do local consultado" hidden></nav>
 </div>
 
 <div id="mapaBox">
@@ -194,6 +196,7 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="resources/home-layout.js"></script>
+<script src="resources/links-mapas.js"></script>
 <script>
 (function(){
   "use strict";
@@ -207,6 +210,17 @@
     maxZoom: 19, attribution: "&copy; OpenStreetMap"
   }).addTo(map);
   if(window.RadarLayout)window.RadarLayout.iniciar({mapa:map, api:API});
+
+  map.on("popupopen", function(e){
+    document.getElementById("mapaBox").classList.add("popup-aberto");
+    // Mantem o fechamento e o conteudo acessiveis mesmo num mapa baixo de celular.
+    e.popup.options.maxHeight = Math.max(80, map.getSize().y - 100);
+    e.popup.options.maxWidth = Math.min(300, Math.max(160, map.getSize().x - 60));
+    e.popup.update();
+  });
+  map.on("popupclose", function(){
+    document.getElementById("mapaBox").classList.remove("popup-aberto");
+  });
 
   var camadaPts = L.layerGroup().addTo(map);
   var marcaEu = null;
@@ -351,7 +365,7 @@
     if (circleRaio){ map.removeLayer(circleRaio); circleRaio = null; }
     if (lat == null || lon == null) return;
     circleRaio = L.circle([lat, lon], {
-      radius: raio, color: "#12508f", weight: 1.5, dashArray: "5,5",
+      interactive: false, radius: raio, color: "#12508f", weight: 1.5, dashArray: "5,5",
       fillColor: "#9ecbff", fillOpacity: 0.10
     }).addTo(map);
   }
@@ -383,6 +397,14 @@
     return null;
   }
 
+  function atualizarLinksConsulta(lat, lon){
+    var links = window.RadarMapas.links(lat, lon);
+    var nav = document.getElementById("mapasConsulta");
+    nav.innerHTML = "Local consultado: " + links;
+    nav.hidden = !links;
+    return links;
+  }
+
   function popupHtml(p){
     var loc = p.localizacao || {};
     var via = loc.via || {};
@@ -402,6 +424,7 @@
     if ((p.conflitos || []).some(function(c){ return c.campo === "localizacao"; })){
       h += "Há informações de localização divergentes entre fontes.<br>";
     }
+    h += window.RadarMapas.links(loc.latitude, loc.longitude);
     h += "<a class='detalhe' href='detalhe.html?id=" + encodeURIComponent(p.id) + "'>Ver todos os detalhes &raquo;</a>";
     return h;
   }
@@ -437,17 +460,14 @@
       tabela = "<div class='tabWrap'><table><thead><tr><th>ID</th><th>Via</th><th>km</th><th>Velocidade</th><th>Sentido</th><th>Distância</th><th>Posição</th></tr></thead><tbody>" +
         linhas.join("") + "</tbody></table></div>";
     }
-    var st = (meta && meta.status) || "?";
-    var resumo = "<span class='pill'>" + escapeHtml(st) + "</span> " +
-      "<b>" + (meta ? meta.total_pontos : 0) + "</b> ponto(s) de fiscalização no raio";
-    if (meta && meta.total_equipamentos != null) resumo += " · " + meta.total_equipamentos + " equipamento(s)";
+    var aviso = "";
     if (meta && meta.proximo_cursor){
-      // ##-- BUNDITA DE URSO #{23} -- Uma pagina parcial nao representa todas as marcacoes do raio. ##
-      resumo += " <span class='aviso' style='display:inline-block'>Exibidos " +
+      // Uma pagina parcial nao representa todas as marcacoes do raio.
+      aviso = "<div class='aviso'>Exibidos " +
         (meta.retornados || 0) + " de " + (meta.total_pontos || 0) +
-        " pontos; consulta ainda incompleta.</span>";
+        " pontos; consulta ainda incompleta.</div>";
     }
-    elRes.innerHTML = resumo + tabela;
+    elRes.innerHTML = aviso + tabela;
   }
 
   // ##-- BUNDITA DE URSO #{23} -- O mapa parava na primeira pagina e respostas antigas podiam substituir uma consulta nova. ##
@@ -502,8 +522,9 @@
     elBarra.innerHTML = "Consultando " + lat + ", " + lon + " (raio " + raio + " m)…";
     camadaPts.clearLayers();
     if (marcaEu) map.removeLayer(marcaEu);
+    var linksConsulta = atualizarLinksConsulta(lat, lon);
     marcaEu = L.circleMarker([lat, lon], {radius:8, color:"#12508f", weight:3, fillColor:"#9ecbff", fillOpacity:1})
-      .addTo(map).bindPopup("Sua consulta");
+      .addTo(map).bindPopup("<b>Sua consulta</b><br>" + linksConsulta);
     ultimo = {lat: lat, lon: lon};
     desenharCirculo(lat, lon, raio);
     enquadrar(lat, lon, raio);
@@ -523,8 +544,7 @@
         else problemaCowboy(pontos.length, raio);
         ultimoAviso = aviso;
       }
-      elBarra.innerHTML = "Snapshot " + escapeHtml(d.consultado_em || "") +
-        (pontos.length === 0 ? " — <span class='aviso' style='display:inline-block'>nada no raio informado (isso não afirma que não exista radar: verifique cobertura da região).</span>" : "");
+      elBarra.textContent = "Snapshot " + (d.consultado_em || "");
     }).catch(function(e){
       if (numero !== numeroConsulta || sinal.aborted) return;
       elRes.innerHTML = "<div class='err'>Erro de rede: " + escapeHtml(e.message) + "</div>";

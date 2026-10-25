@@ -18,6 +18,7 @@ function contexto(fetch) {
     elRes: {}, elBarra: {}, camadaPts: {clearLayers() {}}, marcaEu: null,
     map: {removeLayer() {}}, ultimo: null,
     L: {circleMarker: () => ({addTo() {return this;}, bindPopup() {return this;}})},
+    atualizarLinksConsulta() {return "";},
     desenharCirculo() {}, enquadrar() {}, escapeHtml: String,
     render: (meta, pontos) => renders.push({meta, pontos}),
     festa: () => festas.push(true), problemaCowboy: n => avisos.push(n)};

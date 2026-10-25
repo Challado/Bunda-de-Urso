@@ -1,6 +1,6 @@
 const {test,expect}=require('./fixtures.cjs');
 
-const {preparar,medidas}=require('./home-layout-ajuda.cjs');
+const {preparar,medidas,conferirMapas}=require('./home-layout-ajuda.cjs');
 
 test('poucos radares preservam mapa legivel e cabem no PC',async({page})=>{
   await page.setViewportSize({width:1280,height:900});
@@ -55,4 +55,36 @@ test('configuracao indisponivel conserva limites locais e consulta funcional',as
   if((await medidas(page)).natural)await expect(page.locator('#painelResultados')).not.toHaveClass(/recolhivel/);
   else await expect(page.locator('#painelResultados')).toHaveClass(/recolhivel/);
   await expect.poll(async()=>{const m=await medidas(page);return Math.abs(m.mapa-Math.max(180,m.natural?Math.min(480,m.tela*.5):m.util*.5))<2;}).toBe(true);
+});
+
+
+test('snapshot sem resumo redundante e mapas acompanham o local consultado',async({page})=>{
+  await preparar(page,0);
+  await expect(page.locator('#barra')).toHaveText('Snapshot 2026-10-25T15:16:38+00:00');
+  await expect(page.locator('#resultado')).toBeEmpty();
+  await conferirMapas(page.locator('#mapasConsulta'),-24.9556,-53.4552);
+  await page.locator('#lat').fill('-16.32712');
+  await page.locator('#lon').fill('-51.35782');
+  await page.locator('#btConsultar').click();
+  await conferirMapas(page.locator('#mapasConsulta'),-16.32712,-51.35782);
+  await page.locator('.leaflet-overlay-pane path[stroke="#12508f"][stroke-width="3"]').click();
+  await conferirMapas(page.locator('.leaflet-popup-content'),-16.32712,-51.35782);
+  // Abre efetivamente outra aba sem depender dos provedores externos.
+  await page.context().route('https://www.google.com/maps/**',r=>r.fulfill({body:'Mapa de teste',contentType:'text/plain'}));
+  const nova=page.waitForEvent('popup');
+  await page.locator('.leaflet-popup-content').getByRole('link',{name:'Google Maps',exact:true}).click();
+  const mapa=await nova;
+  await expect(mapa).toHaveURL(/query=-16.32712%2C-51.35782/);
+  await mapa.close();
+});
+
+test('icone do urso volta a raiz da home em todas as paginas',async({page})=>{
+  await preparar(page,1);
+  for(const caminho of ['./','detalhe.html?id=P-1','cadastro.html','gestao.html','usuarios.html','status.html','status-estado.html?uf=PR']){
+    await page.goto(caminho);
+    const inicio=page.getByRole('link',{name:'Voltar à home',exact:true});
+    await expect(inicio.locator('img')).toHaveAttribute('src','resources/bunda-de-urso.png');
+    await inicio.click();
+    await expect(page).toHaveURL(/\/openclaw\/radar\/$/);
+  }
 });

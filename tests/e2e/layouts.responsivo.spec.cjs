@@ -1,5 +1,5 @@
 const {test,expect}=require('./fixtures.cjs');
-const {preparar,medidas}=require('./home-layout-ajuda.cjs');
+const {preparar,medidas,conferirMapas}=require('./home-layout-ajuda.cjs');
 
 function tela(info){return info.project.metadata.tela;}
 async function acionar(locator,info){if(tela(info).toque)await locator.tap();else await locator.click();}
@@ -80,6 +80,13 @@ async function rolarLista(page,browserName,info){
 
 test('um radar, controles e links cabem na largura e preservam mapa legivel',async({page},info)=>{
   const estado=await preparar(page,1);
+  await conferirMapas(page.locator("#mapasConsulta"),-24.9556,-53.4552);
+  await expect(page.locator("#barra")).toHaveText("Snapshot 2026-10-25T15:16:38+00:00");
+  const radar=page.locator('.leaflet-overlay-pane path[stroke="#c0392b"]').first();
+  await radar.scrollIntoViewIfNeeded();
+  await acionar(radar,info);
+  await conferirMapas(page.locator('.leaflet-popup-content .links-mapas'),-24.9556,-53.4552);
+  await page.locator('.leaflet-popup-close-button').click();
   await semOverflowHorizontal(page);
   if(tela(info).width>=768&&tela(info).height>=720)await expect(page.locator('#painelResultados')).not.toHaveClass(/recolhivel/);
   const m=await medidas(page);
@@ -178,7 +185,13 @@ test('zerar a busca limpa lista, muda aviso e recupera espaco do mapa',async({pa
   await page.locator('#festa').click({position:{x:5,y:5}});
   await expect(page.locator('#painelResultados')).not.toHaveClass(/recolhivel/);
   await expect(page.locator('#tituloResultados')).toBeHidden();
-  await expect(page.locator('#resultado tbody tr')).toHaveCount(0);
+  await expect(page.locator('#resultado')).toBeEmpty();
+  await expect(page.locator('#barra')).toHaveText('Snapshot 2026-10-25T15:16:38+00:00');
+  const consulta=page.locator('.leaflet-overlay-pane path[stroke="#12508f"][stroke-width="3"]');
+  await consulta.scrollIntoViewIfNeeded();
+  await acionar(consulta,info);
+  await conferirMapas(page.locator('.leaflet-popup-content'),-24.9556,-53.4552);
+  await page.locator('.leaflet-popup-close-button').click();
   estado.quantidade=60;
   await page.locator('#raio').press('ArrowRight');
   await expect(page.locator('#problema')).toBeVisible();
@@ -246,7 +259,7 @@ test('cadastro simplificado recebe protocolo e permite abrir os detalhes em cada
     await expect(link).toBeInViewport();
   }
   await semOverflowHorizontal(page);
-  await page.getByRole('link',{name:/voltar à consulta/}).first().click();
+  await acionar(page.getByRole('link',{name:'Voltar à home',exact:true}),info);
   await expect(page).toHaveURL(/\/openclaw\/radar\/$/);
 });
 

@@ -6,6 +6,9 @@ acionamento manual. A matriz é definida em `tests/e2e/resolucoes.cjs`:
 jobs (navegador × celular/tablet/PC). Cada grupo continua mesmo se outro falhar.
 Não usa dados, credenciais, nginx ou banco da produção.
 
+A matriz também confere o snapshot sem resumo redundante, os cinco links de mapas
+do local consultado e do seu marcador, e o retorno à home pelo ícone do urso.
+
 ## Perfis de tela
 
 Dimensões em pixels CSS; densidade e toque são emulados. O Firefox recebe o
