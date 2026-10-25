@@ -30,6 +30,8 @@ NUMEROS = {**{("governanca", k): (1, 1000000000)
            ("coleta", "tentativas"): (1, 10),
            ("coleta", "espera_atualizacao"): (1, 3600),
            ("governanca", "gov_iteracoes"): (200000, 2000000)}
+NUMEROS.update({("interface", "mapa_min_percentual"): (10, 90),
+                ("interface", "mapa_min_altura_px"): (120, 600)})
 NUMEROS.update({("assistente", k): limites for k, limites in {
     "habilitado": (0, 1), "timeout": (1, 60), "max_entrada": (1000, 60000),
     "max_saida_tokens": (128, 4096), "max_chamadas": (1, 100),

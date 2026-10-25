@@ -1,0 +1,20 @@
+/* O mapa cede espaco aos resultados sem esconder conteudo em telas baixas. */
+#mapa{min-height:0}
+#painelResultados{margin:0;min-width:0}
+#painelResultados:not(.recolhivel)>summary{display:none}
+#painelResultados>summary{padding:8px 16px;cursor:pointer;font-weight:600;color:var(--azul);background:var(--cinza);border-top:1px solid var(--borda)}
+#painelResultados>summary:focus-visible,#resultado:focus-visible{outline:3px solid var(--azul);outline-offset:-3px}
+#painelResultados.recolhivel #resultado{overflow-y:auto;overscroll-behavior-y:contain;scrollbar-gutter:stable;-webkit-overflow-scrolling:touch;padding-bottom:8px}
+#painelResultados #resultado:empty{padding:0}
+#painelResultados .tabWrap{overflow-x:auto}
+@media(max-width:720px){
+  #controles{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;align-items:end}
+  #controles>label{grid-column:span 3}
+  #controles>.munBox,#controles>.raioBox,#controles>.chk{grid-column:1/-1}
+  #controles>button{grid-column:span 2;height:100%;padding:6px;font-size:13px}
+  #controles .raioBox{display:grid;grid-template-columns:auto 1fr;align-items:center}
+  #controles .raioBox input{grid-column:1/-1;margin-top:0}
+  .rodape-site{padding:8px 12px}
+  .rodape-site nav{gap:4px 18px}
+  .rodape-site a{min-height:32px}
+}

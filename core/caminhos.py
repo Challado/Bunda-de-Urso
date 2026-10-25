@@ -46,6 +46,7 @@ SECOES = {
     "instalacao": ("home",),
     "dados": ("dir", "banco"),
     "web": ("raiz", "url", "origem"),
+    "interface": ("mapa_min_percentual", "mapa_min_altura_px"),
     "logs": ("dir",),
     "sincronizacao": ("clone", "remoto"),
     "api": ("token_arquivo", "max_body", "proxies_confiaveis"),
@@ -61,6 +62,8 @@ SECOES = {
 }
 # Apenas valores de instalacao. Segredos continuam em arquivos separados.
 PADROES = {
+    ("interface", "mapa_min_percentual"): "50",
+    ("interface", "mapa_min_altura_px"): "180",
     ("web", "origem"): "",
     ("api", "max_body"): "8388608",
     ("api", "proxies_confiaveis"): "",

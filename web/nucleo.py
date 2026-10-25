@@ -71,6 +71,7 @@ PARAMS = [
 ]
 
 ENDPOINTS_AJUDA = {
+    "/api/v1/interface": ["GET"],
     "/api/v1/status/estados": ["GET"],
     "/api/v1/status/estados/{uf}": ["GET"],
     "/api/v1/status/coletores": ["GET"],
@@ -124,6 +125,7 @@ ENDPOINTS_ADMINISTRATIVOS = {
 }
 
 ENDPOINTS_DESC = {
+    "/api/v1/interface": "Limites publicos de altura do mapa definidos no radar.conf, sem acesso ao banco.",
     "/api/v1/atualizacoes/status": "Relatorio consolidado das atualizacoes, em JSON e sem acesso ao banco.",
     "/api/v1/status/estados": "Contagem de pontos unicos nas 27 UFs por esfera de fiscalizacao; inclui nao classificados.",
     "/api/v1/status/estados/{uf}": "Detalhes da cobertura por UF, municipios, orgaos, fontes e pontos paginados.",
@@ -169,6 +171,7 @@ ENDPOINTS_DESC = {
 
 # Parametros aplicaveis por endpoint (documentado na ajuda, gerado do codigo).
 ENDPOINTS_PARAMS = {
+    "/api/v1/interface": [],
     "/api/v1/atualizacoes/status": [],
     "/api/v1/status/estados": [],
     "/api/v1/status/estados/{uf}": ["limite", "depois"],
@@ -1144,6 +1147,16 @@ def handle_request(environ, stdin_bytes=b""):
         return _erro(400, "delimitador_invalido", str(exc), campo="delimitador")
 
     # --- endpoints sem banco -------------------------------------------------
+    if caminho.rstrip('/') == '/api/v1/interface':
+        if metodo != 'GET':
+            return _erro(405, 'metodo_nao_permitido', 'Use GET para consultar a interface.')
+        if formato != 'json':
+            return _erro(400, 'formato_invalido', 'A configuracao publica da interface usa JSON.')
+        from core import caminhos
+        limites = {'mapa_min_percentual': (10, 90), 'mapa_min_altura_px': (120, 600)}
+        resultado = {chave: max(minimo, min(maximo, caminhos.inteiro('interface', chave)))
+                     for chave, (minimo, maximo) in limites.items()}
+        return _resp({'sucesso': True, 'resultado': resultado})
     if caminho.rstrip('/') == '/api/v1/atualizacoes/status':
         if metodo != 'GET':
             return _erro(405, 'metodo_nao_permitido', 'Use GET para consultar o relatorio.')

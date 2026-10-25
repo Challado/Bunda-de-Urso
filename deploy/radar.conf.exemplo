@@ -40,6 +40,12 @@ url = /
 # Origem HTTP(S) opcional para verificar API e pagina pelo endereco publicado.
 origem =
 
+[interface]
+# Percentual minimo do espaco util (sem cabecalho, controles e rodape) para o mapa.
+mapa_min_percentual = 50
+# Altura minima legivel em pixels; telas muito baixas podem precisar de rolagem.
+mapa_min_altura_px = 180
+
 [logs]
 # Logs do tick e do dados-sync (o logrotate le daqui).
 dir = logs

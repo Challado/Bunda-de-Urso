@@ -117,6 +117,7 @@
   .rodape-site nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px 24px}
   .rodape-site a{display:inline-flex;align-items:center;min-height:40px;color:var(--azul);text-underline-offset:3px}
 </style>
+<link rel="stylesheet" href="resources/home-layout.css">
 <link rel="icon" href="resources/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" href="resources/favicon-32.png" sizes="32x32">
 <link rel="icon" type="image/png" href="resources/favicon-16.png" sizes="16x16">
@@ -161,7 +162,10 @@
   <button id="dicaAqui" type="button">Mostrar radares aqui ▾</button>
 </div>
 <div id="barra">Informe as coordenadas ou use a localização do navegador.</div>
-<div id="resultado"></div>
+<details id="painelResultados" open>
+  <summary id="tituloResultados">Radares encontrados</summary>
+  <div id="resultado" role="region" aria-label="Lista de radares"></div>
+</details>
 
 <footer class="rodape-site">
   <nav aria-label="Links do projeto">
@@ -189,6 +193,7 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="resources/home-layout.js"></script>
 <script>
 (function(){
   "use strict";
@@ -201,6 +206,7 @@
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19, attribution: "&copy; OpenStreetMap"
   }).addTo(map);
+  if(window.RadarLayout)window.RadarLayout.iniciar({mapa:map, api:API});
 
   var camadaPts = L.layerGroup().addTo(map);
   var marcaEu = null;

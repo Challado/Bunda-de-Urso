@@ -24,6 +24,33 @@ atualiza os links e aponta o descritor do projeto para a home. A checagem final
 consulta a URL principal e exige a mesma página instalada. Os testes de
 navegador abrem a home pelo prefixo do site e navegam até o cadastro.
 
+## Altura adaptável do mapa
+
+A home mede o espaço útil da tela, descontando cabeçalho, controles, legenda,
+barra de status e rodapé. Usa a altura restante para mapa e resultados:
+
+- Se a tabela couber, reduz o mapa e exibe os radares diretamente, sem rolagem
+  da página.
+- Se a tabela exigisse um mapa menor que o mínimo, mostra uma seção recolhível
+  aberta por padrão, com rolagem dentro da lista. Recolher a lista amplia o mapa.
+- Em telas muito baixas, permite a rolagem da página para manter controles e mapa
+  legíveis. Redimensionamento, orientação e teclado virtual recalculam o layout.
+
+Os limites ficam somente no `radar.conf`, também editáveis pela API do painel:
+
+```ini
+[interface]
+mapa_min_percentual = 50
+mapa_min_altura_px = 180
+```
+
+O percentual usa o espaço útil, não a altura total incluindo controles. O mínimo
+em pixels evita um mapa ilegível. O painel aceita 10–90% e 120–600 pixels; o
+instalador completa as opções ausentes sem sobrescrever as existentes.
+`api.pse?rota=/api/v1/interface` publica somente esses dois números, sem abrir o
+banco ou expor o restante da configuração. Se essa consulta falhar, a home usa
+50% e 180 pixels. Imagens, CSS e JavaScript continuam em `resources/`.
+
 ## Configuração manual do servidor web
 
 O nginx é administrado exclusivamente pelo operador. O instalador não muda
