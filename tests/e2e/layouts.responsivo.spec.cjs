@@ -1,5 +1,5 @@
 const {test,expect}=require('./fixtures.cjs');
-const {preparar,medidas,conferirMapas}=require('./home-layout-ajuda.cjs');
+const {preparar,medidas,conferirMapas,abrirEVoltar}=require('./home-layout-ajuda.cjs');
 
 function tela(info){return info.project.metadata.tela;}
 async function acionar(locator,info){if(tela(info).toque)await locator.tap();else await locator.click();}
@@ -86,6 +86,7 @@ test('um radar, controles e links cabem na largura e preservam mapa legivel',asy
   await radar.scrollIntoViewIfNeeded();
   await acionar(radar,info);
   await conferirMapas(page.locator('.leaflet-popup-content .links-mapas'),-24.9556,-53.4552);
+  await abrirEVoltar(page,page.locator('.leaflet-popup-content a.detalhe'),'topo',el=>acionar(el,info));
   await page.locator('.leaflet-popup-close-button').click();
   await semOverflowHorizontal(page);
   if(tela(info).width>=768&&tela(info).height>=720)await expect(page.locator('#painelResultados')).not.toHaveClass(/recolhivel/);
@@ -104,6 +105,7 @@ test('um radar, controles e links cabem na largura e preservam mapa legivel',asy
     await expect(page.locator('#resultado tbody tr')).toHaveCount(1);
     await expect(page.locator('#problema')).toBeHidden();
   }
+  await abrirEVoltar(page,page.locator('#resultado a.detalhe').first(),'fim',el=>acionar(el,info));
   await capturar(page,info,'home-um-radar');
 });
 

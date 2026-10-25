@@ -405,6 +405,16 @@
     return links;
   }
 
+  function urlDetalhe(id){
+    var url = "detalhe.html?id=" + encodeURIComponent(id) + "&nova_aba=1";
+    if (ultimo){
+      var consulta = "?lat=" + encodeURIComponent(ultimo.lat) + "&lon=" +
+        encodeURIComponent(ultimo.lon) + "&raio=" + encodeURIComponent(ultimo.raio);
+      url += "&consulta=" + encodeURIComponent(consulta);
+    }
+    return escapeHtml(url);
+  }
+
   function popupHtml(p){
     var loc = p.localizacao || {};
     var via = loc.via || {};
@@ -425,7 +435,7 @@
       h += "Há informações de localização divergentes entre fontes.<br>";
     }
     h += window.RadarMapas.links(loc.latitude, loc.longitude);
-    h += "<a class='detalhe' href='detalhe.html?id=" + encodeURIComponent(p.id) + "'>Ver todos os detalhes &raquo;</a>";
+    h += "<a class='detalhe' href='" + urlDetalhe(p.id) + "' target='_blank' rel='noopener noreferrer'>Ver todos os detalhes &raquo;</a>";
     return h;
   }
 
@@ -446,7 +456,7 @@
       var via = (loc.via || {});
       var vel = velDoPonto(p);
       linhas.push("<tr>" +
-        "<td data-label='ID'><a class='detalhe' href='detalhe.html?id=" + encodeURIComponent(p.id) + "'><b>" + escapeHtml(p.id) + "</b></a></td>" +
+        "<td data-label='ID'><a class='detalhe' href='" + urlDetalhe(p.id) + "' target='_blank' rel='noopener noreferrer'><b>" + escapeHtml(p.id) + "</b></a></td>" +
         "<td data-label='Via'>" + escapeHtml([via.codigo, via.nome].filter(Boolean).join(" · ") || "—") + "</td>" +
         "<td data-label='km'>" + (loc.km != null ? escapeHtml(loc.km) : "—") + "</td>" +
         "<td data-label='Velocidade'>" + (vel != null ? "<span class='vel'>" + escapeHtml(vel) + "</span>" : "—") + "</td>" +
@@ -525,7 +535,7 @@
     var linksConsulta = atualizarLinksConsulta(lat, lon);
     marcaEu = L.circleMarker([lat, lon], {radius:8, color:"#12508f", weight:3, fillColor:"#9ecbff", fillOpacity:1})
       .addTo(map).bindPopup("<b>Sua consulta</b><br>" + linksConsulta);
-    ultimo = {lat: lat, lon: lon};
+    ultimo = {lat: lat, lon: lon, raio: raio};
     desenharCirculo(lat, lon, raio);
     enquadrar(lat, lon, raio);
     var url = API + "?rota=" + encodeURIComponent("/api/v1/radares") +

@@ -5,3 +5,6 @@ header .inicio:focus-visible{outline:3px solid #ffcc00;outline-offset:4px}
 .links-mapas a{color:var(--azul)}
 #mapasConsulta{flex-basis:100%;padding-bottom:6px}
 #mapasConsulta:not([hidden]){display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px}
+/* Voltar permanece acessivel no topo e apos a leitura, inclusive em celular. */
+.voltar-consulta{display:inline-flex;align-items:center;min-height:44px;padding:8px 12px;border:1px solid currentColor;border-radius:6px;font-weight:600;text-decoration:none}
+.rodape-site>.voltar-consulta{margin-bottom:12px}

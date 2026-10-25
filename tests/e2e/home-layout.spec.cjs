@@ -1,6 +1,6 @@
 const {test,expect}=require('./fixtures.cjs');
 
-const {preparar,medidas,conferirMapas}=require('./home-layout-ajuda.cjs');
+const {preparar,medidas,conferirMapas,abrirEVoltar}=require('./home-layout-ajuda.cjs');
 
 test('poucos radares preservam mapa legivel e cabem no PC',async({page})=>{
   await page.setViewportSize({width:1280,height:900});
@@ -86,5 +86,39 @@ test('icone do urso volta a raiz da home em todas as paginas',async({page})=>{
     await expect(inicio.locator('img')).toHaveAttribute('src','resources/bunda-de-urso.png');
     await inicio.click();
     await expect(page).toHaveURL(/\/openclaw\/radar\/$/);
+  }
+});
+
+
+test('detalhes abrem em outra aba e voltar preserva consulta, raio e rolagem',async({page})=>{
+  await preparar(page,1);
+  await page.locator('#raio').press('ArrowRight');
+  await expect(page.locator('#raioVal')).toHaveText('5,0 km');
+  await expect(page.locator('#barra')).toContainText('Snapshot');
+  await abrirEVoltar(page,page.locator('#resultado a.detalhe').first(),'topo');
+  const radar=page.locator('.leaflet-overlay-pane path[stroke="#c0392b"]').first();
+  await radar.scrollIntoViewIfNeeded();
+  await radar.click();
+  await abrirEVoltar(page,page.locator('.leaflet-popup-content a.detalhe'),'fim');
+});
+
+test('voltar restaura a consulta se o navegador impedir fechar a aba',async({page})=>{
+  await preparar(page,1);
+  await page.addInitScript(()=>{window.close=()=>{};});
+  const consulta='?lat=-24.9556&lon=-53.4552&raio=5000';
+  await page.goto('detalhe.html?id=P-1&nova_aba=1&consulta='+encodeURIComponent(consulta));
+  await page.locator('footer .voltar-consulta').click();
+  await expect(page).toHaveURL(new URL('./'+consulta,page.url()).href);
+  await expect(page.locator('#lat')).toHaveValue('-24.9556');
+  await expect(page.locator('#lon')).toHaveValue('-53.4552');
+  await expect(page.locator('#raioVal')).toHaveText('5,0 km');
+  await expect(page.locator('#resultado tbody tr')).toHaveCount(1);
+});
+
+test('link de retorno externo nao substitui a consulta local',async({page})=>{
+  await preparar(page,1);
+  await page.goto('detalhe.html?id=P-1&consulta='+encodeURIComponent('https://externo.invalid/'));
+  for(const link of await page.locator('.voltar-consulta').all()){
+    await expect(link).toHaveAttribute('href',new URL('./',page.url()).href);
   }
 });

@@ -1,5 +1,12 @@
 # Histórico de alterações
 
+## Retorno à consulta anterior
+
+- Links dos radares na lista e no mapa abrem os detalhes em nova aba, preservando a consulta original.
+- Botões de voltar no topo e no fim dos detalhes, acessíveis também no celular.
+- Se o navegador bloquear o fechamento da aba, o retorno recompõe as coordenadas e o raio consultados.
+- Testes de clique/toque e preservação de busca e rolagem integrados à matriz de layouts.
+
 ## Home, navegação e mapas
 
 - Ícone do urso retorna à home em todas as páginas.

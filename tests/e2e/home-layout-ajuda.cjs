@@ -1,9 +1,9 @@
 const {expect}=require('./fixtures.cjs');
 
 async function preparar(page,quantidade,config={mapa_min_percentual:50,mapa_min_altura_px:180}){
-  await page.route('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',r=>r.fulfill({path:require.resolve('leaflet/dist/leaflet.js'),contentType:'application/javascript'}));
-  await page.route('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',r=>r.fulfill({path:require.resolve('leaflet/dist/leaflet.css'),contentType:'text/css'}));
-  await page.route('https://*.tile.openstreetmap.org/**',r=>r.fulfill({status:204}));
+  await page.context().route('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',r=>r.fulfill({path:require.resolve('leaflet/dist/leaflet.js'),contentType:'application/javascript'}));
+  await page.context().route('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',r=>r.fulfill({path:require.resolve('leaflet/dist/leaflet.css'),contentType:'text/css'}));
+  await page.context().route('https://*.tile.openstreetmap.org/**',r=>r.fulfill({status:204}));
   const doc=await (await page.request.get('api.pse?rota=/api/v1/radares&lat=-24.9556&lon=-53.4552&raio=2000')).json();
   const ponto=doc.resultado.pontos[0];
   expect(ponto).toBeTruthy();
@@ -55,4 +55,34 @@ async function conferirMapas(container,lat,lon){
   }
 }
 
-module.exports={preparar,medidas,conferirMapas};
+async function abrirEVoltar(page,link,posicao,acionar=el=>el.click()){
+  await link.scrollIntoViewIfNeeded();
+  const estado=await page.evaluate(()=>({url:location.href,lat:document.querySelector('#lat').value,
+    lon:document.querySelector('#lon').value,raio:document.querySelector('#raio').value,
+    linhas:document.querySelector('#resultado').innerHTML,rolagem:scrollY}));
+  await expect(link).toHaveAttribute('target','_blank');
+  await expect(link).toHaveAttribute('rel','noopener noreferrer');
+  const nova=page.waitForEvent('popup');
+  await acionar(link);
+  const detalhe=await nova;
+  await expect(detalhe.locator('#titulo')).toHaveText('Radar P-1 — detalhes');
+  await expect(detalhe.locator('.mapas-principais a')).toHaveCount(5);
+  const botoes=detalhe.getByRole('link',{name:'Voltar à consulta',exact:false});
+  await expect(botoes).toHaveCount(2);
+  const voltar=posicao==='topo'?botoes.first():botoes.last();
+  await voltar.scrollIntoViewIfNeeded();
+  await expect(voltar).toBeInViewport();
+  const fechada=detalhe.waitForEvent('close');
+  await Promise.all([fechada,acionar(voltar).catch(erro=>{
+    // Firefox pode encerrar a pagina antes de devolver a confirmacao do clique.
+    if(!detalhe.isClosed())throw erro;
+  })]);
+  await expect(page).toHaveURL(estado.url);
+  await expect(page.locator('#lat')).toHaveValue(estado.lat);
+  await expect(page.locator('#lon')).toHaveValue(estado.lon);
+  await expect(page.locator('#raio')).toHaveValue(estado.raio);
+  expect(await page.locator('#resultado').innerHTML()).toBe(estado.linhas);
+  await expect.poll(()=>page.evaluate(()=>scrollY)).toBe(estado.rolagem);
+}
+
+module.exports={preparar,medidas,conferirMapas,abrirEVoltar};

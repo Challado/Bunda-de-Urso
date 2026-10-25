@@ -110,8 +110,9 @@
   <a class="inicio" href="./" aria-label="Voltar à home" title="Voltar à home"><img class="logo" src="resources/bunda-de-urso.png" alt="Bundita de Urso — a base do Bunda de urso"></a>
   <div class="cabTxt">
     <h1 id="titulo">Radar — detalhes</h1>
-    <div class="sub">Dados do radar separados por fonte. Clique no nome de uma fonte para recolher ou expandir seus dados. &nbsp;·&nbsp; <a href="./">&larr; voltar à consulta por localização</a></div>
+    <div class="sub">Dados do radar separados por fonte. Clique no nome de uma fonte para recolher ou expandir seus dados.</div>
     <nav class="nav">
+      <a class="voltar-consulta" href="./">&larr; Voltar à consulta</a>
       <a href="cadastro.html">Cadastrar radar</a>
       <a href="gestao.html">Administração</a>
     </nav>
@@ -123,12 +124,14 @@
 </main>
 
 <footer class="rodape-site">
+  <a class="voltar-consulta" href="./">&larr; Voltar à consulta</a>
   <nav aria-label="Links do projeto">
     <a href="https://github.com/Challado/Bunda-de-Urso" target="_blank" rel="noopener noreferrer">Código no GitHub</a>
     <a href="https://servidor.lucas.inf.br/site/contato" target="_blank" rel="noopener noreferrer">Contato</a>
   </nav>
 </footer>
 
+<script src="resources/voltar-consulta.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="resources/links-mapas.js"></script>
 <script>

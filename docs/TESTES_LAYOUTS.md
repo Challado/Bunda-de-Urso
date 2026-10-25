@@ -8,6 +8,9 @@ Não usa dados, credenciais, nginx ou banco da produção.
 
 A matriz também confere o snapshot sem resumo redundante, os cinco links de mapas
 do local consultado e do seu marcador, e o retorno à home pelo ícone do urso.
+Os links da lista e do mapa abrem os detalhes em outra aba: os botões do topo
+e do fim fecham os detalhes sem perder coordenadas, raio, resultados ou rolagem
+da consulta original, por clique no PC e toque nas telas móveis.
 
 ## Perfis de tela
 
