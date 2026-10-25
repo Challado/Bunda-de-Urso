@@ -33,7 +33,18 @@ test('detalhe usa equipamento comum às fontes e preserva suas publicações',as
   expect(await inmetro.evaluate(e=>e.open)).toBe(false);
   await page.getByRole('button',{name:'Expandir fontes',exact:true}).click();
   expect(await inmetro.evaluate(e=>e.open)).toBe(true);
-  await expect(page.locator('.mapas-principais a')).toHaveCount(3);
+  await expect(page.locator('.mapas-principais a')).toHaveCount(5);
+  for(const [nome,estilo] of [['Bing Mapas','r'],['Bing Streetside','x']]){
+    const link=page.locator('.mapas-principais').getByRole('link',{name:nome,exact:true});
+    const url=new URL(await link.getAttribute('href'));
+    expect(url.origin).toBe('https://www.bing.com');
+    expect(url.pathname).toBe('/maps');
+    expect(url.searchParams.get('cp')).toBe(p.localizacao.latitude+'~'+p.localizacao.longitude);
+    expect(url.searchParams.get('style')).toBe(estilo);
+    await expect(link).toHaveAttribute('target','_blank');
+    await expect(link).toHaveAttribute('rel','noopener noreferrer');
+    await expect(page.locator('.mapas-campo').getByRole('link',{name:nome,exact:true}).first()).toBeVisible();
+  }
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 

@@ -240,6 +240,11 @@ test('cadastro simplificado recebe protocolo e permite abrir os detalhes em cada
   const atual=await (await page.request.get('api.pse?rota=/api/v1/radares/envios/'+protocolo)).json();
   await page.goto('detalhe.html?id='+atual.resultado.resultado.cadastros[0].id);
   await expect(page.locator('h1')).toContainText('Radar');
+  for(const nome of ['Bing Mapas','Bing Streetside']){
+    const link=page.locator('.mapas-principais').getByRole('link',{name:nome,exact:true});
+    await link.scrollIntoViewIfNeeded();
+    await expect(link).toBeInViewport();
+  }
   await semOverflowHorizontal(page);
   await page.getByRole('link',{name:/voltar à consulta/}).first().click();
   await expect(page).toHaveURL(/\/openclaw\/radar\/$/);

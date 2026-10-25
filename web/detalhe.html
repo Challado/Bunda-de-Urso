@@ -259,7 +259,9 @@
     var links = [
       ["https://www.openstreetmap.org/?mlat=" + lat + "&mlon=" + lon + "#map=18/" + lat + "/" + lon, "OpenStreetMap"],
       ["https://www.google.com/maps/search/?api=1&query=" + posicao, "Google Maps"],
-      ["https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=" + posicao, "Street View"]
+      ["https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=" + posicao, "Street View"],
+      ["https://www.bing.com/maps?cp=" + lat + "~" + lon + "&lvl=18&style=r", "Bing Mapas"],
+      ["https://www.bing.com/maps?cp=" + lat + "~" + lon + "&lvl=18&style=x", "Bing Streetside"]
     ];
     return "<span class='links-mapas'>" + links.map(function(link){
       return "<a href='" + esc(link[0]) + "' target='_blank' rel='noopener noreferrer'>" + link[1] + "</a>";

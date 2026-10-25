@@ -52,6 +52,7 @@ No PC, permanece o ajuste para caber na tela e a lista recolhível quando necess
   aqui, envio simplificado, links de detalhes ou estados do status.
 - Cadastro sem HTTP 202/protocolo, fila sem processamento, detalhes inacessíveis
   ou popup do estado que não abre.
+- Links de Bing Mapas e Bing Streetside nos detalhes fora da área acessível da tela.
 - Aviso que não muda ao passar de radares para nenhum radar e de volta, ou aviso
   repetido quando a categoria da busca permanece a mesma.
 - Lista que perde a posição de leitura ao recalcular o tamanho.
