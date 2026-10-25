@@ -1,6 +1,7 @@
 """Migracao real pela API, sem nginx/cron do sistema no laboratorio."""
 from contextlib import closing
 import getpass
+import pwd
 import json
 import os
 from pathlib import Path
@@ -8,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from core import caminhos, db
@@ -58,6 +60,24 @@ class TestRaizWeb(unittest.TestCase):
         return subprocess.run([sys.executable,str(ROOT/'web/api.pse'),'instalacao','--conf',str(conf or self.conf),
                                '--laboratorio',str(self.lab),'--usuario-web',getpass.getuser(),*extras],
                               env=dict(self.env,RADAR_CONF=str(conf or self.conf)),capture_output=True,text=True,timeout=100,cwd='/tmp')
+
+    def test_aplicacao_sem_laboratorio_so_verifica_nginx_e_recusa_http_exposto(self):
+        from core.raiz_web import _aplicar
+        from core.instalacao import _usar_conf
+        nginx = self.lab / 'etc/nginx/default'
+        nginx.parent.mkdir(parents=True)
+        nginx.write_text('configuracao exclusiva do operador')
+        with _usar_conf(self.conf), \
+             patch('core.protecao_configuracao.planejar', side_effect=AssertionError('nao gerenciar nginx')) as planejar, \
+             patch('core.raiz_web._executar', return_value='') as executar, \
+             patch('core.raiz_web._bloqueios_http', side_effect=RuntimeError('HTTP privado exposto')):
+            with self.assertRaisesRegex(RuntimeError, 'HTTP privado exposto'):
+                _aplicar(SimpleNamespace(origem_http='https://teste.example'), ROOT, self.conf, self.web,
+                         self.dados, self.db, self.logs, self.home, pwd.getpwuid(os.getuid()), None,
+                         'teste', {}, [], self.web/'dados', self.web/'dados/radar.sqlite3', self.web/'dados/logs')
+        planejar.assert_not_called()
+        self.assertEqual([c.args[0] for c in executar.call_args_list], [['nginx', '-t']])
+        self.assertEqual(nginx.read_text(), 'configuracao exclusiva do operador')
 
     def test_simular_nao_copia_dados_nem_troca_link(self):
         r=self.rodar('--migrar-raiz-web')

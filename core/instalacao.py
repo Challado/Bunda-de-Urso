@@ -26,6 +26,9 @@ from . import auditoria_instalacao as auditoria
 from .contexto_api import operacao_local
 from .governanca import GovernancaError
 
+# Contrato conferido pelo bootstrap antes de aplicar uma revisao.
+NGINX_SOMENTE_LEITURA = True
+
 CODIGO = ("core", "coletor", "config", "sql", "web", "deploy", "tools")
 ESTATICOS = {".html", ".json", ".png", ".ico", ".css", ".js", ".svg"}
 
@@ -290,7 +293,6 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
     entrada_cron = wrapper.with_name("radar-api.pse")
     logrotate = (laboratorio / "etc" if laboratorio else Path("/etc")) / "logrotate.d" / "openclaw-radar"
     sudoers_antigo = (laboratorio / "etc" if laboratorio else Path("/etc")) / "sudoers.d" / "radar-configuracao"
-    nginx_alterado = False
     cron_anterior = None
     with open(dirs["dados"] / "instalacao.lock", "a") as trava:
         fcntl.flock(trava, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -302,21 +304,10 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
             if sudoers_antigo.exists():
                 _guardar(sudoers_antigo, backup, indice)
             if not laboratorio:
-                from .protecao_configuracao import planejar
-                plano_nginx = planejar(caminhos.web_url(), dirs["web"], caminhos.valor("web", "origem")[0], raiz_local=True)
-                for arquivo, anterior, novo in plano_nginx:
-                    if arquivo.read_text() != anterior:
-                        raise RuntimeError("A configuracao do nginx mudou durante a preparacao.")
-                    _guardar(arquivo, backup, indice)
-                    indice[-1]["tipo"] = "nginx"
-                    arquivo.write_text(novo)
-                    nginx_alterado = True
-                    observacoes.append("Nginx: acesso HTTP direto a radar.conf bloqueado em " + str(arquivo))
+                _executar(["nginx", "-t"])
+                observacoes.append("Nginx do operador preservado: sem editar arquivos, iniciar ou recarregar o servico.")
             (backup / "restauracao.json").write_text(json.dumps(indice, indent=2))
             atualizacoes.evento("backup.arquivos", arquivos=indice)
-            if nginx_alterado:
-                _executar(["nginx", "-t"])
-                _executar(["systemctl", "reload", "nginx"])
             # Pausa novas chamadas CGI e tick durante a troca coordenada.
             dirs["web"].mkdir(parents=True, exist_ok=True)
             (dirs["web"] / "api.pse").write_text(
@@ -407,9 +398,6 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
                 raise
             _restaurar(indice)
             atualizacoes.publicar_link()
-            if nginx_alterado:
-                _executar(["nginx", "-t"])
-                _executar(["systemctl", "reload", "nginx"])
             if not laboratorio and cron_anterior is not None:
                 for nome in cron_anterior:
                     _recuperar_cron(backup / ("crontab-" + nome + "-anterior.txt"), wrapper, nome)
@@ -706,19 +694,14 @@ def _recuperar(backup, dirs, laboratorio, usuario_web="www-data"):
     etc = laboratorio / "etc" if laboratorio else Path("/etc")
     permitidos.update((str(etc / "logrotate.d" / "openclaw-radar"),
                        str(etc / "sudoers.d" / "radar-configuracao"), str(dirs["conf"]) + ".painel"))
-    if not laboratorio:
-        permitidos.update(item["alvo"] for item in indice if item.get("tipo") == "nginx"
-                          and Path(item["alvo"]).is_relative_to(Path("/etc/nginx"))
-                          and Path(item["alvo"]).resolve() == Path(item["alvo"]))
+    # Backups antigos podem conter nginx; esses arquivos nunca sao restaurados.
+    indice = [item for item in indice if item.get("tipo") != "nginx"]
     if any(item["alvo"] not in permitidos or Path(item["copia"]).parent != backup for item in indice):
         raise RuntimeError("Manifesto de recuperacao invalido.")
     with open(dirs["dados"] / "instalacao.lock", "a") as trava, open(dirs["dados"] / "tick.lock", "a") as tick:
         fcntl.flock(trava, fcntl.LOCK_EX | fcntl.LOCK_NB)
         fcntl.flock(tick, fcntl.LOCK_EX | fcntl.LOCK_NB)
         _restaurar(indice)
-        if not laboratorio and any(item.get("tipo") == "nginx" for item in indice):
-            _executar(["nginx", "-t"])
-            _executar(["systemctl", "reload", "nginx"])
         cron_antigo = backup / "crontab-anterior.txt"
         if not laboratorio and cron_antigo.is_file():
             _recuperar_cron(cron_antigo, dirs["codigo"].parent / "radar-tick.sh")
@@ -747,7 +730,7 @@ def _preparar_servicos(observacoes=None):
     erros = [c for c in checagens if c["estado"] == "erro" and not c["checagem"].startswith("servico.")]
     if erros:
         raise RuntimeError("Pre-requisitos: " + "; ".join(c["checagem"] + ": " + c["detalhe"] for c in erros))
-    for alternativas in (("cron.service", "crond.service"), ("nginx.service",),
+    for alternativas in (("cron.service", "crond.service"),
                           ("fcgiwrap.socket", "fcgiwrap.service")):
         for unidade in alternativas:
             ativo = subprocess.run(["systemctl", "is-active", unidade], capture_output=True, timeout=15)
@@ -837,13 +820,9 @@ def _diagnosticar(origem, dirs, usuario_web, laboratorio, cron, final=False):
             checagens.append({"checagem": "gravacao_do_painel", "estado": "erro", "detalhe": str(exc), "traceback": traceback.format_exc()})
         if not laboratorio:
             checagens.append(auditoria.validar_logrotate(logrotate))
-            try:
-                from .protecao_configuracao import planejar
-                pendencias = planejar(caminhos.web_url(), dirs["web"], origem_http)
-                checagens.append({"checagem": "nginx.configuracao_privada", "estado": "erro" if pendencias else "ok",
-                                  "detalhe": "link radar.conf bloqueado para acesso HTTP direto" if not pendencias else "Reaplique para proteger o link da configuracao no nginx"})
-            except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
-                checagens.append({"checagem": "nginx.configuracao_privada", "estado": "erro", "detalhe": str(exc)})
+            protegido = any(c["checagem"] == "http.publico" and c["estado"] == "ok" for c in checagens)
+            checagens.append({"checagem": "nginx.configuracao_privada", "estado": "ok" if protegido else "erro",
+                              "detalhe": "Protecao conferida por HTTP; configuracao nginx mantida pelo operador."})
     return {"sucesso": not any(c["estado"] == "erro" for c in checagens),
             "atualizacao_necessaria": bool(divergencias or faltantes or pastas or instalada != versao or any(
                 c["estado"] in ("erro", "atualizar") and c["checagem"] in

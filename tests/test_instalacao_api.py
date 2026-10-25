@@ -404,6 +404,30 @@ class TestInstalacaoAPI(unittest.TestCase):
         self.assertFalse(any("restart" in c for c in chamadas))
         self.assertEqual(observacoes, ["Servico iniciado: cron.service"])
 
+    def test_preparacao_nao_inicia_nginx_inativo(self):
+        def executar(cmd, **kwargs):
+            return subprocess.CompletedProcess(cmd, 3 if cmd[1] == 'is-active' else 0)
+        with patch.object(auditoria_instalacao, 'ambiente_servidor', return_value=[]), \
+             patch('core.instalacao.subprocess.run', side_effect=executar) as comandos:
+            _preparar_servicos([])
+        self.assertFalse(any('nginx.service' in c.args[0] for c in comandos.call_args_list))
+
+    def test_recuperacao_de_backup_antigo_preserva_nginx_atual(self):
+        from core.instalacao import _recuperar
+        backup = self.dados / 'backups/instalacao/teste'
+        backup.mkdir(parents=True)
+        nginx = self.lab / 'etc/nginx/default'
+        nginx.parent.mkdir(parents=True)
+        nginx.write_text('configuracao atual do operador')
+        copia = backup / 'nginx-antigo'
+        copia.write_text('configuracao antiga que nao deve voltar')
+        (backup / 'restauracao.json').write_text(json.dumps([
+            {'alvo':str(nginx), 'copia':str(copia), 'tipo':'nginx'}]))
+        dirs = dict(dados=self.dados, banco=self.banco, codigo=self.home, web=self.web, conf=self.conf)
+        with patch('core.instalacao._esquema_compativel_com_backup', return_value=True):
+            self.assertEqual(_recuperar(backup, dirs, self.lab), 0)
+        self.assertEqual(nginx.read_text(), 'configuracao atual do operador')
+
     def test_preparacao_nao_inicia_servicos_com_nginx_invalido(self):
         with patch.object(auditoria_instalacao, "ambiente_servidor", return_value=[
                 {"checagem": "nginx.configuracao", "estado": "erro", "detalhe": "invalida"}]), \

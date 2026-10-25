@@ -57,14 +57,12 @@ endereços antigos retornam 404. A entrada é `resources/index.html`, sem nenhum
 redirecionamento da raiz. O descritor do projeto aponta diretamente a essa página. O relatório
 é consultado em `api.pse?rota=/api/v1/atualizacoes/status`, que lê o JSON dentro
 de `dados.dir`, sem abrir SQLite.
-As regras são geradas a partir do prefixo/raiz configurados e preservam o
-handler FastCGI existente, sem fixar caminho de socket.
-
-Quando os servers já incluem `/etc/nginx/snippets/radar-brasil.conf`, o
-instalador preserva seus blocos literalmente e verifica a proteção por HTTP.
-O nginx não é recarregado quando o instalador não alterou sua configuração.
-Isso permite manter o Radar em um snippet separado dos certificados, proxies
-e demais projetos do servidor.
+A configuração do nginx pertence ao operador. O instalador não edita seus
+arquivos nem instala, inicia, reinicia ou recarrega o nginx. Apenas confere a
+sintaxe existente e consulta as URLs por HTTP. Se arquivos privados estiverem
+expostos, recusa a atualização e informa o erro, sem tentar mudar as regras.
+Recuperações de backups também preservam o nginx, inclusive quando um backup
+antigo continha arquivos desse serviço.
 
 ## Atualizar o servidor
 
@@ -81,15 +79,12 @@ confere a instalação. A preparação do sistema operacional continua local; n�
 existe serviço root ou cron de atualização remota.
 
 O instalador baixa o código público e executa a instalação pela API local. Ele
-protege configuração e pastas privadas no nginx, testa os bloqueios por HTTP,
+confere por HTTP a proteção da configuração e das pastas privadas,
 pausa as entradas, aguarda os coletores e faz backup SQLite consistente.
 
-A recarga do nginx é assíncrona. Antes de migrar, o instalador espera até
-15 segundos pela ativação das regras e consulta sondas reais com URLs únicas
-e cabeçalhos sem cache. Só continua quando todas retornam 403/404; uma resposta
-200 persistente reprova a instalação. A identificação do server também reconhece
-links intermediários na raiz web. As observações mostram os arquivos do nginx
-alterados e o diretório de backup usado na preparação.
+A atualização não provoca recarga do nginx. As sondas consultam arquivos reais
+com URLs únicas e cabeçalhos sem cache. Só continua quando os privados retornam
+403/404. As observações e o relatório final registram o resultado das verificações.
 
 Se o banco **já estiver em `dados.dir`**, ele é usado nesse local: não é trocado
 por uma base vazia ou uma cópia antiga. IDs, decisões e fila são preservados.

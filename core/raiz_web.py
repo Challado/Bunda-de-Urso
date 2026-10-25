@@ -367,7 +367,7 @@ def executar(args, observacoes):
         plano['sucesso'] = all(c['estado']=='ok' for c in plano['checagens'])
     elif args.aplicar:
         if os.geteuid() != 0 and not lab:
-            raise RuntimeError('A primeira etapa prepara nginx/cron/permissoes; execute este .sh como root, sem sudo.')
+            raise RuntimeError('A primeira etapa prepara cron/permissoes; execute este .sh como root, sem sudo.')
         if not lab:
             from .instalacao import _preparar_servicos
             _preparar_servicos(observacoes)
@@ -456,7 +456,6 @@ def _manifesto(origem):
 
 
 def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, versao, plano, observacoes, novo_dados, novo_banco, novos_logs):
-    from .protecao_configuracao import planejar
     agora = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
     # Backups continuam privados; a origem e mantida, jamais apagada.
     backup = dados/'backups/raiz-web'/agora
@@ -503,7 +502,6 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
                 shutil.copy2(copia,alvo)
             if item['tipo'] in ('dir','file'):
                 posse(copia,alvo)
-    alterou_nginx=False
     cron_anterior=None
     transferidos=False
     copiou_logs=False
@@ -512,22 +510,11 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
         _diretorio(raiz, observacoes)
         origem_http=caminhos.valor('web','origem')[0] or args.origem_http or ''
         if not lab:
-            print('RADAR_ETAPA: proteger_nginx', flush=True)
-            for arquivo,anterior,novo in planejar(caminhos.web_url(),raiz,origem_http,raiz_local=True):
-                if arquivo.read_text()!=anterior:
-                    raise RuntimeError('Nginx alterado durante o planejamento')
-                guardar(arquivo)
-                arquivo.write_text(novo)
-                alterou_nginx=True
-                observacoes.append('Regras privadas do nginx atualizadas: '+str(arquivo))
+            print('RADAR_ETAPA: verificar_http', flush=True)
             _executar(['nginx','-t'])
-            if alterou_nginx:
-                _executar(['systemctl','reload','nginx'])
-            else:
-                observacoes.append('Nginx ja preparado; configuracao do operador preservada, sem recarga.')
-            # systemctl reload retorna antes da troca assincrona dos workers.
-            _bloqueios_http(raiz,origem_http,caminhos.web_url(),aguardar=15)
-            observacoes.append('Nginx: arquivos privados bloqueados por HTTP.')
+            observacoes.append('Nginx do operador preservado: sem editar arquivos, iniciar ou recarregar o servico.')
+            _bloqueios_http(raiz,origem_http,caminhos.web_url())
+            observacoes.append('Acesso HTTP a arquivos privados bloqueado.')
             print('RADAR_ETAPA: migrar_instalacao', flush=True)
         with ExitStack() as locks:
             trava=locks.enter_context(open(dados/'instalacao.lock','a'))
@@ -691,16 +678,13 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
         # o codigo novo se houve migracao do esquema, como o instalador legado.
         from .instalacao import _esquema_compativel_com_backup
         if not publicado and (not (backup/'radar.sqlite3').exists() or transferidos or _esquema_compativel_com_backup(backup,banco)):
-            # Remove copias privadas ANTES de desfazer as protecoes do nginx.
+            # Recupera somente arquivos da aplicacao; nginx pertence ao operador.
             if transferidos and (novo_dados).exists():
                 shutil.rmtree(novo_dados)
             restaurar()
             if cron_anterior is not None:
                 for usuario, conteudo in cron_anterior.items():
                     _executar(['crontab','-u',usuario,'-'],input=conteudo)
-            if alterou_nginx:
-                _executar(['nginx','-t'])
-                _executar(['systemctl','reload','nginx'])
             plano['recuperacao_automatica']=True
         if publicado:
             plano['observacao']='Instalacao nova preservada para nao perder gravacoes recebidas. Reaplique o script com --conf apontando ao radar.conf da raiz.'
