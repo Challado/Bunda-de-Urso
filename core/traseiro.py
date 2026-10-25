@@ -73,7 +73,8 @@ def api_local():
     explicita=caminhos.valor('traseiro','api_url')[0]
     if explicita:
         return url_publica(explicita,api=True)
-    return url_publica(caminhos.valor('web','origem')[0].rstrip('/')+'/'+caminhos.web_url().strip('/')+'/api.pse?rota=%2Fapi%2Fv1%2Fintercambio%2Ftrocar',api=True)
+    prefixo=caminhos.web_url().strip('/')
+    return url_publica(caminhos.valor('web','origem')[0].rstrip('/')+('/'+prefixo if prefixo else '')+'/api.pse?rota=%2Fapi%2Fv1%2Fintercambio%2Ftrocar',api=True)
 
 def identidade(conn):
     gov.garantir_esquema(conn)

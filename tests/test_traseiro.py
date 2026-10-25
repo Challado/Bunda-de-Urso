@@ -78,6 +78,10 @@ class TestTraseiro(unittest.TestCase):
         self.assertNotEqual(primeiro['uuid'],self.b.info()['uuid'])
         self.assertEqual(set(primeiro['configuracao']),{'intervalo_segundos','lote','max_bytes','parada_programada','parar_em_segundos','retornar_em_segundos','anuncio_id'})
         self.assertNotIn('tokens',json.dumps(primeiro))
+
+    def test_endpoint_publico_na_raiz_nao_cria_barra_dupla(self):
+        self.a.conf.write_text(self.a.conf.read_text().replace('url = /openclaw/radar/','url = /'))
+        self.assertEqual(self.a.info()['api_url'],'https://a.example.org/api.pse?rota=%2Fapi%2Fv1%2Fintercambio%2Ftrocar')
     def test_registro_automatico_e_blocos_nos_dois_sentidos(self):
         status,_,corpo=self.b.req('/api/v1/intercambio/trocar',{'eventos':[],'depois':0},info=self.a.info())
         self.assertEqual(status,200,corpo)
