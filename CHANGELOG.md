@@ -1,5 +1,12 @@
 # Histórico de alterações
 
+## Caixas aninhadas no status
+
+- Menus de fontes apresentados como caixas recolhíveis uma dentro da outra: Federal → estado → município → fonte → leitura.
+- Federal ocupa toda a largura e começa aberto; as 27 UFs aparecem fechadas, com cabeçalhos, bordas e contadores próprios.
+- Recolher uma caixa oculta seu conteúdo e preserva a abertura dos filhos para a próxima consulta; busca, atualização e controles gerais continuam disponíveis.
+- GitHub Actions valida as bordas, a largura e o encaixe dos cinco níveis em celular, tablet e PC, além de clique, toque e teclado.
+
 ## Fontes do status por esfera e local
 
 - Árvore recolhível Federal → 27 estados/DF → municípios → fontes → leituras.

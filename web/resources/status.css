@@ -273,13 +273,40 @@ th,td {
 
 /* Federal > estados > municipios > fontes > recursos de leitura. */
 .acoes-leitores{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
-.grupo-leitores{min-width:0;border-top:1px solid var(--borda)}
-.grupo-leitores>summary{overflow-wrap:anywhere;padding:12px 4px}
-.territorio-federal>summary{font-size:19px}
-.estado-leitores>summary{font-size:17px}
-.municipio-leitores>summary{font-size:16px}
-.filhos-leitores{min-width:0;margin:0 0 8px 8px;padding-left:12px;border-left:2px solid var(--borda)}
+#coletores{width:100%;min-width:0}
+.grupo-leitores,.leitor{width:100%;min-width:0;border:1px solid #b8c8da;border-radius:10px;background:white;padding:0}
+.grupo-leitores>summary,.leitor>summary{position:relative;list-style:none;overflow-wrap:anywhere;padding:14px 46px 14px 16px;border-radius:9px;min-height:60px;background:#f0f4f9}
+.grupo-leitores>summary::-webkit-details-marker,.leitor>summary::-webkit-details-marker{display:none}
+.grupo-leitores>summary::after,.leitor>summary::after{content:'';position:absolute;right:19px;top:21px;width:9px;height:9px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg)}
+.grupo-leitores[open]>summary::after,.leitor[open]>summary::after{transform:translateY(5px) rotate(225deg)}
+.grupo-leitores[open]>summary,.leitor[open]>summary{border-bottom:1px solid var(--borda);border-radius:9px 9px 0 0}
+.grupo-leitores>summary:hover,.leitor>summary:hover{filter:brightness(.97)}
+.titulo-grupo{display:block;font-size:16px}
+.territorio-federal>summary{background:var(--azul);color:white}
+.territorio-federal>summary .titulo-grupo{font-size:21px}
+.estado-leitores>summary{background:#e6edf7}
+.estado-leitores>summary .titulo-grupo{font-size:18px}
+.municipio-leitores>summary{background:#e7f3f0}
+.fonte-leitores>summary{background:#f4f6f9}
+.filhos-leitores{display:flex;flex-direction:column;gap:12px;min-width:0;margin:0;padding:16px;background:#f8fafc;border-radius:0 0 9px 9px}
 .grupo-leitores:not([open])>.filhos-leitores{display:none}
-.resumo-grupo{font-weight:400}
-.vazio-grupo{font-size:13px;margin:8px 0}
-@media(max-width:640px){.filhos-leitores{margin-left:3px;padding-left:6px}.grupo-leitores>summary{padding-left:0;padding-right:0}.selo{margin-left:0}}
+.resumo-grupo{display:flex;flex-wrap:wrap;gap:5px;font-weight:400;margin-top:7px}
+.resumo-grupo .selo{margin:0}
+.leitor>summary{background:white;font-size:15px}
+.leitor>summary>span:first-child{display:block;margin-bottom:6px}
+.leitor>summary .selo{margin-left:0}
+.leitor>:not(summary){margin:12px 16px}
+.leitor:not([open])>:not(summary){display:none}
+.leitor .campos{grid-template-columns:repeat(auto-fit,minmax(min(230px,100%),1fr))}
+.vazio-grupo{font-size:13px;margin:0;padding:12px;border:1px dashed var(--borda);border-radius:7px;background:white}
+@media(max-width:640px){
+  .filhos-leitores{gap:8px;padding:7px}
+  .grupo-leitores>summary,.leitor>summary{padding:12px 34px 12px 10px}
+  .grupo-leitores>summary::after,.leitor>summary::after{right:13px;top:19px}
+  .territorio-federal>summary .titulo-grupo{font-size:19px}
+  .estado-leitores>summary .titulo-grupo{font-size:16px}
+  .titulo-grupo{font-size:15px}
+  .resumo-grupo{gap:4px}
+  .resumo-grupo .selo{padding:3px 7px}
+  .leitor>:not(summary){margin:10px}
+}

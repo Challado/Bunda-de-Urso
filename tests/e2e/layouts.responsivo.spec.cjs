@@ -292,6 +292,7 @@ test('status permite rolar estados, abrir detalhes e recolher leitores',async({p
   await acionar(leitor.locator(':scope > summary'),info);
   await expect(leitor).toContainText('Última tentativa');
   await expect(leitor.locator('.urls a').first()).toHaveAttribute('href',/fortaleza/);
+  await require('./caixas-status.cjs').validarCaixasStatus(page);
   await semOverflowHorizontal(page);
   await acionar(ce.locator(':scope > summary'),info);
   await expect(municipio).toBeHidden();

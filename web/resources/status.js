@@ -84,7 +84,7 @@
     const box=el('details',null,'grupo-leitores '+classe),s=el('summary');
     box.dataset.chave=chave;box.dataset.ordem=ordem;
     box._resumo=el('span',null,'resumo-grupo');
-    s.append(el('span',titulo),box._resumo);
+    s.append(el('span',titulo,'titulo-grupo'),box._resumo);
     box._corpo=el('div',null,'filhos-leitores');box._fontes=new Map();
     box.append(s,box._corpo);return box;
   }
@@ -144,7 +144,7 @@
       if(g._corpo)g._corpo.replaceChildren(...[...g._corpo.children].sort((a,b)=>Number(a.dataset.ordem||0)-Number(b.dataset.ordem||0)||ordenar.compare(a.querySelector('summary>span')?.textContent||'',b.querySelector('summary>span')?.textContent||'')));
     }
     $('coletores').replaceChildren(brasil);
-    for(const n of $('coletores').querySelectorAll('details[data-chave]'))n.open=abertas.get(n.dataset.chave)||false;
+    for(const n of $('coletores').querySelectorAll('details[data-chave]'))n.open=abertas.has(n.dataset.chave)?abertas.get(n.dataset.chave):n===brasil;
   }
   function resumirGrupo(g){
     const leitores=new Map([...g.querySelectorAll('.leitor:not([hidden])')].map(n=>[n.dataset.leitor,n._leitor]));

@@ -14,7 +14,10 @@ da consulta original, por clique no PC e toque nas telas móveis.
 
 O cenário de status percorre a árvore Federal → estado → município → fonte,
 abre a leitura por clique/toque, confere URLs e testa busca e expansão/recolhimento
-sem ultrapassar a largura disponível.
+sem ultrapassar a largura disponível. Também mede as caixas aninhadas: Federal
+ocupa toda a largura, cada filho fica dentro da borda do pai e preenche sua área
+interna, com cabeçalho clicável de pelo menos 44 px. A abertura por teclado e o
+recolhimento de todos os descendentes são conferidos nos testes funcionais.
 
 ## Perfis de tela
 

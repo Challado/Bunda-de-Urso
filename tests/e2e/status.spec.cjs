@@ -1,4 +1,5 @@
 const {test,expect}=require('./fixtures.cjs');
+const {validarCaixasStatus}=require('./caixas-status.cjs');
 
 test('status: 27 UFs, detalhes em nova aba, leitores e recolhimento',async({page})=>{
   await page.goto('status.html');
@@ -89,8 +90,14 @@ test('fontes ficam na arvore Federal, estado e municipio com busca e aberturas p
   await page.goto('status.html');
   await expect(page.locator('.estado-leitores')).toHaveCount(27);
   const raiz=page.locator('.territorio-federal');
-  expect(await raiz.evaluate(n=>n.open)).toBe(false);
-  await raiz.locator(':scope > summary').click();
+  await expect(raiz).toHaveAttribute('open','');
+  await expect(page.locator('.estado-leitores:visible')).toHaveCount(27);
+  await expect(page.locator('.estado-leitores[open]')).toHaveCount(0);
+  const cabecalho=raiz.locator(':scope > summary');
+  await cabecalho.focus();
+  await cabecalho.press('Enter');
+  await expect(page.locator('.estado-leitores:visible')).toHaveCount(0);
+  await cabecalho.press('Enter');
   await expect(raiz.locator(':scope > .filhos-leitores > .fonte-leitores').filter({hasText:'ANTT'})).toHaveCount(1);
   const ce=page.locator('.estado-leitores[data-uf="CE"]');
   await ce.locator(':scope > summary').click();
@@ -105,6 +112,13 @@ test('fontes ficam na arvore Federal, estado e municipio com busca e aberturas p
   await page.locator('#filtro-leitores').fill('fortaleza');
   await expect(page.locator('.estado-leitores:visible')).toHaveCount(1);
   await expect(page.locator('.leitor:visible')).toHaveCount(1);
+  await validarCaixasStatus(page);
+  await page.screenshot({path:test.info().outputPath('caixas-aninhadas.png'),fullPage:true});
+  await ce.locator(':scope > summary').click();
+  await expect(fortaleza).toBeHidden();
+  await ce.locator(':scope > summary').click();
+  await expect(fortaleza).toBeVisible();
+  await expect(fortaleza).toHaveAttribute('open','');
   await expect(page.locator('#resumo-leitores')).toContainText('1 de ');
   await page.locator('#filtro-leitores').fill('Sao Paulo');
   await expect(page.locator('.estado-leitores:visible')).toHaveCount(1);
