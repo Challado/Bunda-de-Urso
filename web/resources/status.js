@@ -55,26 +55,21 @@
   function campos(pares) {
     const dl=el('dl',null,'campos');for(const [nome,valor] of pares){const grupo=el('div');grupo.append(el('dt',nome),el('dd',valor??'Não informado'));dl.append(grupo);}return dl;
   }
-  function filtrar() {
-    const termo=$('filtro-leitores').value.toLocaleLowerCase('pt-BR');let n=0;
-    for(const item of $('coletores').children){item.hidden=!item.dataset.busca.includes(termo);if(!item.hidden)n++;}
-    $('resumo-leitores').textContent=numero(n)+' de '+numero($('coletores').children.length)+' leitores exibidos.';
-  }
-  async function carregarLeitores() {
-    erro('erro-leitores',null);
-    try {
-      const d=await api('/api/v1/status/coletores');
-      $('coletores').replaceChildren(...d.coletores.map(r=>{
+  const normalizar = texto => String(texto||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim();
+  const chaveLeitor = r => r.id != null ? 'recurso:'+r.id : 'conector:'+r.conector+':'+r.fonte+':'+r.recurso;
+  let filtroAnterior='',aberturaAntesFiltro=new Map();
+  function aberturas(){return new Map([...$('coletores').querySelectorAll('details[data-chave]')].map(n=>[n.dataset.chave,n.open]));}
+  function criarLeitor(r,local,prefixo){
         const box=el('details',null,'leitor'),s=el('summary'),u=r.ultima_tentativa;
         const documental=r.tipo_coleta==='documental';
         const estado=documental&&r.estado==='sem_mudanca'?'Documentação sem alteração':estadosLeitura[r.estado]||r.estado;
-        s.append(el('span',r.fonte+' — '+r.recurso+' '),el('span',estado,'selo '+(['erro','interrompido'].includes(r.estado)?'falha':documental?'espera':['ok','sem_mudanca'].includes(r.estado)?'ok':'espera')));
+        s.append(el('span',r.recurso+' '),el('span',estado,'selo '+(['erro','interrompido'].includes(r.estado)?'falha':documental?'espera':['ok','sem_mudanca'].includes(r.estado)?'ok':'espera')));
         if(documental)s.append(el('span','Cadastro de radares pendente','selo espera'));
         if(!r.ativo)s.append(el('span','Desativado','selo'));
         if(u?.linhas_rejeitadas>0)s.append(el('span','Com rejeições','selo espera'));
         if(r.leitura_atrasada)s.append(el('span','Leitura atrasada','selo espera'));
-        box.append(s);box.dataset.busca=[r.fonte,r.recurso,nomes[r.esfera],estado,r.estado,r.status_integracao,r.descricao_coleta,documental?'cadastro pendente':'',!r.ativo?'desativado':'ativo',r.leitura_atrasada?'atrasada':''].join(' ').toLocaleLowerCase('pt-BR');
-        box.append(campos([['Esfera da fonte',nomes[r.esfera]||r.esfera],['Última tentativa',data(u?.iniciada_em)],['Conclusão da tentativa',data(u?.terminada_em)],['Última leitura bem-sucedida',data(r.ultimo_sucesso?.terminada_em)],['Agendamento',!r.ativo?'Desativado':r.agendado?'Automático':'Fora da agenda automática'],['Intervalo entre leituras',r.intervalo_s ? numero(Math.round(r.intervalo_s/60))+' minutos' : 'Não informado'],['Integração',r.status_integracao],['Resposta HTTP',u?.http_status],['Tentativas',u?.tentativas],['Linhas recebidas',u?quantidade(u.linhas_recebidas):null],['Linhas rejeitadas',u?quantidade(u.linhas_rejeitadas):null],['Cadastros criados / alterados',u?quantidade(u.registros_criados)+' / '+quantidade(u.registros_alterados):null]]));
+        box.append(s);box.dataset.leitor=chaveLeitor(r);box.dataset.chave=prefixo+'/leitor:'+chaveLeitor(r);box._leitor=r;box.dataset.busca=[r.fonte,r.recurso,nomes[r.esfera],local?.uf,local?.nome_uf,local?.municipio,local?.municipio_ibge,estado,r.estado,r.status_integracao,r.descricao_coleta,documental?'cadastro pendente':'',!r.ativo?'desativado':'ativo',r.leitura_atrasada?'atrasada':''].join(' ');box.dataset.busca=normalizar(box.dataset.busca);
+        box.append(campos([['Esfera da fonte',nomes[r.esfera]||r.esfera],['Local da fonte',[local?.municipio,local?.nome_uf||local?.uf].filter(Boolean).join(' — ')||(r.esfera==='federal'?'Brasil — fonte federal':'Localização não informada')],['Última tentativa',data(u?.iniciada_em)],['Conclusão da tentativa',data(u?.terminada_em)],['Última leitura bem-sucedida',data(r.ultimo_sucesso?.terminada_em)],['Agendamento',!r.ativo?'Desativado':r.agendado?'Automático':'Fora da agenda automática'],['Intervalo entre leituras',r.intervalo_s ? numero(Math.round(r.intervalo_s/60))+' minutos' : 'Não informado'],['Integração',r.status_integracao],['Resposta HTTP',u?.http_status],['Tentativas',u?.tentativas],['Linhas recebidas',u?quantidade(u.linhas_recebidas):null],['Linhas rejeitadas',u?quantidade(u.linhas_rejeitadas):null],['Cadastros criados / alterados',u?quantidade(u.registros_criados)+' / '+quantidade(u.registros_alterados):null]]));
         const ul=el('ul',null,'urls');
         for(const [titulo,url] of [['Página da fonte',r.url_institucional],['Endereço da última tentativa (quando registrado)',r.url_ultima_tentativa],['Recurso cadastrado',r.url_recurso],['Endereço configurado para leitura',r.url_configurada]])if(url){const li=el('li');li.append(el('span',titulo+': '),link(url,url));ul.append(li);}
         box.append(ul);
@@ -84,8 +79,111 @@
         if(u?.erro_codigo||u?.erro_detalhe)box.append(el('p',[u.erro_codigo,u.erro_detalhe].filter(Boolean).join(': '),'erro'));
         if(r.erros?.length){box.append(el('h3','Problemas encontrados na última leitura'));const lista=el('ul',null,'lista');for(const e of r.erros)lista.append(el('li',e.codigo_erro+': '+e.descricao+' ('+e.severidade+')'));box.append(lista);}
         return box;
-      }));
-      if(d.erro_agenda||d.erro_relatorio)erro('erro-leitores',new Error([d.erro_agenda?'Agenda: '+d.erro_agenda:null,d.erro_relatorio?'Relatório: '+d.erro_relatorio:null].filter(Boolean).join('; ')));
+  }
+  function grupo(chave,titulo,classe,ordem=0){
+    const box=el('details',null,'grupo-leitores '+classe),s=el('summary');
+    box.dataset.chave=chave;box.dataset.ordem=ordem;
+    box._resumo=el('span',null,'resumo-grupo');
+    s.append(el('span',titulo),box._resumo);
+    box._corpo=el('div',null,'filhos-leitores');box._fontes=new Map();
+    box.append(s,box._corpo);return box;
+  }
+  function anexarFonte(pai,r,local){
+    const chave=r.fonte_id!=null?'id:'+r.fonte_id:'nome:'+r.fonte;
+    let fonte=pai._fontes.get(chave);
+    if(!fonte){
+      fonte=grupo(pai.dataset.chave+'/fonte:'+chave,r.fonte||'Fonte não informada','fonte-leitores');
+      pai._fontes.set(chave,fonte);pai._corpo.append(fonte);
+    }
+    fonte._corpo.append(criarLeitor(r,local,fonte.dataset.chave));
+  }
+  function montarLeitores(d){
+    const abertas=aberturas();
+    const brasil=grupo('federal','Federal — Brasil','territorio-federal');
+    const estados=new Map(),municipios=new Map();
+    for(const uf of d.estados){
+      const estado=grupo('uf:'+uf.uf,'Estadual — '+uf.nome+' ('+uf.uf+')','estado-leitores',1);
+      estado.dataset.uf=uf.uf;estados.set(uf.uf,estado);brasil._corpo.append(estado);
+    }
+    let outras=null;
+    const semLocal=new Map();
+    for(const r of d.coletores){
+      const esfera=r.esfera==='distrital'?'estadual':r.esfera;
+      if(esfera==='federal'){anexarFonte(brasil,r,null);continue;}
+      if(!['estadual','municipal'].includes(esfera)){
+        if(!outras){outras=grupo('outras','Outras fontes / esfera não definida','outras-leitores',3);brasil._corpo.append(outras);}
+        anexarFonte(outras,r,null);continue;
+      }
+      const locais=r.localidades?.length?r.localidades:[{}];
+      const vistos=new Set();
+      for(const local of locais){
+        let pai=estados.get(local.uf);
+        if(!pai){
+          if(!semLocal.has(esfera)){
+            const g=grupo('sem-local:'+esfera,(esfera==='municipal'?'Municipal':'Estadual')+' — localização não informada','sem-local-leitores',2);
+            semLocal.set(esfera,g);brasil._corpo.append(g);
+          }
+          pai=semLocal.get(esfera);
+        }else if(esfera==='municipal'){
+          const chave=local.uf+':'+(local.municipio_ibge||'sem-municipio');
+          if(!municipios.has(chave)){
+            const g=grupo('municipio:'+chave,'Municipal — '+(local.municipio||'Município não informado'),'municipio-leitores',1);
+            g.dataset.municipio=local.municipio_ibge||'';municipios.set(chave,g);pai._corpo.append(g);
+          }
+          pai=municipios.get(chave);
+        }
+        if(!vistos.has(pai.dataset.chave)){anexarFonte(pai,r,local);vistos.add(pai.dataset.chave);}
+      }
+    }
+    for(const estado of estados.values()){
+      if(!estado._fontes.size){const p=el('p','Nenhuma fonte estadual/distrital cadastrada.','suave vazio-grupo');p.dataset.ordem=.5;estado._corpo.append(p);}
+      if(!estado._corpo.querySelector('.municipio-leitores')){const p=el('p','Nenhuma fonte municipal cadastrada neste estado.','suave vazio-grupo');p.dataset.ordem=2;estado._corpo.append(p);}
+    }
+    const ordenar=new Intl.Collator('pt-BR',{sensitivity:'base',numeric:true});
+    for(const g of [brasil,...brasil.querySelectorAll('.grupo-leitores')]){
+      if(g._corpo)g._corpo.replaceChildren(...[...g._corpo.children].sort((a,b)=>Number(a.dataset.ordem||0)-Number(b.dataset.ordem||0)||ordenar.compare(a.querySelector('summary>span')?.textContent||'',b.querySelector('summary>span')?.textContent||'')));
+    }
+    $('coletores').replaceChildren(brasil);
+    for(const n of $('coletores').querySelectorAll('details[data-chave]'))n.open=abertas.get(n.dataset.chave)||false;
+  }
+  function resumirGrupo(g){
+    const leitores=new Map([...g.querySelectorAll('.leitor:not([hidden])')].map(n=>[n.dataset.leitor,n._leitor]));
+    const fontes=new Set();let ok=0,falhas=0,pendentes=0,desativados=0;
+    for(const r of leitores.values()){
+      fontes.add(r.fonte_id??r.fonte);
+      if(!r.ativo){desativados++;continue;}
+      if(['erro','interrompido'].includes(r.estado)){falhas++;continue;}
+      if(['ok','sem_mudanca'].includes(r.estado)&&r.tipo_coleta!=='documental'&&!r.leitura_atrasada&&!r.ultima_tentativa?.linhas_rejeitadas&&!r.erro_relatorio_coleta)ok++;
+      else pendentes++;
+    }
+    g._resumo.replaceChildren(el('span',numero(fontes.size)+' fonte(s) · '+numero(leitores.size)+' leitor(es)','selo'));
+    for(const [n,texto,cls] of [[ok,'OK','ok'],[falhas,'com erro','falha'],[pendentes,'pendente(s) / atenção','espera'],[desativados,'desativado(s)','']])if(n)g._resumo.append(el('span',numero(n)+' '+texto,'selo '+cls));
+    return leitores.size;
+  }
+  function filtrar() {
+    const termo=normalizar($('filtro-leitores').value);
+    if(termo&&!filtroAnterior)aberturaAntesFiltro=aberturas();
+    const visiveis=new Set(),todos=new Set();
+    for(const item of $('coletores').querySelectorAll('.leitor')){
+      todos.add(item.dataset.leitor);item.hidden=!item.dataset.busca.includes(termo);
+      if(!item.hidden)visiveis.add(item.dataset.leitor);
+    }
+    for(const grupo of [...$('coletores').querySelectorAll('.grupo-leitores')].reverse()){
+      const n=resumirGrupo(grupo);grupo.hidden=Boolean(termo&&!n);
+      if(termo&&n)grupo.open=true;
+    }
+    for(const p of $('coletores').querySelectorAll('.vazio-grupo'))p.hidden=Boolean(termo);
+    if(!termo&&filtroAnterior){for(const n of $('coletores').querySelectorAll('details[data-chave]'))n.open=aberturaAntesFiltro.get(n.dataset.chave)||false;}
+    filtroAnterior=termo;
+    $('sem-leitores').hidden=visiveis.size>0;
+    $('resumo-leitores').textContent=numero(visiveis.size)+' de '+numero(todos.size)+' leitores exibidos.';
+  }
+  async function carregarLeitores() {
+    erro('erro-leitores',null);
+    try {
+      const d=await api('/api/v1/status/coletores');
+      montarLeitores(d);
+      if(d.erro_agenda||d.erro_relatorio||d.erro_localidades)erro('erro-leitores',new Error([d.erro_agenda?'Agenda: '+d.erro_agenda:null,d.erro_relatorio?'Relatório: '+d.erro_relatorio:null,d.erro_localidades?'Localização das fontes: '+d.erro_localidades:null].filter(Boolean).join('; ')));
       $('total-leitores').textContent=numero(d.total);$('atualizado-leitores').textContent='Histórico consultado em '+data(d.gerado_em)+'. Horários no fuso deste dispositivo.';filtrar();
     } catch(e){erro('erro-leitores',e);$('atualizado-leitores').textContent='Histórico não atualizado. Use “Atualizar status” para tentar novamente.';}
   }
@@ -118,6 +216,11 @@
   const estado=document.body.dataset.pagina==='status-estado';
   async function atualizar() {const b=$('atualizar');b.disabled=true;try{if(estado)await carregarEstado();else await Promise.all([carregarCobertura(),carregarLeitores()]);}finally{b.disabled=false;}}
   $('atualizar').addEventListener('click',atualizar);
-  if(estado)$('mais').addEventListener('click',()=>carregarEstado(true));else $('filtro-leitores').addEventListener('input',filtrar);
+  if(estado)$('mais').addEventListener('click',()=>carregarEstado(true));else {
+    $('filtro-leitores').addEventListener('input',filtrar);
+    for(const [id,aberto] of [['expandir-leitores',true],['recolher-leitores',false]])$(id).addEventListener('click',()=>{
+      for(const grupo of $('coletores').querySelectorAll('details:not([hidden])'))grupo.open=aberto;
+    });
+  }
   atualizar();
 })();

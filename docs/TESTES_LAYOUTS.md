@@ -12,6 +12,10 @@ Os links da lista e do mapa abrem os detalhes em outra aba: os botões do topo
 e do fim fecham os detalhes sem perder coordenadas, raio, resultados ou rolagem
 da consulta original, por clique no PC e toque nas telas móveis.
 
+O cenário de status percorre a árvore Federal → estado → município → fonte,
+abre a leitura por clique/toque, confere URLs e testa busca e expansão/recolhimento
+sem ultrapassar a largura disponível.
+
 ## Perfis de tela
 
 Dimensões em pixels CSS; densidade e toque são emulados. O Firefox recebe o

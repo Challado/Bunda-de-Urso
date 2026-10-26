@@ -1,5 +1,13 @@
 # Histórico de alterações
 
+## Fontes do status por esfera e local
+
+- Árvore recolhível Federal → 27 estados/DF → municípios → fontes → leituras.
+- Situações agregadas de OK, erro, pendência e desativação em cada nível, com detalhes e URLs preservados.
+- Busca por UF, estado e município abre os caminhos correspondentes, além dos filtros por fonte e situação.
+- Abrangências cadastradas obtidas por LEFT JOIN, com catálogo territorial explícito para fontes conhecidas ainda não coletadas; fontes sem localização continuam visíveis.
+- Estados sem fonte cadastrada aparecem explicitamente; fontes documentais não são apresentadas como cadastro de radares concluído.
+
 ## Retorno à consulta anterior
 
 - Links dos radares na lista e no mapa abrem os detalhes em nova aba, preservando a consulta original.

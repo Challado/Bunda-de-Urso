@@ -195,6 +195,78 @@ class TestLeitoresStatus(BaseDedup):
         self.assertEqual(d['total'],1)
         self.assertIn('agenda invalida',d['erro_agenda'])
 
+    def test_recurso_novo_reutiliza_identidade_da_fonte_ja_cadastrada(self):
+        from coletor.fontes.dnit import ColetorDNIT, ColetorDNITEquipamentos
+        f=self.fonte(ColetorDNIT.FONTE['nome'])
+        self.recurso(f,ColetorDNIT.RECURSO['nome'])
+        d=status.coletores(self.con,agenda={
+            'dnit':dict(conector=ColetorDNIT,ativo=True),
+            'dnit_equipamentos':dict(conector=ColetorDNITEquipamentos,ativo=True)})
+        self.assertEqual(d['total'],2)
+        self.assertEqual({r['fonte_id'] for r in d['coletores']},{f})
+        self.assertEqual(sum(r['id'] is None for r in d['coletores']),1)
+
+    def test_catalogo_localiza_fontes_nunca_lidas_sem_inferir_da_rodovia(self):
+        from coletor.agenda import AGENDA_PADRAO
+        d=status.coletores(self.con,agenda=AGENDA_PADRAO)
+        self.assertEqual(len(d['estados']),27)
+        self.assertEqual(len({e['uf'] for e in d['estados']}),27)
+        por_chave={l['conector']:l for l in d['coletores']}
+        self.assertEqual(por_chave['goinfra']['localidades'][0]['uf'],'GO')
+        self.assertEqual(por_chave['detran_df']['localidades'][0]['uf'],'DF')
+        self.assertEqual(por_chave['natal_rn']['localidades'][0]['municipio'],'Natal')
+        self.assertEqual(por_chave['ctmac_ap']['localidades'][0]['municipio_ibge'],'1600303')
+        self.assertEqual(por_chave['cuiaba_mt']['localidades'][0]['municipio'],'Cuiabá')
+        for leitor in por_chave.values():
+            if leitor['esfera']=='municipal':
+                self.assertEqual(len(leitor['localidades']),1,leitor['fonte'])
+                self.assertTrue(leitor['localidades'][0]['municipio_ibge'])
+                self.assertTrue(leitor['localidades'][0]['municipio'])
+            self.assertEqual(leitor['estado'],'nunca_coletado')
+        self.assertEqual(por_chave['antt']['localidades'],[])
+
+    def test_abrangencia_municipal_consulta_uf_por_left_join(self):
+        f=self.fonte('Fonte municipal nova',esfera='municipal');self.recurso(f)
+        db.insert(self.con,'MUNICIPIO',dict(codigo_ibge='5208707',nome='Goiânia',uf_sigla='GO'))
+        db.insert(self.con,'COBERTURA_FONTE',dict(fonte_id=f,tipo_abrangencia='municipal',municipio_id='5208707',confirmada=1))
+        d=status.coletores(self.con,agenda={})['coletores'][0]
+        self.assertEqual(d['fonte_id'],f)
+        self.assertEqual(d['localidades'],[dict(uf='GO',nome_uf='Goiás',municipio_ibge='5208707',municipio='Goiânia',tipo_abrangencia='municipal',confirmada=True,origem='abrangencia_cadastrada')])
+        self.assertIsNone(db.scalar(self.con,'SELECT uf_sigla FROM COBERTURA_FONTE WHERE fonte_id=?',(f,)))
+
+    def test_abrangencias_multiplas_e_vigencia_sem_ocultar_fonte(self):
+        f=self.fonte('Consorcio',esfera='municipal');self.recurso(f)
+        for codigo,nome,uf in [('5208707','Goiânia','GO'),('4104808','Cascavel','PR')]:
+            db.insert(self.con,'MUNICIPIO',dict(codigo_ibge=codigo,nome=nome,uf_sigla=uf))
+            db.insert(self.con,'COBERTURA_FONTE',dict(fonte_id=f,tipo_abrangencia='municipal',municipio_id=codigo,confirmada=1))
+        db.insert(self.con,'COBERTURA_FONTE',dict(fonte_id=f,tipo_abrangencia='estadual',uf_sigla='AC',vigencia_fim='2000-01-01',confirmada=1))
+        db.insert(self.con,'COBERTURA_FONTE',dict(fonte_id=f,tipo_abrangencia='estadual',uf_sigla='AL',vigencia_inicio='2999-01-01',confirmada=1))
+        d=status.coletores(self.con,agenda={})
+        self.assertEqual(d['total'],1)
+        self.assertEqual({l['uf'] for l in d['coletores'][0]['localidades']},{'GO','PR'})
+
+    def test_sem_localizacao_nao_desaparece_nem_ganha_uf_pelo_nome(self):
+        self.recurso(self.fonte('Fonte GO municipal de Sao Paulo',esfera='municipal'))
+        d=status.coletores(self.con,agenda={})
+        self.assertEqual(d['total'],1)
+        self.assertEqual(d['coletores'][0]['localidades'],[])
+
+    def test_abrangencia_cadastrada_prevalece_sobre_catalogo(self):
+        from coletor.fontes.goinfra import ColetorGOINFRA
+        f=self.fonte(ColetorGOINFRA.FONTE['nome'],esfera='estadual');self.recurso(f)
+        db.insert(self.con,'COBERTURA_FONTE',dict(fonte_id=f,tipo_abrangencia='estadual',uf_sigla='MG',confirmada=0))
+        d=status.coletores(self.con,agenda={})['coletores'][0]
+        self.assertEqual(d['localidades'][0]['uf'],'MG')
+        self.assertFalse(d['localidades'][0]['confirmada'])
+
+    def test_catalogo_indisponivel_preserva_historico_e_informa_erro(self):
+        self.recurso(self.fonte('Fonte sem catalogo',esfera='estadual'))
+        with patch('core.painel_status._catalogo_localidades',side_effect=FileNotFoundError('catalogo ausente')):
+            d=status.coletores(self.con,agenda={})
+        self.assertEqual(d['total'],1)
+        self.assertEqual(d['coletores'][0]['localidades'],[])
+        self.assertIn('catalogo ausente',d['erro_localidades'])
+
 
 class TestApiStatus(unittest.TestCase):
     def setUp(self):

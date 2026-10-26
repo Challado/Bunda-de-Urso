@@ -326,3 +326,14 @@ arquivo como exportação bem sucedida.
   necessário para baixar a base pública.
 - Troca entre sistemas: [Intercâmbio de Instâncias](INTERCAMBIO_INSTANCIAS.md).
 - Rede de radares: [TRASEIRO DE URSO](TRASEIRO_DE_URSO.md).
+
+
+A consulta `GET /api/v1/status/coletores` inclui `fonte_id`, `localidades` por leitor
+e a relação `estados` das 27 UFs para navegação territorial. Cada local informa
+`uf`, `nome_uf`, `municipio_ibge`, `municipio` e `origem`; a UF de uma abrangência
+municipal cadastrada é obtida por `LEFT JOIN` com `MUNICIPIO`. As localidades vêm
+da abrangência vigente cadastrada ou do catálogo explícito do conector, inclusive
+para fontes documentais e nunca lidas. Local vazio não elimina o leitor.
+Esses metadados organizam a fonte; não comprovam cobertura integral nem mudam
+a esfera de um radar. Uma fonte com várias abrangências pode aparecer em
+vários lugares da árvore; contagens gerais de leitores não a duplicam.

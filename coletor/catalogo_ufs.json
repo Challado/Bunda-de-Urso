@@ -1,5 +1,5 @@
 {
-  "versao": "2026-10-22",
+  "versao": "2026-10-26",
   "objetivo": "Catalogo nacional de fontes oficiais das 27 UFs para integracao. Inventario de pontos de partida; NAO e prova de cobertura nacional. cobertura_estadual_confirmada permanece false ate auditoria por circunscricao.",
   "legenda_tipo_esperado": {
     "cadastro_equipamento": "Relacao de equipamentos/pontos (series, modelo, local).",
@@ -31,7 +31,14 @@
       "cobertura_estadual_confirmada": false,
       "modulo_diagnostico": "detran_ac",
       "nome_uf": "Acre",
-      "fontes_estaduais": [],
+      "fontes_estaduais": [
+        {
+          "modulo": "detran_ac",
+          "nome": "Detran-AC - portal institucional (sem cadastro de radares)",
+          "url": "https://www.detran.ac.gov.br/",
+          "esfera": "estadual"
+        }
+      ],
       "modulos_municipais": [],
       "cobertura_municipal_confirmada": false
     },
@@ -48,8 +55,30 @@
       "cobertura_estadual_confirmada": false,
       "modulo_diagnostico": "der_al",
       "nome_uf": "Alagoas",
-      "fontes_estaduais": [],
-      "modulos_municipais": [],
+      "fontes_estaduais": [
+        {
+          "modulo": "der_al",
+          "nome": "DER-AL - canal institucional (sem lista de equipamentos)",
+          "url": "https://www.der.al.gov.br/",
+          "esfera": "estadual"
+        }
+      ],
+      "modulos_municipais": [
+        {
+          "modulo": "agetran_ms",
+          "nome": "Agetran Campo Grande - Radares de fiscalizacao eletronica",
+          "url": "https://www.campogrande.ms.gov.br/",
+          "esfera": "municipal",
+          "municipio_ibge": "2701506"
+        },
+        {
+          "modulo": "segbell_pa",
+          "nome": "SEGBEL Belem - Portarias de ativacao e desativacao de radares",
+          "url": "https://seguranca.belem.pa.gov.br/",
+          "esfera": "municipal",
+          "municipio_ibge": "2700805"
+        }
+      ],
       "cobertura_municipal_confirmada": false
     },
     {
@@ -65,7 +94,15 @@
       "cobertura_estadual_confirmada": false,
       "nome_uf": "Amapá",
       "fontes_estaduais": [],
-      "modulos_municipais": [],
+      "modulos_municipais": [
+        {
+          "modulo": "ctmac_ap",
+          "nome": "CTMac Macapa - Radares (lista de locais, historica)",
+          "url": "https://macapa.ap.gov.br/",
+          "esfera": "municipal",
+          "municipio_ibge": "1600303"
+        }
+      ],
       "cobertura_municipal_confirmada": false,
       "modulo_diagnostico": "ctmac_ap"
     },
@@ -87,7 +124,8 @@
           "modulo": "immu_am",
           "nome": "IMMU Manaus - Fiscalizacao eletronica (locais)",
           "url": "https://www.manaus.am.gov.br/noticia/transito/fiscalizacao-eletronica-salvar-vidas/",
-          "esfera": "municipal"
+          "esfera": "municipal",
+          "municipio_ibge": "1302603"
         }
       ],
       "cobertura_municipal_confirmada": false
@@ -117,7 +155,8 @@
           "modulo": "salvador_ba",
           "nome": "Transalvador - Mapa de equipamentos",
           "url": "https://transonline.salvador.ba.gov.br/equipamentos/index.php",
-          "esfera": "municipal"
+          "esfera": "municipal",
+          "municipio_ibge": "2927408"
         }
       ],
       "cobertura_municipal_confirmada": false
@@ -140,7 +179,8 @@
           "modulo": "amc_ce",
           "nome": "AMC Fortaleza - Equipamentos de fiscalizacao eletronica",
           "url": "https://mapas.fortaleza.ce.gov.br/mapa/538/equipamentos-de-fiscalizacao-eletronica",
-          "esfera": "municipal"
+          "esfera": "municipal",
+          "municipio_ibge": "2304400"
         }
       ],
       "cobertura_municipal_confirmada": false
@@ -193,7 +233,8 @@
           "modulo": "cariacica_es",
           "nome": "Cariacica - Mapa de radares de fiscalizacao eletronica",
           "url": "https://cariacica.es.gov.br/pagina/ler/861/mapa-radares",
-          "esfera": "municipal"
+          "esfera": "municipal",
+          "municipio_ibge": "3201308"
         }
       ],
       "cobertura_municipal_confirmada": false
@@ -260,7 +301,8 @@
           "modulo": "pbh",
           "nome": "Belo Horizonte - Fiscalizacao eletronica",
           "url": "https://dados.pbh.gov.br/pt_BR/dataset/fiscalizacao-eletronica",
-          "esfera": "municipal"
+          "esfera": "municipal",
+          "municipio_ibge": "3106200"
         }
       ],
       "nome_uf": "Minas Gerais",
@@ -292,7 +334,8 @@
           "modulo": "agetran_ms",
           "nome": "Agetran Campo Grande - Radares de fiscalizacao eletronica",
           "url": "https://www.campogrande.ms.gov.br/cgnoticias/noticia/novos-radares-operam-em-carater-educativo-ate-14-de-julho/",
-          "esfera": "municipal"
+          "esfera": "municipal",
+          "municipio_ibge": "5002704"
         }
       ],
       "cobertura_municipal_confirmada": false
@@ -310,7 +353,15 @@
       "cobertura_estadual_confirmada": false,
       "nome_uf": "Mato Grosso",
       "fontes_estaduais": [],
-      "modulos_municipais": [],
+      "modulos_municipais": [
+        {
+          "modulo": "cuiaba_mt",
+          "nome": "Cuiaba SEMOB - Fiscalizacao eletronica (noticia 2015)",
+          "url": "https://www.cuiaba.mt.gov.br/",
+          "esfera": "municipal",
+          "municipio_ibge": "5103403"
+        }
+      ],
       "cobertura_municipal_confirmada": false
     },
     {
@@ -326,7 +377,15 @@
       "cobertura_estadual_confirmada": false,
       "nome_uf": "Pará",
       "fontes_estaduais": [],
-      "modulos_municipais": [],
+      "modulos_municipais": [
+        {
+          "modulo": "segbell_pa",
+          "nome": "SEGBEL Belem - Portarias de ativacao e desativacao de radares",
+          "url": "https://seguranca.belem.pa.gov.br/",
+          "esfera": "municipal",
+          "municipio_ibge": "1501402"
+        }
+      ],
       "cobertura_municipal_confirmada": false,
       "modulo_diagnostico": "segbell_pa"
     },
@@ -348,7 +407,22 @@
           "modulo": "semob_pb",
           "nome": "Semob Joao Pessoa - Medidores de velocidade (locais)",
           "url": "https://www.joaopessoa.pb.gov.br/noticias/secretarias-e-orgaos/semob/semobjp-orienta-populacao-sobre-novos-locais-com-radares-medidores-de-velocidade/",
-          "esfera": "municipal"
+          "esfera": "municipal",
+          "municipio_ibge": "2507507"
+        },
+        {
+          "modulo": "segbell_pa",
+          "nome": "SEGBEL Belem - Portarias de ativacao e desativacao de radares",
+          "url": "https://seguranca.belem.pa.gov.br/",
+          "esfera": "municipal",
+          "municipio_ibge": "2501906"
+        },
+        {
+          "modulo": "boavista_rr",
+          "nome": "Boa Vista SMST - Locais de radares (noticia 2024)",
+          "url": "https://boavista.rr.gov.br/",
+          "esfera": "municipal",
+          "municipio_ibge": "2502151"
         }
       ],
       "cobertura_municipal_confirmada": false
@@ -378,7 +452,8 @@
           "modulo": "curitiba_pr",
           "nome": "Setran Curitiba - Fiscalizacao eletronica",
           "url": "https://transito.curitiba.pr.gov.br/fiscalizacaoeletronica",
-          "esfera": "municipal"
+          "esfera": "municipal",
+          "municipio_ibge": "4106902"
         }
       ],
       "cobertura_municipal_confirmada": false
@@ -414,7 +489,8 @@
           "modulo": "recife",
           "nome": "Recife - Equipamentos de fiscalizacao de transito",
           "url": "https://dados.recife.pe.gov.br/dataset/equipamentos-de-monitoramento-e-fiscalizacao-de-transito",
-          "esfera": "municipal"
+          "esfera": "municipal",
+          "municipio_ibge": "2611606"
         }
       ],
       "cobertura_municipal_confirmada": false
@@ -433,7 +509,15 @@
       "modulo_diagnostico": "teresina_pi",
       "nome_uf": "Piauí",
       "fontes_estaduais": [],
-      "modulos_municipais": [],
+      "modulos_municipais": [
+        {
+          "modulo": "teresina_pi",
+          "nome": "STRANS Teresina - Localizacao de radares (noticia 2019)",
+          "url": "https://www.teresina.pi.gov.br/",
+          "esfera": "municipal",
+          "municipio_ibge": "2211001"
+        }
+      ],
       "cobertura_municipal_confirmada": false
     },
     {
@@ -473,7 +557,22 @@
       "modulo_diagnostico": "natal_rn",
       "nome_uf": "Rio Grande do Norte",
       "fontes_estaduais": [],
-      "modulos_municipais": [],
+      "modulos_municipais": [
+        {
+          "modulo": "agetran_ms",
+          "nome": "Agetran Campo Grande - Radares de fiscalizacao eletronica",
+          "url": "https://www.campogrande.ms.gov.br/",
+          "esfera": "municipal",
+          "municipio_ibge": "2401305"
+        },
+        {
+          "modulo": "natal_rn",
+          "nome": "STTU Natal - portal institucional (sem cadastro estadual)",
+          "url": "https://www.natal.rn.gov.br/sttu",
+          "esfera": "municipal",
+          "municipio_ibge": "2408102"
+        }
+      ],
       "cobertura_municipal_confirmada": false
     },
     {
@@ -529,7 +628,8 @@
           "modulo": "semtran_ro",
           "nome": "SEMTRAN Porto Velho - Fiscalizacao eletronica (radares fixos)",
           "url": "https://semtran.portovelho.ro.gov.br/pagina/fiscalizacao-eletronica-radares-fixos",
-          "esfera": "municipal"
+          "esfera": "municipal",
+          "municipio_ibge": "1100205"
         }
       ],
       "cobertura_municipal_confirmada": false
@@ -547,7 +647,15 @@
       "cobertura_estadual_confirmada": false,
       "nome_uf": "Roraima",
       "fontes_estaduais": [],
-      "modulos_municipais": [],
+      "modulos_municipais": [
+        {
+          "modulo": "boavista_rr",
+          "nome": "Boa Vista SMST - Locais de radares (noticia 2024)",
+          "url": "https://boavista.rr.gov.br/",
+          "esfera": "municipal",
+          "municipio_ibge": "1400100"
+        }
+      ],
       "cobertura_municipal_confirmada": false
     },
     {
@@ -581,7 +689,15 @@
           "modulo": "joinville_cadastro_sc",
           "nome": "Detrans Joinville - Cadastro bienal de radares",
           "url": "https://www.joinville.sc.gov.br/publicacoes/estudos-tecnicos-equipamentos-de-fiscalizacao-eletronica-radares-e-lombadas/",
-          "esfera": "municipal"
+          "esfera": "municipal",
+          "municipio_ibge": "4209102"
+        },
+        {
+          "modulo": "joinville_sc",
+          "nome": "Joinville DETRANS - Estudos tecnicos de fiscalizacao eletronica",
+          "url": "https://www.joinville.sc.gov.br/",
+          "esfera": "municipal",
+          "municipio_ibge": "4209102"
         }
       ],
       "cobertura_municipal_confirmada": false
@@ -611,7 +727,8 @@
           "modulo": "cetsp",
           "nome": "CET Sao Paulo - Fiscalizacao eletronica",
           "url": "https://www.cetsp.com.br/consultas/fiscalizacao-eletronica-do-transito.aspx",
-          "esfera": "municipal"
+          "esfera": "municipal",
+          "municipio_ibge": "3550308"
         }
       ],
       "cobertura_municipal_confirmada": false
@@ -641,7 +758,8 @@
           "modulo": "aracaju_se",
           "nome": "SMTT Aracaju - Medidores de velocidade",
           "url": "https://smtt.aracaju.se.gov.br/medidores-de-velocidade/",
-          "esfera": "municipal"
+          "esfera": "municipal",
+          "municipio_ibge": "2800308"
         }
       ],
       "cobertura_municipal_confirmada": false
@@ -660,7 +778,8 @@
           "modulo": "araguaiana_to",
           "nome": "ASTT Araguaina - Medidores de velocidade (lista de enderecos)",
           "url": "https://www.araguaina.to.gov.br/servicos/medidores-de-velocidade-lista-de-enderecos",
-          "esfera": "municipal"
+          "esfera": "municipal",
+          "municipio_ibge": "1702109"
         }
       ],
       "observacao": "Relacao geral AGETO com GPS, rodovia/km, serie e numero Inmetro; 58 equipamentos no PDF rev01 conferido em 21/10/2026. ASTT Araguaina permanece como complemento municipal. A lista nao comprova atividade atual nem cobertura integral.",

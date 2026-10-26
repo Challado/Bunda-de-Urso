@@ -1,6 +1,7 @@
 """Consultas locais do painel de cobertura e leitores, sem escrita ou rede."""
 from collections import Counter, defaultdict
 import datetime as dt
+from functools import lru_cache
 import json
 from pathlib import Path
 
@@ -151,6 +152,48 @@ def cobertura(conn, uf=None, limite=100, depois=0):
                 proximo_depois=int(pagina[limite - 1]["id"][2:]) if len(pagina) > limite else None)
 
 
+@lru_cache(maxsize=1)
+def _catalogo_localidades():
+    """Jurisdicao declarada dos conectores; independe de haver leitura ou GPS."""
+    raiz = Path(caminhos.ROOT)
+    catalogo = json.loads((raiz / 'coletor/catalogo_ufs.json').read_text(encoding='utf-8'))
+    municipios = {m['codigo_ibge']: m for m in json.loads(
+        (raiz / 'config/municipios_ibge.json').read_text(encoding='utf-8'))['municipios']}
+    locais = {}
+    for estado in catalogo['ufs']:
+        for lista in ('fontes_estaduais', 'modulos_municipais'):
+            for fonte in estado[lista]:
+                codigo = fonte.get('municipio_ibge')
+                municipio = municipios.get(codigo) if codigo else None
+                if codigo and (not municipio or municipio['uf_sigla'] != estado['uf']):
+                    raise ValueError('Municipio do catalogo incoerente com a UF: ' + fonte['modulo'])
+                locais[fonte['modulo']] = dict(uf=estado['uf'], nome_uf=NOMES[estado['uf']],
+                    municipio_ibge=codigo, municipio=municipio['nome'] if municipio else None,
+                    origem='catalogo_fonte')
+    return locais
+
+
+def _localidades_fontes(conn):
+    """LEFT JOIN conserva abrangencias parciais; UF municipal vem do municipio."""
+    locais = defaultdict(list)
+    hoje = dt.datetime.now(dt.timezone.utc).date().isoformat()
+    for row in conn.execute('''
+        SELECT c.fonte_id, c.tipo_abrangencia, c.confirmada, c.municipio_id,
+               COALESCE(m.uf_sigla,c.uf_sigla) AS uf, m.nome AS municipio
+        FROM COBERTURA_FONTE c LEFT JOIN MUNICIPIO m ON m.codigo_ibge=c.municipio_id
+        WHERE (c.vigencia_inicio IS NULL OR c.vigencia_inicio<=?)
+          AND (c.vigencia_fim IS NULL OR c.vigencia_fim>=?)
+        ORDER BY c.id
+    ''', (hoje, hoje)):
+        local = dict(uf=row['uf'], nome_uf=NOMES.get(row['uf']),
+            municipio_ibge=row['municipio_id'], municipio=row['municipio'],
+            tipo_abrangencia=row['tipo_abrangencia'], confirmada=bool(row['confirmada']),
+            origem='abrangencia_cadastrada')
+        if local not in locais[row['fonte_id']]:
+            locais[row['fonte_id']].append(local)
+    return locais
+
+
 def coletores(conn, agenda=None):
     from coletor.agenda import carregar_agenda
     erro_agenda = None
@@ -165,7 +208,7 @@ def coletores(conn, agenda=None):
     recursos = [dict(r) for r in conn.execute("""
         SELECT rf.id, rf.nome AS recurso, rf.url_recurso, rf.ativo,
                rf.status_integracao, rf.periodicidade_segundos,
-               f.nome AS fonte, f.esfera, f.situacao, f.url_institucional
+               f.id AS fonte_id, f.nome AS fonte, f.esfera, f.situacao, f.url_institucional
         FROM RECURSO_FONTE rf LEFT JOIN FONTE f ON f.id=rf.fonte_id ORDER BY rf.id
     """)]
     diario, erro_relatorio = {}, None
@@ -179,6 +222,7 @@ def coletores(conn, agenda=None):
         diario, erro_relatorio = {}, atualizacoes.limpar(str(exc))
     vistos = set()
     leitores = []
+    fontes_cadastradas = {f['nome']: f['id'] for f in conn.execute('SELECT id,nome FROM FONTE')}
     for r in recursos:
         chave, item = itens.get((r["fonte"], r["recurso"]), (None, {}))
         if chave:
@@ -188,15 +232,35 @@ def coletores(conn, agenda=None):
         if chave in vistos:
             continue
         cls = item["conector"]
-        leitores.append(_leitor(conn, dict(id=None, fonte=fonte, recurso=recurso,
+        leitores.append(_leitor(conn, dict(id=None, fonte_id=fontes_cadastradas.get(fonte), fonte=fonte, recurso=recurso,
             esfera=cls.FONTE.get("esfera"), situacao=cls.FONTE.get("situacao", "ativa"),
             ativo=True, status_integracao=cls.RECURSO.get("status_integracao"),
             url_recurso=cls.RECURSO.get("url_recurso"),
             url_institucional=cls.FONTE.get("url_institucional"),
             periodicidade_segundos=cls.RECURSO.get("periodicidade_segundos")), chave, item, None))
+    # Nomes/codigos sao metadados de jurisdicao, nao uma inferencia da rodovia
+    # ou dos radares recebidos. Tambem funcionam para fontes nunca coletadas.
+    from coletor.agenda import AGENDA_PADRAO
+    erro_localidades = None
+    try:
+        catalogo = _catalogo_localidades()
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        # Falta de metadado territorial nao pode ocultar o historico do leitor.
+        catalogo = {}
+        erro_localidades = atualizacoes.limpar(str(exc))
+    por_nome = defaultdict(list)
+    for chave, item in {**AGENDA_PADRAO, **agenda}.items():
+        cls = item.get('conector')
+        if cls and chave in catalogo and catalogo[chave] not in por_nome[cls.FONTE['nome']]:
+            por_nome[cls.FONTE['nome']].append(catalogo[chave])
+    cadastrados = _localidades_fontes(conn)
+    for leitor in leitores:
+        leitor['localidades'] = cadastrados.get(leitor['fonte_id']) or por_nome.get(leitor['fonte'], [])
     leitores.sort(key=lambda r: (r["fonte"] or "", r["recurso"] or ""))
     return {"gerado_em": atualizacoes.agora(), "total": len(leitores), "erro_agenda": erro_agenda, "erro_relatorio": erro_relatorio,
+            "erro_localidades": erro_localidades,
             "resumo": dict(Counter(r["estado"] for r in leitores)),
+            "estados": [{"uf": uf, "nome": NOMES[uf]} for uf, _ in UFS],
             "coletores": atualizacoes.limpar(leitores)}
 
 
