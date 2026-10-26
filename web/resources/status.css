@@ -279,6 +279,7 @@ th,td {
 .estado-leitores>summary{font-size:17px}
 .municipio-leitores>summary{font-size:16px}
 .filhos-leitores{min-width:0;margin:0 0 8px 8px;padding-left:12px;border-left:2px solid var(--borda)}
+.grupo-leitores:not([open])>.filhos-leitores{display:none}
 .resumo-grupo{font-weight:400}
 .vazio-grupo{font-size:13px;margin:8px 0}
 @media(max-width:640px){.filhos-leitores{margin-left:3px;padding-left:6px}.grupo-leitores>summary{padding-left:0;padding-right:0}.selo{margin-left:0}}
