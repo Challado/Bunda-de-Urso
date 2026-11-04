@@ -157,6 +157,7 @@ class ColetorINMETRO(ColetorBase):
     UFS_TODAS = ("AC", "AL", "AP", "AM", "BA", "CE", "ES", "GO", "MA",
                  "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ",
                  "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO")
+    SELETORES_TODAS = frozenset(("TODAS", "*", "ALL"))
 
     # -- resolucao de URL -------------------------------------------------
     @classmethod
@@ -174,6 +175,16 @@ class ColetorINMETRO(ColetorBase):
             raise ValueError("UF invalida: %r" % (uf,))
         return URL_TEMPLATE.format(uf=u)
 
+    def validar_origem(self, origem):
+        """Seletores de UF nao sao arquivos; arquivos mantem a restricao local."""
+        if isinstance(origem, str):
+            seletor = origem.strip().upper()
+            if seletor in self.SELETORES_TODAS:
+                return seletor
+            if _eh_uf(seletor):
+                return self.resolver_url(seletor)
+        return super().validar_origem(origem)
+
     # -- carregar ----------------------------------------------------------
     def carregar(self, origem):
         """origem: caminho local | URL | sigla de UF | "TODAS".
@@ -182,8 +193,7 @@ class ColetorINMETRO(ColetorBase):
         Retorna (bytes, ext, mime, registros), onde `registros` e a lista de
         INSTRUMENTOS (ja agrupados pela regra G01/17.4.5), nao as faixas.
         """
-        if isinstance(origem, str) and origem.strip().upper() in ("TODAS",
-                                                                  "*", "ALL"):
+        if isinstance(origem, str) and origem.strip().upper() in self.SELETORES_TODAS:
             return self._carregar_todas()
         if origem and os.path.exists(origem):
             with open(origem, "rb") as f:

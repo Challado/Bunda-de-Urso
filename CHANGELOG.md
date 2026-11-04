@@ -1,5 +1,12 @@
 # Histórico de alterações
 
+## Inmetro: seleção de UFs na coleta automática — 04/11/2026
+
+- Corrige o bloqueio de `TODAS` pela validação de arquivos locais na API/cron. O seletor nacional e seus aliases são reconhecidos pelo conector; siglas de UF são resolvidas para as URLs oficiais.
+- Arquivos de importação continuam restritos a `[dados] dir`, incluindo a resolução de links simbólicos. Outros conectores não recebem exceções para os seletores do Inmetro.
+- Testes do fluxo completo de sincronização local reproduzem o erro anterior, verificam a coleta por UF/nacional e preservam o bloqueio de arquivos externos. Executados também no GitHub Actions pela suíte existente.
+- A correção não exige alterar `radar.conf` nem recriar o banco. Uma sincronização manual do Inmetro antecipa a próxima leitura agendada e atualiza o status com o resultado real.
+
 ## DNIT por HTTP direto — 04/11/2026
 
 - Coletor de equipamentos consulta a API pública GeoJSON usada pelo portal de multas, sem Chromium ou exportação `blob:`.

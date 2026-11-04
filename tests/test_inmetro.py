@@ -4,12 +4,17 @@
 Testes OFFLINE (fixture local, sem rede), conforme spec 15 e 17.1/[G01].
 """
 import os
+from pathlib import Path
+import tempfile
 import unittest
+from unittest.mock import patch
 
-from core import config
+from core import config, caminhos
+from core.contexto_api import atendimento_local
 from core import db as dbmod
 from coletor.fontes import inmetro
 from coletor.fontes.inmetro import ColetorINMETRO
+from coletor.fontes.dnit import ColetorDNIT
 from tests.common import ambiente_temporario
 
 FIXTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -160,6 +165,79 @@ class TestSincronizacaoOffline(unittest.TestCase):
             self.assertIsNotNone(ident)
         finally:
             coletor.conn.close()
+
+
+class TestOrigemNaSincronizacaoLocal(unittest.TestCase):
+    """Mesmo contexto de validacao da API/cron, sem permissao de migracao."""
+
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory(prefix="radar-inmetro-origem-")
+        self.addCleanup(temp.cleanup)
+        self.raiz = Path(temp.name)
+        self.dados = self.raiz / "dados"
+        self.dados.mkdir()
+        conf = self.raiz / "radar.conf"
+        conf.write_text("[dados]\ndir = %s\n" % self.dados)
+        ambiente = patch.dict(os.environ, RADAR_CONF=str(conf))
+        ambiente.start()
+        caminhos.recarregar()
+        self.addCleanup(caminhos.recarregar)
+        self.addCleanup(ambiente.stop)
+        parametros = patch.multiple(config, DATA_DIR=str(self.dados),
+            RAW_DIR=str(self.dados / "raw"), STAGING_DIR=str(self.dados / "staging"),
+            DB_PATH=str(self.dados / "radar.sqlite3"))
+        parametros.start()
+        self.addCleanup(parametros.stop)
+        legado = caminhos._LEGADO.set(False)
+        self.addCleanup(caminhos._LEGADO.reset, legado)
+        self.coletor = ColetorINMETRO(conn=dbmod.connect(":memory:"))
+        self.addCleanup(self.coletor.conn.close)
+        self.corpo = Path(FIXTURE).read_bytes()
+
+    def test_todas_e_aliases_chegam_ao_download_no_contexto_do_cron(self):
+        with atendimento_local(), patch.object(self.coletor, "UFS_TODAS", ("AC",)), \
+                patch.object(self.coletor, "_baixar", return_value=self.corpo) as baixar, \
+                patch("time.sleep"):
+            for origem in ("TODAS", " todas ", "ALL", "*"):
+                with self.subTest(origem=origem):
+                    resumo = self.coletor.sincronizar(origem, publicar=False)
+                    self.assertEqual(resumo["linhas_recebidas"], 6)
+                    self.assertEqual(baixar.call_args.args,
+                                     (self.coletor.resolver_url("AC"),))
+        self.assertEqual(dbmod.scalar(self.coletor.conn,
+            "SELECT COUNT(*) FROM PONTO_FISCALIZACAO"), 5)
+
+    def test_sigla_de_uf_chega_ao_download_no_contexto_do_cron(self):
+        with atendimento_local(), patch.object(self.coletor, "_baixar", return_value=self.corpo) as baixar:
+            resumo = self.coletor.sincronizar("ac", publicar=False)
+        self.assertEqual(resumo["criados"], 5)
+        baixar.assert_called_once_with(self.coletor.resolver_url("AC"))
+
+    def test_arquivo_dentro_de_dados_continua_importavel(self):
+        arquivo = self.dados / "medidores.json"
+        arquivo.write_bytes(self.corpo)
+        with atendimento_local(), patch.object(self.coletor, "_baixar", side_effect=AssertionError("Nao usa rede")):
+            resumo = self.coletor.sincronizar(arquivo, publicar=False)
+        self.assertEqual(resumo["criados"], 5)
+
+    def test_arquivo_fora_de_dados_e_link_para_fora_continuam_bloqueados(self):
+        externo = self.raiz / "medidores.json"
+        externo.write_bytes(self.corpo)
+        link = self.dados / "atalho.json"
+        link.symlink_to(externo)
+        with atendimento_local(), patch.object(self.coletor, "carregar") as carregar:
+            for origem in (externo, link, str(externo), "../medidores.json"):
+                with self.subTest(origem=origem), self.assertRaisesRegex(ValueError, "dentro de"):
+                    self.coletor.sincronizar(origem, publicar=False)
+            carregar.assert_not_called()
+
+    def test_seletores_inmetro_nao_sao_liberados_para_outros_conectores(self):
+        coletor = ColetorDNIT(conn=self.coletor.conn)
+        with atendimento_local(), patch.object(coletor, "carregar") as carregar:
+            for origem in ("TODAS", "AC", "ALL", "*"):
+                with self.subTest(origem=origem), self.assertRaisesRegex(ValueError, "dentro de"):
+                    coletor.sincronizar(origem, publicar=False)
+            carregar.assert_not_called()
 
 
 class TestDatasAuxiliares(unittest.TestCase):

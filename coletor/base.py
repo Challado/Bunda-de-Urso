@@ -307,6 +307,10 @@ class ColetorBase(object):
         return snap_id, versao
 
     # -- a implementar por fonte ------------------------------------------
+    def validar_origem(self, origem):
+        """Valida URLs/arquivos; conectores podem reconhecer seletores proprios."""
+        return _validar_origem_local(origem)
+
     def carregar(self, origem):
         raise NotImplementedError
 
@@ -478,7 +482,7 @@ class ColetorBase(object):
             self._diario_coleta.update(etapa="download_e_leitura", origem=origem)
             atualizacoes.registrar("coleta", self._diario_coleta, fonte=recurso_id)
             if _LOCAL.get() and not caminhos._LEGADO.get():
-                origem = _validar_origem_local(origem)
+                origem = self.validar_origem(origem)
             conteudo, ext, mime, registros = self.carregar(origem)
             self.validar_coleta(conteudo, registros)
             self._diario_coleta.update(etapa="normalizacao", recebidos=len(registros), bytes=len(conteudo),
