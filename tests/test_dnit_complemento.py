@@ -106,15 +106,17 @@ class DNITComplementoTest(unittest.TestCase):
                 self.assertIsNone(resolver())
                 self.assertIsNone(db.scalar(conn, 'SELECT numero_serie FROM EQUIPAMENTO WHERE id=?', (eid,)))
 
-    def test_online_usa_exportacao_da_pagina_e_valida_cabecalho(self):
-        with patch('coletor.exportacao_publica.baixar_xlsx', return_value=MULTAS.read_bytes()) as baixar:
+    def test_online_usa_api_sem_chromium_e_xlsx_local_valida_cabecalho(self):
+        corpo = (ROOT / 'tests/fixtures/dnit/equipamentos_api.geojson').read_bytes()
+        with patch.object(ColetorDNITEquipamentos, '_baixar', return_value=corpo) as baixar, patch(
+                'coletor.exportacao_publica.baixar_xlsx', side_effect=AssertionError('Nao usar navegador')):
             c = ColetorDNITEquipamentos()
             b, ext, mime, r = c.carregar(c.resolver_url())
-            self.assertEqual(len(r), 1655)
-            self.assertEqual(b, MULTAS.read_bytes())
-            baixar.assert_called_once_with(c.PAGINA, mostrar_tabela=True)
+            self.assertEqual(len(r), 3)
+            self.assertEqual((b, ext, mime), (corpo, '.geojson', 'application/geo+json'))
+            baixar.assert_called_once_with(c.URL_API)
         for b in (b'<html>erro</html>', PNCV.read_bytes()):
-            with patch('coletor.exportacao_publica.baixar_xlsx', return_value=b):
+            with patch.object(ColetorDNITEquipamentos, '_baixar', return_value=b):
                 with self.assertRaises(ValueError):
                     ColetorDNITEquipamentos().carregar(None)
 

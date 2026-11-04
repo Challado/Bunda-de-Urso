@@ -83,7 +83,7 @@ AGENDA_PADRAO = {
         "ativo": True,
     },
     "dnit_equipamentos": {
-        "rotulo": "DNIT Multas - series e registros Inmetro (exportacao publica)",
+        "rotulo": "DNIT Multas - series e registros Inmetro (API publica)",
         "conector": ColetorDNITEquipamentos,
         "intervalo_s": SEMANA,
         "url_direta": None,

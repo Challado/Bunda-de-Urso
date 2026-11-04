@@ -7,8 +7,8 @@ permissions:
   contents: read
 
 jobs:
-  exportacao:
-    name: Exportacao real do portal publico
+  coleta:
+    name: API publica real, sem Chromium
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     steps:
@@ -16,15 +16,9 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-      - run: npm ci --ignore-scripts --no-audit --no-fund
-      - run: npx playwright install --with-deps chromium
-      - name: Abrir portal e testar o coletor de producao sem acessar o servidor
-        run: node .github/scripts/diagnosticar_dnit.cjs
-      - name: Evidencias da pagina, rede e exportacao
+      - name: Baixar e validar GeoJSON pelo coletor de producao
+        run: python .github/scripts/diagnosticar_dnit.py
+      - name: Relatorio e dados recebidos da API publica
         if: always()
         uses: actions/upload-artifact@v4
         with:

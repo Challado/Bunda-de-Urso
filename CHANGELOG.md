@@ -1,5 +1,12 @@
 # Histórico de alterações
 
+## DNIT por HTTP direto — 04/11/2026
+
+- Coletor de equipamentos consulta a API pública GeoJSON usada pelo portal de multas, sem Chromium ou exportação `blob:`.
+- Mantém a identidade do recurso instalado, as junções por código DNIT e a importação de XLSX local; preserva os registros GeoJSON originais e a ordem longitude/latitude.
+- Recusa respostas vazias, esquemas alterados, códigos ausentes/duplicados e coordenadas inválidas, mantendo o tratamento de falhas e retentativas HTTP.
+- Workflow manual do DNIT usa o mesmo coletor por HTTP, salva GeoJSON e relatório e dispensa Node/Playwright/Chromium.
+
 ## Caixas aninhadas no status
 
 - Menus de fontes apresentados como caixas recolhíveis uma dentro da outra: Federal → estado → município → fonte → leitura.

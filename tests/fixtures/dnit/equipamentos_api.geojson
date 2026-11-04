@@ -1,0 +1,71 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -63.889707,
+          -8.777642
+        ]
+      },
+      "properties": {
+        "uf": "RO",
+        "id": 9005,
+        "codigo": "ROR26070037",
+        "tipo": 2,
+        "tipoNome": "Controlador Eletrônico de Velocidade",
+        "municipio": "PORTO VELHO",
+        "km": "714,250",
+        "rodovia": "364",
+        "inmetro": "11",
+        "serie": "FLISD0426A01121"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -67.794678,
+          -10.011417
+        ]
+      },
+      "properties": {
+        "uf": "AC",
+        "id": 8794,
+        "codigo": "ACB26040003",
+        "tipo": 1,
+        "tipoNome": "Redutor Eletrônico de Velocidade",
+        "municipio": "RIO BRANCO",
+        "km": "123,830",
+        "rodovia": "364",
+        "inmetro": "15030378",
+        "serie": "FLICD0426A01117"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -63.889539,
+          -8.741834
+        ]
+      },
+      "properties": {
+        "uf": "RO",
+        "id": 9160,
+        "codigo": "ROB26090048",
+        "tipo": 1,
+        "tipoNome": "Redutor Eletrônico de Velocidade",
+        "municipio": "PORTO VELHO",
+        "km": "141,446",
+        "rodovia": "319",
+        "inmetro": "12",
+        "serie": "FLICD0426A01115"
+      }
+    }
+  ]
+}

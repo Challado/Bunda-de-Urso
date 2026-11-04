@@ -1,5 +1,12 @@
 # Publicacoes DNIT usadas nos testes
 
+- `equipamentos_api.geojson`: recorte de tres registros da API publica
+  `https://servicos.dnit.gov.br/services-sior/portal-multas/pncv/equipamentos`,
+  consultada por HTTP em 04/11/2026 (1.682 registros na resposta integral).
+  Apenas `guidET`, referencia opaca de download do estudo, foi omitido no
+  recorte. Coordenadas GeoJSON em longitude/latitude, campos e identificadores
+  preservados. SHA-256 da resposta integral:
+  `ddee662bd4992c55ad0b44ce1015794da30d5a686758f2c759aaef574441bb09`.
 - `pncv_julho_2026.xlsx`: arquivo original coletado em 10/10/2026 pelo conector
   PNCV, preservado no repositorio privado de dados. SHA-256
   `770bdba412a6f52a74cab5f3b78b13eb86e89bfe5260548aebc1dd36cfdee664`.
@@ -11,8 +18,8 @@ Pagina da exportacao:
 <https://servicos.dnit.gov.br/multas/informacoes/equipamentos-fiscalizacao>.
 Fonte PNCV: <https://servicos.dnit.gov.br/dadosabertos/dataset/controle-de-velocidade>.
 
-Os arquivos sao integrais. Nao representam download online confirmado hoje:
-o portal retornou 503 nesta rede. A segunda publicacao tem ordem longitude/latitude,
+Os dois XLSX sao integrais e historicos; o GeoJSON e um recorte documentado.
+A exportacao XLSX tem ordem longitude/latitude,
 155 celulas de serie com `/` e registros Inmetro com lacunas/placeholders. Os
 registros ausentes de uma das listas nao sao declarados removidos. Nao usar estas
 fixtures automaticamente como fallback de producao para uma coleta nova.

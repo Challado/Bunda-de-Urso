@@ -2,65 +2,64 @@
 
 Pagina publica: <https://servicos.dnit.gov.br/multas/informacoes/equipamentos-fiscalizacao>.
 
-O arquivo `TabelaEquipamentosFiscalizacao.xlsx` fornecido pelo operador em
-22/10/2026 foi gerado por **SheetJS**, conforme as propriedades internas do XLSX.
-O navegador pode gerar um endereco `blob:` temporario; esse endereco nao serve
-como URL fixa de coleta. O conector abre a pagina publica em Chromium/Chrome e
-aciona sua exportacao Excel. Nao depende de Node, Playwright, login ou IA.
+## Coleta atual por HTTP direto — 04/11/2026
 
-**Limite da verificacao:** a pagina real retornou HTTP 503/timeout neste ambiente
-em 22/10/2026, inclusive pelo navegador. A exportacao automatizada foi validada
-com um download `blob:` real em pagina de teste e o arquivo enviado pelo operador;
-o download do portal DNIT ainda precisa ser confirmado em uma rede onde ele
-responda. Falha de acesso gera erro de coleta, sem trocar o snapshot bom por vazio
-e sem resolver verificacoes humanas. O exportador procura botoes/links visiveis
-de Excel/exportacao; mudanca na interface pode exigir ajuste.
+A API publica usada pela propria pagina fornece um GeoJSON:
 
-### Investigacao da coleta e da instalacao em 22/10
+<https://servicos.dnit.gov.br/services-sior/portal-multas/pncv/equipamentos>.
 
-O status publico do servidor, atualizado as 21:08 UTC, mostrou que o bootstrap
-de 21:06 UTC recusou o link `status-atualizacoes.json` na pasta web. Assim,
-o exportador corrigido anteriormente ainda nao estava instalado: o erro do
-DNIT continuava sendo a tentativa X-358 das 17:54 UTC, com timeout apos 90 s.
-A validacao do instalador foi corrigida para aceitar esse link apenas quando
-leva ao relatorio persistente configurado, incluindo a cadeia pelo diretorio
-do aplicativo. A verificacao de permissoes tambem o preserva durante a troca
-dos fontes. Outros destinos continuam recusados.
+O JavaScript do portal consulta essa URL e seu metodo `downloadTable()` gera
+`TabelaEquipamentosFiscalizacao.xlsx` com os mesmos registros. O conector
+`dnit_equipamentos` baixa o GeoJSON por `coletor.http`, usando os limites,
+retentativas e verificacao HTTPS existentes. Nao precisa de Chromium, Node,
+Playwright, login ou IA. A pagina antiga, se passada como origem, e resolvida
+para a API. XLSX e GeoJSON locais continuam aceitos pela mesma entrada.
 
-Ha uma etapa anterior a exportacao que o conector nao acionava: **Mostrar
-Tabela**. Esse fluxo foi identificado tambem em um
-[coletor publico independente](https://github.com/patarruda/if697_acidentesPRF/blob/HEAD/radares_scrapTable.py).
-Agora o conector DNIT abre a tabela antes de procurar o Excel. O teste com
-navegador real so disponibiliza a exportacao depois desse clique.
+Em 04/11/2026 a chamada por HTTP na rede configurada respondeu 200 com
+**1.682 registros**, todos com codigo preenchido e unico. Houve timeout antes
+do sucesso: a disponibilidade da origem continua sujeita a falhas de rede.
+Esse teste nao equivale a uma sincronizacao ja executada no servidor.
 
-O workflow manual `.github/workflows/dnit.yml` verifica o **portal real** em
-separado dos testes locais. Guarda captura de tela, controles visiveis, status
-de rede, falhas JavaScript e scripts publicos do proprio DNIT; executa o mesmo
-conector da instalacao e confere todas as linhas recebidas. O XLSX baixado
-fica no artefato, sem importar em producao. Falha externa reprova a verificacao;
-ela nunca usa a fixture como substituto de um download atual.
+A resposta precisa ser `FeatureCollection` nao vazia, com `Feature`, geometria
+`Point`, campos publicados, codigos unicos e coordenadas numericas validas no
+Brasil. HTML de erro, mudanca de esquema, dados vazios e coordenadas invertidas
+ou invalidas interrompem a coleta. Uma falha nao e substituida por fixture,
+arquivo antigo ou tentativa de exportacao pelo navegador.
 
-Resultado do [teste externo de 22/10, 21:13 UTC](https://github.com/Challado/Bunda-de-Urso/actions/runs/39855409278):
-o navegador do GitHub nao recebeu resposta HTTP do DNIT em 45 s; depois, o
-conector tambem esgotou seus 90 s durante a navegacao inicial. Nao houve HTML,
-script ou XLSX recebido. Portanto, a coleta online continua **nao confirmada**.
-Timeout de socket agora tambem inclui contexto no erro registrado, em vez de
-apenas `TimeoutError: timed out`; ha um teste com servidor que nao responde.
+O artefato bruto e o registro original preservam o GeoJSON, incluindo campos
+adicionais da origem. A normalizacao interpreta coordenadas GeoJSON em
+**longitude/latitude** e aplica as mesmas regras do XLSX para serie e registro
+Inmetro. As duas publicacoes continuam complementando-se pelo codigo DNIT;
+nenhum ponto ausente de uma edicao e removido ou declarado desativado.
 
-O teste Chromium no Actions tambem revelou uma corrida na inicializacao:
-`DevToolsActivePort` podia existir vazio ou com apenas a porta, causando
-`ValueError` antes de navegar. O coletor agora espera as duas linhas completas
-e validas dentro do prazo original. Um teste reproduz essas escritas parciais;
-o encerramento do processo continua garantido em caso de falha.
+O nome historico do recurso foi preservado para reutilizar seu ID, historico
+de execucoes e artefatos. URL, formato e status de integracao sao atualizados
+para a coleta da API, sem migracao de banco ou criacao de uma terceira fonte.
 
-Para permitir a complementacao sem depender dessa disponibilidade, a planilha
-exatamente como fornecida pelo operador fica em `importacoes/dnit/2026-10-22/`
-no repositorio privado, com manifesto de origem e SHA-256. O bootstrap aceita
-`--aplicar --dnit-arquivo CAMINHO.xlsx`: primeiro instala e verifica, depois
-importa pela API e registra a etapa. A opcao e explicita; nunca e acionada como
-substituto silencioso de um download. O teste do bootstrap importa as 1.655
-linhas sem rejeicoes e repete sem duplicacao. A data original da exportacao
-nao foi confirmada e nao e apresentada como uma consulta atual ao DNIT.
+## Validacao no GitHub Actions
+
+O workflow manual `.github/workflows/dnit.yml` executa
+`.github/scripts/diagnosticar_dnit.py` com o mesmo conector da instalacao,
+sem instalar navegador. Guarda o GeoJSON recebido e `coletor.json`, com URL,
+contagem, SHA-256, datas e erro em caso de falha. Nao escreve em banco real e
+nao troca erro de rede por uma fixture de sucesso.
+
+Os testes locais cobrem validacao do esquema e da ordem de coordenadas,
+independencia do navegador, XLSX local e complemento da PNCV sem duplicacao
+de pontos, instrumentos ou recursos.
+
+## Publicacoes historicas usadas nos testes
+
+O XLSX fornecido pelo operador em 22/10/2026 foi gerado por SheetJS. Sua URL
+`blob:` era temporaria e nao podia ser usada como arquivo fixo. O conector
+anterior acionava a exportacao pela pagina; em 04/11 o servidor registrava
+falha ao iniciar o Chromium (`chrome_crashpad_handler: --database is required`).
+A coleta atual elimina essa dependencia do DNIT.
+
+A planilha fornecida permanece em `importacoes/dnit/2026-10-22/` no repositorio
+privado, com manifesto e hash. O bootstrap continua aceitando a opcao explicita
+`--dnit-arquivo CAMINHO.xlsx`. Ela nao serve como substituto automatico de um
+download novo e nao e apresentada como consulta atual ao DNIT.
 
 ## Dados que se complementam
 
@@ -95,16 +94,16 @@ nao numero de certificado; a verificacao continua exigindo evidencia metrologica
 ## Coleta pelo ponto de entrada existente
 
 O recurso `dnit_equipamentos` entra na agenda semanal do `api.pse tick`, com
-vencimento independente da planilha PNCV. Para tentar imediatamente, como root:
+vencimento independente da planilha PNCV. Para tentar imediatamente, como root, na raiz da instalacao:
 
 ```sh
-/openclaw/bin/radar-api.pse sync --fonte dnit_equipamentos
+runuser -u www-data -- ./api.pse sync --fonte dnit_equipamentos
 ```
 
-Se o portal estiver indisponivel, um XLSX exportado pelo operador pode ser lido:
+Um XLSX ja exportado pelo operador pode ser importado explicitamente (o arquivo deve ficar dentro de `[dados] dir`):
 
 ```sh
-/openclaw/bin/radar-api.pse sync --fonte dnit_equipamentos --arquivo TabelaEquipamentosFiscalizacao.xlsx
+runuser -u www-data -- ./api.pse sync --fonte dnit_equipamentos --arquivo TabelaEquipamentosFiscalizacao.xlsx
 ```
 
 O instalador privado prepara Chromium quando nao encontra um navegador compativel.

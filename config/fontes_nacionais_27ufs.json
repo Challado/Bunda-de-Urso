@@ -349,8 +349,8 @@
       "nome": "DNIT Multas - Equipamentos de fiscalizacao (complemento do PNCV)",
       "url": "https://servicos.dnit.gov.br/multas/informacoes/equipamentos-fiscalizacao",
       "modulo": "dnit_equipamentos",
-      "estado_integracao": "parcial",
-      "nota_tecnica": "Exportacao SheetJS/blob por Chromium ou XLSX local. Formato e carga conjunta testados; acesso online retornou 503 neste ambiente em 22/10/2026."
+      "estado_integracao": "implementada",
+      "nota_tecnica": "API publica GeoJSON do portal: https://servicos.dnit.gov.br/services-sior/portal-multas/pncv/equipamentos. HTTP sem Chromium, com validacao e complemento do PNCV por codigo. XLSX local continua aceito. Download de 1.682 registros confirmado em 04/11/2026 pela rede configurada."
     }
   ],
   "fontes_adicionais": [

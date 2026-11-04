@@ -7,6 +7,8 @@ cujo NOME muda a cada publicacao (ex.: cgpert___pncv___07_2026.xlsx). Por isso
 NAO fixamos a URL do arquivo datado: perguntamos a API CKAN qual e o recurso
 mais recente. Aceita arquivo LOCAL (fixtures/testes sem rede) ou URL.
 """
+import json
+import math
 import os
 import re
 
@@ -185,37 +187,109 @@ class ColetorDNIT(ColetorBase):
 class ColetorDNITEquipamentos(ColetorDNIT):
     """Outra publicacao do MESMO orgao e codigo: fonte comum, recurso separado.
 
-    O XLSX e gerado pelo SheetJS no navegador (blob), portanto nao ha URL
-    compartilhavel do arquivo enviado. Aciona a exportacao publica ou le um
-    XLSX local exportado pelo operador. Nao substitui a planilha PNCV.
+    A API publica fornece o GeoJSON usado pelo portal para gerar seu XLSX.
+    Baixa os dados diretamente por HTTP, sem navegador. Tambem aceita os
+    arquivos GeoJSON e XLSX do operador. Nao substitui a planilha PNCV.
     """
     PAGINA = "https://servicos.dnit.gov.br/multas/informacoes/equipamentos-fiscalizacao"
+    URL_API = "https://servicos.dnit.gov.br/services-sior/portal-multas/pncv/equipamentos"
     RECURSO = {
+        # Nome preservado: e parte da chave do recurso ja instalado no banco.
         "nome": "DNIT Multas - Equipamentos de fiscalizacao (exportacao XLSX)",
-        "url_recurso": PAGINA, "formato_origem": "xlsx",
-        "periodicidade_segundos": 604800, "status_integracao": "parcial",
+        "url_recurso": URL_API, "formato_origem": "geojson|xlsx",
+        "periodicidade_segundos": 604800, "status_integracao": "ok",
     }
 
     @classmethod
     def resolver_url(cls):
-        return cls.PAGINA
+        return cls.URL_API
+
+    def garantir_referencias(self):
+        fonte_id, recurso_id = super().garantir_referencias()
+        campos = ("url_recurso", "formato_origem", "status_integracao")
+        valores = tuple(self.RECURSO[c] for c in campos)
+        atual = self.conn.execute(
+            "SELECT url_recurso, formato_origem, status_integracao "
+            "FROM RECURSO_FONTE WHERE id=?", (recurso_id,)).fetchone()
+        if tuple(atual) != valores:
+            self.conn.execute(
+                "UPDATE RECURSO_FONTE SET url_recurso=?, formato_origem=?, "
+                "status_integracao=? WHERE id=?", valores + (recurso_id,))
+            self.conn.commit()
+        return fonte_id, recurso_id
 
     def carregar(self, origem):
         if origem and os.path.isfile(origem):
             with open(origem, "rb") as arquivo:
                 corpo = arquivo.read()
         else:
-            from coletor.exportacao_publica import baixar_xlsx
-            corpo = baixar_xlsx(origem or self.PAGINA, mostrar_tabela=True)
+            url = self.URL_API if not origem or origem.rstrip("/") == self.PAGINA else origem
+            corpo = self._baixar(url)
         if not corpo.startswith(b"PK"):
-            raise ValueError("Exportacao DNIT nao e um XLSX")
+            registros = self._ler_geojson(corpo)
+            return corpo, ".geojson", "application/geo+json", registros
         linhas = pl.ler_xlsx(corpo)
         esperadas = {"Código do Equipamento", "Equipamento", "UF", "Município",
                      "Rodovia", "Km", "Coordenadas", "Registro INMETRO", "Nº de Série"}
         if not linhas or len(linhas[0]) != len(esperadas) or set(linhas[0]) != esperadas:
             raise ValueError("DNIT Multas alterou o cabecalho da exportacao")
         registros = pl.dicts_de_linhas(linhas)
+        self._validar_codigos(registros)
+        return corpo, ".xlsx", MIME_XLSX, registros
+
+    def _validar_codigos(self, registros):
         codigos = [str(self.identificador(r) or "").strip().upper() for r in registros]
         if not registros or not all(codigos) or len(set(codigos)) != len(codigos):
-            raise ValueError("Exportacao DNIT vazia ou com codigos ausentes/ambiguos")
-        return corpo, ".xlsx", MIME_XLSX, registros
+            raise ValueError("Publicacao DNIT vazia ou com codigos ausentes/ambiguos")
+
+    def _ler_geojson(self, corpo):
+        try:
+            documento = json.loads(corpo.decode("utf-8-sig"))
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise ValueError("API DNIT nao retornou GeoJSON valido") from exc
+        if not isinstance(documento, dict) or documento.get("type") != "FeatureCollection" \
+                or not isinstance(documento.get("features"), list):
+            raise ValueError("API DNIT alterou a estrutura FeatureCollection")
+        registros = documento["features"]
+        campos = {"codigo", "tipoNome", "uf", "municipio", "rodovia", "km", "inmetro", "serie"}
+        for indice, registro in enumerate(registros, 1):
+            if not isinstance(registro, dict) or registro.get("type") != "Feature":
+                raise ValueError("API DNIT: registro %d nao e Feature" % indice)
+            propriedades = registro.get("properties")
+            geometria = registro.get("geometry")
+            if not isinstance(propriedades, dict) or not campos.issubset(propriedades):
+                raise ValueError("API DNIT: campos obrigatorios ausentes no registro %d" % indice)
+            if not isinstance(geometria, dict) or geometria.get("type") != "Point":
+                raise ValueError("API DNIT: geometria Point ausente no registro %d" % indice)
+            coordenadas = geometria.get("coordinates")
+            if not isinstance(coordenadas, list) or len(coordenadas) < 2 \
+                    or any(isinstance(v, bool) or not isinstance(v, (int, float))
+                           or not math.isfinite(v) for v in coordenadas[:2]):
+                raise ValueError("API DNIT: coordenadas invalidas no registro %d" % indice)
+            lon, lat = coordenadas[:2]
+            if not (-34 <= lat <= 6 and -74 <= lon <= -34):
+                raise ValueError("API DNIT: coordenadas fora do Brasil no registro %d" % indice)
+        self._validar_codigos(registros)
+        return registros  # Feature original preservada no REGISTRO_FONTE.
+
+    def identificador(self, raw):
+        if raw.get("type") == "Feature":
+            return raw["properties"].get("codigo")
+        return super().identificador(raw)
+
+    def normalizar(self, idx, raw):
+        if raw.get("type") == "Feature":
+            propriedades = raw["properties"]
+            lon, lat = raw["geometry"]["coordinates"][:2]
+            # Mesma projecao de downloadTable() no portal. So a normalizacao
+            # usa essas colunas; o payload original continua integral no banco.
+            raw = {
+                "Código do Equipamento": propriedades["codigo"],
+                "Equipamento": propriedades["tipoNome"],
+                "UF": propriedades["uf"], "Município": propriedades["municipio"],
+                "Rodovia": propriedades["rodovia"], "Km": propriedades["km"],
+                "Coordenadas": "%s, %s" % (lon, lat),
+                "Registro INMETRO": propriedades["inmetro"],
+                "Nº de Série": propriedades["serie"],
+            }
+        return super().normalizar(idx, raw)
