@@ -290,6 +290,13 @@ def motor_banco():
     return motor
 
 
+def certificado_postgres():
+    """Use a CA do sistema com as versões de libpq que exigem um caminho."""
+    import ssl
+
+    return ssl.get_default_verify_paths().cafile or "system"
+
+
 def postgres():
     """Configuração do servidor. O libpq lê a senha de um arquivo privado."""
     import re
@@ -305,7 +312,7 @@ def postgres():
     ca = valor("postgres", "certificado_ca")[0]
     return dict(host=dados["host"], dbname=dados["banco"], user=dados["usuario"], port=porta,
                 esquema=esquema, passfile=arquivo, sslmode="verify-full",
-                sslrootcert=dentro_dados(ca, "postgres.certificado_ca") if ca else "system",
+                sslrootcert=dentro_dados(ca, "postgres.certificado_ca") if ca else certificado_postgres(),
                 connect_timeout=10)
 
 

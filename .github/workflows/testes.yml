@@ -72,7 +72,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: Instalar driver PostgreSQL
-        run: python -m pip install 'psycopg[binary]>=3.2,<4'
+        run: python -m pip install 'psycopg2-binary>=2.9.10,<3'
       - name: Testar migração, API, coleta e fila no PostgreSQL
         env:
           RADAR_TESTE_POSTGRES: host=127.0.0.1 port=${{ job.services.postgres.ports[5432] }} user=postgres dbname=postgres sslmode=disable

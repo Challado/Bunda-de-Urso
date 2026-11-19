@@ -15,7 +15,7 @@ O projeto é dividido em **duas partes independentes**:
 ## Stack
 
 - **Linguagem:** Python 3. A aplicação usa a biblioteca padrão. O migrador
-  PostgreSQL usa o driver opcional Psycopg.
+  PostgreSQL usa o driver opcional `psycopg2`.
 - **Banco:** relacional, com exigência de 3FN para o modelo canônico e
   [revisão das dependências](NORMALIZACAO_RELACIONAL.md). O motor é selecionado em `radar.conf`.
   A [migração para PostgreSQL](MIGRACAO_POSTGRES.md) prepara um esquema e

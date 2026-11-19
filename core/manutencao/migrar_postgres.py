@@ -47,7 +47,7 @@ def preparar_origem(origem, destino):
 
 
 def criar_esquema(conn, esquema):
-    from psycopg import errors, sql
+    from psycopg2 import errors, sql
 
     if conn.info.server_version < 120000:
         raise ErroMigracao("O migrador requer PostgreSQL 12 ou superior.")
@@ -122,20 +122,53 @@ def identificador_sqlite(nome):
     return '"' + nome.replace('"', '""') + '"'
 
 
+_ESCAPES_COPY = str.maketrans({"\\": r"\\", "\t": r"\t", "\r": r"\r", "\n": r"\n"})
+
+
+def _campo_copy(valor):
+    if valor is None:
+        return r"\N"
+    if isinstance(valor, bytes):
+        valor = r"\x" + valor.hex()
+    return str(valor).translate(_ESCAPES_COPY)
+
+
+class _FonteCopy:
+    """Entregue o COPY textual por blocos, mantendo só uma linha excedente."""
+
+    def __init__(self, linhas):
+        self.linhas = iter(linhas)
+        self.sobra = ""
+        self.lidas = 0
+
+    def read(self, tamanho):
+        partes = [self.sobra]
+        restante = tamanho - len(self.sobra)
+        while restante > 0:
+            linha = next(self.linhas, None)
+            if linha is None:
+                break
+            texto = "\t".join(map(_campo_copy, linha)) + "\n"
+            partes.append(texto)
+            restante -= len(texto)
+            self.lidas += 1
+        texto = "".join(partes)
+        self.sobra = texto[tamanho:]
+        return texto[:tamanho]
+
+
 def copiar_tabela(origem, destino, tabela, nome_sqlite, colunas):
-    from psycopg import Error, sql
+    from psycopg2 import Error, sql
 
     campos = ", ".join(map(identificador_sqlite, colunas))
     seletor = f"SELECT {campos} FROM {identificador_sqlite(nome_sqlite)}"
     alvo = sql.Identifier(tabela)
     comando = sql.SQL("COPY {} ({}) FROM STDIN").format(
         alvo, sql.SQL(", ").join(map(sql.Identifier, colunas)))
-    lidas = 0
+    fonte = _FonteCopy(origem.execute(seletor))
     try:
-        with destino.cursor().copy(comando) as copia:
-            for linha in origem.execute(seletor):
-                copia.write_row(tuple(linha))
-                lidas += 1
+        with destino.cursor() as cursor:
+            cursor.copy_expert(comando, fonte)
     except Error as exc:
         # O contexto de COPY inclui o conteúdo do campo. Exiba apenas a linha
         # e o nome da coluna, quando estiverem disponíveis.
@@ -145,16 +178,16 @@ def copiar_tabela(origem, destino, tabela, nome_sqlite, colunas):
         detalhe = f", linha {local[1]}" if local else ""
         if local and local[2]:
             detalhe += f", coluna {local[2]}"
-        raise ErroMigracao(f"Falha em {tabela}{detalhe} (SQLSTATE {exc.sqlstate or 'indisponível'}).") from exc
+        raise ErroMigracao(f"Falha em {tabela}{detalhe} (SQLSTATE {exc.pgcode or 'indisponível'}).") from exc
 
     gravadas, = destino.execute(sql.SQL("SELECT count(*) FROM {}").format(alvo)).fetchone()
-    if lidas != gravadas:
-        raise ErroMigracao(f"Contagens divergentes em {tabela}: {lidas} e {gravadas}.")
+    if fonte.lidas != gravadas:
+        raise ErroMigracao(f"Contagens divergentes em {tabela}: {fonte.lidas} e {gravadas}.")
     return gravadas
 
 
 def ajustar_sequencias(origem, destino, esquema):
-    from psycopg import sql
+    from psycopg2 import sql
 
     historico = {r[0].lower(): r[1] for r in origem.execute("SELECT name, seq FROM sqlite_sequence")}
     for tabela, coluna, sequencia in destino.execute("""
@@ -174,7 +207,7 @@ def ajustar_sequencias(origem, destino, esquema):
 
 
 def apagar_esquema_anterior(conn, esquema, tabelas):
-    from psycopg import errors, sql
+    from psycopg2 import errors, sql
 
     existe = conn.execute("SELECT to_regnamespace(%s) IS NOT NULL", (esquema,)).fetchone()[0]
     if not existe:
@@ -215,14 +248,14 @@ def apagar_esquema_anterior(conn, esquema, tabelas):
 
 
 def importar(origem, destino, esquema, simular=False, progresso=None, *, recriar=False):
-    from psycopg import sql
+    from psycopg2 import sql
 
     if not re.fullmatch(r"[a-z][a-z0-9_]{0,62}", esquema) or esquema.startswith("pg_"):
         raise ErroMigracao("Use um nome de esquema com até 63 letras minúsculas, dígitos ou _.")
     if recriar and esquema == "public":
         raise ErroMigracao("Use um esquema dedicado para o Radar, como radar_brasil.")
     nomes = tabelas_sqlite(origem)
-    with destino.transaction(force_rollback=simular):
+    with destino:
         if recriar:
             destino.execute("SET LOCAL lock_timeout TO '10s'")
             apagar_esquema_anterior(destino, esquema, nomes.keys())
@@ -252,6 +285,8 @@ def importar(origem, destino, esquema, simular=False, progresso=None, *, recriar
             destino.execute(sql.SQL("ALTER TABLE {} ENABLE TRIGGER {}").format(
                 sql.Identifier(tabela), sql.Identifier(gatilho)))
         ajustar_sequencias(origem, destino, esquema)
+        if simular:
+            destino.rollback()
     return totais
 
 
@@ -300,7 +335,7 @@ def ativar_configuracao(host, banco, usuario, porta, esquema, ca, senha, revisao
 
 @operacao_local
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__ + " Driver PostgreSQL: psycopg2.")
     parser.add_argument("--origem", default=config.DB_PATH,
                         help="arquivo SQLite existente, dentro de [dados] dir")
     parser.add_argument("--host", help="endereço do PostgreSQL")
@@ -321,9 +356,9 @@ def main(argv=None):
         parser.error("--recriar-destino exige --ativar.")
 
     try:
-        import psycopg
+        import psycopg2
     except ImportError:
-        print("Psycopg 3 indisponível no Python que executa api.pse: " + sys.executable, file=sys.stderr)
+        print("psycopg2 indisponível no Python que executa api.pse: " + sys.executable, file=sys.stderr)
         return 2
 
     try:
@@ -366,7 +401,7 @@ def main(argv=None):
             destino = db.connect_postgres(host=host, port=args.porta, dbname=banco,
                                           user=usuario, password=senha, connect_timeout=10,
                                           sslmode="verify-full", sslrootcert=ca)
-        except psycopg.OperationalError as exc:
+        except psycopg2.OperationalError as exc:
             raise ErroMigracao("Conexão recusada. Confira endereço, porta, credenciais "
                                "e certificado TLS do PostgreSQL.") from exc
         if not args.ativar:
@@ -405,7 +440,7 @@ def main(argv=None):
             if args.ativar:
                 try:
                     ativar_configuracao(host, banco, usuario, args.porta, args.esquema, ca, senha, revisao)
-                except (governanca.GovernancaError, psycopg.Error, OSError, ErroMigracao):
+                except (governanca.GovernancaError, psycopg2.Error, OSError, ErroMigracao):
                     print("Os dados foram copiados. Falhou a ativação automática. Confira radar.conf.",
                           file=sys.stderr)
                     return 1
@@ -420,9 +455,9 @@ def main(argv=None):
         print(f"Migração interrompida: {exc}", file=sys.stderr)
     except GetPassWarning:
         print("Migração interrompida: não foi possível ocultar a senha neste terminal.", file=sys.stderr)
-    except (sqlite3.Error, psycopg.Error, OSError) as exc:
+    except (sqlite3.Error, psycopg2.Error, OSError) as exc:
         # Evite mensagens de drivers com valores de linhas ou credenciais.
-        codigo = getattr(exc, "sqlstate", None) or getattr(exc, "sqlite_errorname", None)
+        codigo = getattr(exc, "pgcode", None) or getattr(exc, "sqlite_errorname", None)
         detalhe = f" ({codigo})" if codigo else ""
         print(f"Migração interrompida: {type(exc).__name__}{detalhe}.", file=sys.stderr)
     except (KeyboardInterrupt, EOFError):
