@@ -81,7 +81,7 @@ class TestOperacao(unittest.TestCase):
     ##-- BUNDITA DE URSO #{13} -- O sync sem arquivo deve resolver o recurso de dados, nao baixar HTML do catalogo. ##
     def test_antt_resolve_url_no_caminho_do_cli(self):
         coletor = ColetorANTT(conn=self.con)
-        with patch.object(coletor, "resolver_url", return_value="https://dados.antt.gov.br/radares.json"), \
+        with patch.object(coletor, "_descobrir_edicao", return_value=("atividades", ["https://dados.antt.gov.br/radares.json"])), \
                 patch.object(coletor, "_baixar", return_value=Path(ANTT_FIXTURE).read_bytes()) as baixar:
             _, _, _, registros = coletor.carregar(None)
         baixar.assert_called_once_with("https://dados.antt.gov.br/radares.json")

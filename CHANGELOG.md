@@ -1,5 +1,10 @@
 # Histórico de alterações
 
+## Descoberta das edições da ANTT
+
+- O coletor acompanha as atividades do conjunto de radares e segue o link da revisão mais recente. O catálogo CKAN também pode indicar a edição atual.
+- JSON e CSV da mesma edição podem ser usados na coleta. Uma falha na descoberta ou no arquivo fica no histórico de leituras e preserva os dados já publicados.
+
 ## Backup SQL do PostgreSQL
 
 - O backup PostgreSQL agora gera SQL compactado com a estrutura e os dados do esquema ativo. A restauração recria as tabelas em uma transação.

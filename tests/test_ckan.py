@@ -3,7 +3,6 @@
 import unittest
 
 from coletor.fontes import ckan
-from coletor.fontes.antt import ColetorANTT
 from coletor.fontes.recife import ColetorRecife
 
 BASE = "https://exemplo/dataset/x/resource/y/download/"
@@ -42,18 +41,6 @@ class TestCkan(unittest.TestCase):
         chave = ckan.versao_numerica()
         self.assertGreater(chave(type("M", (), {"groups": lambda self: ("2", "2027")})()),
                            chave(type("M", (), {"groups": lambda self: ("9", "2026")})()))
-
-    def test_fallback_antt_com_api_fora(self):
-        def explode(*a, **k):
-            raise RuntimeError("portal fora do ar")
-        orig = ckan.package_show
-        ckan.package_show = explode
-        try:
-            url = ColetorANTT.resolver_url()
-        finally:
-            ckan.package_show = orig
-        self.assertTrue(url.endswith(".json"))
-        self.assertIn("dados-dos-radares", url)
 
     def test_fallback_recife_com_api_fora(self):
         def explode(*a, **k):

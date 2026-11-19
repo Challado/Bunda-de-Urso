@@ -64,7 +64,7 @@ AGENDA_PADRAO = {
         "rotulo": "ANTT - radares em rodovias concedidas",
         "conector": ColetorANTT,
         "intervalo_s": HORA,
-        "url_direta": None,
+        "url_direta": ColetorANTT.URL_ATIVIDADES,
         "ativo": True,
     },
     "recife": {
