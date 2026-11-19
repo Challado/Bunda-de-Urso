@@ -1,5 +1,7 @@
 """Entrada real CGI/local, clientes legados e regressao dos atalhos ao banco."""
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
+import fcntl
 import importlib.util
 import json
 import os
@@ -8,10 +10,12 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from unittest.mock import patch
 
-from core import db
+from core import db, operacoes
 from core.manutencao import radar_admin
 from coletor import sync, tick
 
@@ -82,6 +86,56 @@ class TestEntradaApi(unittest.TestCase):
         self.assertNotIn("admin intruso criado", result.stdout)
         with closing(db.connect_readonly(self.banco)) as conn:
             self.assertEqual(conn.execute("SELECT count(*) FROM USUARIO").fetchone()[0], 0)
+
+    def test_pausa_aguarda_operacao_ativa_bloqueia_novas_e_libera_apos_erro(self):
+        dados = self.pasta / 'dados'
+        dados.mkdir()
+        conf = Path(self.env['RADAR_CONF'])
+        conf.write_text(conf.read_text().replace(f'dir = {self.pasta}\n', 'dir = dados\n'))
+        self.assertEqual(self.executar('ferramenta', 'inicializar_banco').returncode, 0)
+        web = dict(self.env, REQUEST_METHOD='GET', QUERY_STRING='rota=/health/ready')
+        iniciou = threading.Event()
+        encerrar = threading.Event()
+
+        def migrar():
+            with operacoes.pausar():
+                iniciou.set()
+                if not encerrar.wait(10):
+                    raise TimeoutError('O teste não liberou a migração.')
+                raise RuntimeError('falha simulada na migração')
+
+        with patch.dict(os.environ, {'RADAR_CONF': str(conf)}), ThreadPoolExecutor(max_workers=1) as executor:
+            try:
+                with operacoes.acompanhar():
+                    futuro = executor.submit(migrar)
+                    fd = os.open(self.pasta, os.O_RDONLY | os.O_DIRECTORY)
+                    try:
+                        limite = time.monotonic() + 5
+                        while time.monotonic() < limite:
+                            try:
+                                fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+                            except BlockingIOError:
+                                break
+                            fcntl.flock(fd, fcntl.LOCK_UN)
+                            time.sleep(0.05)
+                        else:
+                            self.fail('O migrador não bloqueou a entrada de novas operações.')
+                    finally:
+                        os.close(fd)
+                    self.assertFalse(iniciou.is_set())
+                    bloqueado = self.executar(env=web)
+                    self.assertIn('Status: 503', bloqueado.stdout)
+                    self.assertIn('Retry-After: 30', bloqueado.stdout)
+                    self.assertEqual(self.executar('ferramenta', 'inicializar_banco').returncode, 75)
+                    self.assertEqual(self.executar('cron', 'fila').returncode, 0)
+                    self.assertFalse((dados / 'fila-cadastros').exists())
+                self.assertTrue(iniciou.wait(5))
+                self.assertIn('Status: 503', self.executar(env=web).stdout)
+            finally:
+                encerrar.set()
+            with self.assertRaisesRegex(RuntimeError, 'falha simulada'):
+                futuro.result(timeout=5)
+        self.assertIn('Status: 200', self.executar(env=web).stdout)
 
     def test_operacoes_locais_recusam_entrada_direta(self):
         for main in (radar_admin.main, sync._main_servico, tick._main_servico):

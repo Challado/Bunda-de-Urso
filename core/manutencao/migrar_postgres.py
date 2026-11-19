@@ -3,7 +3,7 @@
 import argparse
 import os
 import shutil
-from contextlib import closing
+from contextlib import ExitStack, closing
 from getpass import GetPassWarning, getpass
 from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
@@ -13,7 +13,7 @@ import sys
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 import warnings
 
-from core import caminhos, config, db, governanca
+from core import caminhos, config, db, governanca, operacoes
 from core.contexto_api import operacao_local
 
 
@@ -266,7 +266,7 @@ def main(argv=None):
     modo = parser.add_mutually_exclusive_group()
     modo.add_argument("--simular", action="store_true", help="importe, valide e desfaça a transação")
     modo.add_argument("--ativar", action="store_true",
-                      help="após copiar, configure o PostgreSQL como banco ativo. Requer janela de manutenção")
+                      help="pause as gravações, copie os dados e ative o PostgreSQL")
 
     args = parser.parse_args(argv)
 
@@ -301,7 +301,7 @@ def main(argv=None):
             if not atual["gravavel"]:
                 raise ErroMigracao("A conta do serviço precisa poder gravar radar.conf para ativar.")
             revisao = atual["revisao"]
-            if input("Com as escritas do Radar pausadas, digite ATIVAR: ").strip() != "ATIVAR":
+            if input("Para pausar as gravações e migrar, digite ATIVAR: ").strip() != "ATIVAR":
                 raise ErroMigracao("Ativação cancelada.")
         host = (args.host or input("Servidor PostgreSQL: ")).strip()
         banco = (args.banco or input("Nome do banco PostgreSQL: ")).strip()
@@ -321,27 +321,39 @@ def main(argv=None):
                                "e certificado TLS do PostgreSQL.") from exc
         if not args.ativar:
             del senha
-        with closing(destino), TemporaryDirectory(prefix="migrar-postgres-", dir=config.DATA_DIR) as temp:
-            copia = Path(temp) / "origem.sqlite3"
-            print("Preparando cópia consistente do SQLite...", flush=True)
-            preparar_origem(origem, copia)
-            with closing(db.connect_sqlite_readonly(copia)) as fonte:
-                totais = importar(fonte, destino, args.esquema, simular=args.simular,
-                                  progresso=lambda t, n: print(f"{t}: {n} linhas", flush=True))
+        with closing(destino), ExitStack() as corte:
+            if args.ativar:
+                print("Pausando o Radar e aguardando as operações em andamento...", flush=True)
+                corte.enter_context(operacoes.pausar())
+                if configuracao.consultar()["revisao"] != revisao:
+                    raise ErroMigracao("radar.conf mudou antes da cópia. Execute novamente.")
+                # Reserve a escrita no SQLite também para conexões abertas antes
+                # da atualização do Radar. O backup continua podendo ler o WAL.
+                reserva = corte.enter_context(closing(db.connect_sqlite(origem.as_uri() + "?mode=rw", uri=True)))
+                reserva.execute("BEGIN IMMEDIATE")
+                print("Gravações pausadas.", flush=True)
+            with TemporaryDirectory(prefix="migrar-postgres-", dir=config.DATA_DIR) as temp:
+                copia = Path(temp) / "origem.sqlite3"
+                print("Preparando cópia consistente do SQLite...", flush=True)
+                preparar_origem(origem, copia)
+                with closing(db.connect_sqlite_readonly(copia)) as fonte:
+                    totais = importar(fonte, destino, args.esquema, simular=args.simular,
+                                      progresso=lambda t, n: print(f"{t}: {n} linhas", flush=True))
+            if args.ativar:
+                try:
+                    ativar_configuracao(host, banco, usuario, args.porta, args.esquema, ca, senha, revisao)
+                except (governanca.GovernancaError, psycopg.Error, OSError, ErroMigracao):
+                    print("Os dados foram copiados. Falhou a ativação automática. Confira radar.conf.",
+                          file=sys.stderr)
+                    return 1
+                finally:
+                    del senha
         estado = "Simulação validada e desfeita" if args.simular else "Migração concluída"
         print(f"{estado}. Esquema {args.esquema}: {len(totais)} tabelas, {sum(totais.values())} linhas.")
         if args.ativar:
-            try:
-                ativar_configuracao(host, banco, usuario, args.porta, args.esquema, ca, senha, revisao)
-            except (governanca.GovernancaError, psycopg.Error, OSError, ErroMigracao):
-                print("Os dados foram copiados. Falhou a ativação automática. Confira radar.conf.",
-                      file=sys.stderr)
-                return 1
-            finally:
-                del senha
-            print("PostgreSQL configurado para API, cron e operações locais.")
+            print("Radar liberado. API, cron e operações locais estão usando PostgreSQL.")
         return 0
-    except ErroMigracao as exc:
+    except (ErroMigracao, operacoes.OperacoesPausadas) as exc:
         print(f"Migração interrompida: {exc}", file=sys.stderr)
     except GetPassWarning:
         print("Migração interrompida: não foi possível ocultar a senha neste terminal.", file=sys.stderr)

@@ -18,10 +18,35 @@ FERRAMENTAS = frozenset((
 
 
 def main(argv=None):
-    if os.environ.get("GATEWAY_INTERFACE") or os.environ.get("REQUEST_METHOD"):
-        from web.nucleo import main as cgi
-        return cgi()
     argumentos = list(sys.argv[1:] if argv is None else argv)
+    cgi = bool(os.environ.get("GATEWAY_INTERFACE") or os.environ.get("REQUEST_METHOD"))
+    # O instalador coordena a publicação com instalacao.lock. A ferramenta de
+    # migração pausa a API depois de confirmar as credenciais do destino.
+    if not cgi and (argumentos[:1] == ["instalacao"] or
+                    argumentos[:2] == ["ferramenta", "migrar_postgres"]):
+        return _local(argumentos)
+
+    from . import operacoes
+
+    try:
+        with operacoes.acompanhar():
+            if cgi:
+                from web.nucleo import main as atender
+                return atender()
+            return _local(argumentos)
+    except operacoes.OperacoesPausadas as exc:
+        if cgi:
+            from web.nucleo import _emitir, _erro
+            status, headers, corpo = _erro(503, "manutencao", str(exc))
+            _emitir(status, {**headers, "Retry-After": "30", "Cache-Control": "no-store"}, corpo)
+            return 0
+        if argumentos[:1] == ["cron"]:
+            return 0
+        print(str(exc), file=sys.stderr)
+        return 75
+
+
+def _local(argumentos):
     with atendimento_local():
         if argumentos[:1] == ["fila"]:
             from .fila_cadastros import main as fila

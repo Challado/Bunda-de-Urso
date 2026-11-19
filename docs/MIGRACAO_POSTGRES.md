@@ -29,17 +29,18 @@ esquema ao final. O padrão é porta 5432 e esquema `radar_brasil`. Se necessár
 informe `--porta`, `--esquema` ou `--origem`. A origem escolhida precisa
 estar dentro de `[dados] dir`.
 
-Para a cópia definitiva, pause o cron do Radar e demais operações que escrevam
-no banco durante a janela de manutenção. Suspenda também o processamento de
-cadastros e o acesso de escrita da API. Confira que as operações em andamento
-terminaram. Execute:
+Para a cópia definitiva, execute:
 
 ```sh
 runuser -u www-data -- ./api.pse ferramenta migrar_postgres --ativar
 ```
 
-Digite `ATIVAR` quando solicitado. A ferramenta usa o backup consistente do
-SQLite, incluindo transações confirmadas no WAL, e aplica as migrações pendentes
+Digite `ATIVAR` quando solicitado. Depois de verificar a conexão, o migrador
+pausa as operações da API e do cron, aguarda as que já estavam em andamento
+e reserva a escrita no SQLite até mudar a configuração. O Radar volta a
+aceitar operações assim que a pausa é liberada, inclusive se a migração
+falhar. A ferramenta usa o backup consistente do SQLite, incluindo
+transações confirmadas no WAL, e aplica as migrações pendentes
 na cópia privada temporária. Ela valida as contagens por tabela e a integridade
 do novo esquema, preserva IDs e sequências e só muda `radar.conf` após conferir
 a conexão como a conta do serviço. Reserve espaço para a cópia temporária
@@ -59,8 +60,7 @@ runuser -u www-data -- ./api.pse ferramenta espelho_dados --backup pos-migracao
 ```
 
 O resultado indica `motor: postgres` e aponta para o backup nativo `.pgdump`,
-em `dados/backups/espelho-dados/`. Reative os crons e o acesso à API após a
-checagem. A fila JSON, os brutos, as chaves e os logs continuam no diretório de
+em `dados/backups/espelho-dados/`. A fila JSON, os brutos, as chaves e os logs continuam no diretório de
 dados do aplicativo. Nenhum componente usa o SQLite como fallback quando
 `[dados] motor = postgres`. O arquivo de origem fica como arquivo histórico,
 sem participação nas operações do Radar. Após a cópia, qualquer gravação nova
