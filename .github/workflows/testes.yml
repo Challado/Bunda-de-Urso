@@ -50,6 +50,34 @@ jobs:
       - name: Suíte de testes (com piso)
         run: python .github/scripts/rodar_suite.py
 
+  migracao-postgres:
+    name: Migração SQLite → PostgreSQL
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Instalar driver PostgreSQL
+        run: python -m pip install 'psycopg[binary]>=3.2,<4'
+      - name: Testar cópia, integridade e rollback
+        env:
+          RADAR_TESTE_POSTGRES: host=127.0.0.1 port=${{ job.services.postgres.ports[5432] }} user=postgres dbname=postgres sslmode=disable
+        run: python -m unittest tests.test_migrar_postgres -v
+
   rigido:
     name: Rígido (contratos e invariantes)
     runs-on: ubuntu-24.04

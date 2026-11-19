@@ -48,6 +48,22 @@ Uma sequência de números de série repetidos, por si só, não comprova viola�
 Não se declara `UNIQUE(numero_serie)` global, pois há séries ausentes, genéricas,
 reutilizadas por fabricantes diferentes e conflitos entre publicações.
 
+## Limites da avaliação de 3FN
+
+A 1FN orienta a separação de faixas, documentos e outros grupos repetidos.
+A 2FN orienta as associações com chave composta, como
+`VIA_UF(via_id, uf_sigla)`. A revisão de 3FN removeu, por exemplo, a
+dependência entre município e UF na cobertura municipal e entre artefato
+e recurso nas associações de snapshot. Essas verificações não certificam
+todas as dependências funcionais do sistema.
+
+Há redundâncias deliberadas que impedem classificar o banco inteiro como
+3FN estrita. `IDENTIFICADOR_EXTERNO.valor_normalizado` é derivado de
+`valor` e é armazenado para busca e unicidade. `TRASEIRO_EVENTO` guarda
+o documento e seu hash para verificação e intercâmbio. O payload bruto em
+`REGISTRO_FONTE` é um documento de auditoria com estrutura própria. Seus
+campos não substituem as relações canônicas usadas pelo sistema.
+
 ## Identidade na escrita
 
 O importador não restringe mais a busca de equipamento ao ponto atual. Reuso
@@ -79,8 +95,8 @@ não descartar divergências entre publicações do equipamento compartilhado.
 O instalador aplica as migrações 0004–0006 pela API e executa a reconciliação dos
 equipamentos com backup. Não exige apagar a base ou baixar tudo novamente.
 SQLite **3.35+** é necessário; o instalador confere isso antes de alterar a
-instalação. As duas DDLs são geradas juntas; a execução PostgreSQL ainda requer
-homologação própria, como o restante do projeto.
+instalação. As duas DDLs são geradas juntas; a [ferramenta de migração para PostgreSQL](MIGRACAO_POSTGRES.md)
+executa e valida a cópia nesse banco. O runtime continua usando SQLite.
 
 A reconciliação exige compatibilidade entre **todos** os membros do grupo.
 Casos ambíguos, natureza não oficial, atributos conflitantes, registros

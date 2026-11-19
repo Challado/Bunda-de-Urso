@@ -55,6 +55,13 @@ def connect_readonly(path):
     return connect(Path(path).resolve(strict=True).as_uri() + "?mode=ro", uri=True)
 
 
+def connect_postgres(**parametros):
+    """Conexao PostgreSQL opcional para as operacoes locais de migracao."""
+    import psycopg
+
+    return psycopg.connect(**parametros)
+
+
 def esquema_carregado(conn):
     """True se as tabelas canonicas ja existem (init_db e idempotente)."""
     row = conn.execute(

@@ -761,9 +761,10 @@ PG_TYPES = {
     "CHAR8": "CHAR(8)", "CHAR64": "CHAR(64)", "DATE": "DATE",
     "TS": "TIMESTAMPTZ", "TIME": "TIME", "INT": "INTEGER", "BIGINT": "BIGINT",
     "BOOL": "BOOLEAN",
-    "NUM10_7": "DECIMAL(10,7)", "NUM10_3": "DECIMAL(10,3)",
-    "NUM12_3": "DECIMAL(12,3)", "NUM6_2": "DECIMAL(6,2)",
-    "NUM5_4": "DECIMAL(5,4)",
+    # SQLite nao aplica a escala declarada em DECIMAL. Nao arredondar os
+    # valores ja armazenados ao transferi-los para PostgreSQL.
+    "NUM10_7": "NUMERIC", "NUM10_3": "NUMERIC", "NUM12_3": "NUMERIC",
+    "NUM6_2": "NUMERIC", "NUM5_4": "NUMERIC",
 }
 
 
@@ -827,7 +828,12 @@ def emit(dialect):
         "-- ON DELETE RESTRICT por padrao (dados historicos nao sofrem cascata).",
         "",
     ]
-    return "\n".join(header) + "\n\n".join(defs) + "\n" + VISOES + (RESTRICOES_SQLITE if dialect == "sqlite" else RESTRICOES_POSTGRES)
+    if dialect == "sqlite":
+        visoes, restricoes = VISOES, RESTRICOES_SQLITE
+    else:
+        visoes = VISOES.replace("CREATE VIEW IF NOT EXISTS", "CREATE OR REPLACE VIEW")
+        restricoes = RESTRICOES_POSTGRES
+    return "\n".join(header) + "\n\n".join(defs) + "\n" + visoes + restricoes
 
 
 RESTRICOES_POSTGRES = """

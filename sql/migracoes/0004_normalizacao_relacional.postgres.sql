@@ -1,10 +1,10 @@
 DO $$ DECLARE incoerente boolean;
 BEGIN
-IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='snapshot_recurso' AND column_name='recurso_id') THEN
+IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='snapshot_recurso' AND column_name='recurso_id') THEN
  EXECUTE 'SELECT EXISTS (SELECT 1 FROM SNAPSHOT_RECURSO s JOIN ARTEFATO_COLETA a ON a.id=s.artefato_id WHERE s.recurso_id<>a.recurso_id)' INTO incoerente;
  IF incoerente THEN RAISE EXCEPTION 'snapshot recurso diverge do artefato'; END IF;
 END IF;
-IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='execucao_coleta' AND column_name='artefato_id') THEN
+IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='execucao_coleta' AND column_name='artefato_id') THEN
  EXECUTE 'SELECT EXISTS (SELECT 1 FROM EXECUCAO_COLETA e JOIN ARTEFATO_COLETA a ON a.id=e.artefato_id WHERE e.recurso_id<>a.recurso_id)' INTO incoerente;
  IF incoerente THEN RAISE EXCEPTION 'execucao recurso diverge do artefato'; END IF;
 END IF;
@@ -19,7 +19,7 @@ CREATE TABLE SNAPSHOT_RECURSO_3FN (
 INSERT INTO SNAPSHOT_RECURSO_3FN SELECT snapshot_id, artefato_id FROM SNAPSHOT_RECURSO;
 DROP TABLE SNAPSHOT_RECURSO;
 ALTER TABLE SNAPSHOT_RECURSO_3FN RENAME TO SNAPSHOT_RECURSO;
-CREATE VIEW IF NOT EXISTS SNAPSHOT_RECURSO_DETALHE AS
+CREATE OR REPLACE VIEW SNAPSHOT_RECURSO_DETALHE AS
 SELECT s.snapshot_id, a.recurso_id, s.artefato_id
 FROM SNAPSHOT_RECURSO s LEFT JOIN ARTEFATO_COLETA a ON a.id=s.artefato_id;
 
@@ -29,12 +29,12 @@ CREATE TABLE IF NOT EXISTS EXECUCAO_ARTEFATO (
     artefato_id BIGINT NOT NULL REFERENCES ARTEFATO_COLETA(id) ON DELETE RESTRICT
 );
 DO $$ BEGIN
-IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='execucao_coleta' AND column_name='artefato_id') THEN
+IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='execucao_coleta' AND column_name='artefato_id') THEN
     EXECUTE 'INSERT INTO EXECUCAO_ARTEFATO SELECT id, artefato_id FROM EXECUCAO_COLETA WHERE artefato_id IS NOT NULL';
     ALTER TABLE EXECUCAO_COLETA DROP COLUMN artefato_id;
 END IF;
 END $$;
-CREATE VIEW IF NOT EXISTS EXECUCAO_COLETA_DETALHE AS
+CREATE OR REPLACE VIEW EXECUCAO_COLETA_DETALHE AS
 SELECT e.*, ea.artefato_id FROM EXECUCAO_COLETA e
 LEFT JOIN EXECUCAO_ARTEFATO ea ON ea.execucao_id=e.id;
 CREATE INDEX IF NOT EXISTS IX_EXECUCAO_ARTEFATO ON EXECUCAO_ARTEFATO(artefato_id, execucao_id);

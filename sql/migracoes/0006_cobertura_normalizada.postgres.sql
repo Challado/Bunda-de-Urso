@@ -6,7 +6,7 @@ INSERT INTO VALIDAR_COBERTURA_3FN SELECT CASE WHEN EXISTS
  THEN 0 ELSE 1 END;
 DROP TABLE VALIDAR_COBERTURA_3FN;
 UPDATE COBERTURA_FONTE SET uf_sigla=NULL WHERE municipio_id IS NOT NULL;
-CREATE VIEW IF NOT EXISTS COBERTURA_FONTE_DETALHE AS
+CREATE OR REPLACE VIEW COBERTURA_FONTE_DETALHE AS
 SELECT c.id, c.fonte_id, c.tipo_abrangencia, COALESCE(m.uf_sigla,c.uf_sigla) AS uf_sigla,
        c.municipio_id, c.via_id, c.vigencia_inicio, c.vigencia_fim, c.confirmada
 FROM COBERTURA_FONTE c LEFT JOIN MUNICIPIO m ON m.codigo_ibge=c.municipio_id;

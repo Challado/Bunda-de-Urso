@@ -14,11 +14,13 @@ O projeto é dividido em **duas partes independentes**:
 
 ## Stack
 
-- **Linguagem:** Python 3 (só stdlib — `urllib`, `sqlite3`, `csv`, `json`,
-  `xml.etree`). Sem pip, sem dependências externas.
-- **Banco:** relacional, com exigência de 3FN e [revisão das dependências](NORMALIZACAO_RELACIONAL.md). SQLite em produção; Postgres
-  suportado pela DDL gêmea. **Sem PostGIS** — a consulta geográfica usa
-  *bounding box* em SQL + distância Haversine na aplicação.
+- **Linguagem:** Python 3. A aplicação usa a biblioteca padrão. O migrador
+  PostgreSQL usa o driver opcional Psycopg.
+- **Banco:** relacional, com exigência de 3FN para o modelo canônico e
+  [revisão das dependências](NORMALIZACAO_RELACIONAL.md). SQLite em produção.
+  A [migração para PostgreSQL](MIGRACAO_POSTGRES.md) prepara um esquema e
+  valida a cópia das tabelas. A consulta geográfica usa *bounding box* em
+  SQL e distância Haversine na aplicação.
 - **Web:** **CGI** no padrão da casa — `fcgiwrap` + `nginx` executando um
   arquivo **`.pse`** (entry point fino); toda a lógica mora fora do webroot.
   **O que é `.pse`:** é só uma **extensão de arquivo** — a convenção histórica

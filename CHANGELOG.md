@@ -1,5 +1,11 @@
 # Histórico de alterações
 
+## Migrador interativo do SQLite para PostgreSQL
+
+- A ferramenta local `api.pse ferramenta migrar_postgres` pede dados de conexão e senha oculta. Transfere a base e o histórico para um esquema novo e valida a importação em transação.
+- O migrador preserva os IDs, as referências e a precisão decimal do SQLite. Recusa sobrescrita e permite simular a transferência com rollback.
+- A validação executa a importação contra PostgreSQL real. A API e as rotinas operacionais continuam usando SQLite.
+
 ## Inmetro: seleção de UFs na coleta automática — 04/11/2026
 
 - Corrige o bloqueio de `TODAS` pela validação de arquivos locais na API/cron. O seletor nacional e seus aliases são reconhecidos pelo conector; siglas de UF são resolvidas para as URLs oficiais.
