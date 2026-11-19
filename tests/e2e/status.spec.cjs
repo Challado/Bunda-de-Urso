@@ -154,3 +154,52 @@ test('fontes sem local ficam visiveis e multiplas localidades nao duplicam o tot
   await expect(page.locator('.leitor:visible')).toHaveCount(2);
   await expect(page.locator('#resumo-leitores')).toHaveText('1 de 2 leitores exibidos.');
 });
+
+test('contadores de erro filtram a arvore e permitem restaurar a exibicao',async({page})=>{
+  const resposta=await (await page.request.get('api.pse?rota=/api/v1/status/coletores')).json();
+  const {coletores}=resposta.resultado;
+  const antt=coletores.find(r=>r.conector==='antt');
+  const fortaleza=coletores.find(r=>r.conector==='amc_ce');
+  antt.estado='erro';
+  fortaleza.estado='interrompido';
+  coletores.push({...fortaleza,id:99993,fonte_id:99993,ativo:false,fonte:'Leitor inativo'});
+  resposta.resultado.total=coletores.length;
+  await page.route('**/api.pse?**',r=>new URL(r.request().url()).searchParams.get('rota')==='/api/v1/status/coletores'
+    ?r.fulfill({json:resposta}):r.continue());
+  await page.goto('status.html');
+
+  const brasil=page.locator('.territorio-federal');
+  const ce=page.locator('.estado-leitores[data-uf="CE"]');
+  const contador=brasil.locator(':scope > summary').getByRole('button',{name:'2 com erro'});
+  const filtro=page.getByRole('button',{name:'Só com erro'});
+  const leitores=page.locator('.leitor:visible');
+  const resumo=page.locator('#resumo-leitores');
+
+  await contador.focus();
+  await contador.press('Enter');
+  await expect(contador).toHaveAttribute('aria-pressed','true');
+  await expect(contador).toBeFocused();
+  await expect(brasil).toHaveAttribute('open','');
+  await expect(leitores).toHaveCount(2);
+  await expect(leitores.locator('summary')).toHaveText([/Erro na leitura/,/Leitura interrompida/]);
+  await expect(resumo).toHaveText(`2 de ${coletores.length} leitores exibidos.`);
+  await filtro.click();
+  await expect(filtro).toHaveAttribute('aria-pressed','false');
+  await expect(ce).not.toHaveAttribute('open');
+  await expect(resumo).toHaveText(`${coletores.length} de ${coletores.length} leitores exibidos.`);
+
+  const errosCe=ce.locator(':scope > summary').getByRole('button',{name:'1 com erro'});
+  await errosCe.click();
+  await expect(errosCe).toHaveAttribute('aria-pressed','true');
+  await expect(leitores).toHaveCount(1);
+  await expect(leitores).toContainText('Leitura interrompida');
+  await errosCe.click();
+  await expect(ce).not.toHaveAttribute('open');
+
+  await page.locator('#filtro-leitores').fill('erro');
+  await expect(leitores).toHaveCount(2);
+  await page.locator('#filtro-leitores').clear();
+  await filtro.click();
+  await expect(leitores).toHaveCount(2);
+  await expect(filtro).toHaveAttribute('aria-pressed','true');
+});

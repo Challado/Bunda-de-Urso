@@ -57,8 +57,13 @@
   }
   const normalizar = texto => String(texto||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim();
   const chaveLeitor = r => r.id != null ? 'recurso:'+r.id : 'conector:'+r.conector+':'+r.fonte+':'+r.recurso;
-  let filtroAnterior='',aberturaAntesFiltro=new Map();
+  const temErro = r => r.ativo && ['erro','interrompido'].includes(r.estado);
+  let filtroErros=null, haviaFiltro=false, aberturaAntesFiltro=new Map();
   function aberturas(){return new Map([...$('coletores').querySelectorAll('details[data-chave]')].map(n=>[n.dataset.chave,n.open]));}
+  function alternarFiltroErros(chave) {
+    filtroErros=filtroErros===chave?null:chave;
+    filtrar();
+  }
   function criarLeitor(r,local,prefixo){
         const box=el('details',null,'leitor'),s=el('summary'),u=r.ultima_tentativa;
         const documental=r.tipo_coleta==='documental';
@@ -83,8 +88,24 @@
   function grupo(chave,titulo,classe,ordem=0){
     const box=el('details',null,'grupo-leitores '+classe),s=el('summary');
     box.dataset.chave=chave;box.dataset.ordem=ordem;
-    box._resumo=el('span',null,'resumo-grupo');
-    s.append(el('span',titulo,'titulo-grupo'),box._resumo);
+    const resumo=el('span',null,'resumo-grupo');
+    const erros=el('button',null,'selo falha filtro-erros-grupo');
+    erros.type='button';
+    erros.title='Filtrar leitores com erro neste grupo';
+    erros.addEventListener('click',e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      alternarFiltroErros(chave);
+    });
+    box._selos={
+      total:el('span',null,'selo'),
+      ok:el('span',null,'selo ok'),
+      erros,
+      pendentes:el('span',null,'selo espera'),
+      desativados:el('span',null,'selo'),
+    };
+    resumo.append(...Object.values(box._selos));
+    s.append(el('span',titulo,'titulo-grupo'),resumo);
     box._corpo=el('div',null,'filhos-leitores');box._fontes=new Map();
     box.append(s,box._corpo);return box;
   }
@@ -152,29 +173,43 @@
     for(const r of leitores.values()){
       fontes.add(r.fonte_id??r.fonte);
       if(!r.ativo){desativados++;continue;}
-      if(['erro','interrompido'].includes(r.estado)){falhas++;continue;}
+      if(temErro(r)){falhas++;continue;}
       if(['ok','sem_mudanca'].includes(r.estado)&&r.tipo_coleta!=='documental'&&!r.leitura_atrasada&&!r.ultima_tentativa?.linhas_rejeitadas&&!r.erro_relatorio_coleta)ok++;
       else pendentes++;
     }
-    g._resumo.replaceChildren(el('span',numero(fontes.size)+' fonte(s) · '+numero(leitores.size)+' leitor(es)','selo'));
-    for(const [n,texto,cls] of [[ok,'OK','ok'],[falhas,'com erro','falha'],[pendentes,'pendente(s) / atenção','espera'],[desativados,'desativado(s)','']])if(n)g._resumo.append(el('span',numero(n)+' '+texto,'selo '+cls));
+    const selos=g._selos;
+    selos.total.textContent=numero(fontes.size)+' fonte(s) · '+numero(leitores.size)+' leitor(es)';
+    selos.erros.setAttribute('aria-pressed',String(filtroErros===g.dataset.chave));
+    for(const [selo,n,texto] of [[selos.ok,ok,'OK'],[selos.erros,falhas,'com erro'],[selos.pendentes,pendentes,'pendente(s) / atenção'],[selos.desativados,desativados,'desativado(s)']]){
+      selo.hidden=n===0;
+      selo.textContent=n?numero(n)+' '+texto:'';
+    }
     return leitores.size;
   }
   function filtrar() {
-    const termo=normalizar($('filtro-leitores').value);
-    if(termo&&!filtroAnterior)aberturaAntesFiltro=aberturas();
+    const termo=normalizar($('filtro-leitores').value).trim();
+    const buscaErros=['erro','com erro'].includes(termo);
+    const ativo=Boolean(termo||filtroErros);
+    if(ativo&&!haviaFiltro)aberturaAntesFiltro=aberturas();
+    const grupos=[...$('coletores').querySelectorAll('.grupo-leitores')];
+    const escopo=grupos.find(g=>g.dataset.chave===filtroErros);
     const visiveis=new Set(),todos=new Set();
     for(const item of $('coletores').querySelectorAll('.leitor')){
-      todos.add(item.dataset.leitor);item.hidden=!item.dataset.busca.includes(termo);
+      const corresponde=buscaErros||item.dataset.busca.includes(termo);
+      const estadoCorresponde=!(filtroErros||buscaErros)||temErro(item._leitor);
+      todos.add(item.dataset.leitor);item.hidden=!(corresponde&&estadoCorresponde&&(!filtroErros||escopo?.contains(item)));
       if(!item.hidden)visiveis.add(item.dataset.leitor);
     }
-    for(const grupo of [...$('coletores').querySelectorAll('.grupo-leitores')].reverse()){
-      const n=resumirGrupo(grupo);grupo.hidden=Boolean(termo&&!n);
-      if(termo&&n)grupo.open=true;
+    for(const grupo of grupos.reverse()){
+      const n=resumirGrupo(grupo);grupo.hidden=ativo&&!n;
+      if(ativo&&n)grupo.open=true;
     }
-    for(const p of $('coletores').querySelectorAll('.vazio-grupo'))p.hidden=Boolean(termo);
-    if(!termo&&filtroAnterior){for(const n of $('coletores').querySelectorAll('details[data-chave]'))n.open=aberturaAntesFiltro.get(n.dataset.chave)||false;}
-    filtroAnterior=termo;
+    for(const p of $('coletores').querySelectorAll('.vazio-grupo'))p.hidden=ativo;
+    if(!ativo&&haviaFiltro){
+      for(const n of $('coletores').querySelectorAll('details[data-chave]'))n.open=aberturaAntesFiltro.get(n.dataset.chave)??n.classList.contains('territorio-federal');
+    }
+    haviaFiltro=ativo;
+    $('filtro-erros')?.setAttribute('aria-pressed',String(Boolean(filtroErros)));
     $('sem-leitores').hidden=visiveis.size>0;
     $('resumo-leitores').textContent=numero(visiveis.size)+' de '+numero(todos.size)+' leitores exibidos.';
   }
@@ -218,6 +253,10 @@
   $('atualizar').addEventListener('click',atualizar);
   if(estado)$('mais').addEventListener('click',()=>carregarEstado(true));else {
     $('filtro-leitores').addEventListener('input',filtrar);
+    $('filtro-erros')?.addEventListener('click',()=>{
+      filtroErros=filtroErros?null:'federal';
+      filtrar();
+    });
     for(const [id,aberto] of [['expandir-leitores',true],['recolher-leitores',false]])$(id).addEventListener('click',()=>{
       for(const grupo of $('coletores').querySelectorAll('details:not([hidden])'))grupo.open=aberto;
     });
