@@ -155,6 +155,7 @@ Seções adicionais no modelo `deploy/radar.conf.exemplo`:
 |---|---|
 | `api` | `token_arquivo` (caminho, nunca o token), `max_body`, `proxies_confiaveis` |
 | `coleta` | `max_bytes`, `timeout`, `tentativas` |
+| `consultas` | regras por fonte e por URL para as consultas externas dos coletores |
 | `governanca` | correspondência por proximidade, bloqueios, submissões, sessão e PBKDF2 |
 | `geografia` | `malha` opcional |
 | `assistente` | URL e modelo do assistente usado em manutenção local |
@@ -162,6 +163,30 @@ Seções adicionais no modelo `deploy/radar.conf.exemplo`:
 Senhas, `RADAR_API_TOKEN` e a senha inicial de administração continuam credenciais
 separadas. Catálogos de fontes, malhas e tabelas de calibração distribuídos com o código
 são dados de referência, não configurações particulares do servidor.
+
+## Consultas externas dos coletores
+
+Em **Gestão → Configuração → Consultas externas**, adicione uma regra e escolha
+a fonte. Deixe o endereço em branco para aplicar à fonte inteira ou informe
+uma URL HTTPS ou seu prefixo para ajustar uma etapa específica. Use **Todas as
+fontes** para uma regra geral. Defina só os campos desejados. Um prefixo de URL
+mais específico prevalece e, no empate, vale a regra da fonte selecionada.
+
+- **Timeout (s)** limita a espera nas operações de rede HTTP. No Chromium,
+  limita a execução da consulta.
+- **Tentativas HTTP** ajusta as repetições em falhas transitórias.
+- **Limite da resposta** é medido em bytes.
+- **User-Agent** pode usar a identificação padrão do cliente, sortear um
+  User-Agent de navegador por execução da coleta ou enviar um valor personalizado.
+
+A ANTT usa pelo menos 60 segundos para atividades, revisão e catálogo e
+120 segundos para o arquivo por padrão. Para ajustar pelo terminal, use
+a seção abaixo no `radar.conf`. Mantenha o JSON das regras em uma linha.
+
+```ini
+[consultas]
+regras = [{"fonte":"antt","timeout":180,"tentativas":2},{"fonte":"antt","url":"https://dados.antt.gov.br/dataset/activity/radar","timeout":90,"user_agent":"sistema"}]
+```
 
 ## Atualização coordenada
 

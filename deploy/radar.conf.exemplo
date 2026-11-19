@@ -78,6 +78,11 @@ tentativas = 3
 # Tempo maximo em segundos para o atualizador esperar uma coleta em andamento.
 espera_atualizacao = 300
 
+[consultas]
+# Regras opcionais de timeout, tentativas HTTP, max_bytes e User-Agent.
+# Edite pela aba Gestão > Configuração > Consultas externas.
+regras = []
+
 [governanca]
 raio_correspondencia_m = 150
 raio_zona_sombra_m = 1000

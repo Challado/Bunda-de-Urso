@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core import config                                   # noqa: E402
 from core import db as dbmod                              # noqa: E402
 from core import atualizacoes                             # noqa: E402
-from coletor import agenda as agenda_mod                  # noqa: E402
+from coletor import agenda as agenda_mod, politica_http                  # noqa: E402
 
 
 def agora_utc():
@@ -180,52 +180,53 @@ def executar(db_path=None, agora=None, forcar=None, arquivos=None,
                                    "origem": arquivos.get(chave) or item.get("url_direta"),
                                    "origem_a_resolver": not bool(arquivos.get(chave) or item.get("url_direta"))})
                 continue
-            origem = arquivos.get(chave) or item.get("url_direta")
-            if origem is None:
-                resolver = getattr(item["conector"], "resolver_url", None)
-                if callable(resolver):
-                    try:
-                        origem = resolver()
-                    except Exception as exc:            # noqa: BLE001
-                        import traceback
-                        atualizacoes.evento("resolver_url.erro", fonte=chave, erro=str(exc), traceback=traceback.format_exc())
-                        resultados.append({
-                            "fonte": chave, "acao": "erro",
-                            "tipo": type(exc).__name__,
-                            "detalhe": "resolver_url: " + str(exc)[:160]})
-                        continue
-            if origem is None:
-                resultados.append({
-                    "fonte": chave, "acao": "pulado",
-                    "motivo": "sem_origem"})
-                continue
-            conector = item["conector"](conn=conn)
-            try:
-                resumo = conector.sincronizar(origem)
-                resultado = {
-                    "fonte": chave, "acao": "erro" if resumo.get("status") == "erro" else "executado",
-                    "motivo": diag["motivo"], "criados": resumo["criados"],
-                    "rejeitados": resumo["rejeitados"],
-                    "recebidos": resumo["linhas_recebidas"]}
-                # Gancho pos-coleta: so roda se a coleta deu certo. Erro no
-                # gancho NAO derruba a coleta (fica registrado no resultado).
-                spec = item.get("pos_coleta")
-                ##-- BUNDITA DE URSO #{9} -- Nao executar pos-coleta sobre lote vazio ou rejeitado. ##
-                if spec and resumo.get("status", "ok") in ("ok", "sem_mudanca", "documentado"):
-                    try:
-                        resultado["pos_coleta"] = _resolver_pos_coleta(spec)(conn)
-                    except Exception as exc:               # noqa: BLE001
-                        import traceback
-                        atualizacoes.evento("pos_coleta.erro", fonte=chave, erro=str(exc), traceback=traceback.format_exc())
-                        resultado["pos_coleta_erro"] = {
-                            "tipo": type(exc).__name__, "detalhe": str(exc)[:200]}
-                resultados.append(resultado)
-            except Exception as exc:                       # noqa: BLE001
-                import traceback
-                atualizacoes.evento("fonte.erro", fonte=chave, erro=str(exc), traceback=traceback.format_exc())
-                resultados.append({
-                    "fonte": chave, "acao": "erro",
-                    "tipo": type(exc).__name__, "detalhe": str(exc)[:200]})
+            with politica_http.fonte(chave):
+                origem = arquivos.get(chave) or item.get("url_direta")
+                if origem is None:
+                    resolver = getattr(item["conector"], "resolver_url", None)
+                    if callable(resolver):
+                        try:
+                            origem = resolver()
+                        except Exception as exc:            # noqa: BLE001
+                            import traceback
+                            atualizacoes.evento("resolver_url.erro", fonte=chave, erro=str(exc), traceback=traceback.format_exc())
+                            resultados.append({
+                                "fonte": chave, "acao": "erro",
+                                "tipo": type(exc).__name__,
+                                "detalhe": "resolver_url: " + str(exc)[:160]})
+                            continue
+                if origem is None:
+                    resultados.append({
+                        "fonte": chave, "acao": "pulado",
+                        "motivo": "sem_origem"})
+                    continue
+                conector = item["conector"](conn=conn)
+                try:
+                    resumo = conector.sincronizar(origem)
+                    resultado = {
+                        "fonte": chave, "acao": "erro" if resumo.get("status") == "erro" else "executado",
+                        "motivo": diag["motivo"], "criados": resumo["criados"],
+                        "rejeitados": resumo["rejeitados"],
+                        "recebidos": resumo["linhas_recebidas"]}
+                    # Gancho pos-coleta: so roda se a coleta deu certo. Erro no
+                    # gancho NAO derruba a coleta (fica registrado no resultado).
+                    spec = item.get("pos_coleta")
+                    ##-- BUNDITA DE URSO #{9} -- Nao executar pos-coleta sobre lote vazio ou rejeitado. ##
+                    if spec and resumo.get("status", "ok") in ("ok", "sem_mudanca", "documentado"):
+                        try:
+                            resultado["pos_coleta"] = _resolver_pos_coleta(spec)(conn)
+                        except Exception as exc:               # noqa: BLE001
+                            import traceback
+                            atualizacoes.evento("pos_coleta.erro", fonte=chave, erro=str(exc), traceback=traceback.format_exc())
+                            resultado["pos_coleta_erro"] = {
+                                "tipo": type(exc).__name__, "detalhe": str(exc)[:200]}
+                    resultados.append(resultado)
+                except Exception as exc:                       # noqa: BLE001
+                    import traceback
+                    atualizacoes.evento("fonte.erro", fonte=chave, erro=str(exc), traceback=traceback.format_exc())
+                    resultados.append({
+                        "fonte": chave, "acao": "erro",
+                        "tipo": type(exc).__name__, "detalhe": str(exc)[:200]})
         _registrar_estado_recursos(conn, agenda, resultados)
     finally:
         conn.close()

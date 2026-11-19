@@ -24,20 +24,6 @@ def fx(nome):
     return os.path.join(FIXTURES, nome)
 
 
-class _FakeResp(object):
-    def __init__(self, dados):
-        self._d = dados if isinstance(dados, bytes) else dados.encode("utf-8")
-
-    def read(self, *a):
-        return self._d
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *a):
-        return False
-
-
 # ==========================================================================
 # F04 DNIT
 # ==========================================================================
@@ -165,13 +151,13 @@ class TestDERPR(unittest.TestCase):
     def test_resolver_url_descobre_pdf_e_fallback(self):
         html = ('<html><body><p><a href="/x/fixos_240326.pdf">'
                 'Rela&ccedil;&atilde;o de Radares</a></p></body></html>')
-        with mock.patch("urllib.request.urlopen",
-                        return_value=_FakeResp(html)):
+        with mock.patch("coletor.http.baixar",
+                        return_value=(html.encode(), {}, ColetorDERPR.PAGINA_FIXO)):
             url = ColetorDERPR.resolver_url()
         self.assertTrue(url.endswith("fixos_240326.pdf"))
         self.assertTrue(url.endswith(".pdf"))
 
-        with mock.patch("urllib.request.urlopen",
+        with mock.patch("coletor.http.baixar",
                         side_effect=RuntimeError("fora")):
             url = ColetorDERPR.resolver_url()
         self.assertEqual(url, ColetorDERPR.URL_FALLBACK)
@@ -215,12 +201,12 @@ class TestDERMG(unittest.TestCase):
         self.assertIn("Serie(s): R09802 R13744", d["observacoes"])
 
     def test_resolver_url_pagina_e_arquivo(self):
-        with mock.patch("urllib.request.urlopen",
+        with mock.patch("coletor.http.baixar",
                         side_effect=RuntimeError("fora")):
             self.assertEqual(ColetorDERMG.resolver_url(), ColetorDERMG.PAGINA)
         html = '<a href="/arq/radares_2026.pdf">baixar</a>'
-        with mock.patch("urllib.request.urlopen",
-                        return_value=_FakeResp(html)):
+        with mock.patch("coletor.http.baixar",
+                        return_value=(html.encode(), {}, ColetorDERMG.PAGINA)):
             url = ColetorDERMG.resolver_url()
         self.assertTrue(url.endswith("radares_2026.pdf"))
 

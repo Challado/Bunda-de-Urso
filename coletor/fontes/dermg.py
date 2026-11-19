@@ -12,10 +12,9 @@ Aceita arquivo LOCAL (HTML de fixture) ou baixa a pagina.
 """
 import os
 import re
+from urllib.parse import urljoin
 import unicodedata
-import urllib.request
 
-from core import config
 from coletor import http
 from coletor.base import ColetorBase
 from coletor.fontes import normalizacao as nz
@@ -79,15 +78,12 @@ class ColetorDERMG(ColetorBase):
         """URL do recurso. Se a pagina expuser um arquivo (xlsx/csv/pdf),
         devolve esse arquivo; senao a propria pagina (fonte do dado)."""
         try:
-            req = urllib.request.Request(
-                cls.PAGINA, headers={"User-Agent": config.USER_AGENT})
-            with urllib.request.urlopen(
-                    req, timeout=config.DEFAULT_TIMEOUT) as resp:
-                html = resp.read().decode("utf-8", "replace")
+            conteudo, _, url_final = http.baixar(cls.PAGINA)
+            html = conteudo.decode("utf-8", "replace")
             for m in re.finditer(
                     r'href="([^"]+\.(?:xlsx|xls|csv|pdf))"', html, re.I):
                 if "radar" in m.group(1).lower():
-                    return m.group(1)
+                    return urljoin(url_final, m.group(1))
         except Exception:                                  # noqa: BLE001
             pass
         return cls.URL_FALLBACK

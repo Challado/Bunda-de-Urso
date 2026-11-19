@@ -7,12 +7,14 @@ redirects salto-a-salto (>5 falha, 303 -> GET), HTTP 304, retry com
 Retry-After, corte por max_bytes e corpo vazio.
 """
 import io
+import json
 import unittest
 from unittest import mock
 
 import urllib.error
 
-from coletor import http
+from coletor import http, politica_http
+from core import caminhos, config
 
 URL = "https://exemplo.org/arquivo.bin"
 
@@ -120,6 +122,25 @@ class TestBaixar(unittest.TestCase):
         # cabeçalhos condicionais enviados
         self.assertEqual(chamadas[0][0].get_header("If-none-match"), "abc")
 
+    def test_politica_aplica_timeout_e_user_agent_e_repete_leitura_lenta(self):
+        class Lenta(_Resp):
+            def read(self, n=-1):
+                raise TimeoutError("leitura lenta")
+
+        abrir, chamadas = _roteiro([Lenta(), _Resp(200, b"ok"), _Resp(200, b"outro")])
+        regras = json.dumps([{"fonte": "antt", "url": URL, "timeout": 120,
+                             "tentativas": 2, "user_agent": "aleatorio"}])
+        with (mock.patch.object(caminhos, "valor", return_value=(regras, "teste")),
+              mock.patch.object(http, "_abrir", abrir), mock.patch.object(http, "_dormir")):
+            with politica_http.fonte("antt"):
+                self.assertEqual(http.baixar(URL, timeout=60)[0], b"ok")
+            with politica_http.fonte("dnit"):
+                self.assertEqual(http.baixar(URL, timeout=40)[0], b"outro")
+        self.assertEqual([c[1] for c in chamadas], [120, 120, 40])
+        agentes = [c[0].get_header("User-agent") for c in chamadas]
+        self.assertIn(agentes[0], politica_http.AGENTES)
+        self.assertEqual(agentes, [agentes[0], agentes[0], config.USER_AGENT])
+
     def test_https_obrigatorio_sem_rede(self):
         def abrir(*a, **k):
             raise AssertionError("nao deveria chamar a rede")
@@ -147,6 +168,13 @@ class TestBaixar(unittest.TestCase):
         self.assertEqual(chamadas[0][0].get_method(), "POST")
         self.assertEqual(chamadas[1][0].get_method(), "GET")
         self.assertIsNone(chamadas[1][0].data)
+
+    def test_redirecionamento_pode_ser_recusado_sem_abrir_o_destino(self):
+        abrir, chamadas = _roteiro([_erro(URL, 302, {"Location": "https://outro.example.org/"})])
+        with mock.patch.object(http, "_abrir", abrir):
+            with self.assertRaisesRegex(http.ErroFonte, "Redirecionamento não permitido"):
+                http.baixar(URL, seguir_redirects=False)
+        self.assertEqual(len(chamadas), 1)
 
     def test_304_nao_modificado_sem_retry(self):
         abrir, chamadas = _roteiro([

@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core import config                                   # noqa: E402
 from core import atualizacoes                             # noqa: E402
+from coletor import politica_http
 from coletor.agenda import AGENDA_PADRAO                 # noqa: E402
 
 FONTES = {chave: cfg["conector"] for chave, cfg in AGENDA_PADRAO.items()}
@@ -42,7 +43,8 @@ def _main_servico(argv=None):
 
     classe = FONTES[args.fonte]
     coletor = classe(db_path=args.db or config.DB_PATH)
-    with atualizacoes.acompanhar("sync", fonte=args.fonte, origem=args.arquivo) as registro:
+    with (politica_http.fonte(args.fonte),
+          atualizacoes.acompanhar("sync", fonte=args.fonte, origem=args.arquivo) as registro):
         resumo = coletor.sincronizar(args.arquivo, publicar=not args.sem_publicar)
         # Os detalhes por registro continuam no banco; o diario guarda contadores.
         registro.terminar(1 if resumo.get("status") == "erro" else 0,

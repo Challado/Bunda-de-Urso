@@ -41,8 +41,10 @@ import urllib.error                      # noqa: E402
 import urllib.parse                      # noqa: E402
 import urllib.request                    # noqa: E402
 from datetime import datetime, timezone  # noqa: E402
+from http.client import HTTPException    # noqa: E402
 
 from core import config                  # noqa: E402
+from coletor import politica_http        # noqa: E402
 
 __all__ = ("ErroFonte", "NaoModificado", "ErroRetentavel", "url_checada",
            "baixar")
@@ -199,7 +201,7 @@ def _status_de(resp):
 # baixar
 # --------------------------------------------------------------------------
 def _uma_tentativa(url, etag, last_modified, method, data, timeout, limite,
-                   verificar_ssl, headers=None):
+                   verificar_ssl, headers=None, seguir_redirects=True):
     cabecalhos = {
         "User-Agent": config.USER_AGENT,
         "Accept": ("application/json,text/csv,text/html,application/xml,"
@@ -230,7 +232,7 @@ def _uma_tentativa(url, etag, last_modified, method, data, timeout, limite,
             recebidos = exc.headers if exc.headers is not None else {}
             _fechar(exc)
             alvo, metodo, corpo_envio = _tratar_erro_http(
-                status, recebidos, alvo, metodo, corpo_envio)
+                status, recebidos, alvo, metodo, corpo_envio, seguir_redirects)
             continue
         except urllib.error.URLError as exc:
             raise ErroRetentavel("Falha de rede em %s: %s" % (alvo, exc.reason))
@@ -243,11 +245,14 @@ def _uma_tentativa(url, etag, last_modified, method, data, timeout, limite,
             if status in (301, 302, 303, 307, 308):
                 recebidos = getattr(resp, "headers", None) or {}
                 alvo, metodo, corpo_envio = _tratar_erro_http(
-                    status, recebidos, alvo, metodo, corpo_envio)
+                    status, recebidos, alvo, metodo, corpo_envio, seguir_redirects)
                 continue
             if status >= 400:
                 raise ErroFonte("HTTP %d em %s" % (status, alvo))
-            corpo = _ler_corpo(resp, limite)
+            try:
+                corpo = _ler_corpo(resp, limite)
+            except (OSError, HTTPException) as exc:
+                raise ErroRetentavel("Falha ao ler %s: %s" % (alvo, exc)) from exc
             if not corpo:
                 raise ErroFonte("HTTP %d com corpo vazio em %s"
                                 % (status, alvo))
@@ -267,13 +272,15 @@ def _uma_tentativa(url, etag, last_modified, method, data, timeout, limite,
                     % url)
 
 
-def _tratar_erro_http(status, recebidos, alvo, metodo, corpo_envio):
+def _tratar_erro_http(status, recebidos, alvo, metodo, corpo_envio, seguir_redirects=True):
     """Decide o que fazer com um status nao-2xx; devolve (alvo, metodo, corpo).
 
     Para redirecionamentos devolve o novo alvo; caso contrario levanta a
     excecao apropriada.
     """
     if status in (301, 302, 303, 307, 308):
+        if not seguir_redirects:
+            raise ErroFonte("Redirecionamento não permitido em %s" % alvo)
         destino = recebidos.get("Location") if hasattr(recebidos, "get") \
             else None
         if not destino:
@@ -294,35 +301,43 @@ def _tratar_erro_http(status, recebidos, alvo, metodo, corpo_envio):
 
 
 def baixar(url, etag=None, last_modified=None, method="GET", data=None,
-           timeout=None, max_bytes=None, verificar_ssl=True, headers=None):
+           timeout=None, max_bytes=None, verificar_ssl=True, headers=None,
+           seguir_redirects=True, tentativas=None):
     """Baixa ``url`` e devolve ``(corpo, headers, url_final)``.
 
-    Repete em falhas transitorias (429/5xx/rede) ate 3 tentativas, respeitando
+    Repete falhas transitorias (429/5xx/rede) conforme a configuracao, respeitando
     ``Retry-After`` e backoff exponencial.  HTTP 304 levanta
     :class:`NaoModificado`; qualquer outra falha levanta :class:`ErroFonte`.
     """
     url_checada(url)
     # Somente cabecalhos de publicacao publica; nao aceita cookies/credenciais.
-    permitidos = {"accept": "Accept", "content-type": "Content-Type",
+    permitidos = {"accept": "Accept", "content-type": "Content-Type", "user-agent": "User-Agent",
                   "x-powerbi-resourcekey": "X-PowerBI-ResourceKey"}
     extras = {}
     for chave, valor in (headers or {}).items():
         if chave.lower() not in permitidos or not isinstance(valor, str) or "\n" in valor or "\r" in valor:
             raise ErroFonte("Cabecalho HTTP nao permitido")
         extras[permitidos[chave.lower()]] = valor
-    limite = int(max_bytes) if max_bytes is not None else MAX_BYTES_PADRAO
-    tempo = float(timeout) if timeout is not None \
-        else float(config.DEFAULT_TIMEOUT)
-    tentativas = max(1, int(getattr(config, "DEFAULT_TENTATIVAS", 3)))
+    opcoes = politica_http.ajustes(
+        url, timeout=timeout if timeout is not None else config.DEFAULT_TIMEOUT,
+        max_bytes=max_bytes if max_bytes is not None else MAX_BYTES_PADRAO,
+        tentativas=tentativas if tentativas is not None else config.DEFAULT_TENTATIVAS)
+    tempo, limite = float(opcoes["timeout"]), int(opcoes["max_bytes"])
+    tentativas = max(1, int(opcoes["tentativas"]))
+    if opcoes["user_agent"]:
+        extras["User-Agent"] = opcoes["user_agent"]
+    from core import atualizacoes
+
+    atualizacoes.evento("http.consulta", url=url, fonte=opcoes["fonte"], timeout=tempo,
+                       tentativas=tentativas, max_bytes=limite, modo_user_agent=opcoes["modo_user_agent"])
     ultimo = None
     for tentativa in range(tentativas):
         try:
             return _uma_tentativa(url, etag, last_modified, method, data,
-                                  tempo, limite, verificar_ssl, extras)
+                                  tempo, limite, verificar_ssl, extras, seguir_redirects)
         except NaoModificado:
             raise
         except ErroRetentavel as exc:
-            from core import atualizacoes
             atualizacoes.registrar("http", {"etapa": "tentativa.erro", "url": url,
                                            "tentativa": tentativa + 1, "max_tentativas": tentativas,
                                            "erro": str(exc), "tipo": type(exc).__name__})
@@ -334,7 +349,6 @@ def baixar(url, etag=None, last_modified=None, method="GET", data=None,
                 else min(15, 2 ** tentativa)
             _dormir(espera)
         except ErroFonte as exc:
-            from core import atualizacoes
             atualizacoes.registrar("http", {"etapa": "tentativa.erro", "url": url,
                                            "tentativa": tentativa + 1, "erro": str(exc), "tipo": type(exc).__name__})
             atualizacoes.evento("http.erro", url=url, tentativa=tentativa + 1, erro=str(exc))

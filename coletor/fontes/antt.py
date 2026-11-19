@@ -12,7 +12,7 @@ import os
 import re
 from urllib.parse import parse_qs, unquote, urljoin, urlsplit
 
-from core import atualizacoes
+from core import atualizacoes, config
 from coletor import http
 from coletor.base import ColetorBase
 from coletor.fontes import ckan, normalizacao as nz
@@ -83,7 +83,7 @@ class ColetorANTT(ColetorBase):
 
     @classmethod
     def _links_da_pagina(cls, pagina):
-        corpo, _, url_final = http.baixar(pagina, timeout=12)
+        corpo, _, url_final = http.baixar(pagina, timeout=max(60, config.DEFAULT_TIMEOUT))
         parser = _Links()
         parser.feed(corpo.decode("utf-8", "replace"))
         parser.close()
@@ -135,7 +135,8 @@ class ColetorANTT(ColetorBase):
     def _descobrir_edicao(cls):
         origens = (
             ("atividades", cls._recursos_atividade),
-            ("api_ckan", lambda: ckan.package_show(cls.CKAN_BASE, cls.CKAN_DATASET, timeout=12)),
+            ("api_ckan", lambda: ckan.package_show(
+                cls.CKAN_BASE, cls.CKAN_DATASET, timeout=max(60, config.DEFAULT_TIMEOUT))),
             ("catalogo", lambda: [{"url": url} for url in cls._links_da_pagina(cls.URL_CATALOGO)]),
         )
         falhas = []
@@ -196,7 +197,7 @@ class ColetorANTT(ColetorBase):
         return conteudo, ext, mime, registros
 
     def _baixar(self, url):
-        corpo, _headers, _url_final = http.baixar(url)
+        corpo, _headers, _url_final = http.baixar(url, timeout=max(120, config.DEFAULT_TIMEOUT))
         return corpo
 
     @staticmethod

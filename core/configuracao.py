@@ -51,6 +51,7 @@ NUMEROS.update({("cadastro", k): limites for k, limites in {
     "lote": (1, 1000), "tentativas": (1, 20), "retencao_dias": (1, 365),
 }.items()})
 EDITAVEIS_WEB = set(NUMEROS) | {("api", "proxies_confiaveis"),
+                              ("consultas", "regras"),
                               ("assistente", "provedor"), ("assistente", "url"), ("assistente", "modelo")}
 EDITAVEIS_WEB.update({('traseiro',k) for k in ('nome','api_url','acesso','pares','inatividade_tipo')})
 
@@ -112,9 +113,16 @@ def consultar(web=False):
                           "efetivo": efetivos.get(par, valor), "origem": origem,
                           "ambiente": caminhos._ENV.get(par),
                           "editavel": not web or par in EDITAVEIS_WEB,
-                          "tipo": "numero" if par in NUMEROS else "texto"})
+                          "tipo": "consultas" if par == ("consultas", "regras")
+                                  else "numero" if par in NUMEROS else "texto"})
+    from coletor.agenda import AGENDA_PADRAO
+
     return {"sucesso": True, "arquivo": str(arq),
             "revisao": _revisao(conteudo), "itens": itens,
+            "fontes_coleta": [
+                *({"chave": k, "nome": v["rotulo"]} for k, v in sorted(AGENDA_PADRAO.items())),
+                {"chave": "traseiro", "nome": "Traseiro de Urso — fontes compartilhadas"},
+            ],
             "gravavel": os.access(arq, os.R_OK | os.W_OK) and os.access(arq.parent, os.W_OK | os.X_OK),
             "problemas": caminhos.problemas()}
 
@@ -136,6 +144,16 @@ def _validar(valores):
         for u in filter(None,[efetivos['api_url']]+[s.strip() for s in efetivos['pares'].split(',')]):
             traseiro.url_publica(u,api=True)
     for par, texto in valores.items():
+        if par == ("consultas", "regras"):
+            from coletor.politica_http import ler_regras
+
+            try:
+                if not isinstance(texto, str) or len(texto.encode("utf-8")) > 48000 or "\r" in texto or "\n" in texto:
+                    raise ValueError("Informe regras de consulta em uma linha, com até 48 KB.")
+                ler_regras(texto)
+            except ValueError as exc:
+                _erro(422, "consultas_invalidas", str(exc))
+            continue
         if not isinstance(texto, str) or len(texto) > 2048 or any(
                 ord(c) < 32 or ord(c) == 127 for c in texto):
             _erro(422, "valor_invalido", "Use texto de uma linha, ate 2048 caracteres.")
@@ -317,6 +335,8 @@ def salvar(dados, autor="local", web=False, *, auditar=True):
                     _erro(409, "configuracao_sobreposta", "Remova a variavel de ambiente que sobrepoe %s.%s." % par)
             _validar_destinos(alteracoes)
             novo = _editar(anterior.decode("utf-8"), alteracoes).encode("utf-8")
+            if len(novo) > 65536:
+                _erro(422, "configuracao_invalida", "radar.conf excede 64 KiB.")
             if novo == anterior:
                 return consultar(web)
             info = arq.stat()

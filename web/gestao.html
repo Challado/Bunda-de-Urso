@@ -58,6 +58,9 @@
   .bloco > h3{margin:0 0 8px;font-size:14px}
   #confCampos summary{font-weight:600;cursor:pointer;margin-bottom:10px}
   #confCampos small{overflow-wrap:anywhere}
+  .regra-consulta{min-width:0;margin:0 0 12px;padding:12px;border:1px solid var(--borda);border-radius:8px}
+  .campos-consulta{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:0 12px}
+  .regra-consulta[hidden],.regra-consulta [hidden]{display:none}
   .modal{position:fixed;inset:0;background:rgba(20,20,26,.55);display:flex;align-items:center;justify-content:center;z-index:5000;padding:16px}
   .modal[hidden]{display:none}
   .modal .cx{background:#fff;border-radius:12px;max-width:480px;width:100%;padding:18px;box-shadow:0 14px 44px rgba(0,0,0,.3)}
@@ -480,6 +483,97 @@
     el.className = "aviso " + (erro ? "err" : "ok");
     el.textContent = texto;
   }
+  function editorConsultas(item, doc){
+    const bloco=document.createElement("details");
+    bloco.open=true;bloco.className="bloco";
+    const titulo=document.createElement("summary");
+    titulo.textContent="Consultas externas";
+    const ajuda=document.createElement("p");
+    ajuda.textContent="Escolha a fonte e, se necessário, o endereço ou prefixo da consulta. Campos vazios herdam os valores padrão.";
+    const lista=document.createElement("div");
+    const salvar=document.createElement("input");
+    salvar.type="hidden";salvar.dataset.chave="consultas.regras";
+    salvar.value=item.valor;salvar.dataset.anterior=item.valor;
+    salvar.disabled=!doc.gravavel||item.editavel===false;
+    const adicionar=document.createElement("button");
+    adicionar.type="button";adicionar.className="sec";adicionar.textContent="Adicionar regra de consulta";
+    adicionar.disabled=salvar.disabled;
+    bloco.append(titulo,ajuda,lista,adicionar,salvar);
+    const regras=new Map();
+    function atualizar(){
+      salvar.value=JSON.stringify([...regras.values()].map(ler=>ler()));
+    }
+    function botarCampo(pai, rotulo, campo){
+      const label=document.createElement("label");
+      label.textContent=rotulo;label.append(campo);pai.append(label);
+      return label;
+    }
+    function seletor(opcoes, valor){
+      const campo=document.createElement("select");
+      for(const [chave,nome] of opcoes)campo.add(new Option(nome,chave));
+      if(!opcoes.some(op=>op[0]===valor))campo.add(new Option(valor,valor));
+      campo.value=valor;
+      return campo;
+    }
+    function renderRegra(regra){
+      const caixa=document.createElement("fieldset");
+      caixa.disabled=salvar.disabled;caixa.className="regra-consulta";
+      const fonte=seletor([["*","Todas as fontes"],...(doc.fontes_coleta||[]).map(f=>[f.chave,f.nome])],regra.fonte||"*");
+      const url=document.createElement("input");
+      url.type="url";url.placeholder="https://";url.value=regra.url||"";
+      botarCampo(caixa,"Fonte",fonte);
+      botarCampo(caixa,"URL ou prefixo",url);
+      const numeros=document.createElement("div");
+      numeros.className="campos-consulta";caixa.append(numeros);
+      const campos={};
+      for(const [chave,rotulo,min,max] of [["timeout","Timeout (s)",1,3600],["tentativas","Tentativas HTTP",1,10],["max_bytes","Limite da resposta (bytes)",1,1073741824]]){
+        const campo=document.createElement("input");
+        campo.type="number";campo.min=min;campo.max=max;campo.value=regra[chave]??"";
+        campo.placeholder="Herdar";
+        campos[chave]=campo;botarCampo(numeros,rotulo,campo);
+      }
+      const valor=regra.user_agent||"";
+      const opcoes=[["","Herdar"],["sistema","Do sistema"],["aleatorio","Aleatório"],["personalizado","Personalizado"]];
+      const modo=seletor(opcoes,opcoes.some(op=>op[0]===valor)&&valor!=="personalizado"?valor:"personalizado");
+      botarCampo(caixa,"User-Agent",modo);
+      const agente=document.createElement("input");
+      agente.maxLength=512;agente.value=modo.value==="personalizado"?valor:"";
+      const rotuloAgente=botarCampo(caixa,"User-Agent personalizado",agente);
+      function mostrarAgente(){
+        rotuloAgente.hidden=modo.value!=="personalizado";
+        agente.required=!rotuloAgente.hidden;
+      }
+      mostrarAgente();
+      modo.addEventListener("change",mostrarAgente);
+      const remover=document.createElement("button");
+      remover.type="button";remover.className="sec";remover.textContent="Remover regra";
+      remover.addEventListener("click",()=>{regras.delete(caixa);caixa.remove();atualizar();});
+      caixa.append(remover);
+      regras.set(caixa,()=>{
+        const r={fonte:fonte.value};
+        if(url.value.trim())r.url=url.value.trim();
+        for(const [chave,campo] of Object.entries(campos))if(campo.value!=="")r[chave]=Number(campo.value);
+        if(modo.value)r.user_agent=modo.value==="personalizado"?agente.value.trim():modo.value;
+        return r;
+      });
+      caixa.addEventListener("input",atualizar);
+      caixa.addEventListener("change",atualizar);
+      lista.append(caixa);
+      return fonte;
+    }
+    try{
+      JSON.parse(item.valor||"[]").forEach(renderRegra);
+    }catch(e){
+      lista.replaceChildren();
+      regras.clear();
+      const erro=document.createElement("p");
+      erro.textContent="As regras salvas estão inválidas. Revise [consultas] no radar.conf.";
+      erro.className="aviso err";
+      lista.append(erro);adicionar.disabled=true;salvar.disabled=true;
+    }
+    adicionar.addEventListener("click",()=>{renderRegra({}).focus();atualizar();});
+    return bloco;
+  }
   function renderConf(doc){
     confAtual = doc;
     document.getElementById("confArquivo").textContent = doc.arquivo || "";
@@ -487,6 +581,7 @@
     destino.replaceChildren();
     var secoes = {};
     (doc.itens || []).forEach(function(item){
+      if(item.tipo==="consultas"){destino.prepend(editorConsultas(item,doc));return;}
       var secao = secoes[item.secao];
       if (!secao){
         secao = document.createElement("details"); secao.open = true; secao.className = "bloco";

@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import patch
 
 from core import caminhos, config, configuracao, db, governanca
+from coletor import politica_http
 from web import nucleo
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -96,6 +97,33 @@ class TestConfiguracaoAPI(unittest.TestCase):
             configuracao.salvar(payload)
         self.assertEqual(erro.exception.status, 409)
         self.assertIn("editado no servidor", self.conf.read_text())
+
+    def test_salva_regras_de_consulta_e_respeita_fonte_e_prefixo(self):
+        url = "https://dados.antt.gov.br/dataset/activity/radar"
+        regras = [
+            {"fonte": "*", "timeout": 45},
+            {"fonte": "antt", "timeout": 180, "tentativas": 2},
+            {"fonte": "antt", "url": url, "timeout": 90, "user_agent": "RadarLab/2.0"},
+        ]
+        status, _, doc = self.requisicao("PUT", self.alteracao(**{"consultas.regras": json.dumps(regras)}))
+        self.assertEqual(status, 200, doc)
+        self.assertIn("antt", {f["chave"] for f in doc["fontes_coleta"]})
+        item = next(i for i in doc["itens"] if i["secao"] == "consultas")
+        self.assertEqual(json.loads(item["valor"]), regras)
+        with politica_http.fonte("antt"):
+            aplicado = politica_http.ajustes(url)
+            self.assertEqual((aplicado["timeout"], aplicado["tentativas"], aplicado["user_agent"]),
+                             (90, 2, "RadarLab/2.0"))
+            self.assertEqual(politica_http.ajustes(url + ".exemplo")["timeout"], 90)
+            self.assertEqual(politica_http.ajustes("https://dados.antt.gov.br/dados.csv")["timeout"], 180)
+        with politica_http.fonte("inmetro"):
+            self.assertEqual(politica_http.ajustes(url)["timeout"], 45)
+        anterior = self.conf.read_bytes()
+        for invalida in ({"fonte": "antt", "timeout": 0}, {"fonte": "antt", "user_agent": "UA\r\nHeader: valor"}):
+            status, _, _ = self.requisicao("PUT", self.alteracao(
+                **{"consultas.regras": json.dumps([invalida])}))
+            self.assertEqual(status, 422)
+        self.assertEqual(self.conf.read_bytes(), anterior)
 
     def test_web_recusa_caminhos_e_requisicao_externa_sem_alterar_arquivo(self):
         payload = self.alteracao(**{"instalacao.home": "/tmp/codigo-arbitrario"})

@@ -58,7 +58,7 @@ import subprocess
 import tempfile
 from core import caminhos
 
-from coletor import http
+from coletor import http, politica_http
 from coletor.base import ColetorBase
 from coletor.fontes import normalizacao as nz
 
@@ -90,10 +90,18 @@ def _achar_navegador():
 
 def _dump_dom(navegador, url, perfil, timeout=90):
     """Abre ``url`` headless (perfil dado) e devolve o DOM renderizado."""
+    opcoes = politica_http.ajustes(url, timeout=timeout, max_bytes=http.MAX_BYTES_PADRAO)
+    timeout = opcoes["timeout"]
     cmd = [navegador, "--headless=new", "--disable-gpu", "--no-sandbox",
            "--hide-scrollbars", "--no-first-run",
            "--no-default-browser-check", "--user-data-dir=%s" % perfil,
            "--virtual-time-budget=15000", "--dump-dom", url]
+    if opcoes["user_agent"]:
+        cmd.insert(-1, "--user-agent=" + opcoes["user_agent"])
+    from core import atualizacoes
+
+    atualizacoes.evento("navegador.consulta", url=url, fonte=opcoes["fonte"], timeout=timeout,
+                       max_bytes=opcoes["max_bytes"], modo_user_agent=opcoes["modo_user_agent"])
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               timeout=timeout)
@@ -102,6 +110,8 @@ def _dump_dom(navegador, url, perfil, timeout=90):
     if proc.returncode:
         detalhe = proc.stderr.decode('utf-8', 'replace').strip()[-2000:]
         raise http.ErroFonte('Navegador terminou com codigo %s em %s: %s' % (proc.returncode, url, detalhe))
+    if len(proc.stdout) > opcoes["max_bytes"]:
+        raise http.ErroFonte("Conteúdo do navegador excede o limite de coleta")
     if not proc.stdout.strip():
         raise http.ErroFonte('Navegador nao produziu conteudo em %s' % url)
     return proc.stdout.decode("utf-8", "replace")

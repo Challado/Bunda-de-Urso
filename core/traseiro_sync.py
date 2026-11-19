@@ -32,6 +32,12 @@ def _bytes(url, *, dados=None, headers=None):
     # Sem redirects: credenciais nunca sao reenviadas a outro destino.
     from coletor import http
     _publica_resolvida(url)
+    if dados is None and headers is None:
+        from coletor import politica_http
+        with politica_http.fonte('traseiro'):
+            return http.baixar(url, timeout=tr.numero('timeout'), max_bytes=tr.numero('max_bytes'),
+                               headers={'User-Agent':'Traseiro-de-Urso/1'}, seguir_redirects=False,
+                               tentativas=1)[0]
     corpo=None if dados is None else tr.json_doc(dados).encode()
     if corpo is not None and len(corpo)>tr.numero('max_bytes'):
         raise ValueError('Lote mesh excedeu max_bytes.')

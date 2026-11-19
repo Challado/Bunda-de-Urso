@@ -19,7 +19,7 @@ from core import caminhos
 import time
 import urllib.parse
 
-from coletor import http
+from coletor import http, politica_http
 from core import config, atualizacoes
 
 
@@ -254,7 +254,12 @@ def baixar_xlsx(url, timeout=None, mostrar_tabela=False):
         if shutil.which(n)), None)
     if not navegador:
         raise http.ErroFonte("Exportacao publica requer Chromium/Chrome; instale chromium ou use --arquivo com o XLSX exportado")
-    prazo = time.monotonic() + (timeout or max(60, config.DEFAULT_TIMEOUT * 3))
+    opcoes = politica_http.ajustes(
+        url, timeout=timeout or max(60, config.DEFAULT_TIMEOUT * 3), max_bytes=http.MAX_BYTES_PADRAO)
+    prazo = time.monotonic() + opcoes["timeout"]
+    limite = opcoes["max_bytes"]
+    atualizacoes.evento("navegador.consulta", url=url, fonte=opcoes["fonte"], timeout=opcoes["timeout"],
+                       max_bytes=limite, modo_user_agent=opcoes["modo_user_agent"])
     with tempfile.TemporaryDirectory(prefix="radar-exportacao-", dir=caminhos.temporarios()) as pasta:
         perfil, downloads = Path(pasta) / "perfil", Path(pasta) / "downloads"
         downloads.mkdir()
@@ -262,6 +267,8 @@ def baixar_xlsx(url, timeout=None, mostrar_tabela=False):
                "--disable-background-networking", "--disable-extensions", "--disable-sync",
                "--no-first-run", "--no-default-browser-check", "--remote-debugging-address=127.0.0.1",
                "--remote-debugging-port=0", "--user-data-dir=" + str(perfil), "about:blank"]
+        if opcoes["user_agent"]:
+            cmd.insert(-1, "--user-agent=" + opcoes["user_agent"])
         proxy = (os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
                  or os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy"))
         if proxy:
@@ -287,11 +294,11 @@ def baixar_xlsx(url, timeout=None, mostrar_tabela=False):
             contextos = [(sessao, None)]
             anexos = {}
             while time.monotonic() < prazo:
-                if any(a.stat().st_size > http.MAX_BYTES_PADRAO for a in downloads.iterdir() if a.is_file()):
+                if any(a.stat().st_size > limite for a in downloads.iterdir() if a.is_file()):
                     raise http.ErroFonte("Download da planilha excede o limite de coleta")
                 for arquivo in downloads.glob("*.xlsx"):
                     if arquivo.is_file() and arquivo.stat().st_size > 0:
-                        if arquivo.stat().st_size > http.MAX_BYTES_PADRAO:
+                        if arquivo.stat().st_size > limite:
                             raise http.ErroFonte("Planilha exportada excede o limite de coleta")
                         return arquivo.read_bytes()
                 for evento in cdp.eventos:
