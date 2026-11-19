@@ -255,7 +255,7 @@ def importar(origem, destino, esquema, simular=False, progresso=None, *, recriar
     return totais
 
 
-def ativar_configuracao(host, banco, usuario, porta, esquema, ca, senha, revisao):
+def ativar_configuracao(host, banco, usuario, porta, esquema, ca, senha, revisao, *, transporte):
     from core import configuracao, postgres_runtime
 
     linha = (host, str(porta), banco, usuario, senha)
@@ -274,8 +274,7 @@ def ativar_configuracao(host, banco, usuario, porta, esquema, ca, senha, revisao
     concluida = False
     try:
         parametros = dict(host=host, dbname=banco, user=usuario, port=porta,
-                          passfile=str(nome), sslrootcert=ca, sslmode="verify-full",
-                          connect_timeout=10)
+                          passfile=str(nome), connect_timeout=10, **transporte)
         with closing(postgres_runtime.conectar(
                 db.connect_postgres, leitura=True, opcoes={**parametros, "esquema": esquema})) as teste:
             governanca.garantir_esquema(teste)
@@ -286,7 +285,8 @@ def ativar_configuracao(host, banco, usuario, porta, esquema, ca, senha, revisao
                 "dados.motor": "postgres", "postgres.host": host,
                 "postgres.porta": str(porta), "postgres.banco": banco,
                 "postgres.usuario": usuario, "postgres.esquema": esquema,
-                "postgres.pgpass": nome.name, "postgres.certificado_ca": "" if ca == "system" else ca,
+                "postgres.pgpass": nome.name, "postgres.sslmode": transporte["sslmode"],
+                "postgres.certificado_ca": ca if transporte["sslmode"] != "disable" else "",
             },
         }, autor="migrar_postgres", auditar=os.environ.get("RADAR_MIGRACAO_DIRETA") != "1")
         concluida = True
@@ -309,6 +309,10 @@ def main(argv=None):
     parser.add_argument("--usuario", help="usuário PostgreSQL com permissão CREATE no banco")
     parser.add_argument("--esquema", default="radar_brasil", help="nome de um esquema novo")
     parser.add_argument("--certificado-ca", help="CA do servidor, se ele usar uma CA própria")
+    tls = parser.add_mutually_exclusive_group()
+    tls.add_argument("--sslmode", choices=caminhos.POSTGRES_SSLMODES, help="modo TLS do libpq (padrão: disable)")
+    tls.add_argument("--sem-tls", dest="sslmode", action="store_const", const="disable",
+                     help="conecte em texto simples")
     modo = parser.add_mutually_exclusive_group()
     modo.add_argument("--simular", action="store_true", help="importe, valide e desfaça a transação")
     modo.add_argument("--ativar", action="store_true",
@@ -331,8 +335,9 @@ def main(argv=None):
             raise ErroMigracao("O PostgreSQL já é o banco ativo desta instalação.")
         try:
             origem = Path(caminhos.dentro_dados(args.origem, "origem SQLite"))
-            ca = (caminhos.dentro_dados(args.certificado_ca, "certificado CA")
-                  if args.certificado_ca else "system")
+            ca = args.certificado_ca or ""
+            sslmode = args.sslmode or ("verify-full" if ca else "disable")
+            transporte = caminhos.transporte_postgres(sslmode, ca)
         except ValueError as exc:
             raise ErroMigracao(str(exc)) from exc
         if not origem.is_file():
@@ -365,10 +370,10 @@ def main(argv=None):
         try:
             destino = db.connect_postgres(host=host, port=args.porta, dbname=banco,
                                           user=usuario, password=senha, connect_timeout=10,
-                                          sslmode="verify-full", sslrootcert=ca)
+                                          **transporte)
         except psycopg.OperationalError as exc:
             raise ErroMigracao("Conexão recusada. Confira endereço, porta, credenciais "
-                               "e certificado TLS do PostgreSQL.") from exc
+                               "e modo de conexão do PostgreSQL.") from exc
         if not args.ativar:
             del senha
         with closing(destino), ExitStack() as corte:
@@ -404,7 +409,8 @@ def main(argv=None):
                                       recriar=args.recriar_destino)
             if args.ativar:
                 try:
-                    ativar_configuracao(host, banco, usuario, args.porta, args.esquema, ca, senha, revisao)
+                    ativar_configuracao(host, banco, usuario, args.porta, args.esquema, ca, senha, revisao,
+                                        transporte=transporte)
                 except (governanca.GovernancaError, psycopg.Error, OSError, ErroMigracao):
                     print("Os dados foram copiados. Falhou a ativação automática. Confira radar.conf.",
                           file=sys.stderr)

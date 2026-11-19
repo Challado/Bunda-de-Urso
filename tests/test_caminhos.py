@@ -77,6 +77,22 @@ class TestSemConfiguracao(BaseCaminhos):
 
 class TestArquivo(BaseCaminhos):
 
+    def test_postgres_texto_simples_por_padrao_e_tls_opcional(self):
+        config = "[dados]\ndir = dados\n[postgres]\nhost = postgres.local\nbanco = radar\nusuario = radar\n"
+        self.escrever(config)
+        opcoes = caminhos.postgres()
+        self.assertEqual(opcoes["sslmode"], "disable")
+        self.assertEqual(opcoes["gssencmode"], "disable")
+        self.assertNotIn("sslrootcert", opcoes)
+
+        self.escrever(config + "sslmode = verify-full\ncertificado_ca = ca.pem\n")
+        opcoes = caminhos.postgres()
+        self.assertEqual(opcoes["sslmode"], "verify-full")
+        self.assertEqual(opcoes["sslrootcert"], str(self.dir / "dados/ca.pem"))
+
+        self.escrever(config + "sslmode = disable\ncertificado_ca = ca.pem\n")
+        self.assertNotIn("sslrootcert", caminhos.postgres())
+
     def test_le_caminhos_do_arquivo(self):
         self.escrever("""
             [instalacao]

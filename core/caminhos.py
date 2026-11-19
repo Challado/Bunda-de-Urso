@@ -45,7 +45,7 @@ _ENV = {}  # Somente RADAR_CONF seleciona o arquivo; valores vem do .conf.
 SECOES = {
     "instalacao": ("home",),
     "dados": ("dir", "banco", "motor"),
-    "postgres": ("host", "porta", "banco", "usuario", "esquema", "pgpass", "certificado_ca"),
+    "postgres": ("host", "porta", "banco", "usuario", "esquema", "pgpass", "sslmode", "certificado_ca"),
     "web": ("raiz", "url", "origem"),
     "interface": ("mapa_min_percentual", "mapa_min_altura_px"),
     "traseiro": ("habilitado", "nome", "api_url", "acesso", "tokens_arquivo", "pares",
@@ -297,6 +297,20 @@ def certificado_postgres():
     return ssl.get_default_verify_paths().cafile or "system"
 
 
+POSTGRES_SSLMODES = ("disable", "allow", "prefer", "require", "verify-ca", "verify-full")
+
+
+def transporte_postgres(sslmode, certificado_ca=""):
+    if sslmode not in POSTGRES_SSLMODES:
+        raise ValueError("postgres.sslmode inválido. Use " + ", ".join(POSTGRES_SSLMODES) + ".")
+    opcoes = {"sslmode": sslmode, "gssencmode": "disable"}
+    if sslmode != "disable" and certificado_ca:
+        opcoes["sslrootcert"] = dentro_dados(certificado_ca, "postgres.certificado_ca")
+    elif sslmode in ("verify-ca", "verify-full"):
+        opcoes["sslrootcert"] = certificado_postgres()
+    return opcoes
+
+
 def postgres():
     """Configuração do servidor. O libpq lê a senha de um arquivo privado."""
     import re
@@ -310,10 +324,10 @@ def postgres():
         raise ValueError("postgres.porta inválida.")
     arquivo = dentro_dados(valor("postgres", "pgpass", "postgres.pgpass")[0], "postgres.pgpass")
     ca = valor("postgres", "certificado_ca")[0]
+    sslmode = valor("postgres", "sslmode", "verify-full" if ca else "disable")[0]
+    transporte = transporte_postgres(sslmode, ca)
     return dict(host=dados["host"], dbname=dados["banco"], user=dados["usuario"], port=porta,
-                esquema=esquema, passfile=arquivo, sslmode="verify-full",
-                sslrootcert=dentro_dados(ca, "postgres.certificado_ca") if ca else certificado_postgres(),
-                connect_timeout=10)
+                esquema=esquema, passfile=arquivo, connect_timeout=10, **transporte)
 
 
 def banco():

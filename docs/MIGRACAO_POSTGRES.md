@@ -7,10 +7,14 @@ cria um esquema novo no PostgreSQL e pode ativar esse esquema para toda a instal
 
 Use PostgreSQL 12 ou superior, um banco UTF-8 já criado e uma conta dedicada
 com acesso ao banco e permissões `CONNECT`, `CREATE` e `TEMP`. A conta que
-cria o esquema será sua proprietária. A conexão usa TLS com verificação de
-certificado e de nome do servidor. Se o certificado for de uma CA privada,
-guarde o certificado da CA dentro de `[dados] dir` e passe
-`--certificado-ca nome-do-arquivo.pem`. Use o nome presente no certificado.
+cria o esquema será sua proprietária. A conexão padrão é em texto simples,
+com `sslmode=disable`. O servidor PostgreSQL decide o método de autenticação.
+No pedido de senha, pressione Enter se o servidor dispensar senha.
+
+Para usar TLS, passe `--sslmode verify-full`. Com CA privada, guarde o
+certificado dentro de `[dados] dir` e use `--certificado-ca nome-do-arquivo.pem`.
+Essa opção também ativa a verificação TLS quando usada sozinha. O modo
+escolhido é gravado no `radar.conf` para a API, o cron e os backups.
 
 O migrador usa o Psycopg 3 disponível no Python do Radar e o `pg_dump` no
 `PATH` da conta do serviço. Use um `pg_dump` de versão igual ou superior à

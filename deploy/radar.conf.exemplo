@@ -43,6 +43,8 @@ usuario =
 esquema = radar_brasil
 # Arquivos relativos a dados.dir. O pgpass precisa de permissao 0600.
 pgpass = postgres.pgpass
+# Para exigir e verificar TLS, use verify-full.
+sslmode = disable
 certificado_ca =
 
 [web]

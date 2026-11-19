@@ -149,6 +149,8 @@ def _validar(valores):
                 _erro(422, "numero_invalido", "%s.%s: use %d..%d." % (*par, minimo, maximo))
         if par == ("assistente", "provedor") and texto not in ("", "ollama", "openai_compativel"):
             _erro(422, "provedor_invalido", "Use ollama ou openai_compativel.")
+        if par == ("postgres", "sslmode") and texto and texto not in caminhos.POSTGRES_SSLMODES:
+            _erro(422, "sslmode_invalido", "Use " + ", ".join(caminhos.POSTGRES_SSLMODES) + ".")
         if texto and par == ("api", "proxies_confiaveis"):
             try:
                 for rede in texto.split(","):

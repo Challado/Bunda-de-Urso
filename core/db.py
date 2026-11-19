@@ -262,9 +262,9 @@ def backup_operacional(pasta, nome, origem=None):
                 variaveis = {
                     "host": "PGHOST", "port": "PGPORT", "dbname": "PGDATABASE", "user": "PGUSER",
                     "passfile": "PGPASSFILE", "sslmode": "PGSSLMODE", "sslrootcert": "PGSSLROOTCERT",
-                    "connect_timeout": "PGCONNECT_TIMEOUT",
+                    "connect_timeout": "PGCONNECT_TIMEOUT", "gssencmode": "PGGSSENCMODE",
                 }
-                ambiente.update({v: str(opcoes[k]) for k, v in variaveis.items()})
+                ambiente.update({v: str(opcoes[k]) for k, v in variaveis.items() if k in opcoes})
                 try:
                     subprocess.run(["pg_dump", "-w", "-Fc", "--schema", opcoes["esquema"],
                                     "--file", str(temporario)], env=ambiente,
