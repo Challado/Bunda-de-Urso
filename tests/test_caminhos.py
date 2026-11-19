@@ -72,10 +72,44 @@ class TestSemConfiguracao(BaseCaminhos):
 
     def test_resumo_diz_que_veio_do_padrao(self):
         origens = {(i["secao"], i["chave"]): i["origem"] for i in caminhos.resumo()}
-        self.assertEqual(origens[("dados", "banco")], "padrao")
+        self.assertEqual(origens[("sqlite", "banco")], "padrao")
 
 
 class TestArquivo(BaseCaminhos):
+
+    def test_motor_ativo_ignora_configuracao_do_outro_motor(self):
+        self.escrever("""
+            [dados]
+            dir = dados
+            motor = sqlite
+            banco = legado.sqlite3
+            [sqlite]
+            banco = escolhido.sqlite3
+            [postgres]
+            porta = invalida
+        """)
+        self.assertEqual(caminhos.banco(), str(self.dir / "dados/escolhido.sqlite3"))
+        caminhos.validar_operacionais()
+
+        self.escrever("""
+            [dados]
+            dir = dados
+            motor = postgres
+            banco = /fora/legado.sqlite3
+            [sqlite]
+            banco = /fora/inativo.sqlite3
+            [postgres]
+            host = banco.exemplo
+            banco = radar_ativo
+            usuario = radar
+            connect_timeout = 20
+        """)
+        caminhos.validar_operacionais()
+        self.assertIsNone(caminhos.banco())
+        self.assertEqual(caminhos.postgres()["dbname"], "radar_ativo")
+        self.assertEqual(caminhos.postgres()["connect_timeout"], 20)
+        self.assertNotIn(("dados", "banco"), caminhos._ler_conf()[0])
+        self.assertFalse(any(item["secao"] == "sqlite" for item in caminhos.resumo()))
 
     def test_postgres_texto_simples_por_padrao_e_tls_opcional(self):
         config = "[dados]\ndir = dados\n[postgres]\nhost = postgres.local\nbanco = radar\nusuario = radar\n"

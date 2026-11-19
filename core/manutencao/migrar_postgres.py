@@ -332,6 +332,8 @@ def main(argv=None):
     try:
         if args.ativar and db.postgres_ativo():
             raise ErroMigracao("O PostgreSQL já é o banco ativo desta instalação.")
+        if not args.origem:
+            raise ErroMigracao("Informe --origem com o arquivo SQLite que deseja migrar.")
         try:
             origem = Path(caminhos.dentro_dados(args.origem, "origem SQLite"))
             ca = args.certificado_ca or ""

@@ -1,7 +1,8 @@
 # Migrar o Radar Brasil de SQLite para PostgreSQL
 
-O migrador roda no servidor do Radar. Ele lê a origem escolhida em `radar.conf`,
-cria um esquema novo no PostgreSQL e pode ativar esse esquema para toda a instalação.
+O migrador roda no servidor do Radar. Ele lê o arquivo de origem de `[sqlite]
+banco` em `radar.conf`, cria um esquema no PostgreSQL e pode ativá-lo para toda a
+instalação.
 
 ## Preparar o destino
 
@@ -48,8 +49,9 @@ do novo esquema, preserva IDs e sequências e só muda `radar.conf` após confer
 a conexão como a conta do serviço. Reserve espaço para a cópia temporária
 em `[dados] dir`.
 
-A ativação grava a senha num arquivo `.pgpass` de permissão 0600 dentro de
-`[dados] dir`. Nas outras modalidades a senha é usada somente em memória.
+A ativação define `[dados] motor = postgres` e grava a conexão em `[postgres]`.
+A opção `postgres.pgpass` aponta para o arquivo de senha de permissão 0600
+dentro de `[dados] dir`. Nas outras modalidades a senha é usada em memória.
 O modo `--recriar-destino` com `--ativar` substitui o esquema dedicado do
 Radar na mesma transação da cópia. A ferramenta recusa tabelas alheias e
 dependências externas. Se a cópia falhar, o esquema anterior é recuperado

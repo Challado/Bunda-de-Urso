@@ -85,7 +85,7 @@ def _copiar_dados(origem, destino, banco):
         raise RuntimeError("Existem dados em dois destinos diferentes; nada sera sobrescrito: " + str(destino))
     destino.mkdir(parents=True, exist_ok=True)
     for item in origem.iterdir():
-        if item == banco or item.name in {banco.name + '-wal', banco.name + '-shm', banco.name + '-journal'}:
+        if banco is not None and (item == banco or item.name in {banco.name + '-wal', banco.name + '-shm', banco.name + '-journal'}):
             continue
         # Backups anteriores permanecem intactos na origem; nao os duplica.
         if item.name == 'backups' or item.name.endswith('.lock'):
@@ -299,9 +299,11 @@ def _arquivos(origem):
 
 def _conf_nova(texto, conta, origem_http, raiz, novo_dados, novo_banco, novos_logs, malha=False):
     alteracoes = {('instalacao','home'): str(raiz), ('web','raiz'): str(raiz),
-                  ('dados','dir'): str(novo_dados), ('dados','banco'): novo_banco.name,
+                  ('dados','dir'): str(novo_dados),
                   ('logs','dir'): novos_logs.relative_to(novo_dados).as_posix(),
                   ('api','token_arquivo'): 'api_token', ('assistente','chave_arquivo'): 'assistente_chave'}
+    if novo_banco is not None:
+        alteracoes['sqlite','banco'] = novo_banco.name
     if malha:
         alteracoes['geografia','malha'] = 'geografia/malha.json'
     if caminhos.sync_clone():
@@ -322,25 +324,31 @@ def executar(args, observacoes):
         raise RuntimeError('; '.join(caminhos.problemas()))
     raiz = Path(caminhos.web_raiz()).resolve()
     dados = Path(caminhos.data_dir()).resolve()
-    banco = Path(caminhos.banco()).resolve()
+    motor = caminhos.motor_banco()
+    arquivo = caminhos.banco()
+    banco = Path(arquivo).resolve() if arquivo is not None else None
     logs = Path(caminhos.log_dir()).resolve()
     home = Path(caminhos.home()).resolve()
     novo_conf = raiz / 'radar.conf'
     local = conf == novo_conf and home == raiz
     novo_dados = dados if local else raiz/'dados'
-    novo_banco = novo_dados / banco.name
+    novo_banco = novo_dados / banco.name if banco is not None else None
     novos_logs = logs if logs.is_relative_to(novo_dados) else novo_dados/'logs'
-    if local and not (dados.is_relative_to(raiz/'dados') and banco.is_relative_to(raiz/'dados') and novos_logs.is_relative_to(novo_dados)):
+    if local and not (dados.is_relative_to(raiz/'dados') and novos_logs.is_relative_to(novo_dados)):
         raise RuntimeError('No layout web, os dados devem ficar na pasta privada dados/; logs tambem ficam dentro de dados.dir.')
+    if local and banco is not None and not banco.is_relative_to(dados):
+        raise RuntimeError('sqlite.banco deve ficar dentro de dados.dir.')
     conta = pwd.getpwnam(args.usuario_web)
     if not args.laboratorio and conta.pw_uid == 0:
         raise RuntimeError('O usuario da aplicacao deve ser sem privilegios, como www-data.')
     lab = args.laboratorio.resolve() if args.laboratorio else None
     if args.restaurar:
         raise RuntimeError('Backups do layout antigo nao podem substituir a raiz com dados. Use o relatorio da migracao para recuperacao.')
-    if sys.version_info < (3,13) or (not db.postgres_ativo() and not banco.is_file()):
-        raise RuntimeError('Necessario Python >= 3.13 e banco existente no radar.conf.')
-    for destino in (raiz, dados, banco, logs, home, conf):
+    if sys.version_info < (3,13):
+        raise RuntimeError('Necessario Python >= 3.13.')
+    if banco is not None and not banco.is_file():
+        raise RuntimeError('O arquivo de [sqlite] banco deve existir.')
+    for destino in (raiz, dados, logs, home, conf, *([banco] if banco is not None else [])):
         if destino == Path('/') or (lab and not destino.is_relative_to(lab)):
             raise RuntimeError('Destino invalido ou fora do laboratorio: ' + str(destino))
     if raiz == origem or origem.is_relative_to(raiz) or raiz.is_relative_to(origem):
@@ -353,15 +361,17 @@ def executar(args, observacoes):
         raise RuntimeError('Dados nos dois destinos: recusa sobrescrever uma base existente.')
     for pasta in (dados, logs, *(raiz / p for p in PASTAS_PRIVADAS)):
         _sem_links(pasta)
-    if banco.is_relative_to(raiz) and banco != novo_banco and not banco.is_relative_to(novo_dados):
-        raise RuntimeError('Banco em local publico inesperado: ajuste dados.banco antes de migrar.')
+    if banco is not None and banco.is_relative_to(raiz) and banco != novo_banco and not banco.is_relative_to(novo_dados):
+        raise RuntimeError('Banco em local publico inesperado: ajuste sqlite.banco antes de migrar.')
     # Nenhum dado ou codigo e criado durante a simulacao/verificacao.
     versao = _executar(['git','-C',str(origem),'rev-parse','HEAD']).strip()
     plano = dict(sucesso=True, modo='verificacao' if args.verificar else 'simulacao',
                  layout='raiz_web', configuracao=str(novo_conf), raiz=str(raiz),
-                 dados_origem=str(dados), banco_origem=str(banco), dados_destino=str(novo_dados),
+                 dados_origem=str(dados), motor_banco=motor, dados_destino=str(novo_dados),
                  logs_destino=str(novos_logs), usuario=conta.pw_name, versao_disponivel=versao,
                  observacoes=observacoes)
+    if banco is not None:
+        plano['banco_origem'] = str(banco)
     if args.verificar:
         with _usar_conf(novo_conf):
             plano['checagens'] = _verificar(origem, raiz, novo_conf, conta, lab, cron=not args.sem_cron)
@@ -389,7 +399,7 @@ def _verificar(origem, raiz, conf, conta, lab, cron=True):
         except Exception as exc:
             checagens.append(dict(checagem=nome, estado='erro', detalhe=str(exc)))
     def integridade():
-        with closing(db.connect_readonly(caminhos.banco())) as conn:
+        with closing(db.connect_readonly()) as conn:
             db.verificar_integridade(conn)
     def permissoes():
         for arq in (raiz/'api.pse', raiz/'radar.conf', raiz/'resources', Path(caminhos.data_dir()), Path(caminhos.log_dir()), *(raiz/n for n in CODIGO)):
@@ -540,7 +550,7 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
             # Nunca substitui o diretorio raiz: banco, fila e segredos nao sao fontes.
             transferidos = dados != novo_dados
             _copiar_dados(dados,novo_dados,banco)
-            if not db.postgres_ativo() and novo_banco!=banco:
+            if novo_banco is not None and novo_banco!=banco:
                 if novo_banco.exists():
                     raise RuntimeError('Banco destino existente: recusa sobrescrever')
                 shutil.copy2(backup_banco,novo_banco)

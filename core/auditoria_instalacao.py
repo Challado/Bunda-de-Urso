@@ -33,7 +33,12 @@ def chaves_gravadas(texto):
 
 def opcoes_faltantes(texto):
     gravadas = chaves_gravadas(texto)
-    return {par: valor for par, valor in caminhos.PADROES.items() if par not in gravadas}
+    motor = caminhos.motor_banco()
+    opcoes = {par: valor for par, valor in caminhos.PADROES.items()
+              if par not in gravadas and (par[0] not in ("sqlite", "postgres") or par[0] == motor)}
+    if ("sqlite", "banco") in opcoes and ("dados", "banco") in gravadas:
+        opcoes[("sqlite", "banco")] = caminhos.valor("sqlite", "banco")[0]
+    return opcoes
 
 
 def comando_coletor(linha, wrapper):

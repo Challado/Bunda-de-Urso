@@ -16,8 +16,8 @@ O que confere:
 Sai com 1 se houver divergencia ou erro de execucao. Uso:
     python3 .github/scripts/verificar_sql.py
 """
+import argparse
 import re
-import sqlite3
 import sys
 from pathlib import Path
 
@@ -198,31 +198,45 @@ def ler_dialeto(sufixo):
     return tabelas
 
 
-def main():
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--motor", choices=("ambos", "postgres", "sqlite"), default="ambos")
+    args = parser.parse_args(argv)
+    if args.motor == "postgres":
+        tabelas = ler_dialeto("postgres")
+        if not tabelas:
+            print("::error::nao encontrei tabelas no esquema PostgreSQL")
+            return 1
+        print("Esquema PostgreSQL: %d tabelas declaradas." % len(tabelas))
+        return 0
+
+    import sqlite3
+
     problemas = []
     if not (SQL / "schema.sqlite.sql").is_file():
         print("::error::nao encontrei sql/schema.sqlite.sql")
         return 1
 
     sq = ler_dialeto("sqlite")
-    pg = ler_dialeto("postgres")
+    pg = ler_dialeto("postgres") if args.motor == "ambos" else None
 
-    print("Tabelas: SQLite=%d  PostgreSQL=%d" % (len(sq), len(pg)))
-    so_sq = sorted(set(sq) - set(pg))
-    so_pg = sorted(set(pg) - set(sq))
-    if so_sq:
-        problemas.append("tabelas so no SQLite: %s" % ", ".join(so_sq))
-    if so_pg:
-        problemas.append("tabelas so no PostgreSQL: %s" % ", ".join(so_pg))
+    if pg is not None:
+        print("Tabelas: SQLite=%d  PostgreSQL=%d" % (len(sq), len(pg)))
+        so_sq = sorted(set(sq) - set(pg))
+        so_pg = sorted(set(pg) - set(sq))
+        if so_sq:
+            problemas.append("tabelas so no SQLite: %s" % ", ".join(so_sq))
+        if so_pg:
+            problemas.append("tabelas so no PostgreSQL: %s" % ", ".join(so_pg))
 
-    for tabela in sorted(set(sq) & set(pg)):
-        cs, cp = set(sq[tabela]), set(pg[tabela])
-        faltam_pg = sorted(cs - cp)
-        faltam_sq = sorted(cp - cs)
-        if faltam_pg:
-            problemas.append("%s: colunas sem par no PostgreSQL: %s" % (tabela, ", ".join(faltam_pg)))
-        if faltam_sq:
-            problemas.append("%s: colunas sem par no SQLite: %s" % (tabela, ", ".join(faltam_sq)))
+        for tabela in sorted(set(sq) & set(pg)):
+            cs, cp = set(sq[tabela]), set(pg[tabela])
+            faltam_pg = sorted(cs - cp)
+            faltam_sq = sorted(cp - cs)
+            if faltam_pg:
+                problemas.append("%s: colunas sem par no PostgreSQL: %s" % (tabela, ", ".join(faltam_pg)))
+            if faltam_sq:
+                problemas.append("%s: colunas sem par no SQLite: %s" % (tabela, ", ".join(faltam_sq)))
 
     # o DDL do SQLite tem de executar de verdade
     sys.path.insert(0, str(RAIZ))
@@ -250,7 +264,8 @@ def main():
             print("::error::%s" % p)
         return 1
 
-    print("Paridade OK: mesmos nomes de tabela e de coluna nos dois dialetos.")
+    if pg is not None:
+        print("Paridade OK: mesmos nomes de tabela e de coluna nos dois dialetos.")
     return 0
 
 

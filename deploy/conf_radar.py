@@ -71,7 +71,10 @@ def verificar():
     if not os.path.isdir(os.path.join(caminhos.home(), "core")):
         problemas.append("instalacao.home nao tem core/ (%s)" % caminhos.home())
     _checar_caminho(problemas, "dados.dir", caminhos.data_dir(), escrita=True)
-    _checar_caminho(problemas, "dados.banco", caminhos.banco(), tipo="arq")
+    if caminhos.motor_banco() == "sqlite":
+        _checar_caminho(problemas, "sqlite.banco", caminhos.banco(), tipo="arq")
+    else:
+        caminhos.postgres()
     _checar_caminho(problemas, "web.raiz", caminhos.web_raiz())
     _checar_caminho(problemas, "web.raiz/api.pse",
                     os.path.join(caminhos.web_raiz(), "api.pse"), tipo="arq")

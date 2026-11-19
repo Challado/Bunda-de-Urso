@@ -156,9 +156,9 @@ class MigrarPostgresTest(unittest.TestCase):
         opcoes["esquema"] = self.esquema
         with (patch.object(caminhos, "motor_banco", return_value="postgres"),
               patch.object(caminhos, "postgres", return_value=opcoes),
-              patch.object(caminhos, "banco", return_value=str(self.origem)),
+              patch.object(caminhos, "banco", side_effect=AssertionError("Backup PostgreSQL consultou arquivo SQLite")),
               patch("subprocess.run", side_effect=AssertionError("Backup invocou um cliente externo"))):
-            backup = db.backup_operacional(self.origem.parent, "completo", self.origem)
+            backup = db.backup_operacional(self.origem.parent, "completo")
         self.assertEqual(backup.name, "completo.sql.gz")
         with gzip.open(backup, "rt", encoding="utf-8") as arquivo:
             comandos = arquivo.read()
@@ -202,13 +202,15 @@ class MigrarPostgresTest(unittest.TestCase):
         with (patch.object(caminhos, "motor_banco", return_value="postgres"),
               patch.object(caminhos, "postgres", return_value=opcoes),
               patch.object(caminhos, "data_dir", return_value=str(pasta)),
-              patch.object(caminhos, "banco", return_value=inexistente),
+              patch.object(caminhos, "banco", side_effect=AssertionError("Operação PostgreSQL consultou arquivo SQLite")),
               patch.multiple(config, DATA_DIR=str(pasta), RAW_DIR=str(pasta),
-                             STAGING_DIR=str(pasta), DB_PATH=inexistente),
+                             STAGING_DIR=str(pasta), DB_PATH=None),
               patch.object(db, "connect_sqlite", side_effect=AssertionError("SQLite operacional")),
               patch.object(db, "connect_sqlite_readonly", side_effect=AssertionError("SQLite operacional"))):
             self.assertEqual(nucleo.handle_request({"PATH_INFO": "/health/ready"})[0], 200)
-            with closing(db.connect_existing(inexistente)) as conn:
+            with self.assertRaisesRegex(ValueError, "sem arquivo --db"):
+                db.connect_existing(inexistente)
+            with closing(db.connect_existing()) as conn:
                 item = json.loads(API.read_bytes())["features"][0]
                 coletor = ColetorDNITEquipamentos(conn=conn)
                 self.assertEqual(coletor.ingerir_registros([item])["status"], "ok")

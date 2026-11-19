@@ -18,7 +18,7 @@ from . import caminhos
 from .governanca import GovernancaError
 from .contexto_api import operacao_local
 
-CAMINHOS = {("instalacao", "home"), ("dados", "dir"), ("dados", "banco"),
+CAMINHOS = {("instalacao", "home"), ("dados", "dir"), ("sqlite", "banco"),
             ("web", "raiz"), ("logs", "dir"), ("sincronizacao", "clone"),
             ("api", "token_arquivo"), ("geografia", "malha")}
 CAMINHOS.add(("assistente", "chave_arquivo"))
@@ -31,6 +31,7 @@ NUMEROS = {**{("governanca", k): (1, 1000000000)
            ("coleta", "timeout"): (1, 300),
            ("coleta", "tentativas"): (1, 10),
            ("coleta", "espera_atualizacao"): (1, 3600),
+           ("postgres", "connect_timeout"): (1, 3600),
            ("governanca", "gov_iteracoes"): (200000, 2000000)}
 NUMEROS.update({("interface", "mapa_min_percentual"): (10, 90),
                 ("interface", "mapa_min_altura_px"): (120, 600)})
@@ -102,9 +103,12 @@ def consultar(web=False):
     efetivos = {(i["secao"], i["chave"]): i["valor"] for i in caminhos.resumo()}
     efetivos[("api", "token_arquivo")] = caminhos.token_arquivo()
     itens = []
+    motor = caminhos.motor_banco()
     for secao, chaves in caminhos.SECOES.items():
         if secao == "sincronizacao":
             continue  # configuracao legada de operacao externa ao aplicativo
+        if secao in ("sqlite", "postgres") and secao != motor:
+            continue
         for chave in chaves:
             par = secao, chave
             valor, origem = caminhos.valor(secao, chave)
@@ -159,8 +163,8 @@ def _validar(valores):
             _erro(422, "valor_invalido", "Use texto de uma linha, ate 2048 caracteres.")
         if texto != texto.strip() or '"' in texto or "'" in texto:
             _erro(422, "valor_invalido", "Nao use aspas ou espacos nas extremidades.")
-        if par == ("dados", "banco") and texto and not caminhos._LEGADO.get() and (Path(texto).name != texto or "\\" in texto or texto in (".", "..")):
-            _erro(422, "caminho_invalido", "dados.banco aceita somente o nome do arquivo dentro de dados.dir.")
+        if par == ("sqlite", "banco") and texto and not caminhos._LEGADO.get() and (Path(texto).name != texto or "\\" in texto or texto in (".", "..")):
+            _erro(422, "caminho_invalido", "sqlite.banco aceita somente o nome do arquivo dentro de dados.dir.")
         if texto and par in NUMEROS:
             minimo, maximo = NUMEROS[par]
             if not texto.isdecimal() or not minimo <= int(texto) <= maximo:
@@ -219,6 +223,10 @@ def _editar(texto, alteracoes):
         if (secao, chave) in (("instalacao", "usuario"), ("instalacao", "grupo")):
             continue
         secoes.setdefault(secao, {"comentarios": [], "valores": {}})["valores"][chave] = valor
+    dados = secoes.get("dados", {}).get("valores", {})
+    legado = dados.pop("banco", None)
+    if legado is not None and (dados.get("motor") or "sqlite").lower() == "sqlite":
+        secoes.setdefault("sqlite", {"comentarios": [], "valores": {}})["valores"].setdefault("banco", legado)
     while inicio and not inicio[-1].strip():
         inicio.pop()
     linhas = inicio
@@ -237,13 +245,15 @@ def _validar_destinos(alteracoes):
     motor = alteracoes.get(("dados", "motor"), caminhos.motor_banco()) or "sqlite"
     if motor not in ("sqlite", "postgres"):
         _erro(422, "motor_invalido", "Use dados.motor=sqlite ou postgres.")
-    operacionais = {("dados", "banco"): "radar.sqlite3", ("logs", "dir"): "logs",
+    operacionais = {("logs", "dir"): "logs",
                     ("api", "token_arquivo"): "api_token", ("assistente", "chave_arquivo"): "assistente_chave",
                     ("geografia", "malha"): "", ("sincronizacao", "clone"): ""}
     operacionais[('traseiro','tokens_arquivo')]='traseiro_tokens.json'
     if motor == "postgres":
         operacionais.update({("postgres", "pgpass"): "postgres.pgpass",
                               ("postgres", "certificado_ca"): ""})
+    else:
+        operacionais[("sqlite", "banco")] = caminhos.PADROES[("sqlite", "banco")]
     # Conferir tambem valores que nao foram editados: mudar dados.dir nao pode
     # deixar um token/log/malha absoluto apontando para a antiga raiz.
     for par, padrao in operacionais.items():
@@ -253,11 +263,14 @@ def _validar_destinos(alteracoes):
         try:
             token = caminhos._LEGADO.set(False)
             try:
-                caminhos.dentro_dados(texto, ".".join(par), base=dados)
+                destino = Path(caminhos.dentro_dados(texto, ".".join(par), base=dados))
             finally:
                 caminhos._LEGADO.reset(token)
         except ValueError as exc:
             _erro(422, "destino_fora_dados", str(exc))
+        if (par == ("sqlite", "banco") and alteracoes.keys() & {par, ("dados", "dir"), ("dados", "motor")}
+                and not destino.is_file()):
+            _erro(422, "destino_ausente", "O banco deve existir dentro de dados.dir; a configuracao nao move arquivos.")
     especiais = {("instalacao", "home"): caminhos.home, ("web", "raiz"): caminhos.web_raiz}
     for par, valor in alteracoes.items():
         if par not in CAMINHOS:
@@ -271,8 +284,8 @@ def _validar_destinos(alteracoes):
         else:
             if not valor:
                 continue
-            if par == ("dados", "banco") and (Path(valor).name != valor or "\\" in valor or valor in (".", "..")):
-                _erro(422, "caminho_invalido", "dados.banco deve conter apenas o nome do arquivo.")
+            if par == ("sqlite", "banco") and (Path(valor).name != valor or "\\" in valor or valor in (".", "..")):
+                _erro(422, "caminho_invalido", "sqlite.banco deve conter apenas o nome do arquivo.")
             try:
                 # A API de configuracao sempre aplica as regras estritas, mesmo
                 # quando chamada por uma ferramenta local de manutencao.
@@ -283,18 +296,12 @@ def _validar_destinos(alteracoes):
                     caminhos._LEGADO.reset(token)
             except ValueError as exc:
                 _erro(422, "destino_fora_dados", str(exc))
-        if par != ("dados", "banco") and not destino.exists():
+        if par != ("sqlite", "banco") and not destino.exists():
             _erro(422, "destino_ausente", ".".join(par) + ": prepare o destino antes de salvar.")
-        if motor == "sqlite" and par == ("dados", "banco") and not destino.is_file():
-            _erro(422, "destino_ausente", "O banco deve existir dentro de dados.dir; a configuracao nao move arquivos.")
         if par == ("instalacao", "home") and not (destino / "core/entrada_api.py").is_file():
             _erro(422, "destino_invalido", "O codigo deve conter core/entrada_api.py.")
         if par == ("web", "raiz") and not (destino / "api.pse").is_file():
             _erro(422, "destino_invalido", "O site deve conter api.pse.")
-    if motor == "sqlite" and ("dados", "dir") in alteracoes:
-        nome = alteracoes.get(("dados", "banco")) or Path(caminhos.banco()).name
-        if not (dados / nome).is_file():
-            _erro(422, "destino_ausente", "O banco deve estar no novo dados.dir antes de salvar.")
 
 
 def salvar(dados, autor="local", web=False, *, auditar=True):

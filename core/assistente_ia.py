@@ -23,7 +23,8 @@ def ativo(funcao=None):
 
 def arquivo_chave():
     arq = Path(caminhos.caminho("assistente", "chave_arquivo", "assistente_chave"))
-    protegidos = {Path(caminhos.conf_path()).resolve(), Path(caminhos.banco()).resolve(),
+    protegido_banco = caminhos.banco() if caminhos.motor_banco() == "sqlite" else caminhos.postgres()["passfile"]
+    protegidos = {Path(caminhos.conf_path()).resolve(), Path(protegido_banco).resolve(),
                   Path(caminhos.token_arquivo()).resolve()}
     if arq.resolve() in protegidos or arq.name.startswith("radar.conf"):
         raise GovernancaError(422, "chave_invalida", "A chave deve ficar em arquivo separado dentro de dados.dir.")

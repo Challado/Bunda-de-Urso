@@ -14,6 +14,9 @@ home = /caminho/da/aplicacao
 
 [dados]
 dir = /caminho/da/aplicacao/dados
+motor = sqlite
+
+[sqlite]
 banco = radar.sqlite3
 
 [web]

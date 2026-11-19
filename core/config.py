@@ -24,7 +24,7 @@ SCHEMA_POSTGRES = os.path.join(SQL_DIR, "schema.postgres.sql")
 DATA_DIR = caminhos.data_dir()
 RAW_DIR = caminhos.bruto()          # cache imutavel por sha256
 STAGING_DIR = caminhos.staging()    # banco em construcao
-DB_PATH = caminhos.banco()
+DB_PATH = caminhos.banco()  # Arquivo local apenas no motor SQLite.
 
 # Contrato/API
 API_VERSION = "1.0"

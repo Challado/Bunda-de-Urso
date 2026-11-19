@@ -36,7 +36,7 @@ def transacao(conn):
 def _servico_postgres(path, *, leitura=False):
     from .postgres_runtime import conectar
 
-    if path is not None and os.fspath(path) not in (config.DB_PATH, caminhos.banco()):
+    if path is not None:
         raise ValueError("Uma instalação PostgreSQL usa o banco de radar.conf, sem arquivo --db.")
     return conectar(connect_postgres, leitura=leitura)
 
@@ -77,18 +77,18 @@ def connect_sqlite(path=None, *, uri=False):
     return con
 
 
-def connect_existing(path):
+def connect_existing(path=None):
     """Escrita no banco existente; nunca cria uma base vazia por engano."""
     if postgres_ativo():
         return _servico_postgres(path)
-    return connect_sqlite(Path(path).resolve(strict=True).as_uri() + "?mode=rw", uri=True)
+    return connect_sqlite(Path(path or caminhos.banco()).resolve(strict=True).as_uri() + "?mode=rw", uri=True)
 
 
-def connect_readonly(path):
+def connect_readonly(path=None):
     """Leitura sem criar arquivos, alterar journal ou aceitar fallback de escrita."""
     if postgres_ativo():
         return _servico_postgres(path, leitura=True)
-    return connect_sqlite_readonly(path)
+    return connect_sqlite_readonly(path or caminhos.banco())
 
 
 def connect_sqlite_readonly(path):
@@ -256,7 +256,7 @@ def backup_operacional(pasta, nome, origem=None):
     with NamedTemporaryFile(dir=pasta, delete=False) as arq:
         temporario = Path(arq.name)
     try:
-        with closing(connect_readonly(origem or caminhos.banco())) as fonte:
+        with closing(connect_readonly(origem)) as fonte:
             if postgres:
                 fonte.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
             verificar_integridade(fonte)

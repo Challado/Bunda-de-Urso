@@ -1,13 +1,8 @@
-# Configuração de caminhos (`/etc/radar-brasil/radar.conf`)
+# Configuração de caminhos (`radar.conf`)
 
-O programa **não sabe** onde está instalado, onde mora o banco nem qual é o webroot.
-Ele pergunta — sempre — a um único lugar:
-
-| Ordem | Fonte | Uso |
-|---|---|---|
-| 1 | variável de ambiente | emergência, teste, CI, execução pontual |
-| 2 | `/etc/radar-brasil/radar.conf` | instalação no servidor (editável pela API) |
-| 3 | padrão do checkout | desenvolvimento e CI, sem configurar nada |
+Na instalação atual, o `radar.conf` fica ao lado de `api.pse`. A variável
+`RADAR_CONF` seleciona outro arquivo para uma execução. Os valores vêm desse
+arquivo, com padrões do código para as opções omitidas.
 
 Quem responde no código é `core/caminhos.py`. Nenhum módulo, conector, script de
 manutenção, entrada CGI ou arquivo de deploy decide caminho por conta própria.
@@ -33,30 +28,45 @@ se já existir, grava `radar.conf.novo` ao lado para revisão.
 
 ## Chaves
 
-| Seção.chave | O que é | Variável equivalente |
-|---|---|---|
-| `instalacao.home` | raiz do código (`core/`, `coletor/`, `web/`, `sql/`) | `RADAR_BRASIL_HOME` |
-| `dados.dir` | dados: banco, `raw/`, `staging/`, `calibracao/` | `RADAR_DATA_DIR` |
-| `dados.banco` | banco SQLite (vazio = `<dados.dir>/radar.sqlite3`) | `RADAR_DB` |
-| `web.raiz` | webroot servido pelo nginx/fcgiwrap | `RADAR_WEB_ROOT` |
-| `web.url` | prefixo público da consulta | `RADAR_WEB_URL` |
-| `logs.dir` | logs do tick e do dados-sync | `RADAR_LOG_DIR` |
-| `instalacao.usuario` / `.grupo` | dono esperado (informativo; o verificador confere) | — |
+| Seção.chave | O que é |
+|---|---|
+| `instalacao.home` | raiz do código (`core/`, `coletor/`, `web/`, `sql/`) |
+| `dados.dir` | diretório dos arquivos operacionais |
+| `dados.motor` | motor ativo, `sqlite` ou `postgres` |
+| `sqlite.banco` | nome do banco SQLite dentro de `dados.dir`, por padrão `radar.sqlite3` |
+| `postgres.host`, `.porta`, `.banco`, `.usuario`, `.esquema` | conexão e esquema do PostgreSQL |
+| `postgres.pgpass`, `.sslmode`, `.certificado_ca`, `.connect_timeout` | arquivo de senha, modo TLS, CA opcional e tempo de conexão em segundos |
+| `web.raiz` | webroot servido pelo nginx/fcgiwrap |
+| `web.url` | prefixo público da consulta |
+| `logs.dir` | logs do Radar |
 
 Extras:
 
-* caminho **relativo** no `.conf` é resolvido contra a pasta do próprio `.conf`;
+* `dados.dir` relativo é resolvido na pasta do `.conf`. Arquivos operacionais
+  relativos, como `sqlite.banco` e `postgres.pgpass`, são resolvidos dentro de `dados.dir`;
 * `~` é expandido;
-* chave vazia (`banco =`) cai no padrão daquela chave;
+* `sqlite.banco` vazio usa `radar.sqlite3`;
 * chave ou seção desconhecida **não derruba** nada: vira aviso em
   `python3 deploy/conf_radar.py --mostrar`.
+
+## Configuração do banco
+
+Use `[dados] motor = postgres` para selecionar `[postgres]`. A opção `pgpass`
+indica o arquivo de senha dentro de `dados.dir`. A porta padrão é 5432, o
+esquema padrão é `radar_brasil` e o tempo de conexão padrão é de 10 segundos.
+Para uma instalação SQLite, use `motor = sqlite` e informe o nome do arquivo
+em `[sqlite] banco`.
+
+Ao atualizar uma instalação antiga, o instalador converte `dados.banco` em
+`sqlite.banco` quando o motor é SQLite. Em PostgreSQL, remove a chave antiga e
+continua usando a conexão existente de `[postgres]`.
 
 ## O que cada peça faz
 
 * `core/caminhos.py` — a porta única (leitura, precedência, normalização).
 * `core/config.py` — reexporta `DATA_DIR`, `RAW_DIR`, `STAGING_DIR`, `DB_PATH`
   vindos da porta. Nada de caminho novo ali.
-* `core/manutencao/*.py` — `DB_PADRAO = caminhos.banco()`; `--db` continua mandando.
+* `core/manutencao/*.py` — `--db` seleciona um arquivo dentro de `dados.dir` nas instalações SQLite.
 * `deploy/radar-tick.sh` — chama o `radar-api.pse` instalado ao lado, com
   `cron tick`. A API resolve a configuração e abre o log; o shell não tem outro parser.
 * `deploy/api.pse` e `web/api.pse` — descobrem a raiz do código pelo `.conf`;
@@ -95,7 +105,7 @@ Com o `.conf`, caminho deixa de ser opinião de cada script: é configuração.
 
 1. `git clone` do código no novo destino;
 2. `install -d /etc/radar-brasil && install -m 0644 deploy/radar.conf.exemplo /etc/radar-brasil/radar.conf`;
-3. ajustar `home`, `dados.dir`, `dados.banco`, `web.raiz`, `logs.dir`;
+3. ajustar `home`, `dados.dir`, `dados.motor`, a seção do motor ativo, `web.raiz` e `logs.dir`;
 4. `python3 <home>/deploy/conf_radar.py --verificar`;
 5. copiar o `api.pse` para o webroot e o `radar-tick.sh` para o diretório do cron.
 
@@ -231,7 +241,7 @@ sempre guarda `checagem-final.json` no backup.
 O perfil privado é enviado à API por `--perfil-conf`: também completa caminhos e
 opções de instalação ausentes em um `radar.conf` parcial. O plano usa uma cópia
 temporária; o arquivo definitivo só é gravado ao aplicar, depois do backup. Se
-`dados.banco` foi omitido, acompanha `dados.dir` já configurado.
+`sqlite.banco` foi omitido numa instalação SQLite, usa `radar.sqlite3` dentro de `dados.dir`.
 
 Ao aplicar, diretórios operacionais ausentes são criados e recebem grupo e
 permissões adequados, inclusive os pais novos para permitir acesso pelo CGI.

@@ -3,10 +3,10 @@
 **Documentação:** [API e exportação — JSON, NDJSON, XML, TXT, DIF e EDIFACT](docs/API_E_EXPORTACAO.md) · [Rede e intercâmbio](docs/INTERCAMBIO_INSTANCIAS.md) · [Histórico](CHANGELOG.md)
 
 
-Configuração atual: só `RADAR_CONF` seleciona o arquivo. Banco, logs, tokens,
-chaves, fila e cache ficam dentro de `[dados] dir`; `banco = radar.sqlite3`
-é apenas o nome do arquivo. A configuração não contém usuário/grupo e a
-instalação transfere os agendamentos do Radar ao crontab do `www-data`.
+O `radar.conf` fica junto da API. `RADAR_CONF` pode indicar outro arquivo.
+`[dados] dir` reúne os arquivos operacionais do Radar e `[dados] motor`
+seleciona a configuração em `[postgres]` ou `[sqlite]`. A instalação
+transfere os agendamentos do Radar ao crontab do `www-data`.
 
 A instalação com `radar.conf` junto aos scripts e caminhos relativos está
 descrita em [Migração para a raiz web](docs/MIGRACAO_RAIZ_WEB.md). A migração

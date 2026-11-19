@@ -1,5 +1,10 @@
 # Histórico de alterações
 
+## Configuração por motor de banco
+
+- `[dados]` define o diretório operacional e o motor ativo. `[postgres]` define a conexão com o servidor e `[sqlite]` define o arquivo local.
+- O instalador converte configurações antigas e informa o motor ativo no relatório. Em PostgreSQL, a instalação valida o esquema PostgreSQL e omite o campo de arquivo SQLite de origem.
+
 ## Descoberta das edições da ANTT
 
 - O coletor acompanha as atividades do conjunto de radares e segue o link da revisão mais recente. O catálogo CKAN também pode indicar a edição atual.

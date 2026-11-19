@@ -63,10 +63,11 @@ def _configuracao_preparada(conf, perfil=None):
                 for chave, valor in padroes.items(secao):
                     if secao != "sincronizacao" and chave in caminhos.SECOES.get(secao, ()) and (secao, chave) not in gravadas:
                         faltantes[secao, chave] = valor
-            # Um banco omitido acompanha dados.dir existente. Uma chave vazia
-            # existente e preservada, como nas outras opcoes do servidor.
-            if ("dados", "dir") in gravadas and ("dados", "banco") in faltantes:
-                faltantes["dados", "banco"] = caminhos.banco()
+            motor = (faltantes.get(("dados", "motor")) or caminhos.motor_banco()).lower()
+            faltantes = {par: valor for par, valor in faltantes.items()
+                         if par[0] not in ("sqlite", "postgres") or par[0] == motor}
+            if ("dados", "banco") in gravadas:
+                faltantes.pop(("sqlite", "banco"), None)
         from .configuracao import _editar, _validar
         _validar(faltantes)
         with tempfile.TemporaryDirectory(prefix="radar-conf-efetiva-") as pasta:
@@ -104,8 +105,11 @@ def _diretorio(pasta, observacoes, modo=None, grupo=None):
 def _pastas_operacionais(dirs):
     from .fila_cadastros import PASTAS
     fila = Path(caminhos.fila_cadastros(dirs["dados"]))
-    return tuple(dict.fromkeys((fila, *(fila / n for n in PASTAS), dirs["dados"], dirs["logs"], dirs["dados"] / "raw",
-                                dirs["dados"] / "staging", dirs["dados"] / "calibracao", dirs["banco"].parent)))
+    pastas = (fila, *(fila / n for n in PASTAS), dirs["dados"], dirs["logs"], dirs["dados"] / "raw",
+              dirs["dados"] / "staging", dirs["dados"] / "calibracao")
+    if dirs["banco"] is not None:
+        pastas += (dirs["banco"].parent,)
+    return tuple(dict.fromkeys(pastas))
 
 
 def _observacoes(observacoes):
@@ -162,21 +166,24 @@ def _cgi(api, conf, rota, usuario=None):
 def _validar_layout(origem, conf, laboratorio):
     if sys.version_info < (3, 13):
         raise RuntimeError("Use Python 3.13 ou superior (RADAR_PYTHON).")
-    if db.sqlite3.sqlite_version_info < (3, 35, 0):
+    arquivo = caminhos.banco()
+    if arquivo is not None and db.sqlite3.sqlite_version_info < (3, 35, 0):
         raise RuntimeError("Use SQLite 3.35 ou superior no Python da instalacao.")
     if caminhos.problemas():
         raise RuntimeError("Corrija os avisos do radar.conf: " + "; ".join(caminhos.problemas()))
     pares = dict(caminhos._ler_conf()[0])
-    for par in (("instalacao", "home"), ("dados", "dir"), ("dados", "banco"),
+    for par in (("instalacao", "home"), ("dados", "dir"),
                 ("web", "raiz"), ("logs", "dir")):
         if not pares.get(par) or not Path(pares[par]).is_absolute():
             raise RuntimeError("Configure um caminho absoluto em %s.%s." % par)
     dirs = {"codigo": Path(caminhos.home()), "dados": Path(caminhos.data_dir()),
-            "banco": Path(caminhos.banco()), "web": Path(caminhos.web_raiz()),
+            "banco": Path(arquivo) if arquivo is not None else None, "web": Path(caminhos.web_raiz()),
             "logs": Path(caminhos.log_dir()), "conf": conf}
     if dirs["codigo"] == origem or dirs["codigo"] in origem.parents:
         raise RuntimeError("Baixe o codigo numa pasta temporaria fora da instalacao atual.")
     for nome, destino in dirs.items():
+        if destino is None:
+            continue
         if destino.is_symlink() or destino == Path("/"):
             raise RuntimeError("Destino deve ser regular, sem symlink: " + nome)
         if laboratorio and not destino.resolve().is_relative_to(laboratorio):
@@ -186,10 +193,10 @@ def _validar_layout(origem, conf, laboratorio):
     if dirs["codigo"].parent == dirs["conf"].parent:
         raise RuntimeError("A configuracao deve ter uma pasta exclusiva fora dos executaveis.")
     for nome in ("codigo", "dados", "logs", "conf", "banco"):
-        if dirs[nome].resolve().is_relative_to(dirs["web"].resolve()):
+        if dirs[nome] is not None and dirs[nome].resolve().is_relative_to(dirs["web"].resolve()):
             raise RuntimeError("Codigo, dados, logs e configuracao devem ficar fora do webroot.")
     for nome in ("dados", "web", "logs", "conf", "banco"):
-        if dirs[nome].resolve().is_relative_to(dirs["codigo"].resolve()):
+        if dirs[nome] is not None and dirs[nome].resolve().is_relative_to(dirs["codigo"].resolve()):
             raise RuntimeError("Dados/configuracao/web devem ficar fora da arvore substituida do codigo.")
     for nome in CODIGO:
         if not (origem / nome).is_dir():
@@ -200,7 +207,7 @@ def _validar_layout(origem, conf, laboratorio):
         reconhecido = any((dirs["codigo"] / nome).exists() for nome in ("VERSAO", "coletor", "deploy"))
         if any(dirs["codigo"].iterdir()) and not reconhecido:
             raise RuntimeError("Destino do codigo ocupado por outra aplicacao.")
-    if not db.postgres_ativo() and not dirs["banco"].is_file():
+    if dirs["banco"] is not None and not dirs["banco"].is_file():
         raise RuntimeError("O banco configurado nao existe. Este instalador atualiza o servidor existente e nao cria base vazia.")
     # A configuracao e o relatorio publico podem ter links conhecidos. Nunca
     # autorizar outros destinos apenas porque o nome parece um arquivo de status.
@@ -440,8 +447,10 @@ def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http=Non
             from .configuracao import _editar
             gravadas = auditoria.chaves_gravadas(conf.read_text())
             novas = {par: valor for par, valor in efetivos.items() if par not in gravadas and par[0] != "sincronizacao"}
-            if novas:
-                conf.write_text(_editar(conf.read_text(), novas))
+            texto = conf.read_text()
+            novo = _editar(texto, novas)
+            if novo != texto:
+                conf.write_text(novo)
                 observacoes.extend("Opcao acrescentada do perfil: %s.%s = %s" % (*par, valor) for par, valor in novas.items())
         # Migra parametros antigos de governanca sem substituir opcoes do .conf.
         antigo = backup / "item-00" / "config" / "governanca.json"
@@ -618,11 +627,12 @@ def _instalar(args, observacoes):
     origem = Path(caminhos.ROOT)
     lab = args.laboratorio.resolve() if args.laboratorio else None
     dirs = _validar_layout(origem, args.conf.absolute(), lab)
-    atualizacoes.evento("layout.validado", destinos={k: str(v) for k, v in dirs.items()})
+    destinos = {k: str(v) for k, v in dirs.items() if v is not None}
+    atualizacoes.evento("layout.validado", destinos=destinos, motor_banco=caminhos.motor_banco())
     if args.restaurar:
         return _recuperar(args.restaurar, dirs, lab, args.usuario_web)
     print(json.dumps({"acao": "aplicar" if args.aplicar else "simular",
-                      "destinos": {k: str(v) for k, v in dirs.items()},
+                      "destinos": destinos, "motor_banco": caminhos.motor_banco(),
                       "usuario_web": args.usuario_web,
                       "cron_tick": not args.sem_cron and not bool(lab),
                       "cron_fila": not args.sem_cron and not bool(lab)}, indent=2))
@@ -672,6 +682,8 @@ def _esquema_compativel_com_backup(backup, banco):
     if any((backup / arquivo).is_file() for arquivo in ("radar.sql.gz", "radar.pgdump")):
         return False  # Restaurar apenas aplicações compatíveis com o esquema PostgreSQL.
     anterior = backup / "radar.sqlite3"
+    if banco is None:
+        return not anterior.is_file()
     if not anterior.is_file() or not banco.is_file():
         return True
     with closing(db.connect_readonly(anterior)) as velho, closing(db.connect_readonly(banco)) as atual:

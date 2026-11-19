@@ -111,7 +111,7 @@ def construir(municipios, malha=None):
 
 
 def _cruzar_db(caminho_db, cadastro):
-    if not caminho_db or (not dbmod.postgres_ativo() and not os.path.exists(caminho_db)):
+    if not dbmod.postgres_ativo() and (not caminho_db or not os.path.exists(caminho_db)):
         return None
     try:
         conn = dbmod.connect_readonly(caminho_db)

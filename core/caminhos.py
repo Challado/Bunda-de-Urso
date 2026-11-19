@@ -44,8 +44,10 @@ _ENV = {}  # Somente RADAR_CONF seleciona o arquivo; valores vem do .conf.
 # Secoes/chaves conhecidas -- usado pelo exemplo, pelo verificador e pelo help.
 SECOES = {
     "instalacao": ("home",),
-    "dados": ("dir", "banco", "motor"),
-    "postgres": ("host", "porta", "banco", "usuario", "esquema", "pgpass", "sslmode", "certificado_ca"),
+    "dados": ("dir", "motor"),
+    "sqlite": ("banco",),
+    "postgres": ("host", "porta", "banco", "usuario", "esquema", "pgpass", "sslmode",
+                 "certificado_ca", "connect_timeout"),
     "web": ("raiz", "url", "origem"),
     "interface": ("mapa_min_percentual", "mapa_min_altura_px"),
     "traseiro": ("habilitado", "nome", "api_url", "acesso", "tokens_arquivo", "pares",
@@ -67,6 +69,9 @@ SECOES = {
 }
 # Apenas valores de instalacao. Segredos continuam em arquivos separados.
 PADROES = {
+    ("dados", "motor"): "sqlite",
+    ("sqlite", "banco"): "radar.sqlite3",
+    ("postgres", "connect_timeout"): "10",
     ("traseiro", "habilitado"): "0",
     ("traseiro", "nome"): "TRASEIRO DE URSO",
     ("traseiro", "api_url"): "",
@@ -184,7 +189,7 @@ def _ler_conf():
                         continue
                     if (secao, nome) in (("instalacao", "usuario"), ("instalacao", "grupo")) and _LEGADO.get():
                         continue
-                    if secao in SECOES and nome not in SECOES[secao]:
+                    if secao in SECOES and nome not in SECOES[secao] and (secao, nome) != ("dados", "banco"):
                         problemas.append(
                             "%s:%d: chave desconhecida [%s] %s"
                             % (caminho, numero, secao, nome))
@@ -195,6 +200,9 @@ def _ler_conf():
         except OSError as exc:
             problemas.append("%s: nao foi possivel ler (%s)" % (caminho, exc))
 
+    legado = valores.pop(("dados", "banco"), None)
+    if legado is not None and (valores.get(("dados", "motor")) or "sqlite").lower() == "sqlite":
+        valores.setdefault(("sqlite", "banco"), legado)
     _CACHE.update({"chave": chave, "valores": valores, "problemas": problemas})
     return valores, problemas
 
@@ -266,7 +274,7 @@ def caminho(secao, chave, padrao="", env=None):
         bruto = padrao
     if not bruto:
         return ""
-    if (secao, chave) in {("dados", "banco"), ("logs", "dir"), ("api", "token_arquivo"),
+    if (secao, chave) in {("sqlite", "banco"), ("logs", "dir"), ("api", "token_arquivo"),
                           ("traseiro", "tokens_arquivo"), ("assistente", "chave_arquivo"), ("geografia", "malha"), ("sincronizacao", "clone")}:
         return dentro_dados(bruto, secao + "." + chave)
     return _absoluto(bruto, origem)
@@ -328,18 +336,23 @@ def postgres():
     ca = valor("postgres", "certificado_ca")[0]
     sslmode = valor("postgres", "sslmode", "verify-full" if ca else "disable")[0]
     transporte = transporte_postgres(sslmode, ca)
+    timeout = int(valor("postgres", "connect_timeout")[0])
+    if timeout < 1:
+        raise ValueError("postgres.connect_timeout deve ser positivo.")
     return dict(host=dados["host"], dbname=dados["banco"], user=dados["usuario"], port=porta,
-                esquema=esquema, passfile=arquivo, connect_timeout=10, **transporte)
+                esquema=esquema, passfile=arquivo, connect_timeout=timeout, **transporte)
 
 
 def banco():
-    """Banco SQLite de producao (ou de trabalho, sem configuracao)."""
-    bruto, _ = valor("dados", "banco", "radar.sqlite3")
+    """Arquivo do motor ativo, quando a instalação usa SQLite."""
+    if motor_banco() != "sqlite":
+        return None
+    bruto, _ = valor("sqlite", "banco")
     # Aceita o caminho absoluto antigo somente se continuar dentro de dados.dir;
     # novas gravacoes de configuracao armazenam apenas o nome do arquivo.
     if not _LEGADO.get() and not os.path.isabs(bruto) and ("/" in bruto or "\\" in bruto or bruto in (".", "..")):
-        raise ValueError("dados.banco: informe somente o nome do arquivo dentro de dados.dir.")
-    return dentro_dados(bruto, "dados.banco")
+        raise ValueError("sqlite.banco: informe somente o nome do arquivo dentro de dados.dir.")
+    return dentro_dados(bruto, "sqlite.banco")
 
 
 def bruto():
@@ -395,13 +408,15 @@ def resumo():
     itens = [
         ("instalacao", "home", home()),
         ("dados", "dir", data_dir()),
-        ("dados", "banco", banco()),
+        ("dados", "motor", motor_banco()),
         ("web", "raiz", web_raiz()),
         ("web", "url", web_url()),
         ("logs", "dir", log_dir()),
         ("sincronizacao", "clone", sync_clone()),
         ("sincronizacao", "remoto", sync_remoto()),
     ]
+    if motor_banco() == "sqlite":
+        itens.append(("sqlite", "banco", banco()))
     saida = []
     for secao, chave, efetivo in itens:
         _, origem = valor(secao, chave)
