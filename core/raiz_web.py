@@ -631,7 +631,7 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
                 _preparar_backups(novo_dados,conta)
                 _comando(raiz,novo_conf,conta,lab,'ferramenta','inicializar_banco')
                 esquema_pg_atualizado = db.postgres_ativo()
-                if not db.postgres_ativo():
+                if not db.postgres_ativo() and not args.sem_reprocessamento:
                     _comando(raiz,novo_conf,conta,lab,'ferramenta','reconciliar_equipamentos','--aplicar')
                 print('RADAR_CONF_DESTINO: '+str(novo_conf),flush=True)
                 (raiz/'api.pse').write_bytes(_conteudo('api.pse',origem/'deploy/api.pse'))

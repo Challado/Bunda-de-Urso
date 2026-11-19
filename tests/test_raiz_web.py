@@ -144,6 +144,25 @@ class TestRaizWeb(unittest.TestCase):
         self.assertFalse((self.web/'dados/radar.sqlite3').exists())
         self.assertEqual((self.web/'dados/logs/diario/tick.log').read_text(),'historico anterior\n')
 
+    def test_reaplicacao_com_reprocessamento_adiado_recupera_api_em_manutencao(self):
+        resultado = self.rodar('--migrar-raiz-web', '--aplicar')
+        self.assertEqual(resultado.returncode, 0, resultado.stdout + resultado.stderr)
+        dados = self.web / 'dados'
+        backups_identidade = set((dados / 'backups/identidade').glob('*.sqlite3'))
+        self.assertTrue(backups_identidade)
+        api = self.web / 'api.pse'
+        api.write_text(f'#!{sys.executable}\nprint("Status: 503 Service Unavailable")\n')
+        conf = self.web / 'radar.conf'
+        resultado = self.rodar('--aplicar', '--sem-cron', '--sem-reprocessamento', conf=conf)
+        self.assertEqual(resultado.returncode, 0, resultado.stdout + resultado.stderr)
+        self.assertIn('Reconciliacao de equipamentos adiada', resultado.stdout)
+        self.assertEqual(set((dados / 'backups/identidade').glob('*.sqlite3')), backups_identidade)
+        with closing(db.connect_readonly(dados / 'radar.sqlite3')) as banco:
+            self.assertEqual(db.scalar(banco, 'SELECT valor FROM SENTINELA'), 'preservar')
+        ajuda = subprocess.run([str(api), 'ferramenta', 'migrar_postgres', '--help'],
+                               env=self.env, capture_output=True, text=True, timeout=15, check=True)
+        self.assertIn('--ativar', ajuda.stdout)
+
     def test_destino_com_outro_banco_nao_e_sobrescrito(self):
         (self.web/'dados').mkdir()
         sentinela=self.web/'dados/radar.sqlite3'

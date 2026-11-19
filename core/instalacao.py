@@ -275,7 +275,8 @@ def _cron_tick(texto, wrapper):
     return "\n".join(linhas) + "\n"
 
 
-def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, observacoes=None):
+def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, observacoes=None,
+             *, sem_reprocessamento=False):
     if not laboratorio and os.geteuid() != 0:
         raise RuntimeError("Execute como root para aplicar no servidor.")
     conta = pwd.getpwnam(usuario_web)
@@ -343,9 +344,10 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
                 # Inicializacao/migracoes continuam passando pela mesma entrada.
                 _executar([sys.executable, str(api), "ferramenta", "inicializar_banco"],
                           env=_ambiente(dirs["conf"]))
-                reconciliacao = _executar([sys.executable, str(api), "ferramenta", "reconciliar_equipamentos", "--aplicar"],
-                                          env=_ambiente(dirs["conf"]))
-                observacoes.append("Identidade dos equipamentos: " + reconciliacao.strip())
+                if not sem_reprocessamento:
+                    reconciliacao = _executar([sys.executable, str(api), "ferramenta", "reconciliar_equipamentos", "--aplicar"],
+                                              env=_ambiente(dirs["conf"]))
+                    observacoes.append("Identidade dos equipamentos: " + reconciliacao.strip())
                 _cgi(api, dirs["conf"], "/health/ready")
                 _cgi(api, dirs["conf"], "/api/v1/ajuda")
                 _executar([sys.executable, str(api), "configuracao", "mostrar"], env=_ambiente(dirs["conf"]))
@@ -566,6 +568,8 @@ def main(argv=None):
     parser.add_argument("--usuario-web", default="www-data")
     parser.add_argument("--laboratorio", type=Path, help="restringe destinos a esta pasta e nao altera cron do sistema")
     parser.add_argument("--sem-cron", action="store_true")
+    parser.add_argument("--sem-reprocessamento", action="store_true",
+                        help="aplica as migrações do esquema e adia a reconciliação de equipamentos")
     parser.add_argument("--origem-http", help="origem inicial da consulta HTTP; usada somente se web.origem ainda nao existe")
     parser.add_argument("--perfil-conf", type=Path, help="perfil inicial: completa somente chaves ausentes, sem substituir o radar.conf")
     parser.add_argument("--pacote-preparado", action="append", default=[], help=argparse.SUPPRESS)
@@ -574,6 +578,8 @@ def main(argv=None):
     modo.add_argument("--restaurar", type=Path, help="restaura codigo/web/configuracao de um backup; nunca restaura banco automaticamente")
     args = parser.parse_args(argv)
     observacoes = ["Dependencia preparada pelo instalador: " + pacote for pacote in args.pacote_preparado]
+    if args.aplicar and args.sem_reprocessamento:
+        observacoes.append("Reconciliacao de equipamentos adiada. As migracoes do esquema continuam ativas.")
     try:
         with _usar_conf(args.conf.absolute()):
             local = (Path(caminhos.home()).resolve() == Path(caminhos.web_raiz()).resolve()
@@ -634,7 +640,8 @@ def _instalar(args, observacoes):
             relatorio["acao"] = "sem_alteracoes"
             print("Instalacao ja atualizada; checagens aprovadas, sem nova copia ou backup.")
         else:
-            relatorio = _aplicar(origem, dirs, args.usuario_web, lab, not args.sem_cron, args.origem_http, observacoes)
+            relatorio = _aplicar(origem, dirs, args.usuario_web, lab, not args.sem_cron, args.origem_http,
+                                 observacoes, sem_reprocessamento=args.sem_reprocessamento)
         resultado = 0
     else:
         relatorio = _diagnosticar(origem, dirs, args.usuario_web, lab, not args.sem_cron,
