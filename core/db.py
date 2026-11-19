@@ -243,34 +243,25 @@ def verificar_integridade(conn):
 
 
 def backup_operacional(pasta, nome, origem=None):
-    """Backup nativo do motor configurado com publicação atômica."""
+    """Backup do motor configurado com publicação atômica."""
     from contextlib import closing
-    import subprocess
     from tempfile import NamedTemporaryFile
 
     pasta = Path(pasta)
     postgres = postgres_ativo()
-    saida = pasta / (nome + (".pgdump" if postgres else ".sqlite3"))
+    if postgres:
+        from . import postgres_backup
+
+    saida = pasta / (nome + (postgres_backup.SUFIXO if postgres else ".sqlite3"))
     with NamedTemporaryFile(dir=pasta, delete=False) as arq:
         temporario = Path(arq.name)
     try:
         with closing(connect_readonly(origem or caminhos.banco())) as fonte:
+            if postgres:
+                fonte.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
             verificar_integridade(fonte)
             if postgres:
-                opcoes = caminhos.postgres()
-                ambiente = {k: v for k, v in os.environ.items() if not k.startswith("PG")}
-                variaveis = {
-                    "host": "PGHOST", "port": "PGPORT", "dbname": "PGDATABASE", "user": "PGUSER",
-                    "passfile": "PGPASSFILE", "sslmode": "PGSSLMODE", "sslrootcert": "PGSSLROOTCERT",
-                    "connect_timeout": "PGCONNECT_TIMEOUT", "gssencmode": "PGGSSENCMODE",
-                }
-                ambiente.update({v: str(opcoes[k]) for k, v in variaveis.items() if k in opcoes})
-                try:
-                    subprocess.run(["pg_dump", "-w", "-Fc", "--schema", opcoes["esquema"],
-                                    "--file", str(temporario)], env=ambiente,
-                                   capture_output=True, check=True, timeout=1800)
-                except (OSError, subprocess.SubprocessError) as exc:
-                    raise RuntimeError("Falha no pg_dump. Confira a versão do cliente, TLS e acesso ao esquema.") from exc
+                postgres_backup.exportar(fonte, caminhos.postgres()["esquema"], temporario)
             else:
                 with closing(connect_sqlite(temporario)) as copia:
                     fonte.backup(copia)

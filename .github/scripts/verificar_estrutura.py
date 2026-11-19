@@ -46,7 +46,7 @@ ARTEFATOS = [
     re.compile(r"(^|/)__pycache__/"),
     re.compile(r"\.py[co]$"),
     re.compile(r"(^|/)\.DS_Store$"),
-    re.compile(r"\.(?:db|sqlite|sqlite3|pgdump)$", re.I),
+    re.compile(r"\.(?:db|sqlite|sqlite3|pgdump|sql\.gz)$", re.I),
     re.compile(r"\.log$", re.I),
     re.compile(r"(^|/)(?:\.venv|venv)/"),
     re.compile(r"^dados/"),

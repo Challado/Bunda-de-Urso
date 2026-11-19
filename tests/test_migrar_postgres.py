@@ -2,6 +2,7 @@
 
 from contextlib import closing
 from decimal import Decimal
+import gzip
 import json
 import os
 from pathlib import Path
@@ -123,6 +124,66 @@ class MigrarPostgresTest(unittest.TestCase):
             importar(origem, self.pg, self.esquema)
         self.assertEqual(self.pg.execute(self.sql.SQL("SELECT observacoes FROM {}").format(
             self.tabela("ponto_fiscalizacao"))).fetchone(), (texto,))
+
+    def test_backup_sql_recria_esquema_completo_e_preserva_dados_e_sequencias(self):
+        from psycopg import errors
+        from psycopg.conninfo import conninfo_to_dict
+        from core import caminhos
+
+        with closing(db.connect_readonly(self.copia)) as origem:
+            totais = importar(origem, self.pg, self.esquema)
+        sql = self.sql
+        pontos = self.tabela("ponto_fiscalizacao")
+        extra = self.tabela("nova_tabela")
+        vista = self.tabela("nova_vista")
+        self.pg.execute(sql.SQL("""
+            CREATE TABLE {} (
+                id BIGINT GENERATED ALWAYS AS IDENTITY (START WITH 30 INCREMENT BY 2),
+                id_ponto BIGINT UNIQUE REFERENCES {}(id),
+                exato NUMERIC(29, 13), texto TEXT, binario BYTEA, itens TEXT[],
+                dobro BIGINT GENERATED ALWAYS AS (id * 2) STORED
+            )
+        """).format(extra, pontos))
+        self.pg.execute(sql.SQL("CREATE VIEW {} AS SELECT * FROM {}").format(vista, extra))
+        exato = Decimal("6543210987654321.0123456789123")
+        texto = "ação ' ☃\\N\r\n\\q\n"
+        self.pg.execute(sql.SQL("""
+            INSERT INTO {}(id_ponto, exato, texto, binario, itens) VALUES (%s, %s, %s, %s, %s)
+        """).format(extra), (3000000000, exato, texto, bytes(range(256)), ["a,b", None, ""]))
+        self.pg.execute(sql.SQL("INSERT INTO {} DEFAULT VALUES").format(extra))
+        self.pg.execute(sql.SQL("DELETE FROM {} WHERE id = 32").format(extra))
+        opcoes = conninfo_to_dict(os.environ["RADAR_TESTE_POSTGRES"])
+        opcoes["esquema"] = self.esquema
+        with (patch.object(caminhos, "motor_banco", return_value="postgres"),
+              patch.object(caminhos, "postgres", return_value=opcoes),
+              patch.object(caminhos, "banco", return_value=str(self.origem)),
+              patch("subprocess.run", side_effect=AssertionError("Backup invocou um cliente externo"))):
+            backup = db.backup_operacional(self.origem.parent, "completo", self.origem)
+        self.assertEqual(backup.name, "completo.sql.gz")
+        with gzip.open(backup, "rt", encoding="utf-8") as arquivo:
+            comandos = arquivo.read()
+
+        self.pg.execute(sql.SQL("INSERT INTO {} DEFAULT VALUES").format(extra))
+        with self.assertRaises(errors.DivisionByZero):
+            try:
+                self.pg.execute(comandos.replace("\nCOMMIT;\n", "\nSELECT 1/0;\nCOMMIT;\n"))
+            finally:
+                self.pg.execute("ROLLBACK")
+        self.assertEqual(self.pg.execute(sql.SQL("SELECT count(*) FROM {}").format(extra)).fetchone(), (2,))
+
+        self.pg.execute(comandos)
+        for tabela, esperado in totais.items():
+            self.assertEqual(self.pg.execute(sql.SQL("SELECT count(*) FROM {}")
+                             .format(self.tabela(tabela))).fetchone(), (esperado,), tabela)
+        self.assertEqual(self.pg.execute(sql.SQL("SELECT * FROM {}").format(vista)).fetchall(),
+                         [(30, 3000000000, exato, texto, bytes(range(256)), ["a,b", None, ""], 60)])
+        self.assertEqual(self.pg.execute(sql.SQL("INSERT INTO {} DEFAULT VALUES RETURNING id")
+                         .format(extra)).fetchone(), (34,))
+        self.pg.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(self.esquema)))
+        self.assertEqual(self.pg.execute(sql.SQL("INSERT INTO {} DEFAULT VALUES RETURNING id")
+                         .format(pontos)).fetchone(), (3000000011,))
+        self.assertTrue(self.pg.execute("SELECT 1 FROM traseiro_ponto_pendente WHERE ponto_id=3000000011").fetchone())
+        self.pg.execute("RESET search_path")
 
     def test_api_coletor_e_fila_usam_postgres_sem_sqlite(self):
         from psycopg.conninfo import conninfo_to_dict

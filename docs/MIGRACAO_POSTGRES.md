@@ -16,9 +16,7 @@ certificado dentro de `[dados] dir` e use `--certificado-ca nome-do-arquivo.pem`
 Essa opção também ativa a verificação TLS quando usada sozinha. O modo
 escolhido é gravado no `radar.conf` para a API, o cron e os backups.
 
-O migrador usa o Psycopg 3 disponível no Python do Radar e o `pg_dump` no
-`PATH` da conta do serviço. Use um `pg_dump` de versão igual ou superior à
-do PostgreSQL remoto.
+O migrador e o backup SQL usam o Psycopg 3 disponível no Python do Radar.
 
 ## Simular e ativar
 
@@ -65,9 +63,12 @@ Confira a rota `/health/ready` da API e o banco ativo via CLI:
 runuser -u www-data -- ./api.pse ferramenta espelho_dados --backup pos-migracao
 ```
 
-O resultado indica `motor: postgres` e aponta para o backup nativo `.pgdump`,
-em `dados/backups/espelho-dados/`. A fila JSON, os brutos, as chaves e os logs continuam no diretório de
-dados do aplicativo. Nenhum componente usa o SQLite como fallback quando
+O resultado indica `motor: postgres` e aponta para um arquivo `.sql.gz` em
+`dados/backups/espelho-dados/`. O Radar consulta o catálogo do banco ativo e gera
+o SQL com a definição das tabelas, todos os registros, sequências, índices,
+restrições, views, rotinas e gatilhos do esquema. A leitura usa um snapshot
+consistente. A fila JSON, os brutos, as chaves e os logs ficam no diretório
+de dados do aplicativo. Nenhum componente usa o SQLite como fallback quando
 `[dados] motor = postgres`. O arquivo de origem fica como arquivo histórico,
 sem participação nas operações do Radar. Após a cópia, qualquer gravação nova
 é feita no PostgreSQL. Voltar simplesmente ao arquivo histórico perderia essas
@@ -76,6 +77,29 @@ gravações.
 Se existe um cron externo que abre o arquivo SQLite diretamente, desative-o
 antes da janela. O sincronizador privado atualizado usa
 `radar-dados-sync.py --api CAMINHO/api.pse` para seguir o banco ativo.
+
+## Restaurar o backup SQL
+
+Use a conta que vai ser dona das tabelas no destino. Para validar uma cópia,
+restaure primeiro em outro banco PostgreSQL UTF-8.
+
+```bash
+set -o pipefail
+gzip -dc dados/backups/espelho-dados/pos-migracao.sql.gz |
+    psql -X -v ON_ERROR_STOP=1 -d banco_de_teste
+```
+
+O SQL começa uma transação e executa `DROP TABLE IF EXISTS` nas tabelas do
+arquivo antes de recriá-las. Dependências fora desse conjunto, como uma view
+externa que use uma delas, fazem a restauração parar e reverter a transação.
+Para restaurar sobre uma instalação ativa, pause as operações do Radar
+durante a troca. A conta de destino deve ter as permissões de conexão e
+gravação adequadas. Contas, senhas e permissões do servidor PostgreSQL são
+configuradas no destino.
+
+Use uma versão do PostgreSQL que suporte as definições do esquema de origem.
+O arquivo SQL pode ser inspecionado e adaptado se o destino usar outro
+dialeto. Backups antigos `.pgdump` continuam restauráveis com `pg_restore`.
 
 O esquema e as dependências revistas estão descritos em
 [Normalização relacional](NORMALIZACAO_RELACIONAL.md).

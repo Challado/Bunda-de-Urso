@@ -2,7 +2,6 @@
 
 import argparse
 import os
-import shutil
 from contextlib import ExitStack, closing
 from getpass import GetPassWarning, getpass
 from graphlib import CycleError, TopologicalSorter
@@ -350,8 +349,6 @@ def main(argv=None):
 
             if os.geteuid() == 0:
                 raise ErroMigracao("Use --ativar com a mesma conta do serviço, como www-data.")
-            if shutil.which("pg_dump") is None:
-                raise ErroMigracao("pg_dump indisponível no PATH da conta do Radar.")
             atual = configuracao.consultar()
             if not atual["gravavel"]:
                 raise ErroMigracao("A conta do serviço precisa poder gravar radar.conf para ativar.")

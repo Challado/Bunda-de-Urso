@@ -669,7 +669,7 @@ def _instalar(args, observacoes):
 
 
 def _esquema_compativel_com_backup(backup, banco):
-    if (backup / "radar.pgdump").is_file():
+    if any((backup / arquivo).is_file() for arquivo in ("radar.sql.gz", "radar.pgdump")):
         return False  # Restaurar apenas aplicações compatíveis com o esquema PostgreSQL.
     anterior = backup / "radar.sqlite3"
     if not anterior.is_file() or not banco.is_file():
