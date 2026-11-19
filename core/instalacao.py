@@ -142,6 +142,8 @@ def _ambiente(conf):
                 k not in ("GATEWAY_INTERFACE", "REQUEST_METHOD", "QUERY_STRING", "PATH_INFO")}
     ambiente["RADAR_CONF"] = str(conf)
     ambiente["PYTHONDONTWRITEBYTECODE"] = "1"
+    if os.environ.get("RADAR_MIGRACAO_DIRETA") == "1":
+        ambiente["RADAR_MIGRACAO_DIRETA"] = "1"
     return ambiente
 
 

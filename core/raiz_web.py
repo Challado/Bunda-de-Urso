@@ -616,6 +616,7 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
                 descritor['url']=caminhos.web_inicio()
                 _json(projeto,descritor)
                 _json(raiz/'resources/projeto.json',descritor)
+                novos_logs.mkdir(parents=True, exist_ok=True)
                 for pasta in (novo_dados,novos_logs,raiz/'resources',*(raiz/p for p in CODIGO)):
                     _permissoes(pasta,conta)
                 for arq in raiz.iterdir():

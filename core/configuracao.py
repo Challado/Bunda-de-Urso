@@ -277,7 +277,7 @@ def _validar_destinos(alteracoes):
             _erro(422, "destino_ausente", "O banco deve estar no novo dados.dir antes de salvar.")
 
 
-def salvar(dados, autor="local", web=False):
+def salvar(dados, autor="local", web=False, *, auditar=True):
     if not isinstance(dados, dict) or set(dados) != {"revisao", "alteracoes"}:
         _erro(422, "configuracao_invalida", "Informe revisao e alteracoes.")
     if not isinstance(dados["revisao"], str) or not isinstance(dados["alteracoes"], dict):
@@ -336,16 +336,16 @@ def salvar(dados, autor="local", web=False):
                     b.write(anterior)
                     b.flush()
                     os.fsync(b.fileno())
-                auditoria = {"quando": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                             "autor": autor, "revisao_anterior": dados["revisao"],
-                             "revisao_nova": _revisao(novo),
-                             "chaves": sorted(dados["alteracoes"])}
-                fd_a = os.open(auxiliares / "radar.conf.auditoria.jsonl", os.O_CREAT | os.O_APPEND | os.O_WRONLY | os.O_NOFOLLOW, 0o660)
-                with os.fdopen(fd_a, "a", encoding="utf-8") as registro:
-                    _permissao_auxiliar(registro.fileno(), info.st_gid)
-                    registro.write(json.dumps(auditoria, ensure_ascii=False) + "\n")
-                    registro.flush()
-                    os.fsync(registro.fileno())
+                if auditar:
+                    auditoria = {"quando": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                                 "autor": autor, "revisao_anterior": dados["revisao"],
+                                 "revisao_nova": _revisao(novo), "chaves": sorted(dados["alteracoes"])}
+                    fd_a = os.open(auxiliares / "radar.conf.auditoria.jsonl", os.O_CREAT | os.O_APPEND | os.O_WRONLY | os.O_NOFOLLOW, 0o660)
+                    with os.fdopen(fd_a, "a", encoding="utf-8") as registro:
+                        _permissao_auxiliar(registro.fileno(), info.st_gid)
+                        registro.write(json.dumps(auditoria, ensure_ascii=False) + "\n")
+                        registro.flush()
+                        os.fsync(registro.fileno())
                 os.replace(temporario, arq)
                 pasta = os.open(arq.parent, os.O_RDONLY | os.O_DIRECTORY)
                 try:

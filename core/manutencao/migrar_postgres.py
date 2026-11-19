@@ -49,8 +49,6 @@ def preparar_origem(origem, destino):
 def criar_esquema(conn, esquema):
     from psycopg import errors, sql
 
-    if not re.fullmatch(r"[a-z][a-z0-9_]{0,62}", esquema) or esquema.startswith("pg_"):
-        raise ErroMigracao("Use um nome de esquema com até 63 letras minúsculas, dígitos ou _.")
     if conn.info.server_version < 120000:
         raise ErroMigracao("O migrador requer PostgreSQL 12 ou superior.")
     # CREATE SCHEMA sem IF NOT EXISTS também recusa uma criação concorrente.
@@ -175,13 +173,61 @@ def ajustar_sequencias(origem, destino, esquema):
                         (sequencia, max(1, ultimo), ultimo > 0))
 
 
-def importar(origem, destino, esquema, simular=False, progresso=None):
+def apagar_esquema_anterior(conn, esquema, tabelas):
+    from psycopg import errors, sql
+
+    existe = conn.execute("SELECT to_regnamespace(%s) IS NOT NULL", (esquema,)).fetchone()[0]
+    if not existe:
+        return
+    nome = sql.Identifier(esquema)
+    try:
+        anterior = conn.execute("SELECT to_regclass(%s) IS NOT NULL",
+                                (esquema + ".migracao_governanca",)).fetchone()[0]
+        if anterior:
+            ddl = [Path(config.SCHEMA_POSTGRES), *Path(config.SQL_DIR, "migracoes").glob("*.postgres.sql")]
+            definidos = {"VIEW": set(), "FUNCTION": set()}
+            for arquivo in ddl:
+                for tipo, objeto in re.findall(r"CREATE (?:OR REPLACE )?(VIEW|FUNCTION) (\w+)",
+                                                arquivo.read_text(encoding="utf-8"), re.I):
+                    definidos[tipo.upper()].add(objeto.lower())
+            tabelas_existentes = conn.execute("""
+                SELECT relname FROM pg_class WHERE relnamespace=%s::regnamespace AND relkind IN ('r','p')
+            """, (esquema,))
+            relacoes = {r[0] for r in tabelas_existentes}
+            if not relacoes <= tabelas or not {"uf", "ponto_fiscalizacao"} <= relacoes:
+                raise ErroMigracao("O destino contém tabelas alheias à migração do Radar.")
+            visoes = {r[0] for r in conn.execute("""
+                SELECT relname FROM pg_class WHERE relnamespace=%s::regnamespace AND relkind='v'
+            """, (esquema,))}
+            for classe, objetos in (("VIEW", visoes & definidos["VIEW"]), ("TABLE", relacoes)):
+                if objetos:
+                    conn.execute(sql.SQL("DROP " + classe + " {} RESTRICT").format(
+                        sql.SQL(", ").join(sql.Identifier(esquema, n) for n in sorted(objetos))))
+            for (funcao,) in conn.execute("""
+                SELECT proname FROM pg_proc WHERE pronamespace=%s::regnamespace
+                AND pronargs=0 AND prorettype='pg_catalog.trigger'::regtype
+            """, (esquema,)):
+                if funcao in definidos["FUNCTION"]:
+                    conn.execute(sql.SQL("DROP FUNCTION {}() RESTRICT").format(sql.Identifier(esquema, funcao)))
+        conn.execute(sql.SQL("DROP SCHEMA {} RESTRICT").format(nome))
+    except errors.DependentObjectsStillExist as exc:
+        raise ErroMigracao("O esquema de destino tem objetos extras ou dependências externas.") from exc
+
+
+def importar(origem, destino, esquema, simular=False, progresso=None, *, recriar=False):
     from psycopg import sql
 
+    if not re.fullmatch(r"[a-z][a-z0-9_]{0,62}", esquema) or esquema.startswith("pg_"):
+        raise ErroMigracao("Use um nome de esquema com até 63 letras minúsculas, dígitos ou _.")
+    if recriar and esquema == "public":
+        raise ErroMigracao("Use um esquema dedicado para o Radar, como radar_brasil.")
+    nomes = tabelas_sqlite(origem)
     with destino.transaction(force_rollback=simular):
+        if recriar:
+            destino.execute("SET LOCAL lock_timeout TO '10s'")
+            apagar_esquema_anterior(destino, esquema, nomes.keys())
         criar_esquema(destino, esquema)
         colunas, ordem = catalogo_postgres(destino, esquema)
-        nomes = tabelas_sqlite(origem)
         conferir_colunas(origem, nomes, colunas)
 
         # Triggers da rede geram novos eventos de origem. A cópia carrega a
@@ -242,7 +288,7 @@ def ativar_configuracao(host, banco, usuario, porta, esquema, ca, senha, revisao
                 "postgres.usuario": usuario, "postgres.esquema": esquema,
                 "postgres.pgpass": nome.name, "postgres.certificado_ca": "" if ca == "system" else ca,
             },
-        }, autor="migrar_postgres")
+        }, autor="migrar_postgres", auditar=os.environ.get("RADAR_MIGRACAO_DIRETA") != "1")
         concluida = True
     finally:
         if not concluida:
@@ -267,8 +313,12 @@ def main(argv=None):
     modo.add_argument("--simular", action="store_true", help="importe, valide e desfaça a transação")
     modo.add_argument("--ativar", action="store_true",
                       help="pause as gravações, copie os dados e ative o PostgreSQL")
+    parser.add_argument("--recriar-destino", action="store_true",
+                        help="substitua o esquema anterior do Radar em uma única transação")
 
     args = parser.parse_args(argv)
+    if args.recriar_destino and not args.ativar:
+        parser.error("--recriar-destino exige --ativar.")
 
     try:
         import psycopg
@@ -301,7 +351,7 @@ def main(argv=None):
             if not atual["gravavel"]:
                 raise ErroMigracao("A conta do serviço precisa poder gravar radar.conf para ativar.")
             revisao = atual["revisao"]
-            if input("Para pausar as gravações e migrar, digite ATIVAR: ").strip() != "ATIVAR":
+            if not args.recriar_destino and input("Para pausar as gravações e migrar, digite ATIVAR: ").strip() != "ATIVAR":
                 raise ErroMigracao("Ativação cancelada.")
         host = (args.host or input("Servidor PostgreSQL: ")).strip()
         banco = (args.banco or input("Nome do banco PostgreSQL: ")).strip()
@@ -330,7 +380,20 @@ def main(argv=None):
                 # Reserve a escrita no SQLite também para conexões abertas antes
                 # da atualização do Radar. O backup continua podendo ler o WAL.
                 reserva = corte.enter_context(closing(db.connect_sqlite(origem.as_uri() + "?mode=rw", uri=True)))
-                reserva.execute("BEGIN IMMEDIATE")
+                try:
+                    reserva.execute("BEGIN IMMEDIATE")
+                except sqlite3.OperationalError as exc:
+                    if exc.sqlite_errorcode != sqlite3.SQLITE_BUSY:
+                        raise
+                    operacoes.encerrar_reconciliacao_abandonada(origem)
+                    print("Aguardando o SQLite concluir a gravação em andamento...", flush=True)
+                    reserva.execute("PRAGMA busy_timeout=120000")
+                    try:
+                        reserva.execute("BEGIN IMMEDIATE")
+                    except sqlite3.OperationalError as ocupado:
+                        if ocupado.sqlite_errorcode != sqlite3.SQLITE_BUSY:
+                            raise
+                        raise ErroMigracao("O SQLite continua ocupado por outro processo.") from ocupado
                 print("Gravações pausadas.", flush=True)
             with TemporaryDirectory(prefix="migrar-postgres-", dir=config.DATA_DIR) as temp:
                 copia = Path(temp) / "origem.sqlite3"
@@ -338,7 +401,7 @@ def main(argv=None):
                 preparar_origem(origem, copia)
                 with closing(db.connect_sqlite_readonly(copia)) as fonte:
                     totais = importar(fonte, destino, args.esquema, simular=args.simular,
-                                      progresso=lambda t, n: print(f"{t}: {n} linhas", flush=True))
+                                      recriar=args.recriar_destino)
             if args.ativar:
                 try:
                     ativar_configuracao(host, banco, usuario, args.porta, args.esquema, ca, senha, revisao)

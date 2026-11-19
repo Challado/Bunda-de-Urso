@@ -88,6 +88,33 @@ class MigrarPostgresTest(unittest.TestCase):
             self.assertNotIn("valor que não é uma data", str(erro.exception))
         self.assertFalse(self.esquema_existe())
 
+    def test_recria_destino_e_recupera_o_esquema_anterior_se_copy_falhar(self):
+        with closing(db.connect(self.copia)) as origem:
+            importar(origem, self.pg, self.esquema)
+            pontos = self.tabela("ponto_fiscalizacao")
+            self.pg.execute(self.sql.SQL("INSERT INTO {} DEFAULT VALUES").format(pontos))
+            origem.execute("UPDATE snapshot_publicado SET publicado_em='data inválida'")
+            origem.commit()
+            with self.assertRaisesRegex(ErroMigracao, "22007"):
+                importar(origem, self.pg, self.esquema, recriar=True)
+            self.assertEqual(self.pg.execute(self.sql.SQL("SELECT count(*) FROM {}").format(pontos)).fetchone(), (2,))
+        with closing(db.connect_readonly(self.origem)) as origem:
+            importar(origem, self.pg, self.esquema, recriar=True)
+        self.assertEqual(self.pg.execute(self.sql.SQL("SELECT count(*) FROM {}").format(pontos)).fetchone(), (1,))
+
+    def test_recriacao_recusa_dependencias_externas(self):
+        with closing(db.connect_readonly(self.copia)) as origem:
+            importar(origem, self.pg, self.esquema)
+            fora = self.esquema + "_outro"
+            self.pg.execute(self.sql.SQL("CREATE SCHEMA {}").format(self.sql.Identifier(fora)))
+            self.addCleanup(self.pg.execute, self.sql.SQL("DROP SCHEMA {} CASCADE").format(self.sql.Identifier(fora)))
+            consulta = self.sql.Identifier(fora, "consulta")
+            self.pg.execute(self.sql.SQL("CREATE VIEW {} AS SELECT id FROM {}").format(
+                consulta, self.tabela("ponto_fiscalizacao")))
+            with self.assertRaisesRegex(ErroMigracao, "dependências externas"):
+                importar(origem, self.pg, self.esquema, recriar=True)
+            self.assertEqual(self.pg.execute(self.sql.SQL("SELECT id FROM {}").format(consulta)).fetchall(), [(3000000000,)])
+
     def test_api_coletor_e_fila_usam_postgres_sem_sqlite(self):
         from psycopg.conninfo import conninfo_to_dict
         from coletor.fontes.dnit import ColetorDNITEquipamentos

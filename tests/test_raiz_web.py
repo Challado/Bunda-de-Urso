@@ -153,7 +153,9 @@ class TestRaizWeb(unittest.TestCase):
         api = self.web / 'api.pse'
         api.write_text(f'#!{sys.executable}\nprint("Status: 503 Service Unavailable")\n')
         conf = self.web / 'radar.conf'
-        resultado = self.rodar('--aplicar', '--sem-cron', '--sem-reprocessamento', conf=conf)
+        with closing(db.connect(dados / 'radar.sqlite3')) as escritor:
+            escritor.execute('BEGIN IMMEDIATE')
+            resultado = self.rodar('--aplicar', '--sem-cron', '--sem-reprocessamento', conf=conf)
         self.assertEqual(resultado.returncode, 0, resultado.stdout + resultado.stderr)
         self.assertIn('Reconciliacao de equipamentos adiada', resultado.stdout)
         self.assertEqual(set((dados / 'backups/identidade').glob('*.sqlite3')), backups_identidade)

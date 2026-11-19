@@ -84,7 +84,7 @@ def registrar(operacao, dados, *, fonte=None, historico=None, recursos=None):
     Sem radar.conf, desenvolvimento/testes continuam sem arquivos operacionais.
     Falha no diario e visivel no stderr; nunca desfaz uma coleta confirmada.
     """
-    if not Path(caminhos.conf_path()).is_file():
+    if os.environ.get("RADAR_MIGRACAO_DIRETA") == "1" or not Path(caminhos.conf_path()).is_file():
         return
     try:
         arquivo = Path(caminhos.status_atualizacoes())

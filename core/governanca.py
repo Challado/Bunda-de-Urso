@@ -151,10 +151,11 @@ def aplicar_migracoes(conn):
         if aplicadas != {versao for versao, _ in migracoes_disponiveis()}:
             raise RuntimeError("O esquema PostgreSQL precisa ser atualizado antes do uso.")
         return conn
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS MIGRACAO_GOVERNANCA ("
-        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-        "versao TEXT NOT NULL UNIQUE, aplicada_em TEXT NOT NULL)")
+    if not dbmod.tabela_existe(conn, "MIGRACAO_GOVERNANCA"):
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS MIGRACAO_GOVERNANCA ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "versao TEXT NOT NULL UNIQUE, aplicada_em TEXT NOT NULL)")
     aplicadas = {r[0] for r in conn.execute(
         "SELECT versao FROM MIGRACAO_GOVERNANCA")}
     for versao, caminho in migracoes_disponiveis():

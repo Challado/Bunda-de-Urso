@@ -48,8 +48,10 @@ em `[dados] dir`.
 
 A ativação grava a senha num arquivo `.pgpass` de permissão 0600 dentro de
 `[dados] dir`. Nas outras modalidades a senha é usada somente em memória.
-O processo recusa um esquema já existente. Se a cópia terminar e a ativação
-falhar, o esquema fica disponível para inspeção e a saída registra a falha.
+O modo `--recriar-destino` com `--ativar` substitui o esquema dedicado do
+Radar na mesma transação da cópia. A ferramenta recusa tabelas alheias e
+dependências externas. Se a cópia falhar, o esquema anterior é recuperado
+pelo rollback. Se apenas a ativação falhar, a cópia fica no PostgreSQL.
 
 ## Depois da ativação
 

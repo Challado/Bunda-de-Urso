@@ -147,16 +147,15 @@ def init_db(conn, schema_path=None):
 
 def seed_dominios(conn):
     """Carga idempotente dos catalogos e das UFs."""
-    cur = conn.cursor()
-    for sigla, nome in _domains.UFS:
-        cur.execute("INSERT OR IGNORE INTO UF (sigla, nome) VALUES (?, ?)",
-                    (sigla, nome))
-    for tabela, itens in _domains.DOMINIOS.items():
-        col = COLUNA_TEXTO_DOMINIO.get(tabela, "descricao")
+    catalogos = [("UF", "sigla", "nome", _domains.UFS)]
+    catalogos.extend((tabela, "codigo", COLUNA_TEXTO_DOMINIO.get(tabela, "descricao"), itens)
+                    for tabela, itens in _domains.DOMINIOS.items())
+    for tabela, chave, texto, itens in catalogos:
+        existentes = {linha[0] for linha in conn.execute(f"SELECT {chave} FROM {tabela}")}
         for codigo, descricao in itens:
-            cur.execute(
-                "INSERT OR IGNORE INTO %s (codigo, %s) VALUES (?, ?)"
-                % (tabela, col), (codigo, descricao))
+            if codigo not in existentes:
+                conn.execute(f"INSERT OR IGNORE INTO {tabela} ({chave}, {texto}) VALUES (?, ?)",
+                             (codigo, descricao))
     conn.commit()
 
 
