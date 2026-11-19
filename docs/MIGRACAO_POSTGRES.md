@@ -12,7 +12,7 @@ certificado e de nome do servidor. Se o certificado for de uma CA privada,
 guarde o certificado da CA dentro de `[dados] dir` e passe
 `--certificado-ca nome-do-arquivo.pem`. Use o nome presente no certificado.
 
-O migrador usa o `psycopg2` disponível no Python do Radar e o `pg_dump` no
+O migrador usa o Psycopg 3 disponível no Python do Radar e o `pg_dump` no
 `PATH` da conta do serviço. Use um `pg_dump` de versão igual ou superior à
 do PostgreSQL remoto.
 

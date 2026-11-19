@@ -17,7 +17,7 @@ from core.manutencao.migrar_postgres import ErroMigracao, importar, preparar_ori
 @unittest.skipUnless(os.environ.get("RADAR_TESTE_POSTGRES"), "Requer PostgreSQL de testes.")
 class MigrarPostgresTest(unittest.TestCase):
     def setUp(self):
-        from psycopg2 import sql
+        from psycopg import sql
 
         self.sql = sql
         temp = TemporaryDirectory()
@@ -125,7 +125,7 @@ class MigrarPostgresTest(unittest.TestCase):
             self.tabela("ponto_fiscalizacao"))).fetchone(), (texto,))
 
     def test_api_coletor_e_fila_usam_postgres_sem_sqlite(self):
-        from psycopg2.extensions import parse_dsn
+        from psycopg.conninfo import conninfo_to_dict
         from coletor.fontes.dnit import ColetorDNITEquipamentos
         from core import caminhos, config, fila_cadastros
         from tests.test_dnit_http import API
@@ -136,7 +136,7 @@ class MigrarPostgresTest(unittest.TestCase):
         pasta = self.origem.parent / "operacional"
         pasta.mkdir()
         inexistente = str(pasta / "radar.sqlite3")
-        opcoes = parse_dsn(os.environ["RADAR_TESTE_POSTGRES"])
+        opcoes = conninfo_to_dict(os.environ["RADAR_TESTE_POSTGRES"])
         opcoes["esquema"] = self.esquema
         with (patch.object(caminhos, "motor_banco", return_value="postgres"),
               patch.object(caminhos, "postgres", return_value=opcoes),

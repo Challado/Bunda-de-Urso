@@ -95,17 +95,13 @@ def connect_sqlite_readonly(path):
     return connect_sqlite(Path(path).resolve(strict=True).as_uri() + "?mode=ro", uri=True)
 
 
-def connect_postgres(conninfo="", *, autocommit=False, **parametros):
-    """Abra PostgreSQL com o psycopg2 instalado."""
-    import psycopg2
-    from .postgres_runtime import Conexao
+def connect_postgres(**parametros):
+    """Abra PostgreSQL com o Psycopg 3 instalado."""
+    import psycopg
 
     if parametros.get("sslrootcert") == "system":
         parametros["sslrootcert"] = caminhos.certificado_postgres()
-    conn = psycopg2.connect(dsn=conninfo, connection_factory=Conexao, **parametros)
-    if autocommit:
-        conn.autocommit = True
-    return conn
+    return psycopg.connect(**parametros)
 
 
 def e_postgres(conn):
