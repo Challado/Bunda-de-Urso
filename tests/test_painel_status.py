@@ -133,6 +133,22 @@ class TestLeitoresStatus(BaseDedup):
         self.assertEqual(d['ultima_tentativa']['id'],erro)
         self.assertEqual(d['erros'][0]['codigo_erro'],'download')
 
+    def test_consulta_o_historico_de_todos_os_leitores_em_lote(self):
+        fonte = self.fonte('Fonte em lote')
+        for i in range(30):
+            recurso = self.recurso(fonte, str(i))
+            self.execucao(recurso, 'ok')
+            self.execucao(recurso, 'erro')
+        instrucoes = []
+        self.con.set_trace_callback(instrucoes.append)
+        try:
+            leitores = status.coletores(self.con, agenda={})['coletores']
+        finally:
+            self.con.set_trace_callback(None)
+        self.assertEqual(len(leitores), 30)
+        self.assertTrue(all(r['ultimo_sucesso']['status'] == 'ok' and r['estado'] == 'erro' for r in leitores))
+        self.assertLessEqual(len(instrucoes), 5)
+
     def test_inclui_leitores_da_agenda_ainda_nao_cadastrados(self):
         d=status.coletores(self.con,agenda={'antt':dict(conector=ColetorANTT,ativo=True,intervalo_s=3600)})
         self.assertEqual(d['total'],1)

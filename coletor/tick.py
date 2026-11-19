@@ -19,6 +19,7 @@ import importlib
 import json
 import os
 import sys
+from collections import Counter, defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -26,6 +27,7 @@ from core import config                                   # noqa: E402
 from core import db as dbmod                              # noqa: E402
 from core import atualizacoes                             # noqa: E402
 from coletor import agenda as agenda_mod, politica_http                  # noqa: E402
+from coletor.base import ColetorBase                                    # noqa: E402
 
 
 def agora_utc():
@@ -53,6 +55,39 @@ def historico(conn, recurso_id, n=10):
         (recurso_id, n))
 
 
+def _historicos_da_agenda(conn, itens):
+    classes = {chave: item["conector"] for chave, item in itens.items()}
+    pares = {chave: (cls.FONTE["nome"], cls.RECURSO["nome"]) for chave, cls in classes.items()}
+    frequencias = Counter(pares.values())
+    cadastrados = {(r["fonte"], r["recurso"]): r["id"] for r in conn.execute("""
+        SELECT f.nome AS fonte, rf.nome AS recurso, rf.id FROM RECURSO_FONTE rf
+        JOIN FONTE f ON f.id=rf.fonte_id
+    """)}
+    recursos = {}
+    for chave, par in pares.items():
+        # Cadastros novos, conectores com atualização própria e recursos
+        # partilhados ainda seguem o fluxo que consulta o estado na hora.
+        if (frequencias[par] == 1 and par in cadastrados
+                and classes[chave].garantir_referencias is ColetorBase.garantir_referencias):
+            recursos[chave] = cadastrados[par]
+    if dbmod.e_postgres(conn):
+        sql = """SELECT rf.id AS recurso_id, e.status, e.iniciada_em
+            FROM RECURSO_FONTE rf JOIN LATERAL (
+                SELECT status, iniciada_em, id FROM EXECUCAO_COLETA
+                WHERE recurso_id=rf.id ORDER BY id DESC LIMIT 10
+            ) e ON TRUE WHERE rf.id IN ({ids}) ORDER BY rf.id, e.id DESC"""
+    else:
+        sql = """SELECT recurso_id, status, iniciada_em FROM (
+                SELECT recurso_id, status, iniciada_em,
+                       ROW_NUMBER() OVER (PARTITION BY recurso_id ORDER BY id DESC) AS ordem
+                FROM EXECUCAO_COLETA WHERE recurso_id IN ({ids})
+            ) historico WHERE ordem<=10 ORDER BY recurso_id, ordem"""
+    historicos = defaultdict(list)
+    for row in dbmod.consultar_ids(conn, sql, recursos.values()):
+        historicos[row["recurso_id"]].append(row)
+    return {chave: (rid, historicos[rid]) for chave, rid in recursos.items()}
+
+
 def espera_s(intervalo_s, hist):
     """Segundos de espera desde a ultima tentativa (qualquer status).
 
@@ -75,11 +110,13 @@ def espera_s(intervalo_s, hist):
     return max(base * fator, agenda_mod.BACKOFF_MINIMO_S)
 
 
-def situacao(conn, item, agora):
+def situacao(conn, item, agora, referencia=None):
     """Decide se a fonte esta vencida. Retorna dict de decisao."""
-    conector = item["conector"](conn=conn)
-    _, recurso_id = conector.garantir_referencias()
-    hist = historico(conn, recurso_id)
+    if referencia is None:
+        conector = item["conector"](conn=conn)
+        _, recurso_id = conector.garantir_referencias()
+        referencia = recurso_id, historico(conn, recurso_id)
+    recurso_id, hist = referencia
     if not hist:
         return {"vencida": True, "motivo": "nunca_coletada",
                 "recurso_id": recurso_id, "ultima": None, "espera_s": 0}
@@ -131,8 +168,8 @@ def _registrar_estado_recursos(conn, agenda, resultados):
                e.linhas_validas, e.linhas_rejeitadas, e.registros_criados, e.registros_alterados
         FROM RECURSO_FONTE rf
         LEFT JOIN FONTE f ON f.id = rf.fonte_id
-        LEFT JOIN EXECUCAO_COLETA e ON e.id = (
-            SELECT u.id FROM EXECUCAO_COLETA u WHERE u.recurso_id = rf.id ORDER BY u.id DESC LIMIT 1)
+        LEFT JOIN ULTIMA_EXECUCAO_RECURSO ult ON ult.recurso_id=rf.id
+        LEFT JOIN EXECUCAO_COLETA e ON e.id=ult.execucao_id
         ORDER BY rf.id
     """):
         chave, item = itens.get((row["fonte"], row["recurso"]), (None, {}))
@@ -161,14 +198,21 @@ def executar(db_path=None, agora=None, forcar=None, arquivos=None,
     agenda = agenda or agenda_mod.carregar_agenda()
     config.ensure_dirs()
     conn = dbmod.connect(db_path or config.DB_PATH)
-    dbmod.init_db(conn)
     resultados = []
     try:
+        dbmod.init_db(conn)
+        ativos = {chave: item for chave, item in agenda.items() if item.get("ativo", True) or chave in forcar}
+        referencias = _historicos_da_agenda(conn, ativos) if ativos else {}
         for chave, item in sorted(agenda.items()):
-            if not item.get("ativo", True) and chave not in forcar:
+            if chave not in ativos:
                 resultados.append({"fonte": chave, "acao": "inativo"})
                 continue
-            diag = situacao(conn, item, agora)
+            referencia = referencias.get(chave)
+            diag = situacao(conn, item, agora, referencia)
+            if referencia is not None and diag["vencida"] and not dry_run and chave not in forcar:
+                # Uma execução manual pode ter ocorrido durante outra coleta deste tick.
+                rid = referencia[0]
+                diag = situacao(conn, item, agora, (rid, historico(conn, rid)))
             if not diag["vencida"] and chave not in forcar:
                 resultados.append({
                     "fonte": chave, "acao": "nao_vencido",

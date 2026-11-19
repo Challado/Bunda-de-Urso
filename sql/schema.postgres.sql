@@ -866,6 +866,12 @@ SELECT e.*, ea.artefato_id
 FROM EXECUCAO_COLETA e
 LEFT JOIN EXECUCAO_ARTEFATO ea ON ea.execucao_id=e.id;
 
+CREATE OR REPLACE VIEW ULTIMA_EXECUCAO_RECURSO AS
+SELECT rf.id AS recurso_id,
+       (SELECT e.id FROM EXECUCAO_COLETA e
+        WHERE e.recurso_id=rf.id ORDER BY e.id DESC LIMIT 1) AS execucao_id
+FROM RECURSO_FONTE rf;
+
 
 CREATE OR REPLACE FUNCTION validar_relacoes_coleta() RETURNS trigger AS $$
 BEGIN

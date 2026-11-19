@@ -88,6 +88,28 @@ class TestComplementos(apoio.BaseDedup):
         self.assertEqual(consultas.buscar_pontos(self.con, -25, -54, 100)[1]["total_pontos"], 1)
         self.assertEqual(consultas.buscar_cadastral(self.con)[1]["total_pontos"], 1)
 
+    def test_busca_carrega_complementos_em_lotes_e_conta_fora_da_pagina(self):
+        posicao = self.posicao(-25, -54)
+        pontos = [self.ponto(posicao) for _ in range(505)]
+        for ponto in pontos:
+            self.faixa(ponto, 1)
+            self.faixa(ponto, 2)
+        externo = self.equipamento("FORA-DA-PAGINA")
+        db.insert(self.con, "INSTALACAO", {"ponto_id": pontos[-1], "equipamento_id": externo})
+        instrucoes = []
+        self.con.set_trace_callback(instrucoes.append)
+        try:
+            radares, total = consultas.buscar_pontos(self.con, -25, -54, 100, limite=501)
+        finally:
+            self.con.set_trace_callback(None)
+        self.assertEqual(len(radares), 501)
+        self.assertEqual(len(radares[-1]["faixas"]), 2)
+        self.assertEqual(radares[-1]["documentos"], [])
+        self.assertEqual(total["total_pontos"], 506)
+        self.assertEqual(total["total_equipamentos"], 2)
+        self.assertEqual(total["proximo_cursor"], "501")
+        self.assertLess(len(instrucoes), 40)
+
     def test_endereco_relacionado_aparece_sem_precisar_de_documentos(self):
         eid = db.insert(self.con, "ENDERECO", {"logradouro": "Avenida de teste", "numero": "42",
             "bairro": "Centro", "cep": "74000000", "ponto_referencia": "Ao lado da praça"})

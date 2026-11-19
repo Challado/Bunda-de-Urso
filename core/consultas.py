@@ -8,6 +8,7 @@ Enriquecimentos usam LEFT JOIN: dado complementar ausente nao elimina o principa
 import datetime
 import json
 import sqlite3
+from collections import defaultdict
 
 from . import db as dbmod
 from . import geo
@@ -38,6 +39,13 @@ LEFT JOIN SITUACAO_OPERACIONAL so ON so.id = p.situacao_operacional_id
 """
 
 
+def _agrupar_ids(conn, sql, ids, coluna):
+    grupos = defaultdict(list)
+    for row in dbmod.consultar_ids(conn, sql, ids):
+        grupos[row[coluna]].append(row)
+    return grupos
+
+
 def _bbox_clause(lat_min, lat_max, lon_min, lon_max, cruza):
     if cruza:
         lon_min_n = geo.normaliza_longitude(lon_min)
@@ -50,18 +58,22 @@ def _bbox_clause(lat_min, lat_max, lon_min, lon_max, cruza):
 
 
 ##-- BUNDITA DE URSO #{17} -- A UF de um alias nao pode alterar a localizacao original escolhida para o canonico. ##
-def _uf_original(conn, pid):
+def _ufs_originais(conn, ids):
     """UF derivada do payload original quando NAO ha municipio cadastrado.
 
     Nao inventa nada: le o campo 'uf'/sigla ja publicado pela propria fonte
     (spec: texto administrativo sem IBGE nao vira codigo, mas a sigla de UF
     publicada e um dado real da origem).
     """
-    for r in dbmod.query_all(
-            conn, "SELECT r.payload_original AS p "
+    ufs = {}
+    for r in dbmod.consultar_ids(
+            conn, "SELECT vp.ponto_id, r.payload_original AS p "
             "FROM VINCULO_REGISTRO_PONTO vp "
             "JOIN REGISTRO_FONTE_DETALHE r ON r.id=vp.registro_id "
-            "WHERE vp.ponto_id=? AND vp.decisao_id IS NULL ORDER BY r.id", (pid,)):
+            "WHERE vp.ponto_id IN ({ids}) AND vp.decisao_id IS NULL ORDER BY r.id", ids):
+        pid = r["ponto_id"]
+        if pid in ufs:
+            continue
         try:
             d = json.loads(r["p"])
         except (ValueError, TypeError):
@@ -75,25 +87,25 @@ def _uf_original(conn, pid):
                 continue
             s = str(v).strip().upper()
             if len(s) == 2 and s.isalpha():
-                return s
-    return None
+                ufs[pid] = s
+                break
+    return ufs
 
 
-def _uf_do_ponto(conn, row):
+def _uf_do_ponto(row, ufs):
     """UF do ponto: municipio cadastrado; senao a UF publicada na origem."""
     uf = row["uf"] if "uf" in row.keys() else None
-    return (uf or _uf_original(conn, row["ponto_id"]) or "").upper() or None
+    return (uf or ufs.get(row["ponto_id"]) or "").upper() or None
 
 
-def _governanca_do_ponto(conn, pid):
+def _governanca_dos_pontos(conn, ids):
     """Campos de governanca do ponto (ou {} se a base ainda nao os tem)."""
     try:
-        row = dbmod.query_one(
-            conn, "SELECT procedencia, verificacao_status, removido_em, "
-            "motivo_remocao FROM PONTO_FISCALIZACAO WHERE id=?", (pid,))
+        return {r["id"]: r for r in dbmod.consultar_ids(
+            conn, "SELECT id, procedencia, verificacao_status, removido_em, "
+            "motivo_remocao FROM PONTO_FISCALIZACAO WHERE id IN ({ids})", ids)}
     except sqlite3.OperationalError:
         return {}
-    return dict(row) if row is not None else {}
 
 
 def _filtros_extra(filtros, conn=None):
@@ -144,7 +156,7 @@ def _filtros_extra(filtros, conn=None):
     return clauses, params
 
 
-def _pontos_inferidos_dentro(conn, lat, lon, raio, filtros):
+def _pontos_inferidos_dentro(conn, lat, lon, raio, extra, params):
     """Pontos SEM posicao que ganham coordenada INFERIDA via (via, km).
 
     Le os pontos sem POSICAO_GEOGRAFICA mas com via + km, resolve o km pelo
@@ -156,12 +168,13 @@ def _pontos_inferidos_dentro(conn, lat, lon, raio, filtros):
 
     Devolve lista de ``(distancia_m, row)`` no mesmo formato de ``_PONTO_SQL``.
     """
-    candidatos = dbmod.query_all(
-        conn,
-        "SELECT p.id AS ponto_id, v.codigo AS via_codigo, p.km AS km "
-        "FROM PONTO_FISCALIZACAO p JOIN VIA v ON v.id = p.via_id "
-        "WHERE p.posicao_id IS NULL AND p.via_id IS NOT NULL "
-        "AND p.km IS NOT NULL", ())
+    sql = ("SELECT p.id AS ponto_id, v.codigo AS via_codigo, p.km AS km "
+           "FROM PONTO_FISCALIZACAO p JOIN VIA v ON v.id=p.via_id "
+           "LEFT JOIN SITUACAO_OPERACIONAL so ON so.id=p.situacao_operacional_id "
+           "WHERE p.posicao_id IS NULL AND p.km IS NOT NULL")
+    if extra:
+        sql += " AND " + " AND ".join(extra)
+    candidatos = dbmod.query_all(conn, sql, params)
     if not candidatos:
         return []
     calibracao = georesolver.calibracao()
@@ -182,14 +195,11 @@ def _pontos_inferidos_dentro(conn, lat, lon, raio, filtros):
             dentro[c["ponto_id"]] = (dist, rlat, rlon)
     if not dentro:
         return []
-    ids = sorted(dentro)
-    placeholders = ",".join("?" * len(ids))
-    extra, extra_params = _filtros_extra(filtros, conn)
-    sql = _PONTO_SQL + " WHERE p.id IN (%s)" % placeholders
+    sql = _PONTO_SQL + " WHERE p.id IN ({ids})"
     if extra:
         sql += " AND " + " AND ".join(extra)
     saida = []
-    for row in dbmod.query_all(conn, sql, ids + extra_params):
+    for row in dbmod.consultar_ids(conn, sql, dentro, params):
         dist, rlat, rlon = dentro[row["ponto_id"]]
         d = dict(row)
         d["latitude"] = rlat
@@ -218,15 +228,19 @@ def buscar_pontos(conn, lat, lon, raio, filtros=None, limite=100, cursor=None):
 
     visao = VisaoCanonica(conn)
     uf_filtro = (filtros.get("uf") or "").upper() or None
+    inferidos = _pontos_inferidos_dentro(conn, lat, lon, raio, extra, extra_params)
+    candidatos = rows + [r for _, r in inferidos]
+    contexto = _contexto_canonico(conn, candidatos, visao, bool(uf_filtro))
+    _, _, ufs = contexto
     dentro = []
     encontrados = set()
-    for r in rows:
-        r = _linha_canonica(conn, r, visao)
+    for r in candidatos:
+        r = _linha_canonica(conn, r, visao, contexto)
         if r is None or r["ponto_id"] in encontrados:
             continue
         if r["latitude"] is None or r["longitude"] is None:
             continue
-        if uf_filtro and _uf_do_ponto(conn, r) != uf_filtro:
+        if uf_filtro and _uf_do_ponto(r, ufs) != uf_filtro:
             continue
         dist = geo.haversine_m(lat, lon, r["latitude"], r["longitude"])
         if dist <= raio:
@@ -234,52 +248,25 @@ def buscar_pontos(conn, lat, lon, raio, filtros=None, limite=100, cursor=None):
             encontrados.add(r["ponto_id"])
     dentro.sort(key=lambda t: (t[0], t[1]["ponto_id"]))
 
-    inferidos = _pontos_inferidos_dentro(conn, lat, lon, raio, filtros)
-    uf_inf = (filtros.get("uf") or "").upper() or None
-    for dist, r in inferidos:
-        r = _linha_canonica(conn, r, visao)
-        if r is None or r["ponto_id"] in encontrados:
-            continue
-        if r["latitude"] is None or r["longitude"] is None:
-            continue
-        dist = geo.haversine_m(lat, lon, r["latitude"], r["longitude"])
-        if dist > raio:
-            continue
-        if uf_inf and _uf_do_ponto(conn, r) != uf_inf:
-            continue
-        dentro.append((dist, r))
-        encontrados.add(r["ponto_id"])
-    dentro.sort(key=lambda t: (t[0], t[1]["ponto_id"]))
-
-    incluir_operacoes = filtros.get("incluir_operacoes", True)
     pontual = filtros.get("fiscalizacao_pontual")
-    pre_montados = {}
-    ##-- BUNDITA DE URSO #{15} -- Filtrar depois de paginar produzia totais e paginas incorretos. ##
+    regimes = None
     if pontual is not None:
-        filtrados = []
-        for dist, row in dentro:
-            registro = montar_registro(conn, row, round(dist, 3), incluir_operacoes, visao)
-            ##-- BUNDITA DE URSO #{21} -- Regimes mistos satisfazem ambos os filtros; um regime nao pode apagar o outro. ##
-            modalidades = {rg["modalidade_fiscalizacao"] == "pontual"
-                           for rg in registro["regimes"]
-                           if rg.get("modalidade_fiscalizacao") not in (None, "", "desconhecida")}
-            if bool(pontual) in modalidades:
-                filtrados.append((dist, row))
-                pre_montados[row["ponto_id"]] = registro
-        dentro = filtrados
+        # O filtro depende apenas das modalidades do grupo canônico.
+        pontos = {pid for _, r in dentro for pid in visao.membros("ponto", r["ponto_id"])}
+        regimes = _agrupar_ids(conn, _REGIMES_SQL, pontos, "ponto_id")
+        dentro = [(dist, r) for dist, r in dentro
+                  if any(rg["modalidade"] not in (None, "", "desconhecida")
+                         and (rg["modalidade"] == "pontual") == bool(pontual)
+                         for pid in visao.membros("ponto", r["ponto_id"]) for rg in regimes.get(pid, ()))]
     total = len(dentro)
     offset = max(0, _offset_cursor(cursor))
     recorte = dentro[offset:offset + limite]
-    records = [pre_montados.get(r["ponto_id"]) or montar_registro(
-        conn, r, round(dist, 3), incluir_operacoes, visao) for dist, r in recorte]
-    # Contagem de instrumentos de todo o resultado, nao so da pagina.
-    pontos = {m for _, r in dentro for m in visao.membros("ponto", r["ponto_id"])}
-    equipamentos = set()
-    if pontos:
-        # Consultas por ponto evitam exceder o limite de parametros SQLite.
-        for pid in pontos:
-            equipamentos.update(visao.canonico("equipamento", row[0]) for row in conn.execute(
-                "SELECT equipamento_id FROM INSTALACAO WHERE ponto_id=?", (pid,)))
+    records = _montar_pontos(conn, [(r, round(dist, 3)) for dist, r in recorte],
+                            filtros.get("incluir_operacoes", True), visao, ufs, regimes)
+    # Contagem de instrumentos de todo o resultado, inclusive aliases.
+    pontos = {pid for _, r in dentro for pid in visao.membros("ponto", r["ponto_id"])}
+    equipamentos = {visao.canonico("equipamento", row[0]) for row in dbmod.consultar_ids(
+        conn, "SELECT DISTINCT equipamento_id FROM INSTALACAO WHERE ponto_id IN ({ids})", pontos)}
     return records, {
         "total_pontos": total,
         "total_equipamentos": len(equipamentos),
@@ -373,39 +360,55 @@ _VINCULOS_IDENTIFICADOR = {
 }
 
 
-def _documentos(conn, tipo, entidade_id):
+def _documentos_de(conn, tipo, ids):
     tabela, coluna = _VINCULOS_DOCUMENTO[tipo]
-    rows = dbmod.query_all(conn, """
-        SELECT v.documento_id, td.codigo AS tipo, d.codigo_documento,
+    grupos = defaultdict(list)
+    rows = dbmod.consultar_ids(conn, f"""
+        SELECT v.{coluna} AS entidade_id, v.documento_id, td.codigo AS tipo, d.codigo_documento,
                d.titulo, d.url, d.data_emissao, d.validade_ate,
                o.nome AS orgao_emissor, d.hash_conteudo, d.descricao
-        FROM %s v
+        FROM {tabela} v
         LEFT JOIN DOCUMENTO d ON d.id=v.documento_id
         LEFT JOIN TIPO_DOCUMENTO td ON td.id=d.tipo_documento_id
         LEFT JOIN ORGANIZACAO o ON o.id=d.orgao_emissor_id
-        WHERE v.%s=? ORDER BY v.documento_id
-        """ % (tabela, coluna), (entidade_id,))
-    return [{"id": "D-%d" % d["documento_id"], "tipo_documento": d["tipo"],
-             **{k: d[k] for k in ("codigo_documento", "titulo", "url", "data_emissao",
-                                  "validade_ate", "orgao_emissor", "hash_conteudo", "descricao")}}
-            for d in rows]
+        WHERE v.{coluna} IN ({{ids}}) ORDER BY v.documento_id
+        """, ids)
+    for d in rows:
+        grupos[d["entidade_id"]].append({
+            "id": "D-%d" % d["documento_id"], "tipo_documento": d["tipo"],
+            **{k: d[k] for k in ("codigo_documento", "titulo", "url", "data_emissao",
+                                 "validade_ate", "orgao_emissor", "hash_conteudo", "descricao")},
+        })
+    return grupos
 
 
-def _identificadores(conn, tipo, entidade_id):
+def _documentos(conn, tipo, entidade_id):
+    return _documentos_de(conn, tipo, [entidade_id])[entidade_id]
+
+
+def _identificadores_de(conn, tipo, ids):
     tabela, coluna = _VINCULOS_IDENTIFICADOR[tipo]
-    rows = dbmod.query_all(conn, """
-        SELECT COALESCE(g.valor_original, ex.valor) AS valor, ti.codigo AS tipo, f.nome AS fonte,
-               v.vigencia_inicio, v.vigencia_fim
-        FROM %s v
+    grupos = defaultdict(list)
+    rows = dbmod.consultar_ids(conn, f"""
+        SELECT v.{coluna} AS entidade_id, COALESCE(g.valor_original, ex.valor) AS valor,
+               ti.codigo AS tipo, f.nome AS fonte, v.vigencia_inicio, v.vigencia_fim
+        FROM {tabela} v
         LEFT JOIN IDENTIFICADOR_EXTERNO ex ON ex.id=v.identificador_id
         LEFT JOIN IDENTIFICADOR_GRAFIA g ON g.identificador_id=ex.id
         LEFT JOIN TIPO_IDENTIFICADOR ti ON ti.id=ex.tipo_identificador_id
         LEFT JOIN FONTE f ON f.id=ex.fonte_id
-        WHERE v.%s=? ORDER BY v.id
-        """ % (tabela, coluna), (entidade_id,))
-    return [{"fonte": r["fonte"], "tipo": r["tipo"], "valor": r["valor"],
-             "vigencia": {"inicio": r["vigencia_inicio"], "fim": r["vigencia_fim"]}}
-            for r in rows]
+        WHERE v.{coluna} IN ({{ids}}) ORDER BY v.id
+        """, ids)
+    for r in rows:
+        grupos[r["entidade_id"]].append({
+            "fonte": r["fonte"], "tipo": r["tipo"], "valor": r["valor"],
+            "vigencia": {"inicio": r["vigencia_inicio"], "fim": r["vigencia_fim"]},
+        })
+    return grupos
+
+
+def _identificadores(conn, tipo, entidade_id):
+    return _identificadores_de(conn, tipo, [entidade_id])[entidade_id]
 
 
 def _primeira_url(documentos):
@@ -418,32 +421,93 @@ def _url_certificado(documentos, numero):
     return next(iter(urls)) if len(urls) == 1 else None
 
 
-def _montar_registro_original(conn, r, distancia_metros=None, incluir_operacoes=True):
+_FAIXAS_SQL = """
+    SELECT f.ponto_id, f.id, f.numero_faixa, f.sentido_original, s.codigo AS sentido
+    FROM FAIXA_FISCALIZACAO f
+    LEFT JOIN SENTIDO s ON s.id=f.sentido_id
+    WHERE f.ponto_id IN ({ids}) ORDER BY f.id
+"""
+_LIMITES_SQL = """
+    SELECT vinculo.ponto_id, vinculo.id, vinculo.faixa_id, vinculo.velocidade_kmh,
+           vinculo.vigencia_inicio, vinculo.vigencia_fim, vinculo.registro_fonte_id,
+           c.codigo AS categoria
+    FROM (
+        SELECT l.ponto_id, l.id, l.faixa_id, l.velocidade_kmh, l.vigencia_inicio,
+               l.vigencia_fim, l.registro_fonte_id, l.categoria_veiculo_id
+        FROM LIMITE_VELOCIDADE l WHERE l.ponto_id IS NOT NULL
+        UNION ALL
+        SELECT f.ponto_id, l.id, l.faixa_id, l.velocidade_kmh, l.vigencia_inicio,
+               l.vigencia_fim, l.registro_fonte_id, l.categoria_veiculo_id
+        FROM LIMITE_VELOCIDADE l JOIN FAIXA_FISCALIZACAO f ON f.id=l.faixa_id
+        WHERE l.ponto_id IS NULL
+    ) vinculo LEFT JOIN CATEGORIA_VEICULO c ON c.id=vinculo.categoria_veiculo_id
+    WHERE vinculo.ponto_id IN ({ids}) ORDER BY vinculo.id
+"""
+_REGIMES_SQL = """
+    SELECT r.ponto_id, r.id, r.inicio_em, r.fim_em,
+           mf.codigo AS modalidade, tm.codigo AS tipo_medicao, so.codigo AS situacao
+    FROM REGIME_FISCALIZACAO r
+    LEFT JOIN MODALIDADE_FISCALIZACAO mf ON mf.id=r.modalidade_id
+    LEFT JOIN TIPO_MEDICAO tm ON tm.id=r.tipo_medicao_id
+    LEFT JOIN SITUACAO_OPERACIONAL so ON so.id=r.situacao_operacional_id
+    WHERE r.ponto_id IN ({ids}) ORDER BY r.id
+"""
+_INSTALACOES_SQL = """
+    SELECT i.ponto_id, i.equipamento_id AS id, e.numero_serie, e.ano_fabricacao,
+           tr.codigo AS tipo_radar, mo.nome_modelo, fa.nome AS fabricante,
+           i.id AS instalacao_id, i.inicio_em, i.fim_em
+    FROM INSTALACAO i
+    LEFT JOIN EQUIPAMENTO e ON e.id=i.equipamento_id
+    LEFT JOIN TIPO_RADAR tr ON tr.id=e.tipo_radar_id
+    LEFT JOIN MODELO_EQUIPAMENTO mo ON mo.id=e.modelo_id
+    LEFT JOIN ORGANIZACAO fa ON fa.id=mo.fabricante_id
+    WHERE i.ponto_id IN ({ids}) ORDER BY i.id
+"""
+_ORGANIZACOES_SQL = """
+    SELECT po.ponto_id, po.organizacao_id AS id, o.nome, p.codigo AS papel, po.inicio_em, po.fim_em
+    FROM PONTO_ORGANIZACAO po
+    LEFT JOIN ORGANIZACAO o ON o.id=po.organizacao_id
+    LEFT JOIN PAPEL_ORGANIZACAO p ON p.id=po.papel_id
+    WHERE po.ponto_id IN ({ids})
+"""
+
+
+def _dados_dos_pontos(conn, linhas, incluir_operacoes, ufs=None, regimes=None):
+    # Cada relação 1:N é lida em lote para evitar multiplicar faixas, limites
+    # e fontes entre si. A montagem do JSON só usa as linhas já carregadas.
+    ids = linhas.keys()
+    ufs = {} if ufs is None else ufs.copy()
+    ufs.update(_ufs_originais(conn, [pid for pid, r in linhas.items() if r["uf"] is None and pid not in ufs]))
+    return {
+        "uf": ufs,
+        "faixas": _agrupar_ids(conn, _FAIXAS_SQL, ids, "ponto_id"),
+        "limites": _agrupar_ids(conn, _LIMITES_SQL, ids, "ponto_id"),
+        "regimes": (_agrupar_ids(conn, _REGIMES_SQL, ids, "ponto_id") if regimes is None else regimes),
+        "equipamentos": _agrupar_ids(conn, _INSTALACOES_SQL, ids, "ponto_id"),
+        "organizacoes": _agrupar_ids(conn, _ORGANIZACOES_SQL, ids, "ponto_id"),
+        "documentos": _documentos_de(conn, "ponto", ids),
+        "identificadores": _identificadores_de(conn, "ponto", ids),
+        "fontes": _fontes_dos_pontos(conn, ids),
+        "operacoes": _operacoes_dos_pontos(conn, ids) if incluir_operacoes else {},
+        "governanca": _governanca_dos_pontos(conn, ids),
+    }
+
+
+def _montar_registro_original(r, dados, distancia_metros=None):
     pid = r["ponto_id"]
     reg = _row_to_base(r, distancia_metros)
     if reg["localizacao"].get("uf") is None:
-        reg["localizacao"]["uf"] = _uf_original(conn, pid)
+        reg["localizacao"]["uf"] = dados["uf"].get(pid)
 
     faixas = []
-    for f in dbmod.query_all(
-            conn, "SELECT f.id, f.numero_faixa, f.sentido_original, "
-            "s.codigo AS sentido FROM FAIXA_FISCALIZACAO f "
-            "LEFT JOIN SENTIDO s ON s.id=f.sentido_id WHERE f.ponto_id=?",
-            (pid,)):
+    for f in dados["faixas"].get(pid, ()):
         faixas.append({"id": "F-%d" % f["id"], "numero": f["numero_faixa"],
                        "sentido": f["sentido"],
                        "sentido_original": f["sentido_original"]})
     reg["faixas"] = faixas
 
     limites = []
-    for lim in dbmod.query_all(
-            conn, "SELECT l.id, l.faixa_id, l.velocidade_kmh, l.vigencia_inicio, "
-            "l.vigencia_fim, l.registro_fonte_id, c.codigo AS categoria "
-            "FROM LIMITE_VELOCIDADE l "
-            "LEFT JOIN CATEGORIA_VEICULO c ON c.id=l.categoria_veiculo_id "
-            "WHERE l.ponto_id=? OR l.faixa_id IN "
-            "(SELECT id FROM FAIXA_FISCALIZACAO WHERE ponto_id=?)",
-            (pid, pid)):
+    for lim in dados["limites"].get(pid, ()):
         limites.append({
             "faixa_id": ("F-%d" % lim["faixa_id"]) if lim["faixa_id"] else None,
             "categoria_veiculo": lim["categoria"],
@@ -462,14 +526,7 @@ def _montar_registro_original(conn, r, distancia_metros=None, incluir_operacoes=
     reg["quantidade_faixas_declarada"] = None
 
     regimes = []
-    for rg in dbmod.query_all(
-            conn, "SELECT r.id, r.inicio_em, r.fim_em, "
-            "mf.codigo AS modalidade, tm.codigo AS tipo_medicao, "
-            "so.codigo AS situacao FROM REGIME_FISCALIZACAO r "
-            "LEFT JOIN MODALIDADE_FISCALIZACAO mf ON mf.id=r.modalidade_id "
-            "LEFT JOIN TIPO_MEDICAO tm ON tm.id=r.tipo_medicao_id "
-            "LEFT JOIN SITUACAO_OPERACIONAL so ON so.id=r.situacao_operacional_id "
-            "WHERE r.ponto_id=?", (pid,)):
+    for rg in dados["regimes"].get(pid, ()):
         regimes.append({
             "id": "R-%d" % rg["id"],
             "modalidade_fiscalizacao": rg["modalidade"],
@@ -482,16 +539,7 @@ def _montar_registro_original(conn, r, distancia_metros=None, incluir_operacoes=
 
     equipamentos = []
     tipos = []
-    for eq in dbmod.query_all(
-            conn, "SELECT i.equipamento_id AS id, e.numero_serie, e.ano_fabricacao, "
-            "tr.codigo AS tipo_radar, mo.nome_modelo, fa.nome AS fabricante, "
-            "i.id AS instalacao_id, i.inicio_em, i.fim_em "
-            "FROM INSTALACAO i "
-            "LEFT JOIN EQUIPAMENTO e ON e.id=i.equipamento_id "
-            "LEFT JOIN TIPO_RADAR tr ON tr.id=e.tipo_radar_id "
-            "LEFT JOIN MODELO_EQUIPAMENTO mo ON mo.id=e.modelo_id "
-            "LEFT JOIN ORGANIZACAO fa ON fa.id=mo.fabricante_id "
-            "WHERE i.ponto_id=?", (pid,)):
+    for eq in dados["equipamentos"].get(pid, ()):
         equipamentos.append({
             "id": "E-%d" % eq["id"],
             "tipo_radar": eq["tipo_radar"],
@@ -524,23 +572,17 @@ def _montar_registro_original(conn, r, distancia_metros=None, incluir_operacoes=
     reg["tipos_radar_presentes"] = tipos
 
     organizacoes = []
-    for org in dbmod.query_all(
-            conn, "SELECT po.organizacao_id AS id, o.nome, p.codigo AS papel, po.inicio_em, po.fim_em "
-            "FROM PONTO_ORGANIZACAO po LEFT JOIN ORGANIZACAO o ON o.id=po.organizacao_id "
-            "LEFT JOIN PAPEL_ORGANIZACAO p ON p.id=po.papel_id "
-            "WHERE po.ponto_id=?", (pid,)):
+    for org in dados["organizacoes"].get(pid, ()):
         organizacoes.append({"id": "O-%d" % org["id"], "nome": org["nome"],
                              "papel": org["papel"],
                              "inicio_em": org["inicio_em"],
                              "fim_em": org["fim_em"]})
     reg["organizacoes"] = organizacoes
 
-    reg["documentos"] = _documentos(conn, "ponto", pid)
-    reg["identificadores_oficiais"] = _identificadores(conn, "ponto", pid)
-
-    reg["fontes"] = _fontes_do_ponto(conn, pid)
-    reg["operacoes"] = (operacoes_do_ponto(conn, pid)
-                        if incluir_operacoes else [])
+    reg["documentos"] = list(dados["documentos"].get(pid, ()))
+    reg["identificadores_oficiais"] = list(dados["identificadores"].get(pid, ()))
+    reg["fontes"] = list(dados["fontes"].get(pid, ()))
+    reg["operacoes"] = list(dados["operacoes"].get(pid, ()))
     reg["primeira_observacao"] = None
     reg["ultima_confirmacao"] = None
     reg["ultima_coleta"] = reg["fontes"][0]["coletado_em"] if reg["fontes"] else None
@@ -548,7 +590,7 @@ def _montar_registro_original(conn, r, distancia_metros=None, incluir_operacoes=
                         else "nao_avaliada")
     reg["observacoes"] = r["observacoes"]
     reg["proveniencia_campos"] = {}
-    gov = _governanca_do_ponto(conn, pid)
+    gov = dict(dados["governanca"].get(pid, {}))
     if gov:
         reg["procedencia"] = gov.get("procedencia")
         reg["verificacao_status"] = gov.get("verificacao_status")
@@ -568,15 +610,34 @@ def _unicos(itens):
 
 
 ##-- BUNDITA DE URSO #{1} -- Aliases precisam resolver o ponto vencedor sem ressuscitar entidades removidas. ##
-def _linha_canonica(conn, row, visao):
+def _contexto_canonico(conn, rows, visao, filtrar_uf=False):
+    """Carrega vencedores dos aliases e UFs em lote para a consulta atual."""
+    aliases = [r for r in rows if visao.canonico("ponto", r["ponto_id"]) != r["ponto_id"]]
+    ids = {visao.canonico("ponto", r["ponto_id"]) for r in aliases}
+    canonicos = {r["ponto_id"]: r for r in dbmod.consultar_ids(
+        conn, _PONTO_SQL + " WHERE p.id IN ({ids})", ids)}
+    ocultos = set()
+    if canonicos:
+        from .governanca import clausulas_consulta
+        clausulas, params = clausulas_consulta(conn)
+        if clausulas:
+            visiveis = {r[0] for r in dbmod.consultar_ids(
+                conn, "SELECT p.id FROM PONTO_FISCALIZACAO p WHERE p.id IN ({ids}) AND "
+                + " AND ".join(clausulas), canonicos, params)}
+            ocultos = canonicos.keys() - visiveis
+    candidatos_uf = {r["ponto_id"] for r in (rows if filtrar_uf else aliases) if r["uf"] is None}
+    candidatos_uf.update(pid for pid, r in canonicos.items() if r["uf"] is None)
+    ufs = dict.fromkeys(candidatos_uf)
+    ufs.update(_ufs_originais(conn, candidatos_uf))
+    return canonicos, ocultos, ufs
+
+
+def _linha_canonica(conn, row, visao, contexto=None):
     pid = visao.canonico("ponto", row["ponto_id"])
     if pid == row["ponto_id"]:
         return row
-    # Uma entidade removida/desabilitada nao pode reaparecer por um alias.
-    from . import governanca
-    clausulas, params = governanca.clausulas_consulta(conn)
-    sql = _PONTO_SQL + " WHERE p.id=?"
-    canonico = dbmod.query_one(conn, sql, (pid,))
+    canonicos, ocultos, ufs = _contexto_canonico(conn, [row], visao) if contexto is None else contexto
+    canonico = canonicos.get(pid)
     if canonico is None:
         return row
     ##-- BUNDITA DE URSO #{20} -- Escolher o ID canonico nao pode apagar GPS divergente, valido ou inferido de outra fonte. ##
@@ -588,33 +649,46 @@ def _linha_canonica(conn, row, visao):
     if any(row[k] != canonico[k] for k in
            ("codigo_ibge", "via_codigo", "km", "situacao_operacional")):
         return row
-    if _uf_do_ponto(conn, row) != _uf_do_ponto(conn, canonico):
+    if _uf_do_ponto(row, ufs) != _uf_do_ponto(canonico, ufs):
         return row
-    if clausulas:
-        # Uma remocao do canonico so oculta aliases equivalentes. Outra
-        # posicao publicada e uma divergencia preservada, nao uma exclusao.
-        return dbmod.query_one(conn, sql + " AND " + " AND ".join(clausulas), [pid] + params)
-    return canonico
+    # Remover o canônico só oculta aliases equivalentes.
+    return None if pid in ocultos else canonico
 
 
-##-- BUNDITA DE URSO #{1} -- Consolidar requer preservar faixas, fontes e divergencias dos pontos originais. ##
 def montar_registro(conn, r, distancia_metros=None, incluir_operacoes=True, visao=None):
     visao = visao or VisaoCanonica(conn)
     r = _linha_canonica(conn, r, visao)
     if r is None:
         return None
+    return _montar_pontos(conn, [(r, distancia_metros)], incluir_operacoes, visao)[0]
+
+
+def _montar_pontos(conn, recorte, incluir_operacoes, visao, ufs=None, regimes=None):
+    if not recorte:
+        return []
+    principais = {r["ponto_id"]: r for r, _ in recorte}
+    grupos = {pid: visao.membros("ponto", pid) for pid in principais}
+    outros = {membro for pid, membros in grupos.items() for membro in membros if membro != pid}
+    originais = {r["ponto_id"]: r for r in dbmod.consultar_ids(
+        conn, _PONTO_SQL + " WHERE p.id IN ({ids})", outros)}
+    dados = _dados_dos_pontos(conn, {**originais, **principais}, incluir_operacoes, ufs, regimes)
+    instrumentos = {}
+    return [_consolidar_ponto(conn, r, distancia, grupos[r["ponto_id"]], originais, dados, visao, instrumentos)
+            for r, distancia in recorte]
+
+
+def _consolidar_ponto(conn, r, distancia_metros, membros, originais, dados, visao, instrumentos):
     pid = r["ponto_id"]
-    reg = _montar_registro_original(conn, r, distancia_metros, incluir_operacoes)
-    membros = visao.membros("ponto", pid)
+    reg = _montar_registro_original(r, dados, distancia_metros)
     campos_lista = ("faixas", "limites_velocidade", "regimes", "equipamentos",
                     "organizacoes", "documentos", "identificadores_oficiais", "fontes", "operacoes")
     for outro in membros:
         if outro == pid:
             continue
-        row = dbmod.query_one(conn, _PONTO_SQL + " WHERE p.id=?", (outro,))
+        row = originais.get(outro)
         if row is None:
             continue
-        original = _montar_registro_original(conn, row, incluir_operacoes=incluir_operacoes)
+        original = _montar_registro_original(row, dados)
         for campo in campos_lista:
             reg[campo].extend(original[campo])
         endereco = original["localizacao"]["endereco"]
@@ -642,7 +716,9 @@ def montar_registro(conn, r, distancia_metros=None, incluir_operacoes=True, visa
             continue
         vistos.add(eid)
         if len(visao.membros("equipamento", eid)) > 1:
-            equip = buscar_equipamento_por_id(conn, eid, visao=visao)
+            if eid not in instrumentos:
+                instrumentos[eid] = buscar_equipamento_por_id(conn, eid, visao=visao)
+            equip = instrumentos[eid]
         equipamentos.append(equip)
     reg["equipamentos"] = equipamentos
     reg["tipos_radar_presentes"] = sorted({e["tipo_radar"] for e in equipamentos if e["tipo_radar"]})
@@ -696,42 +772,45 @@ def _fmt_fonte(f):
     }
 
 
-def _fontes_do_ponto(conn, pid):
-    out = []
-    for f in dbmod.query_all(
-            conn, "SELECT DISTINCT rf.fonte_id AS id, fo.nome, fo.esfera, org.nome AS organizacao, "
+def _fontes_dos_pontos(conn, ids):
+    out = defaultdict(list)
+    for f in dbmod.consultar_ids(
+            conn, "SELECT DISTINCT vp.ponto_id, rf.fonte_id AS id, fo.nome, fo.esfera, org.nome AS organizacao, "
             "fo.url_institucional, rf.url_recurso, rf.status_integracao, "
             "a.hash_sha256, a.baixado_em, ac.iniciada_em "
             "FROM VINCULO_REGISTRO_PONTO vp "
-            "LEFT JOIN REGISTRO_FONTE_DETALHE r ON r.id=vp.registro_id "
+            "LEFT JOIN REGISTRO_FONTE r ON r.id=vp.registro_id "
             "LEFT JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id "
             "LEFT JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id "
             "LEFT JOIN FONTE fo ON fo.id=rf.fonte_id "
             "LEFT JOIN ORGANIZACAO org ON org.id=fo.organizacao_id "
-            "LEFT JOIN EXECUCAO_COLETA_DETALHE ac ON ac.artefato_id=a.id "
-            "WHERE vp.ponto_id=?", (pid,)):
-        out.append(_fmt_fonte(f))
+            "LEFT JOIN EXECUCAO_ARTEFATO ea ON ea.artefato_id=a.id "
+            "LEFT JOIN EXECUCAO_COLETA ac ON ac.id=ea.execucao_id "
+            "WHERE vp.ponto_id IN ({ids})", ids):
+        out[f["ponto_id"]].append(_fmt_fonte(f))
+    return out
+
+
+def _fontes_dos_registros(conn, ids):
+    out = defaultdict(list)
+    for f in dbmod.consultar_ids(
+            conn, "SELECT r.id AS registro_id, rf.fonte_id AS id, fo.nome, fo.esfera, org.nome AS organizacao, "
+            "fo.url_institucional, rf.url_recurso, rf.status_integracao, "
+            "a.hash_sha256, a.baixado_em, ac.iniciada_em "
+            "FROM REGISTRO_FONTE r "
+            "LEFT JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id "
+            "LEFT JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id "
+            "LEFT JOIN FONTE fo ON fo.id=rf.fonte_id "
+            "LEFT JOIN ORGANIZACAO org ON org.id=fo.organizacao_id "
+            "LEFT JOIN EXECUCAO_ARTEFATO ea ON ea.artefato_id=a.id "
+            "LEFT JOIN EXECUCAO_COLETA ac ON ac.id=ea.execucao_id "
+            "WHERE r.id IN ({ids})", ids):
+        out[f["registro_id"]].append(_fmt_fonte(f))
     return out
 
 
 def _fontes_por_registro(conn, registro_id):
-    """Fontes de proveniencia de UM REGISTRO_FONTE (usado por trechos/operacoes)."""
-    if registro_id is None:
-        return []
-    out = []
-    for f in dbmod.query_all(
-            conn, "SELECT rf.fonte_id AS id, fo.nome, fo.esfera, org.nome AS organizacao, "
-            "fo.url_institucional, rf.url_recurso, rf.status_integracao, "
-            "a.hash_sha256, a.baixado_em, ac.iniciada_em "
-            "FROM REGISTRO_FONTE_DETALHE r "
-            "LEFT JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id "
-            "LEFT JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id "
-            "LEFT JOIN FONTE fo ON fo.id=rf.fonte_id "
-            "LEFT JOIN ORGANIZACAO org ON org.id=fo.organizacao_id "
-            "LEFT JOIN EXECUCAO_COLETA_DETALHE ac ON ac.artefato_id=a.id "
-            "WHERE r.id=?", (registro_id,)):
-        out.append(_fmt_fonte(f))
-    return out
+    return _fontes_dos_registros(conn, [registro_id])[registro_id] if registro_id is not None else []
 
 
 # O cadastro proprio pode guardar contato e metadados privados no bruto.
@@ -757,33 +836,30 @@ def _dados_por_fonte(conn, pid, visao, registros_metrologicos=(), registros_cada
     """
     grupos, registros = {}, {}
     membros = visao.membros("ponto", pid)
-    selecionados = {r[0] for membro in membros for r in conn.execute(
-        "SELECT registro_id FROM VINCULO_REGISTRO_PONTO WHERE ponto_id=?", (membro,))}
-    registros_do_ponto = set(selecionados)
-    for membro in membros:
-        selecionados.update(r[0] for r in conn.execute("""SELECT ve.registro_id
-            FROM INSTALACAO i
-            JOIN VINCULO_REGISTRO_EQUIPAMENTO ve ON ve.equipamento_id=i.equipamento_id
-            WHERE i.ponto_id=? AND ve.decisao_id IS NULL""", (membro,)))
+    registros_do_ponto = {r[0] for r in dbmod.consultar_ids(
+        conn, "SELECT DISTINCT registro_id FROM VINCULO_REGISTRO_PONTO WHERE ponto_id IN ({ids})", membros)}
+    selecionados = registros_do_ponto | {r[0] for r in dbmod.consultar_ids(conn, """
+        SELECT DISTINCT ve.registro_id FROM INSTALACAO i
+        JOIN VINCULO_REGISTRO_EQUIPAMENTO ve ON ve.equipamento_id=i.equipamento_id
+        WHERE i.ponto_id IN ({ids}) AND ve.decisao_id IS NULL
+    """, membros)}
     selecionados.update(rid for rid in registros_metrologicos if rid is not None)
     selecionados.update(registros_cadastrais)
-    # Consultas por PK evitam produto cartesiano entre faixas, verificacoes e fontes.
-    for rid in sorted(selecionados):
-        for row in dbmod.query_all(conn, """
-                SELECT r.id AS registro_id, r.identificador_na_fonte,
-                       r.payload_original, a.hash_sha256, a.baixado_em,
-                       rf.nome AS recurso, rf.url_recurso,
-                       rf.fonte_id, fo.nome, fo.url_institucional,
-                       n.codigo AS natureza, org.nome AS organizacao
-                FROM REGISTRO_FONTE_DETALHE r
-                LEFT JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id
-                LEFT JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id
-                LEFT JOIN FONTE fo ON fo.id=rf.fonte_id
-                LEFT JOIN NATUREZA_FONTE n ON n.id=fo.natureza_id
-                LEFT JOIN ORGANIZACAO org ON org.id=fo.organizacao_id
-                WHERE r.id=?
-                """, (rid,)):
-            registros[row["registro_id"]] = row
+    for row in dbmod.consultar_ids(conn, """
+        SELECT r.id AS registro_id, r.identificador_na_fonte,
+               r.payload_original, a.hash_sha256, a.baixado_em,
+               rf.nome AS recurso, rf.url_recurso,
+               rf.fonte_id, fo.nome, fo.url_institucional,
+               n.codigo AS natureza, org.nome AS organizacao
+        FROM REGISTRO_FONTE_DETALHE r
+        LEFT JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id
+        LEFT JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id
+        LEFT JOIN FONTE fo ON fo.id=rf.fonte_id
+        LEFT JOIN NATUREZA_FONTE n ON n.id=fo.natureza_id
+        LEFT JOIN ORGANIZACAO org ON org.id=fo.organizacao_id
+        WHERE r.id IN ({ids}) ORDER BY r.id
+    """, selecionados):
+        registros[row["registro_id"]] = row
     for row in sorted(registros.values(),
                       key=lambda r: (r["baixado_em"] or "", r["registro_id"]), reverse=True):
         fid = row["fonte_id"]
@@ -813,12 +889,12 @@ def _dados_por_fonte(conn, pid, visao, registros_metrologicos=(), registros_cada
     return sorted(grupos.values(), key=lambda grupo: ((grupo["nome"] or "").casefold(), grupo["id"] or ""))
 
 
-def operacoes_do_ponto(conn, pid):
-    """Operacoes publicadas vinculadas a UM ponto (spec 11.4)."""
-    out = []
-    for r in dbmod.query_all(conn, _OPERACAO_SQL + " WHERE o.ponto_id = ? "
-                             "ORDER BY o.id", (pid,)):
-        out.append(montar_operacao(conn, r))
+def _operacoes_dos_pontos(conn, ids):
+    """Operações publicadas dos pontos selecionados."""
+    rows = list(dbmod.consultar_ids(conn, _OPERACAO_SQL + " WHERE o.ponto_id IN ({ids}) ORDER BY o.id", ids))
+    out = defaultdict(list)
+    for r, registro in zip(rows, _montar_operacoes(conn, rows)):
+        out[r["ponto_id"]].append(registro)
     return out
 
 
@@ -882,32 +958,50 @@ def buscar_ponto_por_id(conn, pid_str, *, incluir_ocultos=False):
 
 
 def listar_fontes(conn):
-    out = []
-    for f in dbmod.query_all(
-            conn, "SELECT f.id, f.nome, f.esfera, f.situacao, "
-            "f.url_institucional, f.periodicidade_declarada, "
-            "o.nome AS organizacao, n.codigo AS natureza "
-            "FROM FONTE f LEFT JOIN ORGANIZACAO o ON o.id=f.organizacao_id "
-            "LEFT JOIN NATUREZA_FONTE n ON n.id=f.natureza_id "
-            "ORDER BY f.nome"):
-        recursos = []
-        for rq in dbmod.query_all(
-                conn, "SELECT id, nome, url_recurso, formato_origem, "
-                "status_integracao FROM RECURSO_FONTE WHERE fonte_id=?",
-                (f["id"],)):
-            recursos.append({"id": "RF-%d" % rq["id"], "nome": rq["nome"],
-                             "url_recurso": rq["url_recurso"],
-                             "formato_origem": rq["formato_origem"],
-                             "status_integracao": rq["status_integracao"]})
-        out.append({
-            "id": "S-%d" % f["id"], "nome": f["nome"], "esfera": f["esfera"],
-            "natureza": f["natureza"], "organizacao": f["organizacao"],
-            "url_institucional": f["url_institucional"],
-            "situacao": f["situacao"],
-            "periodicidade_declarada": f["periodicidade_declarada"],
-            "recursos": recursos,
-        })
-    return out
+    fontes = {}
+    for f in conn.execute("""
+        SELECT f.id, f.nome, f.esfera, f.situacao,
+               f.url_institucional, f.periodicidade_declarada,
+               o.nome AS organizacao, n.codigo AS natureza,
+               rf.id AS recurso_id, rf.nome AS recurso_nome, rf.url_recurso,
+               rf.formato_origem, rf.status_integracao
+        FROM FONTE f
+        LEFT JOIN ORGANIZACAO o ON o.id=f.organizacao_id
+        LEFT JOIN NATUREZA_FONTE n ON n.id=f.natureza_id
+        LEFT JOIN RECURSO_FONTE rf ON rf.fonte_id=f.id
+        ORDER BY f.nome, rf.id
+    """):
+        fonte = fontes.get(f["id"])
+        if fonte is None:
+            fonte = {"id": "S-%d" % f["id"], "recursos": [],
+                     **{k: f[k] for k in ("nome", "esfera", "natureza", "organizacao",
+                                           "url_institucional", "situacao", "periodicidade_declarada")}}
+            fontes[f["id"]] = fonte
+        if f["recurso_id"] is not None:
+            fonte["recursos"].append({"id": "RF-%d" % f["recurso_id"], "nome": f["recurso_nome"],
+                                      "url_recurso": f["url_recurso"], "formato_origem": f["formato_origem"],
+                                      "status_integracao": f["status_integracao"]})
+    return list(fontes.values())
+
+
+def metadados_base(conn):
+    """Snapshot e fontes do envelope público, sem contar todo o cadastro."""
+    meta = {"snapshot_id": None, "publicado_em": None, "fontes": []}
+    for r in conn.execute("""
+        SELECT s.identificador_versao, s.publicado_em, f.nome
+        FROM (SELECT 1) base
+        LEFT JOIN (
+            SELECT identificador_versao, publicado_em FROM SNAPSHOT_PUBLICADO
+            ORDER BY publicado_em DESC LIMIT 1
+        ) s ON 1=1
+        LEFT JOIN FONTE f ON 1=1
+        ORDER BY f.nome
+    """):
+        meta["snapshot_id"] = r["identificador_versao"]
+        meta["publicado_em"] = r["publicado_em"]
+        if r["nome"] is not None:
+            meta["fontes"].append({"nome": r["nome"]})
+    return meta
 
 
 ##-- BUNDITA DE URSO #{1} -- As contagens publicas ainda somavam aliases como entidades distintas. ##
@@ -915,19 +1009,19 @@ def status_base(conn):
     snap = dbmod.query_one(
         conn, "SELECT id, identificador_versao, publicado_em, status "
         "FROM SNAPSHOT_PUBLICADO ORDER BY publicado_em DESC LIMIT 1")
-    total_pontos = dbmod.scalar(conn, "SELECT count(*) FROM PONTO_FISCALIZACAO")
-    total_equip = dbmod.scalar(conn, "SELECT count(*) FROM EQUIPAMENTO")
+    totais = dbmod.query_one(conn, """
+        SELECT (SELECT count(*) FROM PONTO_FISCALIZACAO) AS pontos,
+               (SELECT count(*) FROM EQUIPAMENTO) AS equipamentos
+    """)
     visao = VisaoCanonica(conn)
-    total_pontos -= len(visao.aliases("ponto"))
-    total_equip -= len(visao.aliases("equipamento"))
-    total_fontes = dbmod.scalar(conn, "SELECT count(*) FROM FONTE")
+    fontes = listar_fontes(conn)
     return {
         "snapshot_id": (snap["identificador_versao"] if snap else None),
         "publicado_em": (snap["publicado_em"] if snap else None),
-        "total_pontos": total_pontos,
-        "total_equipamentos": total_equip,
-        "total_fontes": total_fontes,
-        "fontes": listar_fontes(conn),
+        "total_pontos": totais["pontos"] - len(visao.aliases("ponto")),
+        "total_equipamentos": totais["equipamentos"] - len(visao.aliases("equipamento")),
+        "total_fontes": len(fontes),
+        "fontes": fontes,
     }
 
 
@@ -1126,34 +1220,39 @@ def _fiscalizacao_pontual(modalidade):
     return False
 
 
-def montar_operacao(conn, r):
+def _montar_operacoes(conn, rows):
+    ids = [r["operacao_id"] for r in rows]
+    equipamentos = _agrupar_ids(conn, """
+        SELECT operacao_id, equipamento_id FROM OPERACAO_EQUIPAMENTO
+        WHERE operacao_id IN ({ids}) ORDER BY equipamento_id
+    """, ids, "operacao_id")
+    faixas = _agrupar_ids(conn, """
+        SELECT operacao_id, faixa_id FROM OPERACAO_FAIXA
+        WHERE operacao_id IN ({ids}) ORDER BY faixa_id
+    """, ids, "operacao_id")
+    recorrencias = _agrupar_ids(conn, """
+        SELECT operacao_id, id, regra_repeticao, fuso_horario, data_inicio, data_fim
+        FROM OPERACAO_RECORRENCIA WHERE operacao_id IN ({ids}) ORDER BY id
+    """, ids, "operacao_id")
+    dias = _agrupar_ids(conn, """
+        SELECT recorrencia_id, dia_semana, hora_inicio, hora_fim FROM RECORRENCIA_DIA
+        WHERE recorrencia_id IN ({ids}) ORDER BY dia_semana, hora_inicio
+    """, [rc["id"] for grupo in recorrencias.values() for rc in grupo], "recorrencia_id")
+    docs = _documentos_de(conn, "operacao", ids)
+    identificadores = _identificadores_de(conn, "operacao", ids)
+    fontes = _fontes_dos_registros(conn, [r["registro_fonte_id"] for r in rows if r["registro_fonte_id"] is not None])
+    return [_montar_operacao(r, equipamentos, faixas, recorrencias, dias, docs, identificadores, fontes) for r in rows]
+
+
+def _montar_operacao(r, equipamentos, faixas, recorrencias, dias, documentos, identificadores, fontes):
     oid = r["operacao_id"]
-    equipamentos_ids = [
-        "E-%d" % e["equipamento_id"] for e in dbmod.query_all(
-            conn, "SELECT equipamento_id FROM OPERACAO_EQUIPAMENTO "
-            "WHERE operacao_id=? ORDER BY equipamento_id", (oid,))]
-    faixas_ids = [
-        "F-%d" % f["faixa_id"] for f in dbmod.query_all(
-            conn, "SELECT faixa_id FROM OPERACAO_FAIXA WHERE operacao_id=? "
-            "ORDER BY faixa_id", (oid,))]
-    recorrencias = []
-    for rc in dbmod.query_all(
-            conn, "SELECT id, regra_repeticao, fuso_horario, data_inicio, "
-            "data_fim FROM OPERACAO_RECORRENCIA WHERE operacao_id=? "
-            "ORDER BY id", (oid,)):
-        dias = []
-        for d in dbmod.query_all(
-                conn, "SELECT dia_semana, hora_inicio, hora_fim "
-                "FROM RECORRENCIA_DIA WHERE recorrencia_id=? "
-                "ORDER BY dia_semana, hora_inicio", (rc["id"],)):
-            dias.append({"dia_semana": d["dia_semana"],
-                         "hora_inicio": d["hora_inicio"],
-                         "hora_fim": d["hora_fim"]})
-        recorrencias.append({"regra": rc["regra_repeticao"],
-                             "fuso": rc["fuso_horario"],
-                             "inicio": rc["data_inicio"],
-                             "fim": rc["data_fim"], "dias": dias})
-    docs = _documentos(conn, "operacao", oid)
+    recorrencias_definidas = [
+        {"regra": rc["regra_repeticao"], "fuso": rc["fuso_horario"],
+         "inicio": rc["data_inicio"], "fim": rc["data_fim"],
+         "dias": [{k: d[k] for k in ("dia_semana", "hora_inicio", "hora_fim")}
+                  for d in dias[rc["id"]]]}
+        for rc in recorrencias[oid]]
+    docs = documentos[oid]
     if r["inicio_em"]:
         evidencia = "confirmada"
     elif r["publicado_em"]:
@@ -1171,7 +1270,7 @@ def montar_operacao(conn, r):
         "fim_em": r["fim_em"],
         "fuso_original": r["fuso_original"],
         "publicado_em": r["publicado_em"],
-        "recorrencias": recorrencias,
+        "recorrencias": recorrencias_definidas,
         "ponto_id": ("P-%d" % r["ponto_id"]) if r["ponto_id"] else None,
         "trecho_id": ("T-%d" % r["trecho_id"]) if r["trecho_id"] else None,
         "latitude": r["latitude"],
@@ -1182,12 +1281,12 @@ def montar_operacao(conn, r):
         "municipio": r["municipio"],
         "uf": r["uf"],
         "orgao_responsavel": r["orgao_responsavel"],
-        "equipamentos_ids": equipamentos_ids,
-        "faixas_ids": faixas_ids,
+        "equipamentos_ids": ["E-%d" % e["equipamento_id"] for e in equipamentos[oid]],
+        "faixas_ids": ["F-%d" % f["faixa_id"] for f in faixas[oid]],
         "documento_url": _primeira_url(docs),
         "documentos": docs,
-        "identificadores_oficiais": _identificadores(conn, "operacao", oid),
-        "fontes": _fontes_por_registro(conn, r["registro_fonte_id"]),
+        "identificadores_oficiais": identificadores[oid],
+        "fontes": fontes[r["registro_fonte_id"]],
         "evidencia_operacao": evidencia,
     }
 
@@ -1247,19 +1346,15 @@ def buscar_operacoes(conn, lat=None, lon=None, raio=None, filtros=None,
     where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
     rows = dbmod.query_all(conn, _OPERACAO_SQL + where, params + bbox_params)
 
-    recs = []
-    for r in rows:
-        if usar_loc:
-            if r["latitude"] is None or r["longitude"] is None:
-                continue
-            if geo.haversine_m(lat, lon, r["latitude"], r["longitude"]) > raio:
-                continue
-        recs.append(montar_operacao(conn, r))
-    recs.sort(key=lambda o: o["id"])
+    if usar_loc:
+        rows = [r for r in rows if r["latitude"] is not None and r["longitude"] is not None
+                and geo.haversine_m(lat, lon, r["latitude"], r["longitude"]) <= raio]
 
-    total = len(recs)
+    # A ordenação pública é pelo ID formatado. Só carregar complementos da página.
+    rows.sort(key=lambda r: "O-%d" % r["operacao_id"])
+    total = len(rows)
     offset = _offset_cursor(cursor)
-    recorte = recs[offset:offset + limite]
+    recorte = _montar_operacoes(conn, rows[offset:offset + limite])
     proximo = None
     if offset + limite < total:
         proximo = str(offset + limite)
@@ -1303,7 +1398,7 @@ def _montar_equipamento_original(conn, r):
     eid = r["equipamento_id"]
     instalacoes = []
     funcao = None
-    for i in dbmod.query_all(
+    rows = dbmod.query_all(
             conn, "SELECT i.id, i.ponto_id, i.inicio_em, i.fim_em, "
             "i.data_inicio_autuacao, i.data_inicio_educativo, "
             "so.codigo AS situacao, fe.descricao AS funcao "
@@ -1311,11 +1406,13 @@ def _montar_equipamento_original(conn, r):
             "LEFT JOIN SITUACAO_OPERACIONAL so "
             "ON so.id=i.situacao_operacional_id "
             "LEFT JOIN FUNCAO_EQUIPAMENTO fe ON fe.id=i.funcao_equipamento_id "
-            "WHERE i.equipamento_id=? ORDER BY i.id", (eid,)):
-        faixas_ids = [
-            "F-%d" % f["faixa_id"] for f in dbmod.query_all(
-                conn, "SELECT faixa_id FROM INSTALACAO_FAIXA "
-                "WHERE instalacao_id=? ORDER BY faixa_id", (i["id"],))]
+            "WHERE i.equipamento_id=? ORDER BY i.id", (eid,))
+    faixas = _agrupar_ids(conn, """
+        SELECT instalacao_id, faixa_id FROM INSTALACAO_FAIXA
+        WHERE instalacao_id IN ({ids}) ORDER BY faixa_id
+    """, [i["id"] for i in rows], "instalacao_id")
+    for i in rows:
+        faixas_ids = ["F-%d" % f["faixa_id"] for f in faixas[i["id"]]]
         instalacoes.append({
             "id": "I-%d" % i["id"],
             "ponto_id": ("P-%d" % i["ponto_id"]) if i["ponto_id"] else None,
@@ -1327,7 +1424,7 @@ def _montar_equipamento_original(conn, r):
         funcao = funcao or i["funcao"]
 
     verificacoes = []
-    for v in dbmod.query_all(
+    rows = dbmod.query_all(
             conn, "SELECT v.id, tv.codigo AS tipo, v.data_verificacao, "
             "v.validade_ate, rv.codigo AS resultado, v.numero_certificado, "
             "v.norma_aplicada, v.observacoes, v.registro_fonte_id, org.nome AS orgao "
@@ -1335,8 +1432,11 @@ def _montar_equipamento_original(conn, r):
             "LEFT JOIN TIPO_VERIFICACAO tv ON tv.id=v.tipo_verificacao_id "
             "LEFT JOIN RESULTADO_VERIFICACAO rv ON rv.id=v.resultado_id "
             "LEFT JOIN ORGANIZACAO org ON org.id=v.orgao_executor_id "
-            "WHERE v.equipamento_id=? ORDER BY v.id", (eid,)):
-        documentos_verificacao = _documentos(conn, "verificacao", v["id"])
+            "WHERE v.equipamento_id=? ORDER BY v.id", (eid,))
+    documentos = _documentos_de(conn, "verificacao", [v["id"] for v in rows])
+    fontes = _fontes_dos_registros(conn, [v["registro_fonte_id"] for v in rows if v["registro_fonte_id"] is not None])
+    for v in rows:
+        documentos_verificacao = documentos[v["id"]]
         verificacoes.append({
             "id": "V-%d" % v["id"],
             "tipo_verificacao": v["tipo"],
@@ -1351,7 +1451,7 @@ def _montar_equipamento_original(conn, r):
                 v["validade_ate"]),
             "documentos": documentos_verificacao,
             "fonte_registro_id": v["registro_fonte_id"],
-            "fonte": (_fontes_por_registro(conn, v["registro_fonte_id"]) or [None])[0],
+            "fonte": (fontes[v["registro_fonte_id"]] or [None])[0],
             "observacoes": v["observacoes"],
         })
 
@@ -1639,23 +1739,42 @@ def buscar_cadastral(conn, filtros=None, limite=100, cursor=None):
     filtros = filtros or {}
     clauses, params = _filtros_extra(filtros, conn)
     where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
-    rows = dbmod.query_all(conn, _PONTO_SQL + where + " ORDER BY p.id",
-                           params)
     visao = VisaoCanonica(conn)
-    canonicos = {}
-    for row in rows:
-        row = _linha_canonica(conn, row, visao)
-        if row is not None:
-            canonicos[row["ponto_id"]] = row
-    rows = [canonicos[pid] for pid in sorted(canonicos)]
     uf_filtro = (filtros.get("uf") or "").upper() or None
-    if uf_filtro:
-        rows = [r for r in rows if _uf_do_ponto(conn, r) == uf_filtro]
-    total = len(rows)
     offset = max(0, _offset_cursor(cursor))
-    recorte = rows[offset:offset + limite]
-    recs = [montar_registro(conn, r,
-             incluir_operacoes=filtros.get("incluir_operacoes", True), visao=visao)
-            for r in recorte]
+    sql = _PONTO_SQL + where + " ORDER BY p.id"
+    ufs = None
+    if not uf_filtro and not visao.aliases("ponto"):
+        # Total e página saem do mesmo conjunto, com os complementos apenas
+        # para os IDs da página. O LEFT JOIN conserva o total na página vazia.
+        pagina = dbmod.query_all(conn, """
+            WITH candidatos AS (
+                SELECT p.id FROM PONTO_FISCALIZACAO p
+                LEFT JOIN VIA v ON v.id=p.via_id
+                LEFT JOIN SITUACAO_OPERACIONAL so ON so.id=p.situacao_operacional_id
+        """ + where + """
+            ), pagina AS (SELECT id FROM candidatos ORDER BY id LIMIT ? OFFSET ?)
+            SELECT total.quantidade, selecionados.*
+            FROM (SELECT COUNT(*) AS quantidade FROM candidatos) total
+            LEFT JOIN (
+        """ + _PONTO_SQL + """
+                JOIN pagina ON pagina.id=p.id
+            ) selecionados ON 1=1
+            ORDER BY selecionados.ponto_id
+        """, [*params, limite, offset])
+        total = pagina[0]["quantidade"]
+        rows = [r for r in pagina if r["ponto_id"] is not None]
+    else:
+        rows = dbmod.query_all(conn, sql, params)
+        contexto = _contexto_canonico(conn, rows, visao, bool(uf_filtro))
+        _, _, ufs = contexto
+        canonicos = {}
+        for row in rows:
+            row = _linha_canonica(conn, row, visao, contexto)
+            if row is not None and (not uf_filtro or _uf_do_ponto(row, ufs) == uf_filtro):
+                canonicos[row["ponto_id"]] = row
+        total = len(canonicos)
+        rows = [canonicos[pid] for pid in sorted(canonicos)[offset:offset + limite]]
+    recs = _montar_pontos(conn, [(r, None) for r in rows], filtros.get("incluir_operacoes", True), visao, ufs)
     return recs, {"total_pontos": total, "retornados": len(recs),
                   "proximo_cursor": str(offset + limite) if offset + limite < total else None}

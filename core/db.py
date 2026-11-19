@@ -186,6 +186,14 @@ def query_all(conn, sql, params=()):
     return conn.execute(sql, params).fetchall()
 
 
+def consultar_ids(conn, sql, ids, params=()):
+    """Executa um SELECT em lotes, inclusive em SQLite com limite de 999 parâmetros."""
+    ids = sorted(set(ids))
+    for inicio in range(0, len(ids), 500):
+        lote = ids[inicio:inicio + 500]
+        yield from conn.execute(sql.format(ids=','.join('?' for _ in lote)), (*lote, *params))
+
+
 def query_one(conn, sql, params=()):
     return conn.execute(sql, params).fetchone()
 

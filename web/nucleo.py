@@ -1372,7 +1372,7 @@ def _radares(conn, params, formato, delimitador):
 
     records, res = consultas.buscar_pontos(
         conn, lat, lon, raio, filtros, limite, params.get("cursor"))
-    st = consultas.status_base(conn)
+    st = consultas.metadados_base(conn)
 
     operacoes = []
     for registro in records:
@@ -1404,7 +1404,7 @@ def _ponto(conn, ident, formato, delimitador):
                      "ponto %s nao encontrado" % ident)
     from core.assistencia import resumo_local
     registro["explicacao"] = resumo_local(registro)
-    st = consultas.status_base(conn)
+    st = consultas.metadados_base(conn)
     meta = _base_meta()
     meta["consultado_em"] = _agora()
     meta["consulta"] = {"id": ident}
@@ -1548,7 +1548,7 @@ def _busca(conn, params, formato, delimitador):
         return _erro(422, "limite_invalido", "limite inteiro 1..1000")
     records, res = consultas.buscar_cadastral(
         conn, filtros, limite, params.get("cursor"))
-    st = consultas.status_base(conn)
+    st = consultas.metadados_base(conn)
     resultado = {
         "encontrado": bool(res["total_pontos"]),
         "total_pontos": res["total_pontos"],
@@ -1583,7 +1583,7 @@ def _trafego(conn, params, formato, delimitador):
                          campo="ponto_id")
     records, res = consultas.buscar_trafego(
         conn, limite, ponto_id, params.get("cursor"))
-    st = consultas.status_base(conn)
+    st = consultas.metadados_base(conn)
     resultado = {
         "encontrado": bool(res["total_observacoes"]),
         "total_observacoes": res["total_observacoes"],
@@ -1618,7 +1618,7 @@ def _trechos(conn, params, formato, delimitador):
         return erro
     records, res = consultas.buscar_trechos(
         conn, lat, lon, raio, filtros, limite, params.get("cursor"))
-    st = consultas.status_base(conn)
+    st = consultas.metadados_base(conn)
     resultado = {
         "encontrado": bool(res["total_trechos"]),
         "total_trechos": res["total_trechos"],
@@ -1653,7 +1653,7 @@ def _operacoes(conn, params, formato, delimitador):
         return erro
     records, res = consultas.buscar_operacoes(
         conn, lat, lon, raio, filtros, limite, params.get("cursor"))
-    st = consultas.status_base(conn)
+    st = consultas.metadados_base(conn)
     resultado = {
         "encontrado": bool(res["total_operacoes"]),
         "total_operacoes": res["total_operacoes"],
@@ -1678,7 +1678,7 @@ def _equipamento(conn, ident, formato, delimitador):
     if reg is None:
         return _erro(404, "equipamento_nao_encontrado",
                      "equipamento %s nao encontrado" % ident)
-    st = consultas.status_base(conn)
+    st = consultas.metadados_base(conn)
     resultado = {
         "encontrado": True, "total_equipamentos": 1, "retornados": 1,
         "proximo_cursor": None, "total_pontos": 0, "total_operacoes": 0,
@@ -1712,7 +1712,7 @@ def _atualizacoes(conn, params, formato, delimitador):
     records, res = consultas.listar_atualizacoes(
         conn, filtros, limite, params.get("cursor"))
     snaps = consultas.listar_snapshots(conn)
-    st = consultas.status_base(conn)
+    st = consultas.metadados_base(conn)
     resultado = {
         "encontrado": bool(res["total_atualizacoes"]),
         "total_atualizacoes": res["total_atualizacoes"],
@@ -1734,7 +1734,7 @@ def _fonte_id(conn, ident, formato, delimitador):
     if fonte is None:
         return _erro(404, "fonte_nao_encontrada",
                      "fonte %s nao encontrada" % ident)
-    st = consultas.status_base(conn)
+    st = consultas.metadados_base(conn)
     meta = _envelope(st, {"id": fonte["id"]}, {"encontrado": True,
                                                  "fonte": fonte})
     try:

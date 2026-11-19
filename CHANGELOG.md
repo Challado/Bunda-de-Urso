@@ -1,5 +1,11 @@
 # Histórico de alterações
 
+## Consultas em lote de radares e leitores
+
+- Buscas carregam faixas, limites, instrumentos, documentos e operações só para os pontos da página. Totais e filtros consideram todos os resultados, inclusive os registros vinculados a aliases.
+- A agenda lê o histórico dos recursos cadastrados em lote. O painel e o cron compartilham a visão da última execução por recurso.
+- Novos índices atendem as buscas por posição, as junções dos pontos e a leitura das execuções recentes em PostgreSQL e SQLite.
+
 ## Configuração por motor de banco
 
 - `[dados]` define o diretório operacional e o motor ativo. `[postgres]` define a conexão com o servidor e `[sqlite]` define o arquivo local.

@@ -7,6 +7,7 @@ testes ancoram o "agora" no relogio real (base) e so deslocam a partir dele.
 import datetime
 import os
 import unittest
+from unittest.mock import patch
 
 from coletor import tick
 from coletor.fontes.antt import ColetorANTT
@@ -69,6 +70,17 @@ class TestTick(unittest.TestCase):
         self.assertEqual(res[0]["acao"], "nao_vencido")
         self.assertAlmostEqual(res[0]["faltam_s"], 1800, delta=5)
 
+    def test_reconfere_historico_de_fonte_vencida_antes_da_coleta(self):
+        self._primeira()
+        origem = tick._historicos_da_agenda
+
+        def historico_anterior(conn, itens):
+            return {k: (recurso, []) for k, (recurso, _) in origem(conn, itens).items()}
+
+        with patch.object(tick, "_historicos_da_agenda", side_effect=historico_anterior):
+            res = self._run(agora=self._agora(minutes=30), arquivos={"antt": common.ANTT_FIXTURE})
+        self.assertEqual(res[0]["acao"], "nao_vencido")
+
     def test_intervalo_vencido_roda(self):
         self._primeira()
         res = self._run(arquivos={"antt": common.ANTT_FIXTURE},
@@ -92,7 +104,6 @@ class TestTick(unittest.TestCase):
         self.assertEqual(res[0]["acao"], "executaria")
 
     def test_dry_run_nao_acessa_descoberta_na_internet(self):
-        from unittest.mock import patch
         with patch.object(ColetorANTT, "resolver_url", side_effect=AssertionError("Nao acessar rede")) as resolver:
             res = self._run(dry_run=True)
         resolver.assert_not_called()

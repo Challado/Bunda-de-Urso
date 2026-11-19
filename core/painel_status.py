@@ -208,9 +208,28 @@ def coletores(conn, agenda=None):
     recursos = [dict(r) for r in conn.execute("""
         SELECT rf.id, rf.nome AS recurso, rf.url_recurso, rf.ativo,
                rf.status_integracao, rf.periodicidade_segundos,
-               f.id AS fonte_id, f.nome AS fonte, f.esfera, f.situacao, f.url_institucional
-        FROM RECURSO_FONTE rf LEFT JOIN FONTE f ON f.id=rf.fonte_id ORDER BY rf.id
+               f.id AS fonte_id, f.nome AS fonte, f.esfera, f.situacao, f.url_institucional,
+               ult.execucao_id AS ultima_id,
+               (SELECT e.id FROM EXECUCAO_COLETA e WHERE e.recurso_id=rf.id
+                  AND e.status IN ('ok','sem_mudanca') ORDER BY e.id DESC LIMIT 1) AS sucesso_id,
+               (SELECT e.id FROM EXECUCAO_COLETA e WHERE e.recurso_id=rf.id
+                  AND e.status IN ('documentado','sem_mudanca') AND e.linhas_validas>0
+                ORDER BY e.id DESC LIMIT 1) AS sucesso_documental_id
+        FROM RECURSO_FONTE rf
+        LEFT JOIN FONTE f ON f.id=rf.fonte_id
+        LEFT JOIN ULTIMA_EXECUCAO_RECURSO ult ON ult.recurso_id=rf.id
+        ORDER BY rf.id
     """)]
+    execucoes = {e["id"]: e for e in db.consultar_ids(
+        conn, "SELECT * FROM EXECUCAO_COLETA WHERE id IN ({ids})",
+        {r[k] for r in recursos for k in ("ultima_id", "sucesso_id", "sucesso_documental_id")
+         if r[k] is not None})}
+    erros = defaultdict(list)
+    for e in db.consultar_ids(conn, """
+        SELECT execucao_id, codigo_erro, descricao, severidade, registrado_em
+        FROM ERRO_VALIDACAO WHERE execucao_id IN ({ids}) ORDER BY id
+    """, {r["ultima_id"] for r in recursos if r["ultima_id"] is not None}):
+        erros[e["execucao_id"]].append({k: e[k] for k in ("codigo_erro", "descricao", "severidade", "registrado_em")})
     diario, erro_relatorio = {}, None
     try:
         diario = json.loads(Path(caminhos.status_atualizacoes()).read_text(encoding="utf-8")).get("fontes", {})
@@ -227,12 +246,18 @@ def coletores(conn, agenda=None):
         chave, item = itens.get((r["fonte"], r["recurso"]), (None, {}))
         if chave:
             vistos.add(chave)
-        leitores.append(_leitor(conn, r, chave, item, diario.get(str(r["id"]))))
+        ultima = r.pop("ultima_id")
+        sucesso = r.pop("sucesso_id")
+        sucesso_documental = r.pop("sucesso_documental_id")
+        modo = getattr(item.get("conector"), "MODO_COLETA", "cadastro")
+        leitores.append(_leitor(r, chave, item, diario.get(str(r["id"])), execucoes.get(ultima),
+                               execucoes.get(sucesso_documental if modo == "documental" else sucesso),
+                               erros[ultima]))
     for (fonte, recurso), (chave, item) in itens.items():
         if chave in vistos:
             continue
         cls = item["conector"]
-        leitores.append(_leitor(conn, dict(id=None, fonte_id=fontes_cadastradas.get(fonte), fonte=fonte, recurso=recurso,
+        leitores.append(_leitor(dict(id=None, fonte_id=fontes_cadastradas.get(fonte), fonte=fonte, recurso=recurso,
             esfera=cls.FONTE.get("esfera"), situacao=cls.FONTE.get("situacao", "ativa"),
             ativo=True, status_integracao=cls.RECURSO.get("status_integracao"),
             url_recurso=cls.RECURSO.get("url_recurso"),
@@ -264,14 +289,9 @@ def coletores(conn, agenda=None):
             "coletores": atualizacoes.limpar(leitores)}
 
 
-def _leitor(conn, r, chave, item, diario):
-    ultima = sucesso = None
+def _leitor(r, chave, item, diario, ultima=None, sucesso=None, erros=()):
     classe = item.get("conector")
     modo = getattr(classe, "MODO_COLETA", "cadastro")
-    if r["id"] is not None:
-        ultima = db.query_one(conn, "SELECT * FROM EXECUCAO_COLETA WHERE recurso_id=? ORDER BY id DESC LIMIT 1", (r["id"],))
-        sucessos = "status IN ('documentado','sem_mudanca') AND linhas_validas>0" if modo == "documental" else "status IN ('ok','sem_mudanca')"
-        sucesso = db.query_one(conn, "SELECT * FROM EXECUCAO_COLETA WHERE recurso_id=? AND " + sucessos + " ORDER BY id DESC LIMIT 1", (r["id"],))
     ativo = bool(r["ativo"]) and r["situacao"] == "ativa" and item.get("ativo", True)
     estado = ultima["status"] if ultima else "nunca_coletado"
     diario = diario if isinstance(diario, dict) and ultima and diario.get("execucao_id") == ultima["id"] else {}
@@ -290,16 +310,10 @@ def _leitor(conn, r, chave, item, diario):
             atraso = dt.datetime.now(dt.timezone.utc) > ts + dt.timedelta(seconds=intervalo + 300)
         except (ValueError, TypeError):
             pass
-    erros = []
-    if ultima:
-        erros = [dict(e) for e in conn.execute("""
-            SELECT codigo_erro, descricao, severidade, registrado_em
-            FROM ERRO_VALIDACAO WHERE execucao_id=? ORDER BY id
-        """, (ultima["id"],))]
     return dict(r, conector=chave, agendado=chave is not None, ativo=ativo,
                 tipo_coleta=modo, descricao_coleta=getattr(classe, "DESCRICAO_COLETA", None),
                 intervalo_s=intervalo, estado=estado, leitura_atrasada=atraso,
                 ultima_tentativa=dict(ultima) if ultima else None,
                 ultimo_sucesso=dict(sucesso) if sucesso else None,
                 url_configurada=item.get("url_direta") or r["url_recurso"],
-                url_ultima_tentativa=url_lida, erro_relatorio_coleta=diario.get("erro"), erros=erros)
+                url_ultima_tentativa=url_lida, erro_relatorio_coleta=diario.get("erro"), erros=list(erros))
