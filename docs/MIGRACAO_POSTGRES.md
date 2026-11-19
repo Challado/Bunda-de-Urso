@@ -12,13 +12,9 @@ certificado e de nome do servidor. Se o certificado for de uma CA privada,
 guarde o certificado da CA dentro de `[dados] dir` e passe
 `--certificado-ca nome-do-arquivo.pem`. Use o nome presente no certificado.
 
-Instale Psycopg 3 no mesmo Python que executa o CGI e os crons, e instale
-`pg_dump` de versão igual ou superior à do PostgreSQL remoto. Em Debian, com
-Python fornecido pela distribuição, execute como root:
-
-```sh
-apt-get install python3-psycopg postgresql-client
-```
+O migrador usa o Psycopg 3 disponível no Python do Radar e o `pg_dump` no
+`PATH` da conta do serviço. Use um `pg_dump` de versão igual ou superior à
+do PostgreSQL remoto.
 
 ## Simular e ativar
 

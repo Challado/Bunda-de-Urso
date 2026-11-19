@@ -273,10 +273,12 @@ def main(argv=None):
     try:
         import psycopg
     except ImportError:
-        print("Instale psycopg 3 no Python utilizado para chamar api.pse.", file=sys.stderr)
+        print("Psycopg 3 indisponível no Python que executa api.pse: " + sys.executable, file=sys.stderr)
         return 2
 
     try:
+        if args.ativar and db.postgres_ativo():
+            raise ErroMigracao("O PostgreSQL já é o banco ativo desta instalação.")
         try:
             origem = Path(caminhos.dentro_dados(args.origem, "origem SQLite"))
             ca = (caminhos.dentro_dados(args.certificado_ca, "certificado CA")
@@ -291,12 +293,10 @@ def main(argv=None):
         if args.ativar:
             from core import configuracao
 
-            if db.postgres_ativo():
-                raise ErroMigracao("O PostgreSQL já é o banco ativo desta instalação.")
             if os.geteuid() == 0:
                 raise ErroMigracao("Use --ativar com a mesma conta do serviço, como www-data.")
             if shutil.which("pg_dump") is None:
-                raise ErroMigracao("Instale o cliente PostgreSQL (pg_dump) antes de ativar.")
+                raise ErroMigracao("pg_dump indisponível no PATH da conta do Radar.")
             atual = configuracao.consultar()
             if not atual["gravavel"]:
                 raise ErroMigracao("A conta do serviço precisa poder gravar radar.conf para ativar.")
