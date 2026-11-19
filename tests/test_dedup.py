@@ -49,7 +49,7 @@ class BaseDedup(unittest.TestCase):
 
     def artefato(self, recurso_id, hash64=None):
         self._seq += 1
-        return dbmod.insert(self.con, "ARTEFATO_COLETA", {
+        return dbmod.inserir_artefato(self.con, {
             "recurso_id": recurso_id,
             "hash_sha256": hash64 or _hash("artefato", recurso_id, self._seq),
             "caminho_cache": "/tmp/raw/%d" % self._seq, "bytes_arquivo": 10,
@@ -58,7 +58,7 @@ class BaseDedup(unittest.TestCase):
 
     def registro(self, artefato_id, payload, ident=None, hash_registro=None):
         self._seq += 1
-        return dbmod.insert(self.con, "REGISTRO_FONTE", {
+        return dbmod.inserir_registro_fonte(self.con, {
             "artefato_id": artefato_id, "numero_ordem": self._seq,
             "identificador_na_fonte": ident,
             "payload_original": json.dumps(payload, sort_keys=True),

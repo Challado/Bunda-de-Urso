@@ -15,6 +15,13 @@ def main(argv=None):
     parser.add_argument("--db", default=config.DB_PATH)
     parser.add_argument("--origem", help="snapshot existente; copiado apenas se a base destino nao existir")
     args = parser.parse_args(argv)
+    if db.postgres_ativo():
+        if args.origem:
+            parser.error("Use o migrador PostgreSQL para copiar um SQLite.")
+        with closing(db.connect_existing(args.db)) as conn:
+            governanca.atualizar_esquema_postgres(conn)
+        print("Base PostgreSQL preparada.")
+        return 0
     destino = Path(args.db).resolve()
     destino.parent.mkdir(parents=True, exist_ok=True)
     if args.origem and not destino.exists():

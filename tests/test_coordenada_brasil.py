@@ -118,7 +118,7 @@ class TestInsercaoCoordenadaBrasil(unittest.TestCase):
             "fonte_id": self.fonte_id, "nome": "rec",
             "url_recurso": "https://exemplo/rec.xlsx",
             "formato_origem": "xlsx", "ativo": 1, "status_integracao": "ok"})
-        self.artefato_id = dbmod.insert(self.con, "ARTEFATO_COLETA", {
+        self.artefato_id = dbmod.inserir_artefato(self.con, {
             "recurso_id": self.recurso_id,
             "hash_sha256": "a" * 64, "caminho_cache": "/tmp/raw/x",
             "bytes_arquivo": 10, "baixado_em": "2026-10-10T00:00:00+00:00",
@@ -132,7 +132,7 @@ class TestInsercaoCoordenadaBrasil(unittest.TestCase):
         self.con.close()
 
     def _registro(self):
-        return dbmod.insert(self.con, "REGISTRO_FONTE", {
+        return dbmod.inserir_registro_fonte(self.con, {
             "artefato_id": self.artefato_id, "numero_ordem": 1,
             "identificador_na_fonte": "00017098",
             "payload_original": "{}", "hash_registro": "b" * 64,

@@ -2,10 +2,12 @@
 
 from contextlib import closing
 from decimal import Decimal
+import json
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 from uuid import uuid4
 
 from core import db, governanca
@@ -85,3 +87,38 @@ class MigrarPostgresTest(unittest.TestCase):
                 importar(c, self.pg, self.esquema)
             self.assertNotIn("valor que não é uma data", str(erro.exception))
         self.assertFalse(self.esquema_existe())
+
+    def test_api_coletor_e_fila_usam_postgres_sem_sqlite(self):
+        from psycopg.conninfo import conninfo_to_dict
+        from coletor.fontes.dnit import ColetorDNITEquipamentos
+        from core import caminhos, config, fila_cadastros
+        from tests.test_dnit_http import API
+        from web import nucleo
+
+        with closing(db.connect_sqlite_readonly(self.copia)) as origem:
+            importar(origem, self.pg, self.esquema)
+        pasta = self.origem.parent / "operacional"
+        pasta.mkdir()
+        inexistente = str(pasta / "radar.sqlite3")
+        opcoes = conninfo_to_dict(os.environ["RADAR_TESTE_POSTGRES"])
+        opcoes["esquema"] = self.esquema
+        with (patch.object(caminhos, "motor_banco", return_value="postgres"),
+              patch.object(caminhos, "postgres", return_value=opcoes),
+              patch.object(caminhos, "data_dir", return_value=str(pasta)),
+              patch.object(caminhos, "banco", return_value=inexistente),
+              patch.multiple(config, DATA_DIR=str(pasta), RAW_DIR=str(pasta),
+                             STAGING_DIR=str(pasta), DB_PATH=inexistente),
+              patch.object(db, "connect_sqlite", side_effect=AssertionError("SQLite operacional")),
+              patch.object(db, "connect_sqlite_readonly", side_effect=AssertionError("SQLite operacional"))):
+            self.assertEqual(nucleo.handle_request({"PATH_INFO": "/health/ready"})[0], 200)
+            with closing(db.connect_existing(inexistente)) as conn:
+                item = json.loads(API.read_bytes())["features"][0]
+                coletor = ColetorDNITEquipamentos(conn=conn)
+                self.assertEqual(coletor.ingerir_registros([item])["status"], "ok")
+                self.assertEqual(coletor.ingerir_registros([item])["status"], "sem_mudanca")
+                governanca.criar_usuario(conn, "operador", "uma-senha-local-de-teste", "admin")
+            envio = fila_cadastros.receber({"latitude": -24.9555, "longitude": -53.4552,
+                                            "velocidade_geral": 60})
+            self.assertEqual(fila_cadastros.processar()["processados"], 1)
+            self.assertEqual(fila_cadastros.consultar(envio["protocolo"])["estado"], "processado")
+            self.assertFalse(Path(inexistente).exists())

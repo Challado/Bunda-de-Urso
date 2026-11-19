@@ -54,14 +54,14 @@ class TestRecuperarPosicoesLegadas(unittest.TestCase):
 
     def test_copia_aparece_no_mapa_preserva_bruto_e_e_idempotente(self):
         antes = self.assinatura()
-        bruto = self.conn.execute("SELECT id,payload_original,hash_registro FROM REGISTRO_FONTE").fetchall()
+        bruto = self.conn.execute("SELECT id,payload_original,hash_registro FROM REGISTRO_FONTE_DETALHE").fetchall()
         pos_existente = self.conn.execute("SELECT posicao_id FROM PONTO_FISCALIZACAO WHERE id=3").fetchone()[0]
         destino = self.pasta / "recuperado.sqlite3"
         resultado = recuperacao.recuperar(self.origem, destino)
         self.assertEqual(len(resultado["recuperadas"]), 2)
         self.assertEqual(self.assinatura(), antes)
         with recuperacao.abrir_leitura(destino) as c:
-            self.assertEqual(c.execute("SELECT id,payload_original,hash_registro FROM REGISTRO_FONTE").fetchall(), bruto)
+            self.assertEqual(c.execute("SELECT id,payload_original,hash_registro FROM REGISTRO_FONTE_DETALHE").fetchall(), bruto)
             self.assertEqual(c.execute("SELECT posicao_id FROM PONTO_FISCALIZACAO WHERE id=3").fetchone()[0], pos_existente)
             for plano in resultado["recuperadas"]:
                 recs, _ = consultas.buscar_pontos(c, plano["latitude"], plano["longitude"], 1)
@@ -85,7 +85,7 @@ class TestRecuperarPosicoesLegadas(unittest.TestCase):
         self.assertEqual([p["ponto_id"] for p in recuperacao.planejar(self.conn)], [2])
 
     def test_observacoes_discordantes_nao_escolhem_coordenada(self):
-        registro = self.conn.execute("SELECT * FROM REGISTRO_FONTE WHERE id=1").fetchone()
+        registro = self.conn.execute("SELECT * FROM REGISTRO_FONTE_DETALHE WHERE id=1").fetchone()
         raw = json.loads(registro["payload_original"])
         raw["latitude"] = "-7.191751"
         rid = self.coletor.registrar_registro(registro["artefato_id"], 99, "OUTRO", raw)

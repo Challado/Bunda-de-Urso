@@ -33,7 +33,7 @@ def planejar(conn):
                    r.payload_original, f.nome fonte
             FROM PONTO_FISCALIZACAO p
             JOIN VINCULO_REGISTRO_PONTO vp ON vp.ponto_id=p.id
-            JOIN REGISTRO_FONTE r ON r.id=vp.registro_id
+            JOIN REGISTRO_FONTE_DETALHE r ON r.id=vp.registro_id
             JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id
             JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id
             JOIN FONTE f ON f.id=rf.fonte_id

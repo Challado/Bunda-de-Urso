@@ -101,7 +101,7 @@ def _rebase_cache(banco, anterior, novo):
     """Recupera referencias inclusive quando o operador ja moveu apenas o banco."""
     alterados = 0
     with closing(db.connect(banco)) as conn:
-        if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='ARTEFATO_COLETA'").fetchone():
+        if not db.tabela_existe(conn, "ARTEFATO_COLETA"):
             return 0
         for linha in conn.execute('SELECT id, caminho_cache, hash_sha256 FROM ARTEFATO_COLETA').fetchall():
             arq = Path(linha['caminho_cache'])
@@ -338,7 +338,7 @@ def executar(args, observacoes):
     lab = args.laboratorio.resolve() if args.laboratorio else None
     if args.restaurar:
         raise RuntimeError('Backups do layout antigo nao podem substituir a raiz com dados. Use o relatorio da migracao para recuperacao.')
-    if sys.version_info < (3,13) or not banco.is_file():
+    if sys.version_info < (3,13) or (not db.postgres_ativo() and not banco.is_file()):
         raise RuntimeError('Necessario Python >= 3.13 e banco existente no radar.conf.')
     for destino in (raiz, dados, banco, logs, home, conf):
         if destino == Path('/') or (lab and not destino.is_relative_to(lab)):
@@ -390,8 +390,7 @@ def _verificar(origem, raiz, conf, conta, lab, cron=True):
             checagens.append(dict(checagem=nome, estado='erro', detalhe=str(exc)))
     def integridade():
         with closing(db.connect_readonly(caminhos.banco())) as conn:
-            if conn.execute('PRAGMA integrity_check').fetchone()[0] != 'ok' or conn.execute('PRAGMA foreign_key_check').fetchone():
-                raise RuntimeError('Integridade/referencias reprovadas')
+            db.verificar_integridade(conn)
     def permissoes():
         for arq in (raiz/'api.pse', raiz/'radar.conf', raiz/'resources', Path(caminhos.data_dir()), Path(caminhos.log_dir()), *(raiz/n for n in CODIGO)):
             nome = str(arq.relative_to(raiz))
@@ -507,6 +506,7 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
     transferidos=False
     copiou_logs=False
     publicado=False
+    esquema_pg_atualizado = False
     try:
         _diretorio(raiz, observacoes)
         origem_http=caminhos.valor('web','origem')[0] or args.origem_http or ''
@@ -536,18 +536,14 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
             for arq in (dados/'tick.lock',fila/'processador.lock',fila/'entrada.lock'):
                 lock=locks.enter_context(open(arq,'a'))
                 _esperar_coletor(lock)
-            with closing(db.connect_readonly(banco)) as conn, closing(db.connect(backup/'radar.sqlite3')) as copia:
-                if conn.execute('PRAGMA integrity_check').fetchone()[0]!='ok' or conn.execute('PRAGMA foreign_key_check').fetchone():
-                    raise RuntimeError('Banco de origem com problemas de integridade')
-                conn.backup(copia)
-                copia.execute('PRAGMA journal_mode=DELETE')
+            backup_banco = db.backup_operacional(backup, 'radar', banco)
             # Nunca substitui o diretorio raiz: banco, fila e segredos nao sao fontes.
             transferidos = dados != novo_dados
             _copiar_dados(dados,novo_dados,banco)
-            if novo_banco!=banco:
+            if not db.postgres_ativo() and novo_banco!=banco:
                 if novo_banco.exists():
                     raise RuntimeError('Banco destino existente: recusa sobrescrever')
-                shutil.copy2(backup/'radar.sqlite3',novo_banco)
+                shutil.copy2(backup_banco,novo_banco)
             if logs!=novos_logs:
                 copiou_logs=True
                 if logs.exists():
@@ -612,9 +608,9 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
             (raiz/'radar.conf').write_text(texto)
             (raiz/'VERSAO').write_text(versao+'\n')
             _json(raiz/'arquivos-instalados.json',_manifesto(origem))
-            referencias=_rebase_cache(novo_banco,dados,novo_dados)
             novo_conf=raiz/'radar.conf'
             with _usar_conf(novo_conf):
+                referencias=_rebase_cache(novo_banco,dados,novo_dados)
                 projeto=raiz/'projeto.json'
                 descritor=json.loads(projeto.read_text())
                 descritor['url']=caminhos.web_inicio()
@@ -625,6 +621,8 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
                 for arq in raiz.iterdir():
                     if arq.is_file() and not arq.is_symlink():
                         _permissoes(arq,conta)
+                if db.postgres_ativo():
+                    Path(caminhos.postgres()["passfile"]).chmod(0o600)
                 if os.geteuid()==0:
                     os.chown(raiz,conta.pw_uid,conta.pw_gid)
                 raiz.chmod(0o2770)
@@ -632,10 +630,12 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
                 # Entradas copiadas para dentro de pastas privadas nao sao CGI publicas.
                 _preparar_backups(novo_dados,conta)
                 _comando(raiz,novo_conf,conta,lab,'ferramenta','inicializar_banco')
-                _comando(raiz,novo_conf,conta,lab,'ferramenta','reconciliar_equipamentos','--aplicar')
+                esquema_pg_atualizado = db.postgres_ativo()
+                if not db.postgres_ativo():
+                    _comando(raiz,novo_conf,conta,lab,'ferramenta','reconciliar_equipamentos','--aplicar')
                 print('RADAR_CONF_DESTINO: '+str(novo_conf),flush=True)
-                publicado=True
                 (raiz/'api.pse').write_bytes(_conteudo('api.pse',origem/'deploy/api.pse'))
+                publicado=True
                 _permissoes(raiz/'api.pse',conta)
                 (raiz/'api.pse').chmod(0o770)
                 link=raiz/'status-atualizacoes.json'
@@ -666,6 +666,8 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
                 # Subprocessos podem criar arquivos; garante a posse ao CGI ao terminar.
                 _permissoes(novo_dados,conta)
                 _permissoes(novos_logs,conta)
+                if db.postgres_ativo():
+                    Path(caminhos.postgres()["passfile"]).chmod(0o600)
             observacoes.append('Codigo, banco, fila, cache e segredos preparados para '+conta.pw_name+'.')
             observacoes.append('Origens antigas preservadas; novos caminhos relativos ao radar.conf da raiz.')
             observacoes.append('Backups anteriores permanecem em '+str(dados/'backups')+'.')
@@ -678,7 +680,7 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
         # arquivos e descartar somente a copia nova. No layout existente preserva
         # o codigo novo se houve migracao do esquema, como o instalador legado.
         from .instalacao import _esquema_compativel_com_backup
-        if not publicado and (not (backup/'radar.sqlite3').exists() or transferidos or _esquema_compativel_com_backup(backup,banco)):
+        if not publicado and not esquema_pg_atualizado and (transferidos or _esquema_compativel_com_backup(backup,banco)):
             # Recupera somente arquivos da aplicacao; nginx pertence ao operador.
             if transferidos and (novo_dados).exists():
                 shutil.rmtree(novo_dados)

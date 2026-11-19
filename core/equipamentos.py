@@ -79,7 +79,7 @@ def _locais(conn, eid):
     # Bases anteriores mantinham esse marco somente no bruto do Inmetro.
     for row in conn.execute("""SELECT r.payload_original, p.municipio_id
         FROM VINCULO_REGISTRO_EQUIPAMENTO ve
-        JOIN REGISTRO_FONTE r ON r.id=ve.registro_id
+        JOIN REGISTRO_FONTE_DETALHE r ON r.id=ve.registro_id
         JOIN VINCULO_REGISTRO_PONTO vp ON vp.registro_id=r.id
         JOIN PONTO_FISCALIZACAO p ON p.id=vp.ponto_id
         WHERE ve.equipamento_id=? AND ve.decisao_id IS NULL AND vp.decisao_id IS NULL
@@ -112,7 +112,7 @@ def compativeis(conn, a, b):
 def _oficial_exclusivo(conn, eid):
     naturezas = {r[0] for r in conn.execute("""SELECT n.codigo
         FROM VINCULO_REGISTRO_EQUIPAMENTO v
-        LEFT JOIN REGISTRO_FONTE r ON r.id=v.registro_id
+        LEFT JOIN REGISTRO_FONTE_DETALHE r ON r.id=v.registro_id
         LEFT JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id
         LEFT JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id
         LEFT JOIN FONTE f ON f.id=rf.fonte_id
@@ -169,7 +169,7 @@ def complementar_cadastro(conn, fonte_id, registro_id, ponto_id, identificador_i
     if (anterior["municipio_id"] != local["municipio_id"] or anterior["via_id"] != local["via_id"]
             or not math.isclose(anterior["km"], local["km"], abs_tol=0.000001, rel_tol=0)):
         return None
-    codigo = db.scalar(conn, "SELECT valor_normalizado FROM IDENTIFICADOR_EXTERNO WHERE id=?", (identificador_id,))
+    codigo = db.scalar(conn, "SELECT valor FROM IDENTIFICADOR_EXTERNO WHERE id=?", (identificador_id,))
     rows = db.query_all(conn, "SELECT e.* FROM EQUIPAMENTO e JOIN INSTALACAO i ON i.equipamento_id=e.id "
                        "WHERE i.ponto_id=?", (ponto_id,))
     if len(rows) != 1:
@@ -181,7 +181,7 @@ def complementar_cadastro(conn, fonte_id, registro_id, ponto_id, identificador_i
     if not modelos_compativeis(conn, row["modelo_id"], dados["modelo_id"]) or _decidido(conn, row["id"], registro_id):
         return None
     origens = db.query_all(conn, "SELECT r.identificador_na_fonte, rf.fonte_id, v.decisao_id "
-        "FROM VINCULO_REGISTRO_EQUIPAMENTO v JOIN REGISTRO_FONTE r ON r.id=v.registro_id "
+        "FROM VINCULO_REGISTRO_EQUIPAMENTO v JOIN REGISTRO_FONTE_DETALHE r ON r.id=v.registro_id "
         "JOIN ARTEFATO_COLETA ar ON ar.id=r.artefato_id JOIN RECURSO_FONTE rf ON rf.id=ar.recurso_id "
         "WHERE v.equipamento_id=?", (row["id"],))
     do_orgao = [o for o in origens if o["fonte_id"] == fonte_id]
@@ -231,7 +231,7 @@ def reconciliar(conn):
                            'OBSERVACAO_TRAFEGO', 'DECISAO_VALOR_CANONICO'):
                 conn.execute('UPDATE %s SET equipamento_id=? WHERE equipamento_id=?' % tabela, (canonico, antigo))
             for tabela in ('DOCUMENTO_EQUIPAMENTO', 'OPERACAO_EQUIPAMENTO', 'VINCULO_REGISTRO_EQUIPAMENTO'):
-                colunas = [x[1] for x in conn.execute('PRAGMA table_info(%s)' % tabela)]
+                colunas = db.colunas(conn, tabela)
                 for vinculo in db.query_all(conn, 'SELECT * FROM %s WHERE equipamento_id=?' % tabela, (antigo,)):
                     dados = dict(vinculo)
                     dados['equipamento_id'] = canonico

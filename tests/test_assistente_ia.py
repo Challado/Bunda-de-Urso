@@ -90,7 +90,7 @@ class TestClienteIA(AmbienteIA):
 
     def test_proposta_de_municipio_por_modelo_nao_e_aplicada_automaticamente(self):
         propostas = [{"codigo": "4106902", "origem": "modelo_validado", "pontos": [1]}]
-        with patch.object(municipios.shutil, "copy2", side_effect=AssertionError("nao alterar banco")):
+        with patch.object(municipios.dbmod, "backup_manutencao", side_effect=AssertionError("nao alterar banco")):
             self.assertEqual(municipios.aplicar(propostas, str(self.raiz / "inexistente.sqlite3")), 0)
 
     def test_ollama_http_real_sem_chave(self):

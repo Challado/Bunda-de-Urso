@@ -1,53 +1,79 @@
 # Migrar o Radar Brasil de SQLite para PostgreSQL
 
-Use o migrador pelo terminal do servidor que tem o arquivo SQLite e consegue
-conectar ao PostgreSQL. Ele usa o arquivo de banco de `radar.conf` como origem
-e prepara as tabelas, índices, restrições e dados em um esquema PostgreSQL novo.
+O migrador roda no servidor do Radar. Ele lê a origem escolhida em `radar.conf`,
+cria um esquema novo no PostgreSQL e pode ativar esse esquema para toda a instalação.
 
-Tenha um banco PostgreSQL 12 ou superior já criado, com UTF-8, e um usuário
-com permissão de conexão, criação de esquema e tabelas temporárias nesse
-banco. A conexão verifica o certificado TLS e o nome do servidor. Use o nome
-presente no certificado. Para uma CA privada, guarde o certificado da CA em
-`[dados] dir` e informe `--certificado-ca nome-do-arquivo.pem`.
+## Preparar o destino
 
-No diretório que contém o `api.pse` instalado, crie um ambiente Python para
-o driver. O exemplo usa o diretório de dados padrão `dados`. Se a instalação
-usa outro caminho, use o diretório indicado pelo `radar.conf`.
+Use PostgreSQL 12 ou superior, um banco UTF-8 já criado e uma conta dedicada
+com acesso ao banco e permissões `CONNECT`, `CREATE` e `TEMP`. A conta que
+cria o esquema será sua proprietária. A conexão usa TLS com verificação de
+certificado e de nome do servidor. Se o certificado for de uma CA privada,
+guarde o certificado da CA dentro de `[dados] dir` e passe
+`--certificado-ca nome-do-arquivo.pem`. Use o nome presente no certificado.
+
+Instale Psycopg 3 no mesmo Python que executa o CGI e os crons, e instale
+`pg_dump` de versão igual ou superior à do PostgreSQL remoto. Em Debian, com
+Python fornecido pela distribuição, execute como root:
 
 ```sh
-python3 -m venv dados/venv-migracao
-dados/venv-migracao/bin/python -m pip install 'psycopg[binary]>=3.2,<4'
-dados/venv-migracao/bin/python api.pse ferramenta migrar_postgres
+apt-get install python3-psycopg postgresql-client
 ```
 
-O comando pede servidor, banco, usuário e senha. A senha fica oculta durante
-a digitação e não é gravada no disco ou passada como argumento. A porta padrão é
-5432 e o esquema padrão é `radar_brasil`. Use `--porta` ou `--esquema` para
-escolher outros valores. Use `--origem` para selecionar outro SQLite existente
-dentro de `[dados] dir`.
+## Simular e ativar
 
-- `--simular` executa a importação e as validações no PostgreSQL e reverte a
-  transação. As duas modalidades precisam das mesmas permissões.
-- A ferramenta lê uma cópia consistente, incluindo as escritas já confirmadas
-  no WAL. Migrações de esquema pendentes são executadas na cópia temporária.
-  Reserve espaço no diretório de dados para essa cópia e seus arquivos auxiliares.
-- A importação é transacional e recusa um esquema existente. Compara tabelas,
-  colunas e contagens, conserva IDs e histórico dos sequenciadores e mantém
-  PKs, FKs, restrições e verificações relacionais ativas durante a cópia.
-- O SQLite permite armazenar mais casas decimais do que as declaradas na DDL.
-  A DDL PostgreSQL usa `NUMERIC` sem escala fixa nesses campos para preservar
-  coordenadas, distâncias e outras medidas existentes. Datas e instantes são
-  carregados nos tipos nativos. Instantes sem fuso são interpretados como UTC.
-- Dados adicionados ao SQLite após a cópia ficam para uma nova execução. Para
-  uma cópia final, pause os escritores antes de iniciar a transferência.
+Na raiz onde o `api.pse` está instalado, execute como root:
 
-A API web, a fila, os coletores e o instalador ainda executam sobre SQLite.
-A ferramenta prepara os dados no PostgreSQL para conferência e para a etapa
-posterior de adaptação do runtime. O banco contém referências a arquivos
-locais, como `ARTEFATO_COLETA.caminho_cache`. Fila em disco, cache bruto,
-arquivos de configuração, chaves e logs ficam no servidor do aplicativo.
-Para mover o aplicativo inteiro, transfira também os arquivos necessários
-e ajuste os caminhos como parte da implantação.
+```sh
+runuser -u www-data -- ./api.pse ferramenta migrar_postgres --simular
+```
 
-A revisão das dependências do modelo está no documento
+A simulação solicita servidor, banco, usuário e senha oculta e reverte todo o
+esquema ao final. O padrão é porta 5432 e esquema `radar_brasil`. Se necessário,
+informe `--porta`, `--esquema` ou `--origem`. A origem escolhida precisa
+estar dentro de `[dados] dir`.
+
+Para a cópia definitiva, pause o cron do Radar e demais operações que escrevam
+no banco durante a janela de manutenção. Suspenda também o processamento de
+cadastros e o acesso de escrita da API. Confira que as operações em andamento
+terminaram. Execute:
+
+```sh
+runuser -u www-data -- ./api.pse ferramenta migrar_postgres --ativar
+```
+
+Digite `ATIVAR` quando solicitado. A ferramenta usa o backup consistente do
+SQLite, incluindo transações confirmadas no WAL, e aplica as migrações pendentes
+na cópia privada temporária. Ela valida as contagens por tabela e a integridade
+do novo esquema, preserva IDs e sequências e só muda `radar.conf` após conferir
+a conexão como a conta do serviço. Reserve espaço para a cópia temporária
+em `[dados] dir`.
+
+A ativação grava a senha num arquivo `.pgpass` de permissão 0600 dentro de
+`[dados] dir`. Nas outras modalidades a senha é usada somente em memória.
+O processo recusa um esquema já existente. Se a cópia terminar e a ativação
+falhar, o esquema fica disponível para inspeção e a saída registra a falha.
+
+## Depois da ativação
+
+Confira a rota `/health/ready` da API e o banco ativo via CLI:
+
+```sh
+runuser -u www-data -- ./api.pse ferramenta espelho_dados --backup pos-migracao
+```
+
+O resultado indica `motor: postgres` e aponta para o backup nativo `.pgdump`,
+em `dados/backups/espelho-dados/`. Reative os crons e o acesso à API após a
+checagem. A fila JSON, os brutos, as chaves e os logs continuam no diretório de
+dados do aplicativo. Nenhum componente usa o SQLite como fallback quando
+`[dados] motor = postgres`. O arquivo de origem fica como arquivo histórico,
+sem participação nas operações do Radar. Após a cópia, qualquer gravação nova
+é feita no PostgreSQL. Voltar simplesmente ao arquivo histórico perderia essas
+gravações.
+
+Se existe um cron externo que abre o arquivo SQLite diretamente, desative-o
+antes da janela. O sincronizador privado atualizado usa
+`radar-dados-sync.py --api CAMINHO/api.pse` para seguir o banco ativo.
+
+O esquema e as dependências revistas estão descritos em
 [Normalização relacional](NORMALIZACAO_RELACIONAL.md).

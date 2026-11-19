@@ -10,7 +10,7 @@ que não pôde ser confirmado está marcado **a confirmar** (não inventado).
 - **Stack:** Python 3, **só stdlib** (`urllib`, `sqlite3`, `csv`, `json`,
   `xml.etree`, `zlib`, `html.parser`). **Sem SQLAlchemy, sem pip, sem
   dependências externas.** Consequência de projeto, não limitação.
-- **Schema:** **78 tabelas (T01..T77 + EXECUCAO_ARTEFATO)** — `grep -c "CREATE TABLE"
+- **Schema:** **81 tabelas (T01..T80 + EXECUCAO_ARTEFATO)** — `grep -c "CREATE TABLE"
   sql/schema.sqlite.sql` = 77. PK/FK/UNIQUE/CHECK/NOT NULL. Fonte única em
   `tools/build_schema.py`, que gera `sql/schema.sqlite.sql` (SQLite) e
   `sql/schema.postgres.sql` (Postgres). SQLite é o alvo exercitado
@@ -94,7 +94,7 @@ que não pôde ser confirmado está marcado **a confirmar** (não inventado).
    fictício). Isso é regra, não falha.
 9. **Postgres:** a DDL é gerada (`sql/schema.postgres.sql`), mas **a
    confirmar** execução/carga reais em Postgres — só SQLite foi exercitado.
-10. **Migrations / volume:** o esquema canônico (T01..T77) é criado por
+10. **Migrations / volume:** o esquema canônico (T01..T80) é criado por
    `init_db`; a camada de **governança** (USUARIO, API_TOKEN, SESSAO,
    RADAR_ALTERACAO, BLOQUEIO_GEOGRAFICO, CORRESPONDENCIA_PONTO,
    SUBMISSAO_PUBLICA) entra por **migração aditiva versionada**

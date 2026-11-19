@@ -131,7 +131,7 @@ class TestNormalizacaoRelacional(apoio.BaseDedup):
     def test_reconciliacao_aproveita_marco_explicito_no_bruto_antigo(self):
         x, rx, y, ry = self.duplicar()
         self.con.execute('UPDATE PONTO_FISCALIZACAO SET via_id=NULL,km=NULL WHERE id=?', (y['ponto_id'],))
-        self.con.execute('UPDATE REGISTRO_FONTE SET payload_original=? WHERE id=?', (json.dumps({'LocalVerificacao':'GO 060 KM249+100M'}),ry))
+        self.con.execute('UPDATE PAYLOAD_FONTE SET payload_original=? WHERE hash_registro=(SELECT hash_registro FROM REGISTRO_FONTE WHERE id=?)', (json.dumps({'LocalVerificacao':'GO 060 KM249+100M'}),ry))
         self.assertEqual(equipamentos.reconciliar(self.con)['equipamentos_reconciliados'], 1)
         self.assertIsNone(db.scalar(self.con, 'SELECT km FROM PONTO_FISCALIZACAO WHERE id=?', (y['ponto_id'],)))
 

@@ -23,6 +23,7 @@ CAMINHOS = {("instalacao", "home"), ("dados", "dir"), ("dados", "banco"),
             ("api", "token_arquivo"), ("geografia", "malha")}
 CAMINHOS.add(("assistente", "chave_arquivo"))
 CAMINHOS.add(("traseiro", "tokens_arquivo"))
+CAMINHOS.update({("postgres", "pgpass"), ("postgres", "certificado_ca")})
 NUMEROS = {**{("governanca", k): (1, 1000000000)
               for k in caminhos.SECOES["governanca"]},
            ("api", "max_body"): (1024, 67108864),
@@ -213,10 +214,16 @@ def _validar_destinos(alteracoes):
     # Valida a configuracao proposta antes de tocar no arquivo ou nos dados.
     dados = alteracoes.get(("dados", "dir")) or caminhos.data_dir()
     dados = Path(caminhos._absoluto(dados, caminhos.conf_path())).resolve()
+    motor = alteracoes.get(("dados", "motor"), caminhos.motor_banco()) or "sqlite"
+    if motor not in ("sqlite", "postgres"):
+        _erro(422, "motor_invalido", "Use dados.motor=sqlite ou postgres.")
     operacionais = {("dados", "banco"): "radar.sqlite3", ("logs", "dir"): "logs",
                     ("api", "token_arquivo"): "api_token", ("assistente", "chave_arquivo"): "assistente_chave",
                     ("geografia", "malha"): "", ("sincronizacao", "clone"): ""}
     operacionais[('traseiro','tokens_arquivo')]='traseiro_tokens.json'
+    if motor == "postgres":
+        operacionais.update({("postgres", "pgpass"): "postgres.pgpass",
+                              ("postgres", "certificado_ca"): ""})
     # Conferir tambem valores que nao foram editados: mudar dados.dir nao pode
     # deixar um token/log/malha absoluto apontando para a antiga raiz.
     for par, padrao in operacionais.items():
@@ -258,13 +265,13 @@ def _validar_destinos(alteracoes):
                 _erro(422, "destino_fora_dados", str(exc))
         if par != ("dados", "banco") and not destino.exists():
             _erro(422, "destino_ausente", ".".join(par) + ": prepare o destino antes de salvar.")
-        if par == ("dados", "banco") and not destino.is_file():
+        if motor == "sqlite" and par == ("dados", "banco") and not destino.is_file():
             _erro(422, "destino_ausente", "O banco deve existir dentro de dados.dir; a configuracao nao move arquivos.")
         if par == ("instalacao", "home") and not (destino / "core/entrada_api.py").is_file():
             _erro(422, "destino_invalido", "O codigo deve conter core/entrada_api.py.")
         if par == ("web", "raiz") and not (destino / "api.pse").is_file():
             _erro(422, "destino_invalido", "O site deve conter api.pse.")
-    if ("dados", "dir") in alteracoes:
+    if motor == "sqlite" and ("dados", "dir") in alteracoes:
         nome = alteracoes.get(("dados", "banco")) or Path(caminhos.banco()).name
         if not (dados / nome).is_file():
             _erro(422, "destino_ausente", "O banco deve estar no novo dados.dir antes de salvar.")

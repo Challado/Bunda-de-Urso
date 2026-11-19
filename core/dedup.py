@@ -308,7 +308,7 @@ def _base_registro(conn, registro_id):
                a.hash_sha256 AS artefato_hash, a.recurso_id,
                rf.fonte_id, rf.nome AS recurso_nome, rf.url_recurso,
                f.natureza_id, nf.codigo AS natureza
-        FROM REGISTRO_FONTE r
+        FROM REGISTRO_FONTE_DETALHE r
         JOIN ARTEFATO_COLETA a ON a.id = r.artefato_id
         JOIN RECURSO_FONTE rf ON rf.id = a.recurso_id
         JOIN FONTE f ON f.id = rf.fonte_id
@@ -968,14 +968,14 @@ def gerar_candidatos(conn, regra=None, pesos=None, raio_m=None, agora=None):
             "encaminhamento": res["encaminhamento"],
             "observacoes_equivalentes": {"a": grupos[a], "b": grupos[b]},
         }
-        cur = conn.execute(
+        novo_id = dbmod.inserir_id(conn,
             "INSERT OR IGNORE INTO CANDIDATO_DUPLICIDADE "
             "(registro_a_id, registro_b_id, regra_id, score, estado, "
             "evidencias_resumo, gerado_em) VALUES (?,?,?,?,?,?,?)",
             (a, b, regra_id, res["score"], "pendente",
              json.dumps(ev, sort_keys=True, ensure_ascii=False), agora))
-        if cur.rowcount == 1:
-            criados.append(cur.lastrowid)
+        if novo_id is not None:
+            criados.append(novo_id)
         else:
             row = dbmod.query_one(
                 conn, "SELECT id FROM CANDIDATO_DUPLICIDADE "
@@ -1013,8 +1013,8 @@ def candidatos(conn, ponto_id=None, estado=None, regra=VERSAO_REGRA_PADRAO,
     sql = ("SELECT cd.*, ra.identificador_na_fonte AS a_identificador, "
            "rb.identificador_na_fonte AS b_identificador "
            "FROM CANDIDATO_DUPLICIDADE cd "
-           "JOIN REGISTRO_FONTE ra ON ra.id = cd.registro_a_id "
-           "JOIN REGISTRO_FONTE rb ON rb.id = cd.registro_b_id ")
+           "JOIN REGISTRO_FONTE_DETALHE ra ON ra.id = cd.registro_a_id "
+           "JOIN REGISTRO_FONTE_DETALHE rb ON rb.id = cd.registro_b_id ")
     cond, params = [], []
     if regra is not None:
         cond.append("cd.regra_id IN (SELECT id FROM REGRA_DEDUPLICACAO WHERE versao=?)")
@@ -1103,7 +1103,7 @@ def decidir(conn, candidato_id, decisao, usuario, motivo, observacoes=None,
             raise ValueError("escopo requer uma entidade original inequivoca por registro")
     if observacoes:
         obs["observacoes"] = observacoes
-    with conn:
+    with dbmod.transacao(conn):
         decisao_id = dbmod.insert(conn, "DECISAO_DUPLICIDADE", {
             "candidato_id": candidato_id,
             "decisao": decisao,
@@ -1197,7 +1197,7 @@ def aplicar(conn, candidato_id=None, usuario=None, agora=None):
     else:
         alvos = [candidato_id]
     resultados = []
-    with conn:
+    with dbmod.transacao(conn):
         antes = {(tipo, r[0], r[1])
                  for tipo, (tabela, coluna) in identidade.TIPOS.items()
                  for r in conn.execute("SELECT registro_id, %s FROM %s"
@@ -1272,7 +1272,7 @@ def reverter_decisao(conn, decisao_id, usuario, motivo=None, agora=None):
         return {"decisao_id": decisao_id, "revertida": False,
                 "motivo": "decisao ja revertida"}
     agora = agora or _agora()
-    with conn:
+    with dbmod.transacao(conn):
         removidos = sum(dbmod.scalar(conn, "SELECT COUNT(*) FROM %s WHERE decisao_id=?"
                                      % tabela, (decisao_id,))
                         for tabela, _ in identidade.TIPOS.values())
@@ -1313,13 +1313,14 @@ def verificacoes_duplicadas(conn, equipamento_ids):
     if not equipamento_ids:
         return []
     qs = ",".join("?" for _ in equipamento_ids)
+    agregador = "STRING_AGG(id::text, ',')" if dbmod.e_postgres(conn) else "GROUP_CONCAT(id)"
     rows = dbmod.query_all(conn, """
         SELECT numero_certificado, data_verificacao, tipo_verificacao_id,
-               COUNT(*) AS n, GROUP_CONCAT(id) AS verificacao_ids
+               COUNT(*) AS n, %s AS verificacao_ids
         FROM VERIFICACAO_METROLOGICA
         WHERE equipamento_id IN (%s) AND numero_certificado IS NOT NULL
         GROUP BY numero_certificado, data_verificacao, tipo_verificacao_id
-        HAVING COUNT(*) > 1""" % qs, list(equipamento_ids))
+        HAVING COUNT(*) > 1""" % (agregador, qs), list(equipamento_ids))
     return [dict(r) for r in rows]
 
 

@@ -12,20 +12,15 @@ Regra (nada e inventado):
   - longitude positiva NAO consertavel, ou latitude == longitude -> preserva
     o bruto e marca a posicao como qualidade "conflitante" (quarentena).
 
-O dado original permanece intacto em REGISTRO_FONTE.payload_original.
+O dado original permanece intacto em PAYLOAD_FONTE.
 
 Uso:
   python3 tools/corrigir_coordenadas_brasil.py [--db CAMINHO] [--aplicar]
 
 Sem --aplicar e dry-run (mostra antes/depois sem escrever). Com --aplicar,
-faz backup CONSISTENTE (sqlite3.Connection.backup, o banco esta em WAL)
-antes de escrever, e valida foreign_key_check + integrity_check depois.
+faz um backup consistente do banco ativo antes de escrever e verifica a integridade depois.
 """
 import argparse
-import os
-import sqlite3
-import sys
-from datetime import datetime, timezone
 
 
 from coletor.fontes import normalizacao as nz    # noqa: E402
@@ -34,10 +29,6 @@ from core import db as dbmod
 from core import caminhos  # caminhos so pela porta unica
 
 DB_PADRAO = caminhos.banco()
-
-
-def _iso_agora():
-    return datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
 
 
 def _uf_do_ponto(cur, posicao_id):
@@ -129,18 +120,6 @@ def aplicar(con, plano):
     return mudancas
 
 
-def _backup_consistente(db, destino):
-    origem = dbmod.connect(db)
-    try:
-        alvo = dbmod.connect(destino)
-        try:
-            origem.backup(alvo)
-        finally:
-            alvo.close()
-    finally:
-        origem.close()
-
-
 @operacao_local
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
@@ -148,7 +127,7 @@ def main(argv=None):
     ap.add_argument("--aplicar", action="store_true")
     args = ap.parse_args(argv)
 
-    con = dbmod.connect("file:%s?mode=ro" % args.db, uri=True)
+    con = dbmod.connect_readonly(args.db)
     plano = coletar(con.cursor())
     con.close()
 
@@ -164,18 +143,15 @@ def main(argv=None):
         print("DRY-RUN: nada foi escrito (use --aplicar para gravar).")
         return 0
 
-    destino = "%s.bak.%s" % (args.db, _iso_agora())
-    _backup_consistente(args.db, destino)
+    destino = dbmod.backup_manutencao(args.db, "corrigir_coordenadas_brasil")
     print("backup consistente: %s" % destino)
 
     con = dbmod.connect(args.db)
     try:
         n = aplicar(con, plano)
-        fk = con.execute("PRAGMA foreign_key_check").fetchall()
-        integridade = con.execute("PRAGMA integrity_check").fetchone()[0]
+        dbmod.verificar_integridade(con)
     finally:
         con.close()
     print("linhas atualizadas: %d" % n)
-    print("foreign_key_check: %s" % ("vazio OK" if not fk else fk))
-    print("integrity_check: %s" % integridade)
+    print("integridade: OK")
     return 0

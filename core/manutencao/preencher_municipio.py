@@ -25,8 +25,6 @@ import argparse
 import json
 import os
 import re
-import shutil
-import sqlite3
 import sys
 
 
@@ -106,7 +104,7 @@ SELECT p.id            AS ponto_id,
 FROM PONTO_FISCALIZACAO p
 LEFT JOIN VINCULO_REGISTRO_PONTO v ON v.ponto_id = p.id
 LEFT JOIN POSICAO_GEOGRAFICA g    ON g.id = p.posicao_id
-LEFT JOIN REGISTRO_FONTE r
+LEFT JOIN REGISTRO_FONTE_DETALHE r
        ON r.id = COALESCE(v.registro_id, g.registro_fonte_id)
 LEFT JOIN ARTEFATO_COLETA a ON a.id = r.artefato_id
 LEFT JOIN RECURSO_FONTE rf  ON rf.id = a.recurso_id
@@ -173,19 +171,17 @@ def main(argv=None):
                     help="copia o banco para <db>.bak.<timestamp> antes de gravar")
     args = ap.parse_args(argv)
 
-    if not os.path.exists(args.db):
+    if not dbmod.postgres_ativo() and not os.path.exists(args.db):
         print("ERRO: banco nao encontrado: %s" % args.db, file=sys.stderr)
         return 2
 
     if args.backup and not args.dry_run:
-        ts = __import__("datetime").datetime.now().strftime("%Y%m%d-%H%M%S")
-        destino = "%s.bak.%s" % (args.db, ts)
-        shutil.copy2(args.db, destino)
+        destino = dbmod.backup_manutencao(args.db, "preencher_municipio")
         print("backup: %s" % destino)
 
     conn = dbmod.connect(args.db)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
+    if not dbmod.e_postgres(conn):
+        conn.execute("PRAGMA foreign_keys = ON")
     try:
         p_antes = contar(conn, "PONTO_FISCALIZACAO",
                          "WHERE municipio_id IS NOT NULL")

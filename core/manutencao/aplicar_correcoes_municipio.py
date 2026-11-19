@@ -12,9 +12,7 @@ Uso:
       [--dry-run] [--backup]
 """
 import argparse
-import datetime
 import os
-import shutil
 import sqlite3
 import sys
 
@@ -45,7 +43,7 @@ def main(argv=None):
                     help="nao derivar VIA_UF apos aplicar")
     args = ap.parse_args(argv)
 
-    if not os.path.exists(args.db):
+    if not dbmod.postgres_ativo() and not os.path.exists(args.db):
         print("ERRO: banco nao encontrado: %s" % args.db, file=sys.stderr)
         return 2
     if not os.path.exists(args.csv):
@@ -53,17 +51,16 @@ def main(argv=None):
         return 3
 
     if args.backup and not args.dry_run:
-        ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        destino = "%s.bak.%s" % (args.db, ts)
-        shutil.copy2(args.db, destino)
+        destino = dbmod.backup_manutencao(args.db, "aplicar_correcoes_municipio")
         print("backup: %s" % destino)
 
     conn = dbmod.connect(args.db)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
+    if not dbmod.e_postgres(conn):
+        conn.execute("PRAGMA foreign_keys = ON")
     try:
-        conn.execute("PRAGMA busy_timeout = 15000")
-        conn.execute("PRAGMA journal_mode = WAL")
+        if not dbmod.e_postgres(conn):
+            conn.execute("PRAGMA busy_timeout = 15000")
+            conn.execute("PRAGMA journal_mode = WAL")
     except sqlite3.Error:                                   # pragma: no cover
         pass
     try:

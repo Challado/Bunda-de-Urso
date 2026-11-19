@@ -11,6 +11,11 @@ corrige, separadamente, a resolução de identidade na escrita.
 |---|---|---|
 | Snapshot | `artefato_id → recurso_id`; repetir o recurso na associação permitia contradições | `SNAPSHOT_RECURSO(snapshot_id, artefato_id)`, chave composta; recurso por JOIN com o artefato |
 | Execução | Quando havia artefato, seu recurso era repetido junto ao recurso da tentativa | `EXECUCAO_COLETA` registra a tentativa e o recurso solicitado; `EXECUCAO_ARTEFATO(execucao_id PK/FK, artefato_id FK)` registra o resultado opcional |
+| Identificador externo | A representação original e a chave normalizada ficavam na mesma linha | `IDENTIFICADOR_EXTERNO` usa a chave canônica, `IDENTIFICADOR_GRAFIA` guarda a grafia original quando diferente |
+| Rede mesh | Origem e chave da revisão eram repetidas no cadastro de radar e no cadastro de fonte | O cadastro referencia o evento vigente, de onde se obtêm origem e chave |
+| Documento bruto | `hash_registro → payload_original` | `PAYLOAD_FONTE` guarda um documento por hash. O registro guarda a proveniência e referencia o documento |
+| Arquivo bruto | `hash_sha256 → bytes_arquivo` | `CONTEUDO_ARTEFATO` guarda o tamanho uma vez. O artefato vincula a coleta ao conteúdo e conserva os metadados da resposta |
+| Alerta | `execucao_id → recurso_id` quando a execução existe | O alerta sem execução pode referenciar o recurso diretamente. Com execução, a view deriva o recurso |
 | Cobertura municipal | `municipio_id → uf_sigla`; a cobertura armazenava os dois | Guarda o município; obtém a UF por JOIN. Cobertura estadual continua guardando sua UF |
 
 `SNAPSHOT_RECURSO_DETALHE`, `EXECUCAO_COLETA_DETALHE` e
@@ -57,12 +62,11 @@ dependência entre município e UF na cobertura municipal e entre artefato
 e recurso nas associações de snapshot. Essas verificações não certificam
 todas as dependências funcionais do sistema.
 
-Há redundâncias deliberadas que impedem classificar o banco inteiro como
-3FN estrita. `IDENTIFICADOR_EXTERNO.valor_normalizado` é derivado de
-`valor` e é armazenado para busca e unicidade. `TRASEIRO_EVENTO` guarda
-o documento e seu hash para verificação e intercâmbio. O payload bruto em
-`REGISTRO_FONTE` é um documento de auditoria com estrutura própria. Seus
-campos não substituem as relações canônicas usadas pelo sistema.
+O catálogo relacional guarda as chaves e vínculos usados na operação.
+Documentos brutos, mensagens da rede e evidências de auditoria preservam o
+conteúdo recebido como unidades opacas. O texto ou JSON de origem pode
+conter atributos que aparecem também no catálogo, por se tratar do documento
+original da fonte.
 
 ## Identidade na escrita
 
@@ -92,11 +96,11 @@ não descartar divergências entre publicações do equipamento compartilhado.
 
 ## Migração e atualização
 
-O instalador aplica as migrações 0004–0006 pela API e executa a reconciliação dos
-equipamentos com backup. Não exige apagar a base ou baixar tudo novamente.
+O instalador aplica as migrações pela API. A reconciliação dos equipamentos
+pode ser executada com backup. Não exige apagar a base ou baixar tudo novamente.
 SQLite **3.35+** é necessário; o instalador confere isso antes de alterar a
 instalação. As duas DDLs são geradas juntas; a [ferramenta de migração para PostgreSQL](MIGRACAO_POSTGRES.md)
-executa e valida a cópia nesse banco. O runtime continua usando SQLite.
+valida a cópia e pode ativar o PostgreSQL para o aplicativo.
 
 A reconciliação exige compatibilidade entre **todos** os membros do grupo.
 Casos ambíguos, natureza não oficial, atributos conflitantes, registros
@@ -123,7 +127,7 @@ python3 web/api.pse ferramenta reconciliar_equipamentos --aplicar
 ```
 
 Os caminhos vêm de `radar.conf`. A simulação desfaz suas escritas; a aplicação
-faz backup SQLite consistente, incluindo WAL, em `dados.dir/backups/identidade/`,
+faz um backup consistente do motor ativo em `dados.dir/backups/identidade/`,
 e executa a reconciliação em transação. Integridade e FKs são verificadas.
 
 A migração recusa relações antigas contraditórias em vez de descartar um dos

@@ -102,7 +102,7 @@ https://servidor3.lucas.inf.br/openclaw/radar/api.pse?rota=/api/v1/radares&lat=-
 
 Resumindo: **nginx + fcgiwrap + Python** executando um arquivo `.pse`. Nada mais exótico que isso.
 
-O esquema é **SQL canônico, sem ORM** — nada de SQLAlchemy por aqui. São **78 tabelas no esquema base** (T01..T77 + EXECUCAO_ARTEFATO) definidas uma única vez em `core/manutencao/build_schema.py` (o comando `tools/build_schema.py` encaminha a geração pela API), que gera as duas DDLs gêmeas (`sql/schema.sqlite.sql` e `sql/schema.postgres.sql`), com chaves primárias/estrangeiras, `CHECK`, `UNIQUE` e índices, incluindo equipamentos, pontos, instalações, faixas, órgãos, fontes, documentos, verificações, operações, evidências e candidatos geográficos. O banco padrão é SQLite, sem PostGIS. O [migrador SQLite → PostgreSQL](docs/MIGRACAO_POSTGRES.md) prepara uma cópia relacional do banco. O runtime ainda usa SQLite.
+O esquema é **SQL canônico, sem ORM** — nada de SQLAlchemy por aqui. São **81 tabelas no esquema base** (T01..T80 + EXECUCAO_ARTEFATO) definidas uma única vez em `core/manutencao/build_schema.py` (o comando `tools/build_schema.py` encaminha a geração pela API), que gera as duas DDLs gêmeas (`sql/schema.sqlite.sql` e `sql/schema.postgres.sql`), com chaves primárias/estrangeiras, `CHECK`, `UNIQUE` e índices, incluindo equipamentos, pontos, instalações, faixas, órgãos, fontes, documentos, verificações, operações, evidências e candidatos geográficos. O banco padrão é SQLite, sem PostGIS. O [migrador SQLite → PostgreSQL](docs/MIGRACAO_POSTGRES.md) transfere o esquema e o histórico e pode ativar o PostgreSQL para a API, os coletores e os crons.
 
 ## Como a coleta funciona
 

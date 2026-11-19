@@ -111,11 +111,10 @@ def construir(municipios, malha=None):
 
 
 def _cruzar_db(caminho_db, cadastro):
-    if not caminho_db or not os.path.exists(caminho_db):
+    if not caminho_db or (not dbmod.postgres_ativo() and not os.path.exists(caminho_db)):
         return None
     try:
-        conn = dbmod.connect("file:%s?mode=ro" % caminho_db, uri=True)
-        conn.row_factory = sqlite3.Row
+        conn = dbmod.connect_readonly(caminho_db)
         db = {r["codigo_ibge"]: (r["uf_sigla"], r["nome"])
               for r in conn.execute(
                   "SELECT codigo_ibge, uf_sigla, nome FROM MUNICIPIO")}

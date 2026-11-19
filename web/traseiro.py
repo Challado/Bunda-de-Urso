@@ -105,7 +105,7 @@ def trocar(conn,par,local,dados):
     if type(cursor) is not int or not 0<=cursor<2**63 or type(limite) is not int or not 1<=limite<=1000:
         tr.erro(422,'cursor_invalido','Cursor/limite invalidos.')
     # Reserva atomica impede duas chamadas simultaneas de furarem o intervalo.
-    atualizada=conn.execute('UPDATE TRASEIRO_INSTANCIA SET ultima_consulta_recebida=? WHERE uuid=? AND ultima_consulta_recebida IS ?',
+    atualizada=conn.execute('UPDATE TRASEIRO_INSTANCIA SET ultima_consulta_recebida=? WHERE uuid=? AND ultima_consulta_recebida IS NOT DISTINCT FROM ?',
         (tr.agora(),par['uuid'],ultima)).rowcount
     conn.commit()
     if not atualizada:

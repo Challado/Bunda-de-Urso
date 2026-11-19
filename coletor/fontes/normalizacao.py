@@ -407,22 +407,9 @@ def _resolver_ponto_identificado(conn, fonte_id, d):
     como identidade ambigua e o registro ganha ponto proprio, como uma fonte
     sem identificador confiavel.
     """
-    if fonte_id is None or d.get("identificador") in (None, ""):
-        return None, None
-    tipo_id = dbmod.domain_id(conn, "TIPO_IDENTIFICADOR",
-                              d.get("tipo_identificador", "id_orgao"))
-    valor_norm = str(d["identificador"]).strip().upper()
-    identificador_id = _buscar_por(conn, "IDENTIFICADOR_EXTERNO", {
-        "fonte_id": fonte_id, "tipo_identificador_id": tipo_id,
-        "valor_normalizado": valor_norm})
+    identificador_id = _identificador_externo_id(conn, fonte_id, d)
     if identificador_id is None:
-        identificador_id = dbmod.insert(conn, "IDENTIFICADOR_EXTERNO", {
-            "fonte_id": fonte_id,
-            "tipo_identificador_id": tipo_id,
-            "valor": d["identificador"],
-            "valor_normalizado": valor_norm,
-        })
-        return None, identificador_id
+        return None, None
     pontos = dbmod.query_all(
         conn, "SELECT DISTINCT ponto_id FROM IDENTIFICADOR_PONTO "
               "WHERE identificador_id=?", (identificador_id,))
@@ -442,17 +429,17 @@ def _identificador_externo_id(conn, fonte_id, d):
         return None
     tipo_id = dbmod.domain_id(conn, "TIPO_IDENTIFICADOR",
                               d.get("tipo_identificador", "id_orgao"))
-    valor_norm = str(d["identificador"]).strip().upper()
+    original = str(d["identificador"])
+    valor = original.strip().upper()
     identificador_id = _buscar_por(conn, "IDENTIFICADOR_EXTERNO", {
-        "fonte_id": fonte_id, "tipo_identificador_id": tipo_id,
-        "valor_normalizado": valor_norm})
+        "fonte_id": fonte_id, "tipo_identificador_id": tipo_id, "valor": valor})
     if identificador_id is None:
         identificador_id = dbmod.insert(conn, "IDENTIFICADOR_EXTERNO", {
-            "fonte_id": fonte_id,
-            "tipo_identificador_id": tipo_id,
-            "valor": d["identificador"],
-            "valor_normalizado": valor_norm,
+            "fonte_id": fonte_id, "tipo_identificador_id": tipo_id, "valor": valor,
         })
+        if original != valor:
+            conn.execute("INSERT INTO IDENTIFICADOR_GRAFIA (identificador_id, valor_original) VALUES (?,?)",
+                         (identificador_id, original))
     return identificador_id
 
 
@@ -547,7 +534,7 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None,
         "observacoes": d.get("observacoes"),
     }
     ##-- BUNDITA DE URSO #{8} -- O DEFAULT oficial da migracao rotulava cadastros proprios como prova governamental. ##
-    colunas = {r[1] for r in conn.execute("PRAGMA table_info(PONTO_FISCALIZACAO)")}
+    colunas = set(dbmod.colunas(conn, "PONTO_FISCALIZACAO"))
     if {"procedencia", "verificacao_status"} <= colunas:
         natureza = dbmod.scalar(conn, "SELECT n.codigo FROM FONTE f "
                                 "JOIN NATUREZA_FONTE n ON n.id=f.natureza_id WHERE f.id=?",

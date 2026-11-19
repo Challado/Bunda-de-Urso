@@ -21,7 +21,6 @@ Uso:
 import argparse
 import json
 import os
-import sqlite3
 import sys
 
 
@@ -113,12 +112,11 @@ def main(argv=None):
                     help="grava os pisos de cobertura (config/cobertura_minima.json)")
     args = ap.parse_args(argv)
 
-    if not os.path.exists(args.db):
+    if not dbmod.postgres_ativo() and not os.path.exists(args.db):
         print("ERRO: banco nao encontrado: %s" % args.db, file=sys.stderr)
         return 2
 
     conn = dbmod.connect_readonly(args.db)
-    conn.row_factory = sqlite3.Row
     try:
         atual = medir(conn)
     finally:

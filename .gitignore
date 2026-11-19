@@ -9,6 +9,8 @@ dados/
 *.db
 *.sqlite
 *.sqlite3
+*.pgdump
+*.pgpass
 
 # temporários
 *.tmp

@@ -34,6 +34,7 @@ NOMES = [
     re.compile(r"conta[-_]servico.*\.json$", re.I),
     re.compile(r"(^|/)credentials\.json$", re.I),
     re.compile(r"(^|/)secrets\.env$"),
+    re.compile(r"\.pgpass$", re.I),
 ]
 
 

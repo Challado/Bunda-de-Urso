@@ -297,11 +297,11 @@ def _envelope(row):
 
 def _catalogar(conn,seq,doc):
     tabela='TRASEIRO_CADASTRO' if doc['tipo']==TIPO_RADAR else 'TRASEIRO_FONTE'
-    antigo=conn.execute('SELECT c.*,e.revisao FROM '+tabela+' c LEFT JOIN TRASEIRO_EVENTO e ON e.seq=c.evento_id WHERE c.origem=? AND c.chave=?',(doc['origem'],doc['chave'])).fetchone()
+    antigo=conn.execute('SELECT c.*,e.revisao FROM '+tabela+' c LEFT JOIN TRASEIRO_EVENTO e ON e.seq=c.evento_id WHERE e.origem=? AND e.chave=?',(doc['origem'],doc['chave'])).fetchone()
     if antigo is not None and antigo['revisao']>=doc['revisao']:
         return
     if antigo is None:
-        conn.execute('INSERT INTO '+tabela+'(origem,chave,evento_id) VALUES(?,?,?)',(doc['origem'],doc['chave'],seq))
+        conn.execute('INSERT INTO '+tabela+'(evento_id) VALUES(?)',(seq,))
     else:
         campo="estado='pendente'" if doc['tipo']==TIPO_RADAR else 'ativo=0'
         conn.execute('UPDATE '+tabela+' SET evento_id=?, '+campo+' WHERE id=?',(seq,antigo['id']))
@@ -324,7 +324,7 @@ def receber(conn,eventos,via):
             if doc['tipo']==TIPO_RADAR and dbmod.scalar(conn,"SELECT COUNT(*) FROM TRASEIRO_CADASTRO WHERE estado='pendente'")>=numero('max_pendentes'):
                 erro(429,'fila_cheia','Fila mesh cheia; o remetente deve tentar depois.')
             texto=json_doc(doc['documento'])
-            seq=dbmod.insert(conn,'TRASEIRO_EVENTO',{**{k:doc[k] for k in ('uuid','origem','tipo','chave','revisao','acao')},'documento':texto,'hash_documento':hashlib.sha256(texto.encode()).hexdigest(),'recebido_via':via,'recebido_em':agora()})
+            seq=dbmod.insert(conn,'TRASEIRO_EVENTO',{**{k:doc[k] for k in ('uuid','origem','tipo','chave','revisao','acao')},'documento':texto,'recebido_via':via,'recebido_em':agora()})
             _catalogar(conn,seq,doc); novos+=1
         conn.execute('RELEASE traseiro_receber'); conn.commit()
     except Exception:
@@ -339,11 +339,11 @@ def publicar(conn,tipo,chave,documento,acao='publicar',catalogar=True):
     anterior=conn.execute('SELECT * FROM TRASEIRO_EVENTO WHERE origem=? AND tipo=? AND chave=? ORDER BY revisao DESC LIMIT 1',(local,tipo,chave)).fetchone()
     if anterior and anterior['acao']==acao and json.loads(anterior['documento'])==documento:
         return anterior['seq']
-    if catalogar and tipo==TIPO_RADAR and not dbmod.scalar(conn,'SELECT 1 FROM TRASEIRO_CADASTRO WHERE origem=? AND chave=?',(local,chave)) and dbmod.scalar(conn,"SELECT COUNT(*) FROM TRASEIRO_CADASTRO WHERE estado='pendente'")>=numero('max_pendentes'):
+    if catalogar and tipo==TIPO_RADAR and not dbmod.scalar(conn,'SELECT 1 FROM TRASEIRO_CADASTRO c JOIN TRASEIRO_EVENTO e ON e.seq=c.evento_id WHERE e.origem=? AND e.chave=?',(local,chave)) and dbmod.scalar(conn,"SELECT COUNT(*) FROM TRASEIRO_CADASTRO WHERE estado='pendente'")>=numero('max_pendentes'):
         erro(429,'fila_cheia','Fila mesh cheia; coleta ensinada sera retomada depois.')
     doc=validar_evento({'uuid':str(uuid.uuid4()),'origem':local,'tipo':tipo,'chave':chave,'revisao':anterior['revisao']+1 if anterior else 1,'acao':acao,'documento':documento})
     texto=json_doc(documento)
-    seq=dbmod.insert(conn,'TRASEIRO_EVENTO',{**{k:doc[k] for k in ('uuid','origem','tipo','chave','revisao','acao')},'documento':texto,'hash_documento':hashlib.sha256(texto.encode()).hexdigest(),'recebido_em':agora()})
+    seq=dbmod.insert(conn,'TRASEIRO_EVENTO',{**{k:doc[k] for k in ('uuid','origem','tipo','chave','revisao','acao')},'documento':texto,'recebido_em':agora()})
     if catalogar:
         _catalogar(conn,seq,doc)
     conn.commit()
@@ -398,7 +398,7 @@ def exportar_pontos(conn):
 
 def listar(conn,tipo,depois=0,limite=100):
     tabela='TRASEIRO_CADASTRO' if tipo=='cadastros' else 'TRASEIRO_FONTE'
-    rows=conn.execute('SELECT c.*,e.documento,e.acao,e.revisao,e.recebido_em,i.nome AS instancia_nome,i.api_url AS instancia_url FROM '+tabela+' c LEFT JOIN TRASEIRO_EVENTO e ON e.seq=c.evento_id LEFT JOIN TRASEIRO_INSTANCIA i ON i.uuid=c.origem WHERE c.id>? ORDER BY c.id LIMIT ?',(depois,min(200,max(1,limite)))).fetchall()
+    rows=conn.execute('SELECT c.*,e.origem,e.chave,e.documento,e.acao,e.revisao,e.recebido_em,i.nome AS instancia_nome,i.api_url AS instancia_url FROM '+tabela+' c LEFT JOIN TRASEIRO_EVENTO e ON e.seq=c.evento_id LEFT JOIN TRASEIRO_INSTANCIA i ON i.uuid=e.origem WHERE c.id>? ORDER BY c.id LIMIT ?',(depois,min(200,max(1,limite)))).fetchall()
     return [{**dict(r),'documento':json.loads(r['documento'])} for r in rows]
 
 @gravacao
@@ -406,7 +406,7 @@ def decidir(conn,cadastro_id,acao,ctx,motivo,evento_id):
     gov.exigir(ctx,'moderador')
     if acao not in ('aprovar','rejeitar') or not isinstance(motivo,str) or not 5<=len(motivo.strip())<=2000:
         erro(422,'decisao_invalida','Aprove/rejeite informando como conferiu a posicao (motivo com 5 a 2000 caracteres).')
-    row=conn.execute('SELECT c.*,e.documento,e.acao FROM TRASEIRO_CADASTRO c LEFT JOIN TRASEIRO_EVENTO e ON e.seq=c.evento_id WHERE c.id=?',(cadastro_id,)).fetchone()
+    row=conn.execute('SELECT c.*,e.origem,e.chave,e.documento,e.acao FROM TRASEIRO_CADASTRO c LEFT JOIN TRASEIRO_EVENTO e ON e.seq=c.evento_id WHERE c.id=?',(cadastro_id,)).fetchone()
     if row is None:
         erro(404,'cadastro_ausente','Cadastro mesh nao encontrado.')
     if evento_id!=row['evento_id']:

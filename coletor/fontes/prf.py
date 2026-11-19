@@ -284,7 +284,7 @@ class ColetorPRFFixos(ColetorBase):
         # mesmo que o arquivo oficial nao tenha mudado. Pontos ja ligados
         # continuam sendo ignorados pelo caminho idempotente da ingestao.
         for row in self.conn.execute("""
-            SELECT r.payload_original FROM REGISTRO_FONTE r
+            SELECT r.payload_original FROM REGISTRO_FONTE_DETALHE r
             LEFT JOIN VINCULO_REGISTRO_PONTO v ON v.registro_id=r.id
             WHERE r.artefato_id=(SELECT id FROM ARTEFATO_COLETA
                 WHERE recurso_id=? ORDER BY id DESC LIMIT 1)

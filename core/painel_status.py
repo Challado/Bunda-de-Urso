@@ -61,7 +61,7 @@ def _pontos(conn):
         SELECT vp.ponto_id, r.payload_original, f.id, f.nome, f.esfera,
                f.url_institucional, n.codigo AS natureza, o.nome AS organizacao
         FROM VINCULO_REGISTRO_PONTO vp
-        LEFT JOIN REGISTRO_FONTE r ON r.id=vp.registro_id
+        LEFT JOIN REGISTRO_FONTE_DETALHE r ON r.id=vp.registro_id
         LEFT JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id
         LEFT JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id
         LEFT JOIN FONTE f ON f.id=rf.fonte_id

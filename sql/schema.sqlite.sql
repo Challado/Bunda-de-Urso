@@ -1,4 +1,4 @@
--- Radar Brasil - esquema canonico (T01..T77 + EXECUCAO_ARTEFATO) - dialeto sqlite
+-- Radar Brasil - esquema canonico (T01..T79 + EXECUCAO_ARTEFATO) - dialeto sqlite
 -- Gerado por tools/build_schema.py a partir da ESPECIFICACAO v1.1.
 -- PK/FK/UQ/CHECK/NOT NULL. Sem PostGIS/recursos proprietarios.
 -- ON DELETE RESTRICT por padrao (dados historicos nao sofrem cascata).
@@ -163,6 +163,13 @@ CREATE TABLE IF NOT EXISTS QUALIDADE_POSICAO (
     descricao TEXT NOT NULL
 );
 
+-- T80 CONTEUDO_ARTEFATO
+CREATE TABLE IF NOT EXISTS CONTEUDO_ARTEFATO (
+    hash_sha256 CHAR(64) PRIMARY KEY NOT NULL,
+    bytes_arquivo INTEGER NOT NULL,
+    CHECK (bytes_arquivo >= 0)
+);
+
 -- T75 NATUREZA_FONTE
 CREATE TABLE IF NOT EXISTS NATUREZA_FONTE (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -208,9 +215,8 @@ CREATE TABLE IF NOT EXISTS RECURSO_FONTE (
 CREATE TABLE IF NOT EXISTS ARTEFATO_COLETA (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     recurso_id INTEGER NOT NULL REFERENCES RECURSO_FONTE(id) ON DELETE RESTRICT,
-    hash_sha256 CHAR(64) NOT NULL,
+    hash_sha256 CHAR(64) NOT NULL REFERENCES CONTEUDO_ARTEFATO(hash_sha256) ON DELETE RESTRICT,
     caminho_cache TEXT NOT NULL,
-    bytes_arquivo INTEGER NOT NULL,
     tipo_mime TEXT,
     etag TEXT,
     last_modified_http TEXT,
@@ -218,8 +224,13 @@ CREATE TABLE IF NOT EXISTS ARTEFATO_COLETA (
     baixado_em TEXT NOT NULL,
     validado_em TEXT,
     resultado_validacao TEXT NOT NULL,
-    UNIQUE (recurso_id, hash_sha256),
-    CHECK (bytes_arquivo >= 0)
+    UNIQUE (recurso_id, hash_sha256)
+);
+
+-- T79 PAYLOAD_FONTE
+CREATE TABLE IF NOT EXISTS PAYLOAD_FONTE (
+    hash_registro CHAR(64) PRIMARY KEY NOT NULL,
+    payload_original TEXT NOT NULL
 );
 
 -- T59 REGISTRO_FONTE
@@ -228,8 +239,7 @@ CREATE TABLE IF NOT EXISTS REGISTRO_FONTE (
     artefato_id INTEGER NOT NULL REFERENCES ARTEFATO_COLETA(id) ON DELETE RESTRICT,
     numero_ordem INTEGER NOT NULL,
     identificador_na_fonte TEXT,
-    payload_original TEXT NOT NULL,
-    hash_registro CHAR(64) NOT NULL,
+    hash_registro CHAR(64) NOT NULL REFERENCES PAYLOAD_FONTE(hash_registro) ON DELETE RESTRICT,
     status_validacao TEXT NOT NULL,
     UNIQUE (artefato_id, numero_ordem),
     CHECK (numero_ordem >= 0)
@@ -468,8 +478,13 @@ CREATE TABLE IF NOT EXISTS IDENTIFICADOR_EXTERNO (
     fonte_id INTEGER NOT NULL REFERENCES FONTE(id) ON DELETE RESTRICT,
     tipo_identificador_id INTEGER NOT NULL REFERENCES TIPO_IDENTIFICADOR(id) ON DELETE RESTRICT,
     valor TEXT NOT NULL,
-    valor_normalizado TEXT NOT NULL,
-    UNIQUE (fonte_id, tipo_identificador_id, valor_normalizado)
+    UNIQUE (fonte_id, tipo_identificador_id, valor)
+);
+
+-- T78 IDENTIFICADOR_GRAFIA
+CREATE TABLE IF NOT EXISTS IDENTIFICADOR_GRAFIA (
+    identificador_id INTEGER PRIMARY KEY NOT NULL REFERENCES IDENTIFICADOR_EXTERNO(id) ON DELETE RESTRICT,
+    valor_original TEXT NOT NULL
 );
 
 -- T43 IDENTIFICADOR_PONTO
@@ -790,7 +805,7 @@ CREATE TABLE IF NOT EXISTS DECISAO_VALOR_CANONICO (
 -- T74 ALERTA_OPERACIONAL
 CREATE TABLE IF NOT EXISTS ALERTA_OPERACIONAL (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    recurso_id INTEGER REFERENCES RECURSO_FONTE(id) ON DELETE RESTRICT,
+    recurso_direto_id INTEGER REFERENCES RECURSO_FONTE(id) ON DELETE RESTRICT,
     execucao_id INTEGER REFERENCES EXECUCAO_COLETA(id) ON DELETE RESTRICT,
     snapshot_id INTEGER REFERENCES SNAPSHOT_PUBLICADO(id) ON DELETE RESTRICT,
     chave_incidente TEXT NOT NULL,
@@ -802,7 +817,8 @@ CREATE TABLE IF NOT EXISTS ALERTA_OPERACIONAL (
     resolvido_em TEXT,
     ocorrencias INTEGER NOT NULL,
     CHECK (ocorrencias >= 1),
-    CHECK (ultima_ocorrencia >= primeira_ocorrencia)
+    CHECK (ultima_ocorrencia >= primeira_ocorrencia),
+    CHECK (execucao_id IS NULL OR recurso_direto_id IS NULL)
 );
 
 -- T76 LICENCA_DADOS
@@ -828,6 +844,15 @@ CREATE TABLE IF NOT EXISTS RECURSO_LICENCA (
     CHECK (vigencia_fim IS NULL OR vigencia_inicio IS NULL OR vigencia_fim >= vigencia_inicio)
 );
 
+CREATE VIEW IF NOT EXISTS ARTEFATO_COLETA_DETALHE AS
+SELECT a.*, c.bytes_arquivo FROM ARTEFATO_COLETA a
+LEFT JOIN CONTEUDO_ARTEFATO c ON c.hash_sha256=a.hash_sha256;
+CREATE VIEW IF NOT EXISTS ALERTA_OPERACIONAL_DETALHE AS
+SELECT a.*, COALESCE(e.recurso_id, a.recurso_direto_id) AS recurso_id
+FROM ALERTA_OPERACIONAL a LEFT JOIN EXECUCAO_COLETA e ON e.id=a.execucao_id;
+CREATE VIEW IF NOT EXISTS REGISTRO_FONTE_DETALHE AS
+SELECT r.*, p.payload_original FROM REGISTRO_FONTE r
+LEFT JOIN PAYLOAD_FONTE p ON p.hash_registro=r.hash_registro;
 CREATE VIEW IF NOT EXISTS COBERTURA_FONTE_DETALHE AS
 SELECT c.id, c.fonte_id, c.tipo_abrangencia, COALESCE(m.uf_sigla,c.uf_sigla) AS uf_sigla,
        c.municipio_id, c.via_id, c.vigencia_inicio, c.vigencia_fim, c.confirmada

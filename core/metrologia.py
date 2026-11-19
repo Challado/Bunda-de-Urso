@@ -22,13 +22,13 @@ JOIN PONTO_FISCALIZACAO po ON po.id = io.ponto_id
 JOIN INSTALACAO i ON i.equipamento_id = e.id
 JOIN PONTO_FISCALIZACAO p ON p.id = i.ponto_id AND p.municipio_id = po.municipio_id
 JOIN VINCULO_REGISTRO_EQUIPAMENTO vo ON vo.equipamento_id = origem.id AND vo.decisao_id IS NULL
-JOIN REGISTRO_FONTE ro ON ro.id = vo.registro_id
+JOIN REGISTRO_FONTE_DETALHE ro ON ro.id = vo.registro_id
 JOIN ARTEFATO_COLETA ao ON ao.id = ro.artefato_id
 JOIN RECURSO_FONTE rfo ON rfo.id = ao.recurso_id
 JOIN FONTE f_o ON f_o.id = rfo.fonte_id
 JOIN NATUREZA_FONTE no ON no.id = f_o.natureza_id AND no.codigo = 'oficial'
 JOIN VERIFICACAO_METROLOGICA vm ON vm.equipamento_id = e.id
-JOIN REGISTRO_FONTE r ON r.id = vm.registro_fonte_id
+JOIN REGISTRO_FONTE_DETALHE r ON r.id = vm.registro_fonte_id
 JOIN ARTEFATO_COLETA a ON a.id = r.artefato_id
 JOIN RECURSO_FONTE rf ON rf.id = a.recurso_id
 JOIN FONTE f ON f.id = rf.fonte_id AND f.id <> f_o.id
@@ -134,7 +134,7 @@ def correspondencias_por_local(conn, pid, visao):
     if origem is None or any(origem[c] is None for c in ('municipio_id','via_id','km')):
         return res
     oficial = db.scalar(conn, """SELECT 1 FROM VINCULO_REGISTRO_PONTO vp
-        JOIN REGISTRO_FONTE r ON r.id=vp.registro_id JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id
+        JOIN REGISTRO_FONTE_DETALHE r ON r.id=vp.registro_id JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id
         JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id JOIN FONTE f ON f.id=rf.fonte_id
         JOIN NATUREZA_FONTE n ON n.id=f.natureza_id AND n.codigo='oficial'
         WHERE vp.ponto_id=? AND vp.decisao_id IS NULL LIMIT 1""", (pid,))
@@ -152,7 +152,7 @@ def correspondencias_por_local(conn, pid, visao):
         FROM PONTO_FISCALIZACAO p JOIN INSTALACAO i ON i.ponto_id=p.id
         JOIN EQUIPAMENTO e ON e.id=i.equipamento_id
         JOIN VINCULO_REGISTRO_EQUIPAMENTO ve ON ve.equipamento_id=e.id AND ve.decisao_id IS NULL
-        JOIN REGISTRO_FONTE r ON r.id=ve.registro_id JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id
+        JOIN REGISTRO_FONTE_DETALHE r ON r.id=ve.registro_id JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id
         JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id JOIN FONTE f ON f.id=rf.fonte_id
         JOIN NATUREZA_FONTE n ON n.id=f.natureza_id AND n.codigo='oficial'
         WHERE p.municipio_id=? AND p.via_id=? AND p.km=? AND p.id<>? AND f.nome LIKE 'INMETRO%'
@@ -183,7 +183,7 @@ def correspondencias_por_local(conn, pid, visao):
     estado = db.scalar(conn,'SELECT codigo FROM SITUACAO_OPERACIONAL WHERE id=?',(origem['situacao_operacional_id'],))
     sql = """SELECT DISTINCT p.id AS ponto_id,p.situacao_operacional_id,r.id,r.payload_original,f.nome
         FROM PONTO_FISCALIZACAO p JOIN VINCULO_REGISTRO_PONTO vp ON vp.ponto_id=p.id AND vp.decisao_id IS NULL
-        JOIN REGISTRO_FONTE r ON r.id=vp.registro_id JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id
+        JOIN REGISTRO_FONTE_DETALHE r ON r.id=vp.registro_id JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id
         JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id JOIN FONTE f ON f.id=rf.fonte_id
         JOIN NATUREZA_FONTE n ON n.id=f.natureza_id AND n.codigo='oficial'
         WHERE p.municipio_id=? AND p.via_id=? AND p.km=? AND p.id<>?

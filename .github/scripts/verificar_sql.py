@@ -138,6 +138,18 @@ def ler_dialeto(sufixo):
     tabelas = {}
     for caminho in arquivos:
         texto = caminho.read_text(encoding="utf-8")
+        if sufixo == "sqlite":
+            linhas = []
+            incluir = True
+            for linha in texto.splitlines():
+                if linha.strip().startswith("-- +SE_COLUNA "):
+                    _, _, tabela, coluna = linha.split()
+                    incluir = coluna.lower() in tabelas.get(tabela.lower(), [])
+                elif linha.strip() == "-- +FIM":
+                    incluir = True
+                elif incluir:
+                    linhas.append(linha)
+            texto = "\n".join(linhas)
         for linha in texto.splitlines():
             m = DIRETIVA.match(linha)
             if m:

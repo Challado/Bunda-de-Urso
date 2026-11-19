@@ -1,10 +1,11 @@
 # Histórico de alterações
 
-## Migrador interativo do SQLite para PostgreSQL
+## Ativação do PostgreSQL e normalização do esquema
 
 - A ferramenta local `api.pse ferramenta migrar_postgres` pede dados de conexão e senha oculta. Transfere a base e o histórico para um esquema novo e valida a importação em transação.
 - O migrador preserva os IDs, as referências e a precisão decimal do SQLite. Recusa sobrescrita e permite simular a transferência com rollback.
-- A validação executa a importação contra PostgreSQL real. A API e as rotinas operacionais continuam usando SQLite.
+- Com `--ativar`, a API, os coletores, os crons e a manutenção passam a usar o PostgreSQL. Backups operacionais e do espelho privado usam `pg_dump`.
+- As migrações separam grafias originais, documentos brutos e tamanho dos artefatos. Origem da revisão mesh e recurso da execução de um alerta são obtidos pelos vínculos relacionais.
 
 ## Inmetro: seleção de UFs na coleta automática — 04/11/2026
 

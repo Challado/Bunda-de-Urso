@@ -60,7 +60,7 @@ def _uf_original(conn, pid):
     for r in dbmod.query_all(
             conn, "SELECT r.payload_original AS p "
             "FROM VINCULO_REGISTRO_PONTO vp "
-            "JOIN REGISTRO_FONTE r ON r.id=vp.registro_id "
+            "JOIN REGISTRO_FONTE_DETALHE r ON r.id=vp.registro_id "
             "WHERE vp.ponto_id=? AND vp.decisao_id IS NULL ORDER BY r.id", (pid,)):
         try:
             d = json.loads(r["p"])
@@ -394,10 +394,11 @@ def _documentos(conn, tipo, entidade_id):
 def _identificadores(conn, tipo, entidade_id):
     tabela, coluna = _VINCULOS_IDENTIFICADOR[tipo]
     rows = dbmod.query_all(conn, """
-        SELECT ex.valor, ti.codigo AS tipo, f.nome AS fonte,
+        SELECT COALESCE(g.valor_original, ex.valor) AS valor, ti.codigo AS tipo, f.nome AS fonte,
                v.vigencia_inicio, v.vigencia_fim
         FROM %s v
         LEFT JOIN IDENTIFICADOR_EXTERNO ex ON ex.id=v.identificador_id
+        LEFT JOIN IDENTIFICADOR_GRAFIA g ON g.identificador_id=ex.id
         LEFT JOIN TIPO_IDENTIFICADOR ti ON ti.id=ex.tipo_identificador_id
         LEFT JOIN FONTE f ON f.id=ex.fonte_id
         WHERE v.%s=? ORDER BY v.id
@@ -702,7 +703,7 @@ def _fontes_do_ponto(conn, pid):
             "fo.url_institucional, rf.url_recurso, rf.status_integracao, "
             "a.hash_sha256, a.baixado_em, ac.iniciada_em "
             "FROM VINCULO_REGISTRO_PONTO vp "
-            "LEFT JOIN REGISTRO_FONTE r ON r.id=vp.registro_id "
+            "LEFT JOIN REGISTRO_FONTE_DETALHE r ON r.id=vp.registro_id "
             "LEFT JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id "
             "LEFT JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id "
             "LEFT JOIN FONTE fo ON fo.id=rf.fonte_id "
@@ -722,7 +723,7 @@ def _fontes_por_registro(conn, registro_id):
             conn, "SELECT rf.fonte_id AS id, fo.nome, fo.esfera, org.nome AS organizacao, "
             "fo.url_institucional, rf.url_recurso, rf.status_integracao, "
             "a.hash_sha256, a.baixado_em, ac.iniciada_em "
-            "FROM REGISTRO_FONTE r "
+            "FROM REGISTRO_FONTE_DETALHE r "
             "LEFT JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id "
             "LEFT JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id "
             "LEFT JOIN FONTE fo ON fo.id=rf.fonte_id "
@@ -774,7 +775,7 @@ def _dados_por_fonte(conn, pid, visao, registros_metrologicos=(), registros_cada
                        rf.nome AS recurso, rf.url_recurso,
                        rf.fonte_id, fo.nome, fo.url_institucional,
                        n.codigo AS natureza, org.nome AS organizacao
-                FROM REGISTRO_FONTE r
+                FROM REGISTRO_FONTE_DETALHE r
                 LEFT JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id
                 LEFT JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id
                 LEFT JOIN FONTE fo ON fo.id=rf.fonte_id

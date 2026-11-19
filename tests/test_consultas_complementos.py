@@ -43,7 +43,7 @@ class TestComplementos(apoio.BaseDedup):
     def identificador(self, tabela, coluna, entidade, valor):
         ex = db.insert(self.con, "IDENTIFICADOR_EXTERNO", {"fonte_id": self.f,
             "tipo_identificador_id": db.domain_id(self.con, "TIPO_IDENTIFICADOR", "id_orgao"),
-            "valor": valor, "valor_normalizado": valor})
+            "valor": valor})
         db.insert(self.con, tabela, {coluna: entidade, "identificador_id": ex,
             "vigencia_inicio": "2026-01-01"})
         return ex

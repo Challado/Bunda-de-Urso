@@ -135,12 +135,12 @@ class TestCarregarDoBanco(unittest.TestCase):
             "url_recurso": "https://exemplo/medidores.json",
             "formato_origem": "json", "ativo": 1,
             "status_integracao": "ok"})
-        art = dbmod.insert(self.con, "ARTEFATO_COLETA", {
+        art = dbmod.inserir_artefato(self.con, {
             "recurso_id": rec, "hash_sha256": "h1",
             "caminho_cache": "/tmp/medidores.json", "bytes_arquivo": 10,
             "baixado_em": "2026-10-10T00:00:00+00:00",
             "resultado_validacao": "ok"})
-        self.reg = dbmod.insert(self.con, "REGISTRO_FONTE", {
+        self.reg = dbmod.inserir_registro_fonte(self.con, {
             "artefato_id": art, "numero_ordem": 1,
             "payload_original": json.dumps(PAYLOAD), "hash_registro": "r1",
             "status_validacao": "ok"})

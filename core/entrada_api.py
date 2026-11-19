@@ -8,7 +8,7 @@ from .contexto_api import atendimento_local
 FERRAMENTAS = frozenset((
     "aplicar_correcoes_municipio", "auditar_coleta", "auditar_deduplicacao",
     "auditar_fontes_estaduais", "auditar_geografia_municipios", "build_schema",
-    "carregar_municipios_ibge", "carregar_verificacao_metrologica",
+    "espelho_dados", "carregar_municipios_ibge", "carregar_verificacao_metrologica",
     "casar_municipios_fuzzy", "construir_cadastro_municipios", "construir_malha",
     "consultar_nomes_pendentes", "corrigir_coordenadas_brasil", "gerar_calibracao",
     "gerar_correcoes_municipio", "gerar_municipios_site", "limpar_calibracao",

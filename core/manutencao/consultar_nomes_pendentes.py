@@ -28,10 +28,7 @@ Uso:
 """
 import argparse
 import csv
-import datetime
 import os
-import shutil
-import sqlite3
 import sys
 
 
@@ -153,17 +150,15 @@ def aplicar(propostas, db, csv_correcoes=corr.CAMINHO_PADRAO):
     if not linhas:
         print("nada confiavel para aplicar.")
         return 0
-    ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    destino = "%s.bak.%s" % (db, ts)
-    shutil.copy2(db, destino)
+    destino = dbmod.backup_manutencao(db, "consultar_nomes_pendentes")
     print("backup: %s" % destino)
     with open(csv_correcoes, "a", encoding="utf-8") as f:
         for p in linhas:
             for pid in p["pontos"]:
                 f.write("%s;%s;%s\n" % (pid, p["codigo"], p["origem"]))
     conn = dbmod.connect(db)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
+    if not dbmod.e_postgres(conn):
+        conn.execute("PRAGMA foreign_keys = ON")
     try:
         res = corr.aplicar_correcoes(conn, corr.carregar_correcoes(csv_correcoes))
     finally:
@@ -187,12 +182,11 @@ def main(argv=None):
         help="aplica somente aproximacoes locais; propostas de IA ficam no relatorio")
     args = ap.parse_args(argv)
 
-    if not os.path.exists(args.db):
+    if not dbmod.postgres_ativo() and not os.path.exists(args.db):
         print("ERRO: banco nao encontrado: %s" % args.db, file=sys.stderr)
         return 2
 
     conn = dbmod.connect(args.db)
-    conn.row_factory = sqlite3.Row
     try:
         grupos = pendentes(conn)
         if args.limite:

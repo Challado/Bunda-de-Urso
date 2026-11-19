@@ -17,31 +17,28 @@ def main(argv=None):
     parser.add_argument('--aplicar', action='store_true', help='grava apos backup; padrao simula')
     args = parser.parse_args(argv)
     with closing(db.connect_existing(args.db)) as conn:
-        if conn.execute('PRAGMA foreign_key_check').fetchone() is not None:
-            raise RuntimeError('Base com referencias invalidas; reconciliacao cancelada.')
+        db.verificar_integridade(conn)
         backup = None
         if args.aplicar:
             pasta = Path(caminhos.data_dir()) / 'backups' / 'identidade'
             pasta.mkdir(parents=True, exist_ok=True, mode=0o700)
             ts = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
-            backup = pasta / (ts + '.sqlite3')
-            with closing(db.connect(backup)) as copia:
-                conn.backup(copia)
-                copia.execute('PRAGMA journal_mode=DELETE')
-            backup.chmod(0o600)
+            backup = db.backup_operacional(pasta, ts, args.db)
         # O preparador e chamado pelo instalador. Simulacao nunca migra esquema.
-        if not db.scalar(conn, "SELECT 1 FROM sqlite_master WHERE name='EQUIPAMENTO_ALIAS' AND type='table'"):
+        if not db.tabela_existe(conn, "EQUIPAMENTO_ALIAS"):
             if not args.aplicar:
                 raise RuntimeError('Prepare o esquema pela API antes de simular a reconciliacao.')
             governanca.garantir_esquema(conn)
-        conn.execute('BEGIN IMMEDIATE')
+        if db.e_postgres(conn):
+            conn.execute("SELECT pg_advisory_xact_lock(792078961)")
+        else:
+            conn.execute('BEGIN IMMEDIATE')
         try:
             from core.reparo_mapeamentos import reparar
             mapeamentos = reparar(conn)
             resumo = reconciliar(conn)
             resumo["mapeamentos"] = mapeamentos
-            if conn.execute('PRAGMA foreign_key_check').fetchone() is not None:
-                raise RuntimeError('Reconciliacao produziu referencia invalida.')
+            db.verificar_integridade(conn)
             if args.aplicar:
                 conn.commit()
             else:

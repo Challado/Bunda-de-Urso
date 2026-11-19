@@ -39,12 +39,8 @@ import csv
 import difflib
 import os
 import re
-import shutil
-import sqlite3
 import sys
 import unicodedata
-from datetime import datetime
-
 
 from coletor.fontes import normalizacao as nz                  # noqa: E402
 from core.config import ROOT                                   # noqa: E402
@@ -151,19 +147,16 @@ def main(argv=None):
                     help="nao faz backup antes de gravar (nao recomendado)")
     args = ap.parse_args(argv)
 
-    if not os.path.exists(args.db):
+    if not dbmod.postgres_ativo() and not os.path.exists(args.db):
         print("ERRO: banco nao encontrado: %s" % args.db, file=sys.stderr)
         return 2
 
     aplicar = not args.dry_run
     if aplicar and not args.sem_backup:
-        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-        destino = "%s.bak.%s" % (args.db, ts)
-        shutil.copy2(args.db, destino)
+        destino = dbmod.backup_manutencao(args.db, "casar_municipios_fuzzy")
         print("backup: %s" % destino)
 
     conn = dbmod.connect(args.db)
-    conn.row_factory = sqlite3.Row
     try:
         antes = contar(conn, "WHERE municipio_id IS NOT NULL")
         res = processar(conn, aplicar=aplicar)

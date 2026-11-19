@@ -97,7 +97,7 @@ class TestCadastro(BaseGov):
             # Muitos pontos oficiais fora do raio. A busca deve percorrer a
             # origem em lote, sem trabalho quadratico conforme a base cresce.
             for i in range(3000):
-                origem = db.insert(con, "REGISTRO_FONTE", {
+                origem = db.inserir_registro_fonte(con, {
                     "artefato_id": artefato, "numero_ordem": i + 100,
                     "payload_original": json.dumps({"Codigo": "CARGA-%d" % i}),
                     "hash_registro": "%064x" % i, "status_validacao": "ok"})

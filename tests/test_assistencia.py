@@ -2,6 +2,7 @@
 import hashlib
 import json
 from pathlib import Path
+from core import db
 import subprocess
 from unittest.mock import patch
 
@@ -31,8 +32,10 @@ class TestAssistencia(BaseDedup, AmbienteIA):
         arquivo = Path(caminhos.bruto()) / (str(artefato) + ".pdf")
         arquivo.parent.mkdir(parents=True, exist_ok=True)
         arquivo.write_bytes(conteudo)
-        self.con.execute("UPDATE ARTEFATO_COLETA SET caminho_cache=?, hash_sha256=?, bytes_arquivo=? WHERE id=?",
-                         (str(arquivo), hashlib.sha256(conteudo).hexdigest(), len(conteudo), artefato))
+        digest = hashlib.sha256(conteudo).hexdigest()
+        db.guardar_conteudo_artefato(self.con, digest, len(conteudo))
+        self.con.execute("UPDATE ARTEFATO_COLETA SET caminho_cache=?, hash_sha256=? WHERE id=?",
+                         (str(arquivo), digest, artefato))
         self.con.commit()
         return artefato
 
@@ -66,6 +69,7 @@ class TestAssistencia(BaseDedup, AmbienteIA):
 
     def test_hash_divergente_e_caminho_fora_do_cache_sao_recusados(self):
         artefato = self.documento(b"texto")
+        db.guardar_conteudo_artefato(self.con, "0" * 64, 5)
         self.con.execute("UPDATE ARTEFATO_COLETA SET hash_sha256=? WHERE id=?", ("0" * 64, artefato))
         with self.assertRaisesRegex(GovernancaError, "Hash"):
             assistencia.analisar(self.con, {"tarefa": "documento", "artefato_id": artefato})

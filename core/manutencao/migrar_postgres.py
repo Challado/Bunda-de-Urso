@@ -1,6 +1,8 @@
 """Copie a base SQLite do Radar Brasil para um esquema novo no PostgreSQL."""
 
 import argparse
+import os
+import shutil
 from contextlib import closing
 from getpass import GetPassWarning, getpass
 from graphlib import CycleError, TopologicalSorter
@@ -8,7 +10,7 @@ from pathlib import Path
 import re
 import sqlite3
 import sys
-from tempfile import TemporaryDirectory
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 import warnings
 
 from core import caminhos, config, db, governanca
@@ -35,7 +37,7 @@ def tabelas_sqlite(conn):
 
 def preparar_origem(origem, destino):
     """Crie uma cópia consistente, incluindo WAL, e atualize o esquema da cópia."""
-    with closing(db.connect_readonly(origem)) as fonte, closing(db.connect(destino)) as copia:
+    with closing(db.connect_sqlite_readonly(origem)) as fonte, closing(db.connect_sqlite(destino)) as copia:
         fonte.backup(copia, pages=1024)
         verificar_sqlite(copia)
         if not db.esquema_carregado(copia):
@@ -207,6 +209,49 @@ def importar(origem, destino, esquema, simular=False, progresso=None):
     return totais
 
 
+def ativar_configuracao(host, banco, usuario, porta, esquema, ca, senha, revisao):
+    from core import configuracao, postgres_runtime
+
+    linha = (host, str(porta), banco, usuario, senha)
+    if "*" in linha[:-1] or any("\n" in valor or "\r" in valor for valor in linha):
+        raise ErroMigracao("O contato ou a senha não pode ser gravado no formato pgpass.")
+
+    def escapar(valor):
+        return valor.replace("\\", "\\\\").replace(":", "\\:")
+
+    with NamedTemporaryFile(mode="w", encoding="utf-8", dir=config.DATA_DIR,
+                            prefix="postgres-", suffix=".pgpass", delete=False) as arquivo:
+        arquivo.write(":".join(map(escapar, linha)) + "\n")
+        arquivo.flush()
+        os.fsync(arquivo.fileno())
+        nome = Path(arquivo.name)
+    concluida = False
+    try:
+        parametros = dict(host=host, dbname=banco, user=usuario, port=porta,
+                          passfile=str(nome), sslrootcert=ca, sslmode="verify-full",
+                          connect_timeout=10)
+        with closing(postgres_runtime.conectar(
+                db.connect_postgres, leitura=True, opcoes={**parametros, "esquema": esquema})) as teste:
+            governanca.garantir_esquema(teste)
+            db.verificar_integridade(teste)
+        configuracao.salvar({
+            "revisao": revisao,
+            "alteracoes": {
+                "dados.motor": "postgres", "postgres.host": host,
+                "postgres.porta": str(porta), "postgres.banco": banco,
+                "postgres.usuario": usuario, "postgres.esquema": esquema,
+                "postgres.pgpass": nome.name, "postgres.certificado_ca": "" if ca == "system" else ca,
+            },
+        }, autor="migrar_postgres")
+        concluida = True
+    finally:
+        if not concluida:
+            # Após os.replace(), uma falha de fsync ainda pode deixar o arquivo novo ativo.
+            caminhos.recarregar()
+            if caminhos.valor("postgres", "pgpass")[0] != nome.name:
+                nome.unlink(missing_ok=True)
+
+
 @operacao_local
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
@@ -218,7 +263,11 @@ def main(argv=None):
     parser.add_argument("--usuario", help="usuário PostgreSQL com permissão CREATE no banco")
     parser.add_argument("--esquema", default="radar_brasil", help="nome de um esquema novo")
     parser.add_argument("--certificado-ca", help="CA do servidor, se ele usar uma CA própria")
-    parser.add_argument("--simular", action="store_true", help="importe, valide e desfaça a transação")
+    modo = parser.add_mutually_exclusive_group()
+    modo.add_argument("--simular", action="store_true", help="importe, valide e desfaça a transação")
+    modo.add_argument("--ativar", action="store_true",
+                      help="após copiar, configure o PostgreSQL como banco ativo. Requer janela de manutenção")
+
     args = parser.parse_args(argv)
 
     try:
@@ -238,6 +287,22 @@ def main(argv=None):
             raise ErroMigracao("O arquivo SQLite de origem não existe.")
         if not sys.stdin.isatty():
             raise ErroMigracao("Execute em um terminal interativo para digitar a senha com segurança.")
+        revisao = None
+        if args.ativar:
+            from core import configuracao
+
+            if db.postgres_ativo():
+                raise ErroMigracao("O PostgreSQL já é o banco ativo desta instalação.")
+            if os.geteuid() == 0:
+                raise ErroMigracao("Use --ativar com a mesma conta do serviço, como www-data.")
+            if shutil.which("pg_dump") is None:
+                raise ErroMigracao("Instale o cliente PostgreSQL (pg_dump) antes de ativar.")
+            atual = configuracao.consultar()
+            if not atual["gravavel"]:
+                raise ErroMigracao("A conta do serviço precisa poder gravar radar.conf para ativar.")
+            revisao = atual["revisao"]
+            if input("Com as escritas do Radar pausadas, digite ATIVAR: ").strip() != "ATIVAR":
+                raise ErroMigracao("Ativação cancelada.")
         host = (args.host or input("Servidor PostgreSQL: ")).strip()
         banco = (args.banco or input("Nome do banco PostgreSQL: ")).strip()
         usuario = (args.usuario or input("Usuário PostgreSQL: ")).strip()
@@ -254,17 +319,27 @@ def main(argv=None):
         except psycopg.OperationalError as exc:
             raise ErroMigracao("Conexão recusada. Confira endereço, porta, credenciais "
                                "e certificado TLS do PostgreSQL.") from exc
-        finally:
+        if not args.ativar:
             del senha
         with closing(destino), TemporaryDirectory(prefix="migrar-postgres-", dir=config.DATA_DIR) as temp:
             copia = Path(temp) / "origem.sqlite3"
             print("Preparando cópia consistente do SQLite...", flush=True)
             preparar_origem(origem, copia)
-            with closing(db.connect_readonly(copia)) as fonte:
+            with closing(db.connect_sqlite_readonly(copia)) as fonte:
                 totais = importar(fonte, destino, args.esquema, simular=args.simular,
                                   progresso=lambda t, n: print(f"{t}: {n} linhas", flush=True))
         estado = "Simulação validada e desfeita" if args.simular else "Migração concluída"
         print(f"{estado}. Esquema {args.esquema}: {len(totais)} tabelas, {sum(totais.values())} linhas.")
+        if args.ativar:
+            try:
+                ativar_configuracao(host, banco, usuario, args.porta, args.esquema, ca, senha, revisao)
+            except (governanca.GovernancaError, psycopg.Error, OSError, ErroMigracao):
+                print("Os dados foram copiados. Falhou a ativação automática. Confira radar.conf.",
+                      file=sys.stderr)
+                return 1
+            finally:
+                del senha
+            print("PostgreSQL configurado para API, cron e operações locais.")
         return 0
     except ErroMigracao as exc:
         print(f"Migração interrompida: {exc}", file=sys.stderr)

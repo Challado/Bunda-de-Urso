@@ -4,7 +4,6 @@
 import argparse
 import json
 from pathlib import Path
-import sqlite3
 import sys
 
 
@@ -20,7 +19,6 @@ def listar(caminho, escopo, limite=50, cursor=0, diagnosticos=False):
     if not 1 <= limite <= 1000 or cursor < 0:
         raise ValueError("limite deve estar entre 1 e 1000; cursor deve ser nao negativo")
     conn = dbmod.connect(Path(caminho).resolve(strict=True).as_uri() + "?mode=ro", uri=True)
-    conn.row_factory = sqlite3.Row
     try:
         rows = dedup.candidatos(conn, estado="pendente", escopo=escopo,
                                incluir_diagnosticos=diagnosticos)

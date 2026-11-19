@@ -32,8 +32,6 @@ import argparse
 import datetime
 import json
 import os
-import shutil
-import sqlite3
 import sys
 import unicodedata
 
@@ -48,7 +46,7 @@ SQL_INMETRO = """
 SELECT r.id            AS registro_id,
        r.payload_original AS payload,
        ve.equipamento_id  AS equipamento_id
-FROM REGISTRO_FONTE r
+FROM REGISTRO_FONTE_DETALHE r
 JOIN ARTEFATO_COLETA a ON a.id = r.artefato_id
 JOIN RECURSO_FONTE rc ON rc.id = a.recurso_id
 JOIN FONTE f ON f.id = rc.fonte_id
@@ -228,19 +226,17 @@ def main(argv=None):
                     help="copia o banco antes de gravar")
     args = ap.parse_args(argv)
 
-    if not os.path.exists(args.db):
+    if not dbmod.postgres_ativo() and not os.path.exists(args.db):
         print("ERRO: banco nao encontrado: %s" % args.db, file=sys.stderr)
         return 2
 
     if args.backup and not args.dry_run:
-        ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        destino = "%s.bak.%s" % (args.db, ts)
-        shutil.copy2(args.db, destino)
+        destino = dbmod.backup_manutencao(args.db, "carregar_verificacao_metrologica")
         print("backup: %s" % destino)
 
     conn = dbmod.connect(args.db)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
+    if not dbmod.e_postgres(conn):
+        conn.execute("PRAGMA foreign_keys = ON")
     try:
         registros = [(r["registro_id"], r["equipamento_id"], r["payload"])
                      for r in conn.execute(SQL_INMETRO)]

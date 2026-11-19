@@ -20,7 +20,6 @@ import argparse
 import csv
 import math
 import os
-import sqlite3
 import sys
 
 
@@ -92,7 +91,6 @@ def classificar_ponto(db, calibracao):
         return None
     uri = "file:%s?mode=ro" % os.path.abspath(db)
     con = dbmod.connect(uri, uri=True)
-    con.row_factory = sqlite3.Row
     try:
         rows = con.execute(
             "SELECT v.codigo AS via, p.km AS km "

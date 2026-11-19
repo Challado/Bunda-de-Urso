@@ -330,8 +330,12 @@ add(T(42, "IDENTIFICADOR_EXTERNO", [
     C("fonte_id", "ID", nn=True, fk=("FONTE", "id")),
     C("tipo_identificador_id", "ID", nn=True, fk=("TIPO_IDENTIFICADOR", "id")),
     C("valor", "TEXT", nn=True),
-    C("valor_normalizado", "TEXT", nn=True),
-], uniques=[("fonte_id", "tipo_identificador_id", "valor_normalizado")]))
+], uniques=[("fonte_id", "tipo_identificador_id", "valor")]))
+
+add(T(78, "IDENTIFICADOR_GRAFIA", [
+    C("identificador_id", "ID", nn=True, pk=True, fk=("IDENTIFICADOR_EXTERNO", "id")),
+    C("valor_original", "TEXT", nn=True),
+]))
 
 add(T(43, "IDENTIFICADOR_PONTO", [
     C("id", "ID", nn=True, pk=True),
@@ -478,12 +482,16 @@ add(T(56, "RECURSO_FONTE", [
     "tamanho_maximo_bytes IS NULL OR tamanho_maximo_bytes > 0",
 ]))
 
+add(T(80, "CONTEUDO_ARTEFATO", [
+    C("hash_sha256", "CHAR64", nn=True, pk=True),
+    C("bytes_arquivo", "BIGINT", nn=True),
+], checks=["bytes_arquivo >= 0"]))
+
 add(T(57, "ARTEFATO_COLETA", [
     C("id", "ID", nn=True, pk=True),
     C("recurso_id", "ID", nn=True, fk=("RECURSO_FONTE", "id")),
-    C("hash_sha256", "CHAR64", nn=True),
+    C("hash_sha256", "CHAR64", nn=True, fk=("CONTEUDO_ARTEFATO", "hash_sha256")),
     C("caminho_cache", "TEXT", nn=True),
-    C("bytes_arquivo", "BIGINT", nn=True),
     C("tipo_mime", "TEXT"),
     C("etag", "TEXT"),
     C("last_modified_http", "TEXT"),
@@ -491,7 +499,7 @@ add(T(57, "ARTEFATO_COLETA", [
     C("baixado_em", "TS", nn=True),
     C("validado_em", "TS"),
     C("resultado_validacao", "TEXT", nn=True),
-], uniques=[("recurso_id", "hash_sha256")], checks=["bytes_arquivo >= 0"]))
+], uniques=[("recurso_id", "hash_sha256")]))
 
 add(T(58, "EXECUCAO_COLETA", [
     C("id", "ID", nn=True, pk=True),
@@ -526,13 +534,17 @@ add(T(78, "EXECUCAO_ARTEFATO", [
 ]))
 
 
+add(T(79, "PAYLOAD_FONTE", [
+    C("hash_registro", "CHAR64", nn=True, pk=True),
+    C("payload_original", "TEXT", nn=True),
+]))
+
 add(T(59, "REGISTRO_FONTE", [
     C("id", "ID", nn=True, pk=True),
     C("artefato_id", "ID", nn=True, fk=("ARTEFATO_COLETA", "id")),
     C("numero_ordem", "INT", nn=True),
     C("identificador_na_fonte", "TEXT"),
-    C("payload_original", "TEXT", nn=True),
-    C("hash_registro", "CHAR64", nn=True),
+    C("hash_registro", "CHAR64", nn=True, fk=("PAYLOAD_FONTE", "hash_registro")),
     C("status_validacao", "TEXT", nn=True),
 ], uniques=[("artefato_id", "numero_ordem")], checks=["numero_ordem >= 0"]))
 
@@ -671,7 +683,7 @@ add(T(73, "DECISAO_VALOR_CANONICO", [
 
 add(T(74, "ALERTA_OPERACIONAL", [
     C("id", "ID", nn=True, pk=True),
-    C("recurso_id", "ID", fk=("RECURSO_FONTE", "id")),
+    C("recurso_direto_id", "ID", fk=("RECURSO_FONTE", "id")),
     C("execucao_id", "ID", fk=("EXECUCAO_COLETA", "id")),
     C("snapshot_id", "ID", fk=("SNAPSHOT_PUBLICADO", "id")),
     C("chave_incidente", "TEXT", nn=True),
@@ -682,7 +694,8 @@ add(T(74, "ALERTA_OPERACIONAL", [
     C("ultima_ocorrencia", "TS", nn=True),
     C("resolvido_em", "TS"),
     C("ocorrencias", "INT", nn=True),
-], checks=["ocorrencias >= 1", "ultima_ocorrencia >= primeira_ocorrencia"]))
+], checks=["ocorrencias >= 1", "ultima_ocorrencia >= primeira_ocorrencia",
+           "execucao_id IS NULL OR recurso_direto_id IS NULL"]))
 
 add(T(75, "NATUREZA_FONTE", [
     C("id", "ID", nn=True, pk=True),
@@ -760,7 +773,7 @@ PG_TYPES = {
     "ID": "BIGINT", "TEXT": "TEXT", "CHAR2": "CHAR(2)", "CHAR7": "CHAR(7)",
     "CHAR8": "CHAR(8)", "CHAR64": "CHAR(64)", "DATE": "DATE",
     "TS": "TIMESTAMPTZ", "TIME": "TIME", "INT": "INTEGER", "BIGINT": "BIGINT",
-    "BOOL": "BOOLEAN",
+    "BOOL": "INTEGER",
     # SQLite nao aplica a escala declarada em DECIMAL. Nao arredondar os
     # valores ja armazenados ao transferi-los para PostgreSQL.
     "NUM10_7": "NUMERIC", "NUM10_3": "NUMERIC", "NUM12_3": "NUMERIC",
@@ -794,8 +807,8 @@ def col_sql(c, dialect, tname, is_composite_pk_col):
         parts.append("REFERENCES %s(%s) ON DELETE RESTRICT" % (c.fk[0], c.fk[1]))
     if c.ck:
         parts.append("CHECK (%s)" % c.check_for(dialect))
-    if dialect == "sqlite" and c.typ == "BOOL":
-        # SQLite nao possui boolean nativo: 0/1 com CHECK
+    if c.typ == "BOOL":
+        # Mesmo contrato de 0/1 nos dois bancos.
         parts.append("CHECK (%s IN (0,1))" % c.name)
     return " ".join(parts)
 
@@ -822,7 +835,7 @@ def emit(dialect):
         defs.append("\n".join(lines))
 
     header = [
-        "-- Radar Brasil - esquema canonico (T01..T77 + EXECUCAO_ARTEFATO) - dialeto %s" % dialect,
+        "-- Radar Brasil - esquema canonico (T01..T79 + EXECUCAO_ARTEFATO) - dialeto %s" % dialect,
         "-- Gerado por tools/build_schema.py a partir da ESPECIFICACAO v1.1.",
         "-- PK/FK/UQ/CHECK/NOT NULL. Sem PostGIS/recursos proprietarios.",
         "-- ON DELETE RESTRICT por padrao (dados historicos nao sofrem cascata).",
@@ -912,6 +925,15 @@ BEGIN SELECT RAISE(ABORT, 'origem do artefato e imutavel'); END;
 
 
 VISOES = """
+CREATE VIEW IF NOT EXISTS ARTEFATO_COLETA_DETALHE AS
+SELECT a.*, c.bytes_arquivo FROM ARTEFATO_COLETA a
+LEFT JOIN CONTEUDO_ARTEFATO c ON c.hash_sha256=a.hash_sha256;
+CREATE VIEW IF NOT EXISTS ALERTA_OPERACIONAL_DETALHE AS
+SELECT a.*, COALESCE(e.recurso_id, a.recurso_direto_id) AS recurso_id
+FROM ALERTA_OPERACIONAL a LEFT JOIN EXECUCAO_COLETA e ON e.id=a.execucao_id;
+CREATE VIEW IF NOT EXISTS REGISTRO_FONTE_DETALHE AS
+SELECT r.*, p.payload_original FROM REGISTRO_FONTE r
+LEFT JOIN PAYLOAD_FONTE p ON p.hash_registro=r.hash_registro;
 CREATE VIEW IF NOT EXISTS COBERTURA_FONTE_DETALHE AS
 SELECT c.id, c.fonte_id, c.tipo_abrangencia, COALESCE(m.uf_sigla,c.uf_sigla) AS uf_sigla,
        c.municipio_id, c.via_id, c.vigencia_inicio, c.vigencia_fim, c.confirmada
@@ -939,7 +961,7 @@ def main(argv=None):
     with open(os.path.join(SQLDIR, "schema.postgres.sql"), "w", encoding="utf-8") as f:
         f.write(pg_sql)
     # auto-verificacao: garante que o SQLite carrega
-    con = dbmod.connect(":memory:")
+    con = dbmod.connect_sqlite(":memory:")
     con.executescript(sqlite_sql)
     n = con.execute(
         "SELECT count(*) FROM sqlite_master WHERE type='table' "

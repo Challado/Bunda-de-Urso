@@ -37,7 +37,6 @@ Uso:
 import argparse
 import csv
 import os
-import sqlite3
 import sys
 
 
@@ -185,7 +184,7 @@ def main(argv=None):
                     help="limita a UFs (repetivel); default: as 27")
     args = ap.parse_args(argv)
 
-    if not os.path.exists(args.db):
+    if not dbmod.postgres_ativo() and not os.path.exists(args.db):
         print("ERRO: banco nao encontrado: %s" % args.db, file=sys.stderr)
         return 2
 

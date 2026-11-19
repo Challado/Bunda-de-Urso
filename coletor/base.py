@@ -160,7 +160,7 @@ class ColetorBase(object):
             (recurso_id, h))
         if row is not None:
             return row["id"], h, caminho
-        artefato_id = dbmod.insert(self.conn, "ARTEFATO_COLETA", {
+        artefato_id = dbmod.inserir_artefato(self.conn, {
             "recurso_id": recurso_id,
             "hash_sha256": h,
             "caminho_cache": caminho,
@@ -230,7 +230,7 @@ class ColetorBase(object):
             (artefato_id, ordem))
         if row is not None:
             return row["id"]
-        return dbmod.insert(self.conn, "REGISTRO_FONTE", {
+        return dbmod.inserir_registro_fonte(self.conn, {
             "artefato_id": artefato_id,
             "numero_ordem": ordem,
             "identificador_na_fonte": identificador,

@@ -17,7 +17,7 @@ O projeto é dividido em **duas partes independentes**:
 - **Linguagem:** Python 3. A aplicação usa a biblioteca padrão. O migrador
   PostgreSQL usa o driver opcional Psycopg.
 - **Banco:** relacional, com exigência de 3FN para o modelo canônico e
-  [revisão das dependências](NORMALIZACAO_RELACIONAL.md). SQLite em produção.
+  [revisão das dependências](NORMALIZACAO_RELACIONAL.md). O motor é selecionado em `radar.conf`.
   A [migração para PostgreSQL](MIGRACAO_POSTGRES.md) prepara um esquema e
   valida a cópia das tabelas. A consulta geográfica usa *bounding box* em
   SQL e distância Haversine na aplicação.
@@ -37,7 +37,7 @@ O projeto é dividido em **duas partes independentes**:
 ```
 core/                    pesquisa/comum aos dois lados
   config.py              caminhos e variáveis de ambiente
-  db.py                  conexão SQLite (FK=ON), init do schema, helpers
+  db.py                  conexão com o banco ativo, inicialização do esquema, consultas
   geo.py                 Haversine + bounding box (sem dependências)
   consultas.py           consulta read-only (bbox em SQL + Haversine)
   domains.py             catálogos (T03, T07..T22, T75, T76) e UFs
@@ -49,7 +49,7 @@ coletor/                 sincronizador (processo independente da web)
   fontes/normalizacao.py normalização compartilhada → modelo canônico
   sync.py                CLI: python3 -m coletor.sync
 web/                     entry point CGI (.pse) + roteamento/response
-sql/                     DDL canônica T01..T77 (SQLite e Postgres)
+sql/                     DDL canônica T01..T80 (SQLite e Postgres)
 tools/build_schema.py    gerador das duas DDLs a partir de 1 definição
 tests/                   unittest (stdlib)
 ```
@@ -168,9 +168,7 @@ do detalhe; o novo ponto continua não verificado. Vários candidatos geram
 sugestões de correspondência, sem complementação automática.
 
 O cadastro próprio Bundita e as contribuições públicas são fontes distintas
-na mesma base SQLite, definida por `RADAR_DB` (padrão `dados/radar.sqlite3`).
-O wrapper de produção em `deploy/api.pse` usa por padrão
-`/var/lib/radar-brasil/radar.sqlite3`.
+na mesma base do Radar. O motor e os caminhos vêm do `radar.conf` instalado.
 
 ### 5. Serialização
 
@@ -182,7 +180,7 @@ valores (testado).
 
 ## Status
 
-- [x] Schema canônico T01–T77 + EXECUCAO_ARTEFATO (SQLite + Postgres), PK/FK/UQ/CHECK; dependências revisadas em NORMALIZACAO_RELACIONAL.md
+- [x] Schema canônico T01–T80 + EXECUCAO_ARTEFATO (SQLite + Postgres), PK/FK/UQ/CHECK; dependências revisadas em NORMALIZACAO_RELACIONAL.md
 - [x] Coletor: cache imutável sha256, staging, snapshot atômico, conectores ANTT/Recife
 - [x] API: `/radares`, `/radares/{id}`, `/ajuda`, `/status`, `/fontes` (GET/POST)
 - [x] TXT 32 colunas + paridade json/ndjson/xml/txt; esqueletos edifact/dif

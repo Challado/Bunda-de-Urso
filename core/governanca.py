@@ -104,7 +104,7 @@ def migracoes_disponiveis():
 
 def _colunas(conn, tabela):
     try:
-        return {r[1] for r in conn.execute("PRAGMA table_info(%s)" % tabela)}
+        return set(dbmod.colunas(conn, tabela))
     except sqlite3.Error:
         return set()
 
@@ -144,6 +144,13 @@ def preparar_migracao(conn, texto):
 
 def aplicar_migracoes(conn):
     """Aplica as migracoes de governanca ainda nao executadas. Idempotente."""
+    if dbmod.e_postgres(conn):
+        if not dbmod.tabela_existe(conn, "MIGRACAO_GOVERNANCA"):
+            raise RuntimeError("Migrações PostgreSQL ausentes. Execute o migrador.")
+        aplicadas = {r[0] for r in conn.execute("SELECT versao FROM MIGRACAO_GOVERNANCA")}
+        if aplicadas != {versao for versao, _ in migracoes_disponiveis()}:
+            raise RuntimeError("O esquema PostgreSQL precisa ser atualizado antes do uso.")
+        return conn
     conn.execute(
         "CREATE TABLE IF NOT EXISTS MIGRACAO_GOVERNANCA ("
         "id INTEGER PRIMARY KEY AUTOINCREMENT, "
@@ -156,11 +163,49 @@ def aplicar_migracoes(conn):
         with open(caminho, "r", encoding="utf-8") as f:
             texto = f.read()
         sql = preparar_migracao(conn, texto)
-        conn.executescript("BEGIN;\n" + sql + "\nCOMMIT;")
-        conn.execute(
-            "INSERT INTO MIGRACAO_GOVERNANCA (versao, aplicada_em) "
-            "VALUES (?, ?)", (versao, _agora()))
-        conn.commit()
+        recria_tabela = texto.startswith("-- +RECRIAR_TABELA\n")
+        if recria_tabela:
+            conn.commit()
+            conn.execute("PRAGMA foreign_keys=OFF")
+        try:
+            conn.executescript("BEGIN;\n" + sql)
+            if recria_tabela and conn.execute("PRAGMA foreign_key_check").fetchone():
+                raise dbmod.ErroIntegridade("A migração deixaria uma referência inválida.")
+            conn.execute(
+                "INSERT INTO MIGRACAO_GOVERNANCA (versao, aplicada_em) "
+                "VALUES (?, ?)", (versao, _agora()))
+            conn.commit()
+        except BaseException:
+            conn.rollback()
+            raise
+        finally:
+            if recria_tabela:
+                conn.execute("PRAGMA legacy_alter_table=OFF")
+                conn.execute("PRAGMA foreign_keys=ON")
+    return conn
+
+
+def atualizar_esquema_postgres(conn):
+    """Aplique alterações do esquema numa transação de manutenção."""
+    from pathlib import Path
+
+    conn.execute("SELECT pg_advisory_xact_lock(792078961)")
+    if not dbmod.tabela_existe(conn, "MIGRACAO_GOVERNANCA"):
+        raise RuntimeError("Esquema sem histórico PostgreSQL. Execute o migrador.")
+    aplicadas = {r[0] for r in conn.execute("SELECT versao FROM MIGRACAO_GOVERNANCA")}
+    arquivos = sorted(Path(_dir_migracoes()).glob("*.postgres.sql"))
+    conhecidas = {p.name.split("_", 1)[0] for p in arquivos}
+    if aplicadas - conhecidas:
+        raise RuntimeError("Esquema PostgreSQL mais recente que o código.")
+    for caminho in arquivos:
+        versao = caminho.name.split("_", 1)[0]
+        if versao not in aplicadas:
+            conn.execute(caminho.read_text(encoding="utf-8"))
+            conn.execute("INSERT INTO MIGRACAO_GOVERNANCA(versao,aplicada_em) VALUES (?,?)",
+                         (versao, _agora()))
+    garantir_esquema(conn)
+    dbmod.verificar_integridade(conn)
+    conn.commit()
     return conn
 
 
@@ -173,8 +218,7 @@ def garantir_esquema(conn):
 
 def tem_governanca(conn):
     for t in ("USUARIO", "API_TOKEN", "RADAR_ALTERACAO", "BLOQUEIO_GEOGRAFICO"):
-        if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' "
-                        "AND name=?", (t,)).fetchone() is None:
+        if not dbmod.tabela_existe(conn, t):
             return False
     return True
 
@@ -1349,8 +1393,7 @@ def clausulas_consulta(conn):
     clausulas = ["(p.removido_em IS NULL)",
                  "(p.verificacao_status IS NULL OR "
                  "p.verificacao_status <> 'desabilitado')"]
-    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND "
-                    "name='CORRESPONDENCIA_PONTO'").fetchone() is not None:
+    if dbmod.tabela_existe(conn, "CORRESPONDENCIA_PONTO"):
         clausulas.append(
             "p.id NOT IN (SELECT cp.ponto_oficial_id FROM "
             "CORRESPONDENCIA_PONTO cp JOIN PONTO_FISCALIZACAO c ON "

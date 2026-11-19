@@ -22,7 +22,6 @@ Uso:
 import argparse
 import csv
 import os
-import sqlite3
 import sys
 
 
@@ -143,8 +142,7 @@ def gerar(conn, malha=None, uf_divergentes=CASOS_UF_DIVERGENTE):
 
 
 def _abrir_leitura(path):
-    conn = dbmod.connect("file:%s?mode=ro" % path, uri=True)
-    conn.row_factory = sqlite3.Row
+    conn = dbmod.connect_readonly(path)
     conn.execute("SELECT 1")
     return conn
 
@@ -175,7 +173,7 @@ def main(argv=None):
                     help="nao carrega a malha (so lista as ressalvas)")
     args = ap.parse_args(argv)
 
-    if not os.path.exists(args.db):
+    if not dbmod.postgres_ativo() and not os.path.exists(args.db):
         print("ERRO: banco nao encontrado: %s" % args.db, file=sys.stderr)
         return 2
 

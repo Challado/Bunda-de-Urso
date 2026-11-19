@@ -26,7 +26,7 @@ def reprocessar(conn):
         if artefato is None:
             continue
         rows = db.query_all(conn, """
-            SELECT r.*, v.ponto_id FROM REGISTRO_FONTE r
+            SELECT r.*, v.ponto_id FROM REGISTRO_FONTE_DETALHE r
             LEFT JOIN VINCULO_REGISTRO_PONTO v ON v.registro_id=r.id
             WHERE r.artefato_id=?
         """, (artefato['id'],))
@@ -58,7 +58,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.parse_args(argv)
     with atualizacoes.acompanhar('reprocessar_fontes_corrigidas') as diario:
-        if not Path(config.DB_PATH).is_file():
+        if not db.postgres_ativo() and not Path(config.DB_PATH).is_file():
             raise FileNotFoundError('Banco existente nao encontrado; reprocessamento recusado sem criar uma base vazia.')
         conn = db.connect(config.DB_PATH)
         try:

@@ -1,0 +1,63 @@
+-- +RECRIAR_TABELA
+CREATE TABLE IF NOT EXISTS CONTEUDO_ARTEFATO (
+    hash_sha256 CHAR(64) PRIMARY KEY NOT NULL,
+    bytes_arquivo INTEGER NOT NULL CHECK(bytes_arquivo >= 0)
+);
+
+-- +SE_COLUNA ARTEFATO_COLETA bytes_arquivo
+INSERT INTO CONTEUDO_ARTEFATO(hash_sha256,bytes_arquivo)
+SELECT DISTINCT hash_sha256,bytes_arquivo FROM ARTEFATO_COLETA;
+CREATE TABLE ARTEFATO_COLETA_3FN (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    recurso_id INTEGER NOT NULL REFERENCES RECURSO_FONTE(id) ON DELETE RESTRICT,
+    hash_sha256 CHAR(64) NOT NULL REFERENCES CONTEUDO_ARTEFATO(hash_sha256) ON DELETE RESTRICT,
+    caminho_cache TEXT NOT NULL,
+    tipo_mime TEXT,
+    etag TEXT,
+    last_modified_http TEXT,
+    data_publicacao_origem TEXT,
+    baixado_em TEXT NOT NULL,
+    validado_em TEXT,
+    resultado_validacao TEXT NOT NULL,
+    UNIQUE (recurso_id, hash_sha256)
+);
+INSERT INTO ARTEFATO_COLETA_3FN SELECT id,recurso_id,hash_sha256,caminho_cache,tipo_mime,
+    etag,last_modified_http,data_publicacao_origem,baixado_em,validado_em,resultado_validacao
+FROM ARTEFATO_COLETA;
+UPDATE sqlite_sequence SET seq=MAX(seq,COALESCE((SELECT seq FROM sqlite_sequence
+    WHERE UPPER(name)='ARTEFATO_COLETA'),0)) WHERE UPPER(name)='ARTEFATO_COLETA_3FN';
+INSERT INTO sqlite_sequence(name,seq)
+SELECT 'ARTEFATO_COLETA_3FN',seq FROM sqlite_sequence WHERE UPPER(name)='ARTEFATO_COLETA'
+    AND NOT EXISTS (SELECT 1 FROM sqlite_sequence WHERE UPPER(name)='ARTEFATO_COLETA_3FN');
+PRAGMA legacy_alter_table=ON;
+DROP TABLE ARTEFATO_COLETA;
+ALTER TABLE ARTEFATO_COLETA_3FN RENAME TO ARTEFATO_COLETA;
+PRAGMA legacy_alter_table=OFF;
+CREATE TRIGGER CK_ARTEFATO_RECURSO_IMUTAVEL
+BEFORE UPDATE OF recurso_id ON ARTEFATO_COLETA WHEN OLD.recurso_id<>NEW.recurso_id
+BEGIN SELECT RAISE(ABORT, 'origem do artefato e imutavel'); END;
+-- +FIM
+
+-- +SE_COLUNA ALERTA_OPERACIONAL recurso_id
+CREATE TEMP TABLE VALIDAR_ALERTA(ok INTEGER CONSTRAINT alerta_recurso_divergente CHECK(ok=1));
+INSERT INTO VALIDAR_ALERTA SELECT CASE WHEN EXISTS (
+    SELECT 1 FROM ALERTA_OPERACIONAL a JOIN EXECUCAO_COLETA e ON e.id=a.execucao_id
+    WHERE a.recurso_id<>e.recurso_id
+) THEN 0 ELSE 1 END;
+DROP TABLE VALIDAR_ALERTA;
+UPDATE ALERTA_OPERACIONAL SET recurso_id=NULL WHERE execucao_id IS NOT NULL;
+ALTER TABLE ALERTA_OPERACIONAL RENAME COLUMN recurso_id TO recurso_direto_id;
+-- +FIM
+
+CREATE TRIGGER CK_ALERTA_RECURSO_INSERT BEFORE INSERT ON ALERTA_OPERACIONAL
+WHEN NEW.execucao_id IS NOT NULL AND NEW.recurso_direto_id IS NOT NULL
+BEGIN SELECT RAISE(ABORT, 'alerta deve derivar o recurso da execução'); END;
+CREATE TRIGGER CK_ALERTA_RECURSO_UPDATE BEFORE UPDATE ON ALERTA_OPERACIONAL
+WHEN NEW.execucao_id IS NOT NULL AND NEW.recurso_direto_id IS NOT NULL
+BEGIN SELECT RAISE(ABORT, 'alerta deve derivar o recurso da execução'); END;
+CREATE VIEW IF NOT EXISTS ARTEFATO_COLETA_DETALHE AS
+SELECT a.*, c.bytes_arquivo FROM ARTEFATO_COLETA a
+LEFT JOIN CONTEUDO_ARTEFATO c ON c.hash_sha256=a.hash_sha256;
+CREATE VIEW IF NOT EXISTS ALERTA_OPERACIONAL_DETALHE AS
+SELECT a.*, COALESCE(e.recurso_id, a.recurso_direto_id) AS recurso_id
+FROM ALERTA_OPERACIONAL a LEFT JOIN EXECUCAO_COLETA e ON e.id=a.execucao_id;

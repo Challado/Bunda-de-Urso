@@ -64,9 +64,9 @@ class TestConservacaoMarcacoes(unittest.TestCase):
 
     def test_filtro_de_uf_preserva_observacao_que_satisfez_o_filtro(self):
         for registro, uf in ((1, "SC"), (2, "PR")):
-            payload = json.loads(db.scalar(self.con, "SELECT payload_original FROM REGISTRO_FONTE WHERE id=?", (registro,)))
+            payload = json.loads(db.scalar(self.con, "SELECT payload_original FROM REGISTRO_FONTE_DETALHE WHERE id=?", (registro,)))
             payload["uf"] = uf
-            self.con.execute("UPDATE REGISTRO_FONTE SET payload_original=? WHERE id=?", (json.dumps(payload), registro))
+            self.con.execute("UPDATE PAYLOAD_FONTE SET payload_original=? WHERE hash_registro=(SELECT hash_registro FROM REGISTRO_FONTE WHERE id=?)", (json.dumps(payload), registro))
         self.cenario.unificar()
         for uf in ("PR", "SC"):
             pontos, _ = consultas.buscar_pontos(self.con, -25, -54, 100, {"uf": uf})

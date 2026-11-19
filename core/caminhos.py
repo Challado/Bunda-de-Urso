@@ -44,7 +44,8 @@ _ENV = {}  # Somente RADAR_CONF seleciona o arquivo; valores vem do .conf.
 # Secoes/chaves conhecidas -- usado pelo exemplo, pelo verificador e pelo help.
 SECOES = {
     "instalacao": ("home",),
-    "dados": ("dir", "banco"),
+    "dados": ("dir", "banco", "motor"),
+    "postgres": ("host", "porta", "banco", "usuario", "esquema", "pgpass", "certificado_ca"),
     "web": ("raiz", "url", "origem"),
     "interface": ("mapa_min_percentual", "mapa_min_altura_px"),
     "traseiro": ("habilitado", "nome", "api_url", "acesso", "tokens_arquivo", "pares",
@@ -282,6 +283,32 @@ def data_dir():
     return caminho("dados", "dir", os.path.join(ROOT, "dados"))
 
 
+def motor_banco():
+    motor = valor("dados", "motor", "sqlite")[0].lower()
+    if motor not in {"sqlite", "postgres"}:
+        raise ValueError("dados.motor: informe sqlite ou postgres.")
+    return motor
+
+
+def postgres():
+    """Configuração do servidor. O libpq lê a senha de um arquivo privado."""
+    import re
+
+    dados = {k: valor("postgres", k)[0] for k in ("host", "banco", "usuario")}
+    esquema = valor("postgres", "esquema", "radar_brasil")[0]
+    if not all(dados.values()) or not re.fullmatch(r"[a-z][a-z0-9_]{0,62}", esquema) or esquema.startswith("pg_"):
+        raise ValueError("Configure [postgres] host, banco, usuario e um esquema válido.")
+    porta = int(valor("postgres", "porta", "5432")[0])
+    if not 1 <= porta <= 65535:
+        raise ValueError("postgres.porta inválida.")
+    arquivo = dentro_dados(valor("postgres", "pgpass", "postgres.pgpass")[0], "postgres.pgpass")
+    ca = valor("postgres", "certificado_ca")[0]
+    return dict(host=dados["host"], dbname=dados["banco"], user=dados["usuario"], port=porta,
+                esquema=esquema, passfile=arquivo, sslmode="verify-full",
+                sslrootcert=dentro_dados(ca, "postgres.certificado_ca") if ca else "system",
+                connect_timeout=10)
+
+
 def banco():
     """Banco SQLite de producao (ou de trabalho, sem configuracao)."""
     bruto, _ = valor("dados", "banco", "radar.sqlite3")
@@ -393,7 +420,10 @@ def temporarios():
 
 def validar_operacionais():
     """Todos os destinos de dados sao conferidos antes de atender requisicoes."""
-    banco()
+    if motor_banco() == "postgres":
+        postgres()
+    else:
+        banco()
     log_dir()
     token_arquivo()
     caminho("traseiro", "tokens_arquivo")

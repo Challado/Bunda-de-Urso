@@ -16,7 +16,6 @@ Uso:
 import argparse
 import csv
 import os
-import sqlite3
 import sys
 
 
@@ -50,7 +49,6 @@ def conectar_ro(caminho):
     """Abre o banco em modo SOMENTE LEITURA (URI mode=ro)."""
     uri = "file:%s?mode=ro" % os.path.abspath(caminho)
     con = dbmod.connect(uri, uri=True)
-    con.row_factory = sqlite3.Row
     return con
 
 
@@ -98,7 +96,7 @@ def main(argv=None):
     ap.add_argument("--saida", default=SAIDA_PADRAO, help="diretorio de saida")
     args = ap.parse_args(argv)
 
-    if not os.path.exists(args.db):
+    if not dbmod.postgres_ativo() and not os.path.exists(args.db):
         print("ERRO: banco nao encontrado: %s" % args.db, file=sys.stderr)
         return 2
 

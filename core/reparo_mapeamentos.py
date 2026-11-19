@@ -17,7 +17,7 @@ def reparar(conn):
     revisados = {r[0] for r in conn.execute("SELECT DISTINCT ponto_id FROM RADAR_ALTERACAO WHERE ponto_id IS NOT NULL")}
     res = {'registros_lidos': 0, 'campos_completados': 0, 'campos_divergentes_preservados': 0}
     rows = conn.execute("""SELECT r.id, r.payload_original, f.nome
-        FROM REGISTRO_FONTE r JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id
+        FROM REGISTRO_FONTE_DETALHE r JOIN ARTEFATO_COLETA a ON a.id=r.artefato_id
         JOIN RECURSO_FONTE rf ON rf.id=a.recurso_id JOIN FONTE f ON f.id=rf.fonte_id
         JOIN NATUREZA_FONTE n ON n.id=f.natureza_id AND n.codigo='oficial'
         WHERE f.nome LIKE 'ANTT - %' OR f.nome LIKE 'INMETRO / %' OR f.nome='PRF - Radares fixos'

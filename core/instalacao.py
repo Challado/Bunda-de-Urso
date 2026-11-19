@@ -198,7 +198,7 @@ def _validar_layout(origem, conf, laboratorio):
         reconhecido = any((dirs["codigo"] / nome).exists() for nome in ("VERSAO", "coletor", "deploy"))
         if any(dirs["codigo"].iterdir()) and not reconhecido:
             raise RuntimeError("Destino do codigo ocupado por outra aplicacao.")
-    if not dirs["banco"].is_file():
+    if not db.postgres_ativo() and not dirs["banco"].is_file():
         raise RuntimeError("O banco configurado nao existe. Este instalador atualiza o servidor existente e nao cria base vazia.")
     # A configuracao e o relatorio publico podem ter links conhecidos. Nunca
     # autorizar outros destinos apenas porque o nome parece um arquivo de status.
@@ -322,16 +322,8 @@ def _aplicar(origem, dirs, usuario_web, laboratorio, cron, origem_http=None, obs
                 fila = locks.enter_context(open(Path(caminhos.fila_cadastros(dirs["dados"])) / "processador.lock", "a"))
                 os.fchmod(fila.fileno(), 0o660)
                 _esperar_coletor(fila)
-                with closing(db.connect_readonly(dirs["banco"])) as fonte:
-                    if fonte.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
-                        raise RuntimeError("Integridade do banco reprovada; nada sera atualizado.")
-                    if fonte.execute("PRAGMA foreign_key_check").fetchone() is not None:
-                        raise RuntimeError("Banco com referencias invalidas; nenhuma atualizacao foi aplicada.")
-                    with closing(db.connect(backup / "radar.sqlite3")) as copia:
-                        fonte.backup(copia)
-                        copia.execute("PRAGMA journal_mode=DELETE")
-                (backup / "radar.sqlite3").chmod(0o600)
-                atualizacoes.evento("backup.banco", integridade="ok", banco_backup=str(backup / "radar.sqlite3"))
+                backup_banco = db.backup_operacional(backup, "radar", dirs["banco"])
+                atualizacoes.evento("backup.banco", integridade="ok", banco_backup=str(backup_banco))
                 atualizacoes.evento("instalar.arquivos")
                 _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http, observacoes)
                 atualizacoes.publicar_link()
@@ -480,7 +472,7 @@ def _instalar_arquivos(origem, dirs, grupo, usuario_web, backup, origem_http=Non
         for pasta in _pastas_operacionais(dirs):
             _diretorio(pasta, observacoes, modo=0o2770, grupo=grupo)
         _permissoes(Path(caminhos.fila_cadastros(dirs["dados"])), grupo, gravavel=True)
-        for arquivo in [dirs["banco"], *dirs["banco"].parent.glob(dirs["banco"].name + "-*")]:
+        for arquivo in ([] if db.postgres_ativo() else [dirs["banco"], *dirs["banco"].parent.glob(dirs["banco"].name + "-*")]):
             if os.geteuid() == 0:
                 os.chown(arquivo, -1, grupo)
             arquivo.chmod(0o660)
@@ -668,6 +660,8 @@ def _instalar(args, observacoes):
 
 
 def _esquema_compativel_com_backup(backup, banco):
+    if (backup / "radar.pgdump").is_file():
+        return False  # Restaurar apenas aplicações compatíveis com o esquema PostgreSQL.
     anterior = backup / "radar.sqlite3"
     if not anterior.is_file() or not banco.is_file():
         return True

@@ -44,7 +44,9 @@ class TestRaizWeb(unittest.TestCase):
             con.execute("INSERT INTO ORGANIZACAO (nome,tipo_organizacao_id) VALUES ('Teste', (SELECT id FROM TIPO_ORGANIZACAO LIMIT 1))")
             con.execute("INSERT INTO FONTE (organizacao_id,natureza_id,nome,url_institucional,esfera,situacao) VALUES (1, (SELECT id FROM NATUREZA_FONTE WHERE codigo='oficial'),'Teste','https://teste.example','federal','ativa')")
             con.execute("INSERT INTO RECURSO_FONTE (fonte_id, nome, url_recurso, formato_origem, ativo, status_integracao) VALUES (1, 'Teste', 'https://teste.example/recurso', 'json', 1, 'ativo')")
-            con.execute("INSERT INTO ARTEFATO_COLETA (recurso_id,hash_sha256,caminho_cache,bytes_arquivo,baixado_em,resultado_validacao) VALUES (1, ?, ?, 19, '2026-10-24', 'valido')", ('a'*64,str(self.dados/'raw/evidencia.txt')))
+            db.inserir_artefato(con, dict(recurso_id=1, hash_sha256='a'*64, bytes_arquivo=19,
+                                       caminho_cache=str(self.dados/'raw/evidencia.txt'),
+                                       baixado_em='2026-10-24', resultado_validacao='valido'))
             con.commit()
         (self.dados/'raw').mkdir()
         (self.dados/'raw/evidencia.txt').write_text('publicacao original')

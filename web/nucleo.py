@@ -521,7 +521,7 @@ def _base_meta():
 
 def _conn():
     path = config.DB_PATH
-    if not os.path.exists(path):
+    if not dbmod.postgres_ativo() and not os.path.exists(path):
         return None
     return dbmod.connect(path)
 
@@ -1197,6 +1197,8 @@ def handle_request(environ, stdin_bytes=b""):
         try:
             conn = _conn()
             pronto = conn is not None and dbmod.esquema_carregado(conn)
+            if pronto and dbmod.e_postgres(conn):
+                governanca.aplicar_migracoes(conn)
         except Exception:
             pronto = False
         finally:

@@ -110,7 +110,7 @@ class TestTraseiro(unittest.TestCase):
         self.assertEqual(db.scalar(self.c.conn,'SELECT COUNT(*) FROM PONTO_FISCALIZACAO'),0)
         self.assertEqual(db.scalar(self.a.conn,'SELECT COUNT(*) FROM TRASEIRO_EVENTO'),2)
         self.assertEqual(len(self.chamadas),3)  # Uma consulta por rodada, nao uma por pagina/direcao.
-        origem=self.c.conn.execute('SELECT origem FROM TRASEIRO_CADASTRO WHERE chave=?',('radar-1',)).fetchone()[0]
+        origem=self.c.conn.execute('SELECT e.origem FROM TRASEIRO_CADASTRO c JOIN TRASEIRO_EVENTO e ON e.seq=c.evento_id WHERE e.chave=?',('radar-1',)).fetchone()[0]
         self.assertEqual(origem,self.a.info()['uuid'])
     def test_reenvio_idempotente_e_lote_conflitante_e_atomico(self):
         self.a.publicar()

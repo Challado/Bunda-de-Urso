@@ -28,8 +28,22 @@ home = .
 # Diretorio de dados: banco, arquivos brutos (raw/), staging/ e calibracao/.
 dir = dados
 
+# A ferramenta migrar_postgres --ativar configura o PostgreSQL apos a copia.
+motor = sqlite
+
 # Banco SQLite de producao. Vazio = <dir>/radar.sqlite3
 banco = radar.sqlite3
+
+[postgres]
+# Estes campos sao usados quando dados.motor=postgres.
+host =
+porta = 5432
+banco =
+usuario =
+esquema = radar_brasil
+# Arquivos relativos a dados.dir. O pgpass precisa de permissao 0600.
+pgpass = postgres.pgpass
+certificado_ca =
 
 [web]
 # Webroot servido pelo nginx/fcgiwrap (onde mora o api.pse instalado).
