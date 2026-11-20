@@ -331,13 +331,14 @@ Em um servidor já preparado, use `bash instalar-servidor3.sh --aplicar
 --sem-pacotes --sem-reprocessamento` como root para atualizar o código e o
 esquema, adiando tarefas de reprocessamento. [Guia de configuração](docs/CONFIGURACAO.md)
 
-Para rodar os testes:
+Para rodar a suíte completa, incluindo os testes do instalador:
 
 ```bash
-python3 -m unittest discover -s tests
+python3.13 .github/scripts/rodar_suite.py
 ```
 
-O ambiente web usa Nginx, fcgiwrap, Python e um usuário com acesso ao banco configurado.
+O instalador requer Python 3.13 ou superior. O ambiente web usa Nginx,
+fcgiwrap e um usuário com acesso ao banco configurado.
 
 ## Validação automática (CI)
 

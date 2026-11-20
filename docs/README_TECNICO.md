@@ -14,8 +14,9 @@ O projeto é dividido em **duas partes independentes**:
 
 ## Stack
 
-- **Linguagem:** Python 3. O modo SQLite usa a biblioteca padrão. O modo
-  PostgreSQL e seu migrador usam Psycopg 3 (`psycopg`).
+- **Linguagem:** Python 3. O instalador requer Python 3.13 ou superior.
+  O modo SQLite usa a biblioteca padrão. O modo PostgreSQL e seu migrador
+  usam Psycopg 3 (`psycopg`).
 - **Banco:** relacional, com exigência de 3FN para o modelo canônico e
   [revisão das dependências](NORMALIZACAO_RELACIONAL.md). O motor é selecionado em `radar.conf`.
   A [migração para PostgreSQL](MIGRACAO_POSTGRES.md) prepara um esquema e
@@ -142,7 +143,7 @@ versão instalada.
 ### 4. Testes
 
 ```bash
-python3 -m unittest discover -s tests
+python3.13 .github/scripts/rodar_suite.py
 ```
 
 ### Cadastro público

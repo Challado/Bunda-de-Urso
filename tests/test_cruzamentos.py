@@ -136,6 +136,9 @@ class TestCruzamentos(BaseGov):
         r = self.lote({"limite": 1})
         recebidos = [r["resultados"][0]["id"]]
         self.colab(-24.1)
+        todos = self.lote({"limite": 0, "cursor": r["proximo_cursor"], "ate_id": r["ate_id"]})
+        self.assertEqual([x["id"] for x in todos["resultados"]], ["P-%d" % pid for pid in ids[1:]])
+        self.assertIsNone(todos["proximo_cursor"])
         while r["proximo_cursor"] is not None:
             r = self.lote({"limite": 1, "cursor": r["proximo_cursor"], "ate_id": r["ate_id"]})
             recebidos.extend(x["id"] for x in r["resultados"])
@@ -208,6 +211,6 @@ class TestCruzamentos(BaseGov):
             token = self._token_cookie("contribuidor")
             self.assertEqual(self._req("POST", rota, {}, headers={"HTTP_X_API_TOKEN": token})[0], 403)
             self.assertEqual(self._req("GET", rota, headers=self.headers)[0], 405)
-        for dados in ({"limite": 0}, {"limite": 21}, {"cursor": -1}, {"cursor": True},
+        for dados in ({"limite": -1}, {"limite": 21}, {"cursor": -1}, {"cursor": True},
                       {"ate_id": "3"}, {"cursor": 2**64}, {"sql": "qualquer"}, []):
             self.assertEqual(self._req("POST", "/api/v1/gestao/cruzamentos", dados, headers=self.headers)[0], 422)
