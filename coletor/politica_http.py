@@ -39,7 +39,8 @@ def ler_regras(texto):
     if not isinstance(dados, list):
         raise ValueError("As regras de consultas devem ser uma lista JSON.")
     chaves = set()
-    permitidos = {"fonte", "url", "user_agent", *LIMITES}
+    parametros = {"user_agent", "verificar_ssl", *LIMITES}
+    permitidos = {"fonte", "url", *parametros}
     for n, regra in enumerate(dados, start=1):
         rotulo = f"Regra de consulta {n}"
         if not isinstance(regra, dict) or set(regra) - permitidos:
@@ -58,11 +59,13 @@ def ler_regras(texto):
         if (chave, prefixo) in chaves:
             raise ValueError(f"{rotulo}: já existe uma regra para esta fonte e URL.")
         chaves.add((chave, prefixo))
-        if not set(regra) & ({"user_agent"} | LIMITES.keys()):
+        if not set(regra) & parametros:
             raise ValueError(f"{rotulo}: informe ao menos um parâmetro.")
         for campo, (minimo, maximo) in LIMITES.items():
             if campo in regra and (type(regra[campo]) is not int or not minimo <= regra[campo] <= maximo):
                 raise ValueError(f"{rotulo}: {campo} deve ficar entre {minimo} e {maximo}.")
+        if "verificar_ssl" in regra and type(regra["verificar_ssl"]) is not bool:
+            raise ValueError(f"{rotulo}: verificar_ssl deve ser true ou false.")
         agente = regra.get("user_agent", "sistema")
         if not isinstance(agente, str) or not re.fullmatch(r"[ -~]{1,512}", agente) or agente != agente.strip():
             raise ValueError(f"{rotulo}: use um User-Agent de até 512 caracteres ASCII em uma linha.")
@@ -82,6 +85,8 @@ def _corresponde(url, prefixo):
 
 def ajustes(url, **padroes):
     """Combina os padrões do transporte com as regras mais específicas."""
+    if padroes.get("verificar_ssl") is None:
+        padroes["verificar_ssl"] = caminhos.inteiro("coleta", "verificar_ssl") == 1
     chave, agente_aleatorio = _CONTEXTO.get()
     regras = ler_regras(caminhos.valor("consultas", "regras")[0])
     aplicaveis = [r for r in regras if r["fonte"] in ("*", chave) and _corresponde(url, r.get("url", ""))]

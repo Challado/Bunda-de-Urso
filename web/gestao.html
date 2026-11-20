@@ -532,6 +532,9 @@
         campo.placeholder="Herdar";
         campos[chave]=campo;botarCampo(numeros,rotulo,campo);
       }
+      const ssl=seletor([["","Herdar"],["true","Validar"],["false","Não validar"]],
+                        regra.verificar_ssl==null?"":String(regra.verificar_ssl));
+      botarCampo(caixa,"Certificado HTTPS",ssl);
       const valor=regra.user_agent||"";
       const opcoes=[["","Herdar"],["sistema","Do sistema"],["aleatorio","Aleatório"],["personalizado","Personalizado"]];
       const modo=seletor(opcoes,opcoes.some(op=>op[0]===valor)&&valor!=="personalizado"?valor:"personalizado");
@@ -553,6 +556,7 @@
         const r={fonte:fonte.value};
         if(url.value.trim())r.url=url.value.trim();
         for(const [chave,campo] of Object.entries(campos))if(campo.value!=="")r[chave]=Number(campo.value);
+        if(ssl.value)r.verificar_ssl=ssl.value==="true";
         if(modo.value)r.user_agent=modo.value==="personalizado"?agente.value.trim():modo.value;
         return r;
       });

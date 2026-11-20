@@ -3,7 +3,7 @@ test.use({comGestao:true,processarFila:false});
 const rota=(caminho)=>'api.pse?rota='+encodeURIComponent(caminho)+'&formato=json';
 const caminho=(url)=>new URL(url).searchParams.get('rota');
 
-test('configuração de consultas grava timeout e User-Agent por URL',async({page,credenciaisGestao})=>{
+test('configuração de consultas grava timeout, certificado e User-Agent por URL',async({page,credenciaisGestao})=>{
   await page.goto('gestao.html');
   await page.locator('#formLogin [name=login]').fill(credenciaisGestao.login);
   await page.locator('#formLogin [name=senha]').fill(credenciaisGestao.senha);
@@ -14,6 +14,7 @@ test('configuração de consultas grava timeout e User-Agent por URL',async({pag
   await regra.getByRole('combobox',{name:'Fonte',exact:true}).selectOption('antt');
   await regra.getByLabel('URL ou prefixo',{exact:true}).fill('https://dados.antt.gov.br/dataset/activity/radar');
   await regra.getByLabel('Timeout (s)',{exact:true}).fill('150');
+  await regra.getByRole('combobox',{name:'Certificado HTTPS',exact:true}).selectOption('false');
   await regra.getByRole('combobox',{name:'User-Agent',exact:true}).selectOption('personalizado');
   await regra.getByLabel('User-Agent personalizado',{exact:true}).fill('RadarLab/2.0');
   await page.locator('#btSalvarConf').click();
@@ -23,6 +24,7 @@ test('configuração de consultas grava timeout e User-Agent por URL',async({pag
   await expect(regra.getByRole('combobox',{name:'Fonte',exact:true})).toHaveValue('antt');
   await expect(regra.getByLabel('Timeout (s)',{exact:true})).toHaveValue('150');
   await expect(regra.getByLabel('User-Agent personalizado',{exact:true})).toHaveValue('RadarLab/2.0');
+  await expect(regra.getByRole('combobox',{name:'Certificado HTTPS',exact:true})).toHaveValue('false');
   await regra.getByRole('button',{name:'Remover regra'}).click();
   await expect(page.locator('[data-chave="consultas.regras"]')).toHaveValue('[]');
   await page.locator('#btSalvarConf').click();

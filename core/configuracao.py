@@ -36,6 +36,7 @@ NUMEROS = {**{("governanca", k): (1, 1000000000)
            ("coleta", "max_bytes"): (1024, 1073741824),
            ("coleta", "timeout"): (1, 300),
            ("coleta", "tentativas"): (1, 10),
+           ("coleta", "verificar_ssl"): (0, 1),
            ("coleta", "espera_atualizacao"): (1, 3600),
            ("postgres", "connect_timeout"): (1, 3600),
            ("governanca", "gov_iteracoes"): (200000, 2000000)}

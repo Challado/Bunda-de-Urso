@@ -259,7 +259,8 @@ def baixar_xlsx(url, timeout=None, mostrar_tabela=False):
     prazo = time.monotonic() + opcoes["timeout"]
     limite = opcoes["max_bytes"]
     atualizacoes.evento("navegador.consulta", url=url, fonte=opcoes["fonte"], timeout=opcoes["timeout"],
-                       max_bytes=limite, modo_user_agent=opcoes["modo_user_agent"])
+                       max_bytes=limite, modo_user_agent=opcoes["modo_user_agent"],
+                       verificar_ssl=opcoes["verificar_ssl"])
     with tempfile.TemporaryDirectory(prefix="radar-exportacao-", dir=caminhos.temporarios()) as pasta:
         perfil, downloads = Path(pasta) / "perfil", Path(pasta) / "downloads"
         downloads.mkdir()
@@ -267,6 +268,8 @@ def baixar_xlsx(url, timeout=None, mostrar_tabela=False):
                "--disable-background-networking", "--disable-extensions", "--disable-sync",
                "--no-first-run", "--no-default-browser-check", "--remote-debugging-address=127.0.0.1",
                "--remote-debugging-port=0", "--user-data-dir=" + str(perfil), "about:blank"]
+        if not opcoes["verificar_ssl"]:
+            cmd.insert(-1, "--ignore-certificate-errors")
         if opcoes["user_agent"]:
             cmd.insert(-1, "--user-agent=" + opcoes["user_agent"])
         proxy = (os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")

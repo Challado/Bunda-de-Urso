@@ -144,6 +144,20 @@ class TestConfiguracaoAPI(unittest.TestCase):
             self.assertEqual(status, 422)
         self.assertEqual(self.conf.read_bytes(), anterior)
 
+    def test_salva_e_valida_configuracao_de_certificado(self):
+        url = "https://cetrio.prefeitura.rio/"
+        regra = {"fonte": "cet_rio", "verificar_ssl": False}
+        self.assertEqual(self.requisicao("PUT", self.alteracao(**{
+            "coleta.verificar_ssl": "1", "consultas.regras": json.dumps([regra]),
+        }))[0], 200)
+        self.assertTrue(politica_http.ajustes(url)["verificar_ssl"])
+        with politica_http.fonte("cet_rio"):
+            self.assertFalse(politica_http.ajustes(url)["verificar_ssl"])
+        regra["verificar_ssl"] = "false"
+        self.assertEqual(self.requisicao("PUT", self.alteracao(**{
+            "consultas.regras": json.dumps([regra]),
+        }))[0], 422)
+
     def test_web_recusa_caminhos_e_requisicao_externa_sem_alterar_arquivo(self):
         payload = self.alteracao(**{"instalacao.home": "/tmp/codigo-arbitrario"})
         antes = self.conf.read_bytes()

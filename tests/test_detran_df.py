@@ -192,7 +192,8 @@ class TestDetranDFContornoWaf(unittest.TestCase):
 
     def test_regra_da_url_configura_timeout_e_user_agent_no_chromium(self):
         url = ColetorDetranDF.URL_DADOS_FALLBACK
-        regras = json.dumps([{"fonte": "detran_df", "url": url, "timeout": 150, "user_agent": "RadarLab/2.0"}])
+        regras = json.dumps([{"fonte": "detran_df", "url": url, "timeout": 150,
+                              "user_agent": "RadarLab/2.0", "verificar_ssl": True}])
         resultado = subprocess.CompletedProcess([], 0, b"<html></html>", b"")
         with (mock.patch.object(caminhos, "valor", return_value=(regras, "teste")),
               mock.patch.object(detran_df.subprocess, "run", return_value=resultado) as rodar,
@@ -200,6 +201,7 @@ class TestDetranDFContornoWaf(unittest.TestCase):
             self.assertEqual(detran_df._dump_dom("chromium", url, "/perfil"), "<html></html>")
         self.assertEqual(rodar.call_args.kwargs["timeout"], 150)
         self.assertIn("--user-agent=RadarLab/2.0", rodar.call_args.args[0])
+        self.assertNotIn("--ignore-certificate-errors", rodar.call_args.args[0])
 
 
 class TestDetranDFSync(unittest.TestCase):

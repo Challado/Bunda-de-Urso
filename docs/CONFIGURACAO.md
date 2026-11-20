@@ -164,7 +164,7 @@ Seções adicionais no modelo `deploy/radar.conf.exemplo`:
 | Seção | Configuração |
 |---|---|
 | `api` | `token_arquivo` (caminho, nunca o token), `max_body`, `proxies_confiaveis` |
-| `coleta` | `max_bytes`, `timeout`, `tentativas` |
+| `coleta` | `max_bytes`, `timeout`, `tentativas`, `verificar_ssl` |
 | `consultas` | regras por fonte e por URL para as consultas externas dos coletores |
 | `governanca` | correspondência por proximidade, bloqueios, submissões, sessão e PBKDF2 |
 | `geografia` | `malha` opcional |
@@ -186,6 +186,11 @@ mais específico prevalece e, no empate, vale a regra da fonte selecionada.
   limita a execução da consulta.
 - **Tentativas HTTP** ajusta as repetições em falhas transitórias.
 - **Limite da resposta** é medido em bytes.
+- **Certificado HTTPS** herda `[coleta] verificar_ssl` ou usa o valor definido
+  na regra. O padrão global é `0` (desligado). Use `1` para ligar globalmente,
+  ou `true` e `false` nas regras JSON. O cliente HTTP reavalia o certificado
+  a cada redirecionamento. No Chromium, a opção vale para a sessão aberta
+  pelo coletor.
 - **User-Agent** pode usar a identificação padrão do cliente, sortear um
   User-Agent de navegador por execução da coleta ou enviar um valor personalizado.
 
@@ -194,8 +199,11 @@ A ANTT usa pelo menos 60 segundos para atividades, revisão e catálogo e
 a seção abaixo no `radar.conf`. Mantenha o JSON das regras em uma linha.
 
 ```ini
+[coleta]
+verificar_ssl = 0
+
 [consultas]
-regras = [{"fonte":"antt","timeout":180,"tentativas":2},{"fonte":"antt","url":"https://dados.antt.gov.br/dataset/activity/radar","timeout":90,"user_agent":"sistema"}]
+regras = [{"fonte":"antt","timeout":180,"tentativas":2,"verificar_ssl":true},{"fonte":"antt","url":"https://dados.antt.gov.br/dataset/activity/radar","timeout":90,"user_agent":"sistema"}]
 ```
 
 ## Atualização coordenada

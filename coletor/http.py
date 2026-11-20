@@ -15,7 +15,7 @@ Camada unica de rede do coletor.  Portada do conector de referencia
   - repete em 429/500/502/503/504 respeitando ``Retry-After`` (em segundos OU
     data HTTP, com teto de 30s) e backoff exponencial ``min(15, 2**tentativa)``
     (3 tentativas por padrao);
-  - permite desligar a verificacao de certificado (``verificar_ssl=False``)
+  - usa a política configurável de verificação de certificados HTTPS
     para portais com cadeia incompleta, preservando o comportamento que ja
     existia no coletor (``fontes/ckan.py`` usava ``_CTX_TOLERANTE``).
 
@@ -124,10 +124,8 @@ _OPENERS = {}
 
 
 def _criar_opener(verificar_ssl):
-    if verificar_ssl:
-        contexto = ssl.create_default_context()
-    else:
-        contexto = ssl.create_default_context()
+    contexto = ssl.create_default_context()
+    if not verificar_ssl:
         contexto.check_hostname = False
         contexto.verify_mode = ssl.CERT_NONE
     return urllib.request.build_opener(
@@ -226,7 +224,8 @@ def _uma_tentativa(url, etag, last_modified, method, data, timeout, limite,
         req = urllib.request.Request(alvo, data=corpo_envio, method=metodo,
                                      headers=cabecalhos)
         try:
-            resp = _abrir(req, timeout, verificar_ssl)
+            ssl_ativo = politica_http.ajustes(alvo, verificar_ssl=verificar_ssl)["verificar_ssl"]
+            resp = _abrir(req, timeout, ssl_ativo)
         except urllib.error.HTTPError as exc:
             status = exc.code
             recebidos = exc.headers if exc.headers is not None else {}
@@ -301,7 +300,7 @@ def _tratar_erro_http(status, recebidos, alvo, metodo, corpo_envio, seguir_redir
 
 
 def baixar(url, etag=None, last_modified=None, method="GET", data=None,
-           timeout=None, max_bytes=None, verificar_ssl=True, headers=None,
+           timeout=None, max_bytes=None, verificar_ssl=None, headers=None,
            seguir_redirects=True, tentativas=None):
     """Baixa ``url`` e devolve ``(corpo, headers, url_final)``.
 
@@ -321,7 +320,8 @@ def baixar(url, etag=None, last_modified=None, method="GET", data=None,
     opcoes = politica_http.ajustes(
         url, timeout=timeout if timeout is not None else config.DEFAULT_TIMEOUT,
         max_bytes=max_bytes if max_bytes is not None else MAX_BYTES_PADRAO,
-        tentativas=tentativas if tentativas is not None else config.DEFAULT_TENTATIVAS)
+        tentativas=tentativas if tentativas is not None else config.DEFAULT_TENTATIVAS,
+        verificar_ssl=verificar_ssl)
     tempo, limite = float(opcoes["timeout"]), int(opcoes["max_bytes"])
     tentativas = max(1, int(opcoes["tentativas"]))
     if opcoes["user_agent"]:
@@ -329,7 +329,8 @@ def baixar(url, etag=None, last_modified=None, method="GET", data=None,
     from core import atualizacoes
 
     atualizacoes.evento("http.consulta", url=url, fonte=opcoes["fonte"], timeout=tempo,
-                       tentativas=tentativas, max_bytes=limite, modo_user_agent=opcoes["modo_user_agent"])
+                       tentativas=tentativas, max_bytes=limite, modo_user_agent=opcoes["modo_user_agent"],
+                       verificar_ssl=opcoes["verificar_ssl"])
     ultimo = None
     for tentativa in range(tentativas):
         try:

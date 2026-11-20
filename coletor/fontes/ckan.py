@@ -19,14 +19,13 @@ from coletor import http
 def package_show(base_url, dataset_id, timeout=None, tolerante=False):
     """Retorna a lista de recursos (dicts) do dataset.
 
-    Baixa via ``coletor.http.baixar`` (HTTPS verificado, redirects salto-a-salto
-    e retry).  ``tolerante=True`` mantem o comportamento historico de aceitar
-    cadeia de certificado incompleta (``verificar_ssl=False``).
+    Usa a configuração HTTPS do coletor. ``tolerante=True`` pede
+    verificação desligada como padrão desta chamada, sujeito às regras.
     """
     url = "%s/api/3/action/package_show?id=%s" % (base_url.rstrip("/"), dataset_id)
     try:
         corpo, _headers, _url_final = http.baixar(
-            url, timeout=timeout, verificar_ssl=not tolerante)
+            url, timeout=timeout, verificar_ssl=False if tolerante else None)
         dados = json.loads(corpo.decode("utf-8", "replace"))
     except Exception as exc:
         atualizacoes.evento("ckan.descoberta_erro", url=url, erro=str(exc),

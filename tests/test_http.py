@@ -141,6 +141,24 @@ class TestBaixar(unittest.TestCase):
         self.assertIn(agentes[0], politica_http.AGENTES)
         self.assertEqual(agentes, [agentes[0], agentes[0], config.USER_AGENT])
 
+    def test_ssl_padrao_desligado_e_regra_aplicada_a_cada_redirecionamento(self):
+        destino = "https://publicacao.example/dados"
+        regras = json.dumps([{"fonte": "cet_rio", "verificar_ssl": True},
+                             {"fonte": "cet_rio", "url": destino, "verificar_ssl": False}])
+        abrir, chamadas = _roteiro([_Resp(200, b"ok"), _erro(URL, 302, {"Location": destino}),
+                                    _Resp(200, b"ok")])
+
+        def valor(secao, chave):
+            return (regras, "teste") if (secao, chave) == ("consultas", "regras") else (
+                caminhos.PADROES[(secao, chave)], "padrao")
+
+        with (mock.patch.object(caminhos, "valor", side_effect=valor),
+              mock.patch.object(http, "_abrir", abrir)):
+            self.assertEqual(http.baixar(URL)[0], b"ok")
+            with politica_http.fonte("cet_rio"):
+                self.assertEqual(http.baixar(URL)[2], destino)
+        self.assertEqual([chamada[2] for chamada in chamadas], [False, True, False])
+
     def test_https_obrigatorio_sem_rede(self):
         def abrir(*a, **k):
             raise AssertionError("nao deveria chamar a rede")

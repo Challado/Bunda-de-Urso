@@ -86,6 +86,8 @@ max_paginas_grandes = 12
 pagina_grande_min = 150
 
 [coleta]
+# Validação de certificados HTTPS dos coletores: 0 desliga, 1 liga.
+verificar_ssl = 0
 max_bytes = 52428800
 timeout = 30
 tentativas = 3
@@ -93,7 +95,7 @@ tentativas = 3
 espera_atualizacao = 300
 
 [consultas]
-# Regras opcionais de timeout, tentativas HTTP, max_bytes e User-Agent.
+# Regras opcionais por fonte ou URL, incluindo verificar_ssl (true ou false).
 # Edite pela aba Gestão > Configuração > Consultas externas.
 regras = []
 

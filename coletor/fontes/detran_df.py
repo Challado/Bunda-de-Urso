@@ -58,12 +58,15 @@ def _dump_dom(navegador, url, perfil, timeout=90):
            "--hide-scrollbars", "--no-first-run",
            "--no-default-browser-check", "--user-data-dir=%s" % perfil,
            "--virtual-time-budget=15000", "--dump-dom", url]
+    if not opcoes["verificar_ssl"]:
+        cmd.insert(-1, "--ignore-certificate-errors")
     if opcoes["user_agent"]:
         cmd.insert(-1, "--user-agent=" + opcoes["user_agent"])
     from core import atualizacoes
 
     atualizacoes.evento("navegador.consulta", url=url, fonte=opcoes["fonte"], timeout=timeout,
-                       max_bytes=opcoes["max_bytes"], modo_user_agent=opcoes["modo_user_agent"])
+                       max_bytes=opcoes["max_bytes"], modo_user_agent=opcoes["modo_user_agent"],
+                       verificar_ssl=opcoes["verificar_ssl"])
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               timeout=timeout)
