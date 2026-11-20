@@ -7,11 +7,25 @@ test.beforeEach(async({page,credenciaisGestao})=>{
   expect(r.status()).toBe(200);
 });
 
-test('status público mostra a entrada de moderação para o histórico',async({page})=>{
+test('status público carrega leituras e URLs sem entrar na gestão',async({page})=>{
   await page.context().clearCookies();
   await page.goto('status.html');
   await expect(page.locator('#estados tr')).toHaveCount(27);
-  await expect(page.getByRole('link',{name:/entre no painel como moderador/i})).toBeVisible();
+  await expect(page.locator('#resumo-leitores')).toContainText('leitores exibidos');
+  await page.locator('#filtro-leitores').fill('Mogi das Cruzes');
+  const fonte=page.locator('#coletores .leitor:visible');
+  await expect(fonte).toHaveCount(1);
+  await fonte.locator('summary').click();
+  await expect(fonte.getByRole('link').first()).toHaveAttribute('href',/^https:\/\/dados\.mogidascruzes\.sp\.gov\.br\//);
+  await expect(page.locator('#acesso-diagnostico')).toBeHidden();
+});
+
+test('diagnóstico sem sessão mantém o status público',async({page})=>{
+  await page.context().clearCookies();
+  await page.goto('status.html?diagnostico=1');
+  await expect(page.locator('#acesso-diagnostico').getByRole('link')).toHaveAttribute('href',/gestao\.html$/);
+  await expect(page.locator('#resumo-leitores')).toContainText('leitores exibidos');
+  await expect(page.locator('#erro-leitores')).toBeHidden();
 });
 
 test('status: 27 UFs, detalhes em nova aba, leitores e recolhimento',async({page})=>{
@@ -30,7 +44,7 @@ test('status: 27 UFs, detalhes em nova aba, leitores e recolhimento',async({page
   await expect(aba.locator('#fontes')).toContainText('ANTT');
   await expect(aba.locator('#progresso')).toContainText('1 de 1');
   await aba.close();
-  const leitores=await (await page.request.get('api.pse?rota=/api/v1/status/coletores')).json();
+  const leitores=await (await page.request.get('api.pse?rota=/api/v1/status/leituras')).json();
   expect(leitores.resultado.total).toBeGreaterThan(1);
   await expect(page.locator('#coletores .leitor')).toHaveCount(leitores.resultado.total);
   await expect(page.locator('#erro-leitores')).toBeHidden();
@@ -77,7 +91,7 @@ test('estado: UF sem cadastros e UF inválida',async({page})=>{
 test.describe('fontes documentais',()=>{
   test.use({comDocumentacao:true});
   test('documentos lidos mantêm cadastro pendente e erros continuam vermelhos',async({page})=>{
-    await page.goto('status.html');
+    await page.goto('status.html?diagnostico=1');
     await page.locator('#filtro-leitores').fill('STTU Natal');
     const leitor=page.locator('#coletores .leitor:visible');
     await expect(leitor).toHaveCount(1);
@@ -156,7 +170,7 @@ test('fontes sem local ficam visiveis e multiplas localidades nao duplicam o tot
   const semLocal={...leitor,id:99992,fonte_id:99992,fonte:'Fonte sem município confirmado',localidades:[]};
   d.coletores=[leitor,semLocal];d.total=2;
   await page.route('**/api.pse?**',r=>new URL(r.request().url()).searchParams.get('rota')==='/api/v1/status/coletores'?r.fulfill({json:{sucesso:true,resultado:d}}):r.continue());
-  await page.goto('status.html');
+  await page.goto('status.html?diagnostico=1');
   await expect(page.locator('.leitor')).toHaveCount(3);
   await expect(page.locator('#resumo-leitores')).toHaveText('2 de 2 leitores exibidos.');
   await page.locator('#expandir-leitores').click();
@@ -179,7 +193,7 @@ test('contadores de erro filtram a arvore e permitem restaurar a exibicao',async
   resposta.resultado.total=coletores.length;
   await page.route('**/api.pse?**',r=>new URL(r.request().url()).searchParams.get('rota')==='/api/v1/status/coletores'
     ?r.fulfill({json:resposta}):r.continue());
-  await page.goto('status.html');
+  await page.goto('status.html?diagnostico=1');
 
   const brasil=page.locator('.territorio-federal');
   const ce=page.locator('.estado-leitores[data-uf="CE"]');

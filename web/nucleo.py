@@ -79,6 +79,7 @@ ENDPOINTS_AJUDA = {
     "/api/v1/radares/download": ["GET", "HEAD"],
     "/api/v1/status/estados": ["GET"],
     "/api/v1/status/estados/{uf}": ["GET"],
+    "/api/v1/status/leituras": ["GET"],
     "/api/v1/status/coletores": ["GET"],
     "/api/v1/radares": ["GET", "POST"],
     "/api/v1/radares/submeter": ["POST"],
@@ -142,6 +143,7 @@ ENDPOINTS_DESC = {
     "/api/v1/atualizacoes/status": "Relatorio consolidado das atualizacoes, em JSON e sem acesso ao banco.",
     "/api/v1/status/estados": "Contagem de pontos unicos nas 27 UFs por esfera de fiscalizacao; inclui nao classificados.",
     "/api/v1/status/estados/{uf}": "Detalhes da cobertura por UF, municipios, orgaos, fontes e pontos paginados.",
+    "/api/v1/status/leituras": "Status público das leituras de fontes oficiais, com datas e links de publicação.",
     "/api/v1/status/coletores": "Diagnóstico dos leitores; exige sessão ou token de moderador.",
     "/api/v1/radares/download": "Arquivo diário radares.json.gz com ETag e Last-Modified.",
     "/api/v1/gestao/radar/{id}/cruzar": "Recruza contribuicao ativa, inclusive verificada, com fontes oficiais locais; gera sugestoes auditadas.",
@@ -189,6 +191,7 @@ ENDPOINTS_PARAMS = {
     "/api/v1/atualizacoes/status": [],
     "/api/v1/status/estados": [],
     "/api/v1/status/estados/{uf}": ["limite", "depois"],
+    "/api/v1/status/leituras": [],
     "/api/v1/status/coletores": [],
     "/api/v1/radares": ["lat", "lon", "raio", "formato", "delimitador",
                         "detalhado", "incluir_inativos", "incluir_incertos",
@@ -1369,13 +1372,13 @@ def handle_request(environ, stdin_bytes=b""):
         if gov is not None:
             return gov
 
-        if caminho.rstrip("/") in ("/api/v1/status/estados", "/api/v1/status/coletores") or caminho.startswith("/api/v1/status/estados/"):
+        if rota in ("/api/v1/status/estados", "/api/v1/status/leituras", "/api/v1/status/coletores") or caminho.startswith("/api/v1/status/estados/"):
             if metodo != "GET":
                 return _erro(405, "metodo_nao_permitido", "Use GET para consultar o status.")
             if formato != "json":
                 return _erro(400, "formato_invalido", "O painel de status usa JSON.")
-            if caminho.rstrip("/") == "/api/v1/status/coletores":
-                resultado = painel_status.coletores(conn)
+            if rota in ("/api/v1/status/leituras", "/api/v1/status/coletores"):
+                resultado = painel_status.coletores(conn, diagnostico=rota == "/api/v1/status/coletores")
             else:
                 uf = caminho[len("/api/v1/status/estados"):].strip("/").upper() or None
                 limite = _param_limite(params)

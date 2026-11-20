@@ -84,6 +84,7 @@
         box.append(ul);
         if(r.descricao_coleta)box.append(el('p',r.descricao_coleta,'aviso'));
         if(documental&&u)box.append(campos([['Registros de documentação aceitos',quantidade(u.linhas_validas)]]));
+        if(r.atencao)box.append(el('p','A última leitura requer atenção.','aviso'));
         if(r.erro_relatorio_coleta)box.append(el('p',typeof r.erro_relatorio_coleta==='string'?r.erro_relatorio_coleta:JSON.stringify(r.erro_relatorio_coleta),'erro'));
         if(u?.erro_codigo||u?.erro_detalhe)box.append(el('p',[u.erro_codigo,u.erro_detalhe].filter(Boolean).join(': '),'erro'));
         if(r.erros?.length){box.append(el('h3','Problemas encontrados na última leitura'));const lista=el('ul',null,'lista');for(const e of r.erros)lista.append(el('li',e.codigo_erro+': '+e.descricao+' ('+e.severidade+')'));box.append(lista);}
@@ -178,7 +179,7 @@
       fontes.add(r.fonte_id??r.fonte);
       if(!r.ativo){desativados++;continue;}
       if(temErro(r)){falhas++;continue;}
-      if(['ok','sem_mudanca'].includes(r.estado)&&r.tipo_coleta!=='documental'&&!r.leitura_atrasada&&!r.ultima_tentativa?.linhas_rejeitadas&&!r.erro_relatorio_coleta)ok++;
+      if(['ok','sem_mudanca'].includes(r.estado)&&r.tipo_coleta!=='documental'&&!r.leitura_atrasada&&!r.ultima_tentativa?.linhas_rejeitadas&&!r.erro_relatorio_coleta&&!r.atencao)ok++;
       else pendentes++;
     }
     const selos=g._selos;
@@ -215,20 +216,31 @@
     haviaFiltro=ativo;
     $('filtro-erros')?.setAttribute('aria-pressed',String(Boolean(filtroErros)));
     $('sem-leitores').hidden=visiveis.size>0;
+    $('sem-leitores').textContent=ativo?'Nenhum leitor corresponde ao filtro.':'Nenhum leitor disponível.';
     $('resumo-leitores').textContent=numero(visiveis.size)+' de '+numero(todos.size)+' leitores exibidos.';
+  }
+  const diagnostico=new URLSearchParams(location.search).get('diagnostico')==='1';
+  async function consultarLeitores() {
+    if(diagnostico){
+      try{return await api('/api/v1/status/coletores');}
+      catch(e){
+        if(e.status!==401 && e.status!==403)throw e;
+        const aviso=$('acesso-diagnostico');
+        aviso.replaceChildren(link('Entre no painel de gestão para abrir o diagnóstico técnico.', 'gestao.html', true));
+        aviso.hidden=false;
+      }
+    }
+    return api('/api/v1/status/leituras');
   }
   async function carregarLeitores() {
     erro('erro-leitores',null);
+    $('acesso-diagnostico').hidden=true;
     try {
-      const d=await api('/api/v1/status/coletores');
+      const d=await consultarLeitores();
       montarLeitores(d);
       if(d.erro_agenda||d.erro_relatorio||d.erro_localidades)erro('erro-leitores',new Error([d.erro_agenda?'Agenda: '+d.erro_agenda:null,d.erro_relatorio?'Relatório: '+d.erro_relatorio:null,d.erro_localidades?'Localização das fontes: '+d.erro_localidades:null].filter(Boolean).join('; ')));
       $('total-leitores').textContent=numero(d.total);$('atualizado-leitores').textContent='Histórico consultado em '+data(d.gerado_em)+'. Horários no fuso deste dispositivo.';filtrar();
     } catch(e){
-      if(e.status===401 || e.status===403){
-        $('atualizado-leitores').replaceChildren(link('Entre no painel como moderador para consultar os leitores.', 'gestao.html', true));
-        return;
-      }
       erro('erro-leitores',e);$('atualizado-leitores').textContent='Histórico não atualizado. Use “Atualizar status” para tentar novamente.';
     }
   }
@@ -262,6 +274,11 @@
   async function atualizar() {const b=$('atualizar');b.disabled=true;try{if(estado)await carregarEstado();else await Promise.all([carregarCobertura(),carregarLeitores()]);}finally{b.disabled=false;}}
   $('atualizar').addEventListener('click',atualizar);
   if(estado)$('mais').addEventListener('click',()=>carregarEstado(true));else {
+    if(diagnostico){
+      const resumo=new URL('status.html',location.href);resumo.hash='leituras';
+      $('modo-leitores').href=resumo.href;
+      $('modo-leitores').textContent='Voltar ao status público';
+    }
     $('filtro-leitores').addEventListener('input',filtrar);
     $('filtro-erros')?.addEventListener('click',()=>{
       filtroErros=filtroErros?null:'federal';

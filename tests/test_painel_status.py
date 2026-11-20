@@ -133,6 +133,30 @@ class TestLeitoresStatus(BaseDedup):
         self.assertEqual(d['ultima_tentativa']['id'],erro)
         self.assertEqual(d['erros'][0]['codigo_erro'],'download')
 
+    def test_status_publico_preserva_progresso_e_url_publicada_sem_diagnostico(self):
+        fonte = self.fonte(ColetorANTT.FONTE['nome'])
+        recurso = self.recurso(fonte, ColetorANTT.RECURSO['nome'])
+        self.con.execute("UPDATE RECURSO_FONTE SET url_recurso=? WHERE id=?",
+                         ("https://proxy.interno.example/consulta", recurso))
+        self.recurso(self.fonte("Leitor interno", natureza="privada"))
+        quando = '2026-10-22T10:00:00+00:00'
+        self.execucao(recurso, 'ok', quando)
+        ultima = self.execucao(recurso, 'erro', http_status=503, erro_detalhe='/dados/caminho-privado')
+        diario = {"fontes": {str(recurso): {"execucao_id": ultima, "erro": "credencial em arquivo",
+                  "origem": "https://espelho.interno.example/consulta"}}}
+        with patch('core.painel_status.Path.read_text', return_value=json.dumps(diario)):
+            resumo = status.coletores(self.con, agenda={}, diagnostico=False)
+        [leitor] = resumo['coletores']
+        self.assertEqual(leitor['estado'], 'erro')
+        self.assertEqual(leitor['ultimo_sucesso'], {'terminada_em': quando})
+        self.assertEqual(leitor['ultima_tentativa']['http_status'], 503)
+        self.assertTrue(leitor['atencao'])
+        self.assertEqual(leitor['url_recurso'], ColetorANTT.RECURSO['url_recurso'])
+        texto = json.dumps(resumo)
+        for reservado in ('Leitor interno', 'interno.example', 'caminho-privado', 'credencial em arquivo',
+                          'erro_detalhe', 'url_ultima_tentativa', 'url_configurada'):
+            self.assertNotIn(reservado, texto)
+
     def test_consulta_o_historico_de_todos_os_leitores_em_lote(self):
         fonte = self.fonte('Fonte em lote')
         for i in range(30):
@@ -301,6 +325,13 @@ class TestApiStatus(unittest.TestCase):
             self.assertEqual(headers['Cache-Control'],'no-store')
             self.assertEqual(self.req(rota,metodo='POST')[0],405)
         self.assertEqual(self.req('/api/v1/status/coletores')[0],401)
+
+    def test_status_publico_carrega_leitores_sem_credencial(self):
+        code, headers, d = self.req('/api/v1/status/leituras')
+        self.assertEqual(code, 200)
+        self.assertEqual(headers['Cache-Control'], 'no-store')
+        self.assertTrue(d['resultado']['coletores'])
+        self.assertEqual(len(d['resultado']['estados']), 27)
 
     def test_uf_e_paginacao_invalidas(self):
         self.assertEqual(self.req('/api/v1/status/estados/XX')[0],422)

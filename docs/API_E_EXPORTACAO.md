@@ -50,6 +50,7 @@ o contrato desses parâmetros da API.
 | `/api/v1/status` | Estado da base, versão e cobertura. |
 | `/api/v1/ajuda` | Parâmetros, campos, formatos e erros, gerados do código. |
 | `/api/v1/status/estados` e `/api/v1/status/estados/{uf}` | Contagens e detalhes por estado, em JSON. |
+| `/api/v1/status/leituras` | Status público das fontes oficiais, com datas, contagens e links de publicação. |
 | `/api/v1/status/coletores` | Diagnóstico de leitores com credencial de moderador. |
 | `/api/v1/atualizacoes/status` | Relatório consolidado com credencial de moderador. |
 | `/health/live` e `/health/ready` | Sinais de vida e prontidão, em JSON. |
@@ -328,6 +329,10 @@ arquivo como exportação bem sucedida.
 - Troca entre sistemas: [Intercâmbio de Instâncias](INTERCAMBIO_INSTANCIAS.md).
 - Rede de radares: [TRASEIRO DE URSO](TRASEIRO_DE_URSO.md).
 
+
+A página de status usa `GET /api/v1/status/leituras` para mostrar as leituras de
+fontes oficiais sem login. A opção “Diagnóstico da equipe” consulta erros
+detalhados e os endereços usados pelo servidor com uma sessão de moderador.
 
 A consulta `GET /api/v1/status/coletores` inclui `fonte_id`, `localidades` por leitor
 e a relação `estados` das 27 UFs para navegação territorial. Cada local informa

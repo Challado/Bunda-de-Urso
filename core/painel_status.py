@@ -4,6 +4,7 @@ import datetime as dt
 from functools import lru_cache
 import json
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from . import atualizacoes, caminhos, consultas, db, governanca
 from .domains import UFS
@@ -194,8 +195,8 @@ def _localidades_fontes(conn):
     return locais
 
 
-def coletores(conn, agenda=None):
-    from coletor.agenda import carregar_agenda
+def coletores(conn, agenda=None, *, diagnostico=True):
+    from coletor.agenda import AGENDA_PADRAO, carregar_agenda
     erro_agenda = None
     if agenda is None:
         try:
@@ -209,6 +210,7 @@ def coletores(conn, agenda=None):
         SELECT rf.id, rf.nome AS recurso, rf.url_recurso, rf.ativo,
                rf.status_integracao, rf.periodicidade_segundos,
                f.id AS fonte_id, f.nome AS fonte, f.esfera, f.situacao, f.url_institucional,
+               nf.codigo AS natureza,
                ult.execucao_id AS ultima_id,
                (SELECT e.id FROM EXECUCAO_COLETA e WHERE e.recurso_id=rf.id
                   AND e.status IN ('ok','sem_mudanca') ORDER BY e.id DESC LIMIT 1) AS sucesso_id,
@@ -217,19 +219,24 @@ def coletores(conn, agenda=None):
                 ORDER BY e.id DESC LIMIT 1) AS sucesso_documental_id
         FROM RECURSO_FONTE rf
         LEFT JOIN FONTE f ON f.id=rf.fonte_id
+        LEFT JOIN NATUREZA_FONTE nf ON nf.id=f.natureza_id
         LEFT JOIN ULTIMA_EXECUCAO_RECURSO ult ON ult.recurso_id=rf.id
         ORDER BY rf.id
     """)]
+    if not diagnostico:
+        recursos = [r for r in recursos if r["natureza"] == "oficial"]
+        itens = {k: v for k, v in itens.items() if v[1]["conector"].FONTE.get("natureza") == "oficial"}
     execucoes = {e["id"]: e for e in db.consultar_ids(
         conn, "SELECT * FROM EXECUCAO_COLETA WHERE id IN ({ids})",
         {r[k] for r in recursos for k in ("ultima_id", "sucesso_id", "sucesso_documental_id")
          if r[k] is not None})}
     erros = defaultdict(list)
-    for e in db.consultar_ids(conn, """
-        SELECT execucao_id, codigo_erro, descricao, severidade, registrado_em
-        FROM ERRO_VALIDACAO WHERE execucao_id IN ({ids}) ORDER BY id
-    """, {r["ultima_id"] for r in recursos if r["ultima_id"] is not None}):
-        erros[e["execucao_id"]].append({k: e[k] for k in ("codigo_erro", "descricao", "severidade", "registrado_em")})
+    if diagnostico:
+        for e in db.consultar_ids(conn, """
+                SELECT execucao_id, codigo_erro, descricao, severidade, registrado_em
+                FROM ERRO_VALIDACAO WHERE execucao_id IN ({ids}) ORDER BY id
+            """, {r["ultima_id"] for r in recursos if r["ultima_id"] is not None}):
+            erros[e["execucao_id"]].append({k: e[k] for k in ("codigo_erro", "descricao", "severidade", "registrado_em")})
     diario, erro_relatorio = {}, None
     try:
         diario = json.loads(Path(caminhos.status_atualizacoes()).read_text(encoding="utf-8")).get("fontes", {})
@@ -246,6 +253,7 @@ def coletores(conn, agenda=None):
         chave, item = itens.get((r["fonte"], r["recurso"]), (None, {}))
         if chave:
             vistos.add(chave)
+        r.pop("natureza")
         ultima = r.pop("ultima_id")
         sucesso = r.pop("sucesso_id")
         sucesso_documental = r.pop("sucesso_documental_id")
@@ -265,7 +273,6 @@ def coletores(conn, agenda=None):
             periodicidade_segundos=cls.RECURSO.get("periodicidade_segundos")), chave, item, None))
     # Nomes/codigos sao metadados de jurisdicao, nao uma inferencia da rodovia
     # ou dos radares recebidos. Tambem funcionam para fontes nunca coletadas.
-    from coletor.agenda import AGENDA_PADRAO
     erro_localidades = None
     try:
         catalogo = _catalogo_localidades()
@@ -282,11 +289,51 @@ def coletores(conn, agenda=None):
     for leitor in leitores:
         leitor['localidades'] = cadastrados.get(leitor['fonte_id']) or por_nome.get(leitor['fonte'], [])
     leitores.sort(key=lambda r: (r["fonte"] or "", r["recurso"] or ""))
-    return {"gerado_em": atualizacoes.agora(), "total": len(leitores), "erro_agenda": erro_agenda, "erro_relatorio": erro_relatorio,
-            "erro_localidades": erro_localidades,
-            "resumo": dict(Counter(r["estado"] for r in leitores)),
-            "estados": [{"uf": uf, "nome": NOMES[uf]} for uf, _ in UFS],
-            "coletores": atualizacoes.limpar(leitores)}
+    resultado = {"gerado_em": atualizacoes.agora(), "total": len(leitores),
+                 "resumo": dict(Counter(r["estado"] for r in leitores)),
+                 "estados": [{"uf": uf, "nome": NOMES[uf]} for uf, _ in UFS]}
+    if diagnostico:
+        return dict(resultado, erro_agenda=erro_agenda, erro_relatorio=erro_relatorio,
+                    erro_localidades=erro_localidades, coletores=atualizacoes.limpar(leitores))
+
+    # Somente as URLs publicadas com o conector. A agenda pode ser sobreposta
+    # no servidor e o diário contém URLs efetivamente consultadas e seus erros.
+    publicacoes = {}
+    for item in AGENDA_PADRAO.values():
+        cls = item["conector"]
+        if cls.FONTE.get("natureza") == "oficial":
+            publicacoes[(cls.FONTE["nome"], cls.RECURSO["nome"])] = (
+                _url_publicada(cls.FONTE.get("url_institucional")),
+                _url_publicada(cls.RECURSO.get("url_recurso")))
+    resultado["coletores"] = [_leitor_publico(r, publicacoes.get((r["fonte"], r["recurso"]), (None, None)))
+                             for r in leitores]
+    return atualizacoes.limpar(resultado)
+
+
+def _url_publicada(valor):
+    if not valor:
+        return None
+    url = urlsplit(valor)
+    if url.scheme in ("http", "https") and url.hostname and url.username is None and url.password is None:
+        return valor
+    return None
+
+
+def _leitor_publico(leitor, urls):
+    campos = ("id", "fonte_id", "fonte", "recurso", "esfera", "agendado", "ativo",
+              "tipo_coleta", "intervalo_s", "estado", "leitura_atrasada", "status_integracao")
+    copia = {chave: leitor[chave] for chave in campos}
+    copia["localidades"] = [{k: local.get(k) for k in ("uf", "nome_uf", "municipio_ibge", "municipio")}
+                           for local in leitor["localidades"]]
+    copia["url_institucional"], copia["url_recurso"] = urls
+    copia["atencao"] = bool(leitor["erro_relatorio_coleta"])
+    ultima = leitor["ultima_tentativa"]
+    campos_ultima = ("iniciada_em", "terminada_em", "http_status", "tentativas", "linhas_recebidas",
+                     "linhas_validas", "linhas_rejeitadas", "registros_criados", "registros_alterados")
+    copia["ultima_tentativa"] = {k: ultima[k] for k in campos_ultima} if ultima else None
+    sucesso = leitor["ultimo_sucesso"]
+    copia["ultimo_sucesso"] = {"terminada_em": sucesso["terminada_em"]} if sucesso else None
+    return copia
 
 
 def _leitor(r, chave, item, diario, ultima=None, sucesso=None, erros=()):

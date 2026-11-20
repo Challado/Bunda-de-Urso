@@ -21,7 +21,7 @@ ROTAS_PAGINADAS = ROTAS_BUSCA | {"/api/v1/trechos", "/api/v1/operacoes",
                                   "/api/v1/trafego", "/api/v1/atualizacoes"}
 ROTAS_REGRAS = ROTAS_PAGINADAS | {ROTA_DUMP, "/api/v1/radares/{id}",
                                   "/api/v1/equipamentos/{id}", "/api/v1/status/estados",
-                                  "/api/v1/status/estados/{uf}"}
+                                  "/api/v1/status/estados/{uf}", "/api/v1/status/leituras"}
 
 
 def categoria_rota(rota):
