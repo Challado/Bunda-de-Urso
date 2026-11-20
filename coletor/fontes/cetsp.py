@@ -34,15 +34,15 @@ def json_publico(corpo):
     return json.loads(corpo)
 
 
-def decodificar_dsr(documento):
+def decodificar_dsr(documento, campos_esperados=CAMPOS):
     """DSR com dicionarios, repeticao e nulos; recusa janela incompleta."""
     dados = documento["results"][0]["result"]["data"]
     dataset = dados["dsr"]["DS"][0]
     if dataset.get("IC") is not True:
-        raise ValueError("Painel CET devolveu janela incompleta; cadastro nao publicado")
+        raise ValueError("Painel público devolveu janela incompleta; cadastro não publicado")
     campos = [x["Name"].split(".", 1)[1] for x in dados["descriptor"]["Select"]]
-    if campos != CAMPOS:
-        raise ValueError("Colunas do painel CET mudaram")
+    if campos != campos_esperados:
+        raise ValueError("Colunas do painel público mudaram")
     registros = []
     for grupo in dataset["PH"]:
         anterior, esquema = [], None
@@ -64,17 +64,32 @@ def decodificar_dsr(documento):
     return registros
 
 
-def consulta(modelo):
+def consulta(modelo, entidade=ENTIDADE, campos=CAMPOS):
     selecoes = [{"Column": {"Expression": {"SourceRef": {"Source": "t"}},
                              "Property": campo},
-                 "Name": ENTIDADE + "." + campo} for campo in CAMPOS]
+                 "Name": entidade + "." + campo} for campo in campos]
     comando = {"Query": {"Version": 2,
-        "From": [{"Name": "t", "Entity": ENTIDADE, "Type": 0}], "Select": selecoes},
-        "Binding": {"Primary": {"Groupings": [{"Projections": list(range(len(CAMPOS)))}]},
+        "From": [{"Name": "t", "Entity": entidade, "Type": 0}], "Select": selecoes},
+        "Binding": {"Primary": {"Groupings": [{"Projections": list(range(len(campos)))}]},
                     "DataReduction": {"DataVolume": 4, "Primary": {"Window": {"Count": 10000}}},
                     "Version": 1}, "ExecutionMetricsKind": 1}
     return {"version": "1.0.0", "queries": [{"Query": {"Commands": [
         {"SemanticQueryDataShapeCommand": comando}]}}], "cancelQueries": [], "modelId": modelo}
+
+
+def consultar_painel(link, api, entidade, campos):
+    parametro = parse_qs(urlsplit(link).query)["r"][0]
+    referencia = json.loads(base64.urlsafe_b64decode(parametro + "=" * (-len(parametro) % 4)))
+    chave = referencia["k"]
+    if not re.fullmatch(r"[a-fA-F0-9-]{36}", chave):
+        raise ValueError("Identificador público de painel inválido")
+    headers = {"X-PowerBI-ResourceKey": chave, "Content-Type": "application/json"}
+    metadados = json_publico(http.baixar(api + "/public/reports/" + chave +
+                            "/modelsAndExploration", headers=headers)[0])
+    modelo = metadados["models"][0]["id"]
+    return http.baixar(api + "/public/reports/querydata?synchronous=true", method="POST",
+                       data=json.dumps(consulta(modelo, entidade, campos), ensure_ascii=False).encode(),
+                       headers=headers)[0]
 
 
 class ColetorCETSP(CadastroPublicado):
@@ -95,18 +110,7 @@ class ColetorCETSP(CadastroPublicado):
         links = re.findall(r'https://app\.powerbi\.com/view\?[^\s"<>]+', html.unescape(pagina))
         if not links:
             raise ValueError("CET nao publicou link do painel")
-        parametro = parse_qs(urlsplit(links[0]).query)["r"][0]
-        referencia = json.loads(base64.urlsafe_b64decode(parametro + "=" * (-len(parametro) % 4)))
-        chave = referencia["k"]
-        if not re.fullmatch(r"[a-fA-F0-9-]{36}", chave):
-            raise ValueError("Identificador publico de painel invalido")
-        headers = {"X-PowerBI-ResourceKey": chave, "Content-Type": "application/json"}
-        metadados = json_publico(http.baixar(API + "/public/reports/" + chave +
-                                "/modelsAndExploration", headers=headers)[0])
-        modelo = metadados["models"][0]["id"]
-        resposta = http.baixar(API + "/public/reports/querydata?synchronous=true",
-            method="POST", data=json.dumps(consulta(modelo), ensure_ascii=False).encode(),
-            headers=headers)[0]
+        resposta = consultar_painel(links[0], API, ENTIDADE, CAMPOS)
         # O artefato e a resposta original, nao uma reserializacao dos pontos.
         return self._resposta(resposta)
 

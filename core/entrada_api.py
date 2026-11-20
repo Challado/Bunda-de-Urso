@@ -11,7 +11,7 @@ FERRAMENTAS = frozenset((
     "espelho_dados", "carregar_municipios_ibge", "carregar_verificacao_metrologica",
     "casar_municipios_fuzzy", "construir_cadastro_municipios", "construir_malha",
     "consultar_nomes_pendentes", "corrigir_coordenadas_brasil", "gerar_calibracao",
-    "gerar_correcoes_municipio", "gerar_municipios_site", "limpar_calibracao",
+    "georreferenciar_oficiais", "gerar_correcoes_municipio", "gerar_municipios_site", "limpar_calibracao",
     "listar_duplicidades", "preencher_municipio", "radar_admin", "inicializar_banco", "migrar_postgres",
     "reprocessar_fontes_corrigidas", "recuperar_posicoes_legadas", "validar_georesolver", "reconciliar_equipamentos",
 ))

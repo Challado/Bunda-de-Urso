@@ -203,6 +203,12 @@
           "nome": "Detran-DF - Relacao de medidores de velocidade",
           "url": "https://www.detran.df.gov.br/equipamentos-eletronicos",
           "esfera": "distrital"
+        },
+        {
+          "modulo": "detran_df_arcgis",
+          "nome": "Detran-DF - Relacao de medidores de velocidade",
+          "url": "https://services.arcgis.com/4CZwpdWHGNPLU7QQ/arcgis/rest/services/Base_DETRAN/FeatureServer",
+          "esfera": "distrital"
         }
       ],
       "modulos_municipais": [],
@@ -540,7 +546,15 @@
           "esfera": "estadual"
         }
       ],
-      "modulos_municipais": [],
+      "modulos_municipais": [
+        {
+          "modulo": "cet_rio",
+          "nome": "CET-Rio - Locais de fiscalizacao eletronica",
+          "url": "https://cetrio.prefeitura.rio/fiscalizacao-eletronica/",
+          "esfera": "municipal",
+          "municipio_ibge": "3304557"
+        }
+      ],
       "cobertura_municipal_confirmada": false
     },
     {
@@ -607,7 +621,15 @@
           "esfera": "estadual"
         }
       ],
-      "modulos_municipais": [],
+      "modulos_municipais": [
+        {
+          "modulo": "eptc_poa",
+          "nome": "EPTC Porto Alegre - Medidores eletronicos de velocidade",
+          "url": "https://prefeitura.poa.br/eptc/medidores-eletronicos-de-velocidade",
+          "esfera": "municipal",
+          "municipio_ibge": "4314902"
+        }
+      ],
       "cobertura_municipal_confirmada": false
     },
     {
@@ -720,6 +742,12 @@
           "nome": "DER-SP - Radares estaduais",
           "url": "https://dadosabertos.sp.gov.br/dataset/radar",
           "esfera": "estadual"
+        },
+        {
+          "modulo": "artesp",
+          "nome": "ARTESP - Medidores de velocidade em rodovias concedidas",
+          "url": "https://dadosabertos.artesp.sp.gov.br/dataset/491d79c5-ee09-4fe8-a3ce-1b425fe60bbe/resource/8b3212ff-1647-42ad-8a45-39e9934c92e1/download/recursos.xlsx",
+          "esfera": "estadual"
         }
       ],
       "modulos_municipais": [
@@ -729,6 +757,13 @@
           "url": "https://www.cetsp.com.br/consultas/fiscalizacao-eletronica-do-transito.aspx",
           "esfera": "municipal",
           "municipio_ibge": "3550308"
+        },
+        {
+          "modulo": "mogi_sp",
+          "nome": "Mogi das Cruzes - Fiscalizacao eletronica",
+          "url": "https://dados.mogidascruzes.sp.gov.br/dataset/b93af036-8ed9-4442-82e4-7bc8c3d6c64f/resource/822a6c76-4c9b-413b-8299-abd40f903bf4/download/localizacao_radares2.csv",
+          "esfera": "municipal",
+          "municipio_ibge": "3530607"
         }
       ],
       "cobertura_municipal_confirmada": false

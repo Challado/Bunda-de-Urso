@@ -53,6 +53,8 @@ from coletor.fontes.base_lwb import ColetorBaseLWB
 from coletor.fontes.cadastros_publicos import NOVAS_FONTES
 from coletor.fontes.cetsp import ColetorCETSP
 from coletor.fontes.sie_sc import ColetorSIEPortateis, ColetorSIELocais
+from coletor.fontes.fiscalizacao_municipal import ColetorCETRio, ColetorEPTC, ColetorMogiSP
+from coletor.fontes.recursos_estaduais import ColetorArtesp, ColetorDFArcGIS
 
 HORA = 3600
 DIA = 86400
@@ -109,6 +111,7 @@ AGENDA_PADRAO = {
         "intervalo_s": SEMANA,
         "url_direta": None,
         "ativo": True,
+        "pos_coleta": "core.manutencao.georreferenciar_oficiais:depois_der_mg",
     },
     "pbh": {
         "rotulo": "Belo Horizonte - fiscalizacao eletronica",
@@ -138,6 +141,7 @@ AGENDA_PADRAO = {
         "intervalo_s": DIA,
         "url_direta": None,
         "ativo": True,
+        "pos_coleta": "core.manutencao.georreferenciar_oficiais:depois_prf",
     },
     # -- metrologia (INMETRO) — todas as UFs numa execucao --------------
     "inmetro": {
@@ -345,10 +349,13 @@ AGENDA_PADRAO = {
 
 for _chave, _classe in dict(NOVAS_FONTES, cetsp=ColetorCETSP,
                           sie_sc_portateis=ColetorSIEPortateis,
-                          sie_sc_locais=ColetorSIELocais).items():
+                          sie_sc_locais=ColetorSIELocais, mogi_sp=ColetorMogiSP,
+                          eptc_poa=ColetorEPTC, cet_rio=ColetorCETRio,
+                          artesp=ColetorArtesp, detran_df_arcgis=ColetorDFArcGIS).items():
     AGENDA_PADRAO[_chave] = {
         "rotulo": _classe.FONTE["nome"], "conector": _classe,
-        "intervalo_s": SEMANA, "url_direta": None, "ativo": True,
+        "intervalo_s": SEMANA, "url_direta": None,
+        "ativo": _chave != "detran_df_arcgis",  # camada histórica, uso sob demanda
     }
 
 # Teto do backoff apos erro consecutivo (multiplicador sobre a base limitada).

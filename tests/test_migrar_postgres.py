@@ -80,6 +80,32 @@ class MigrarPostgresTest(unittest.TestCase):
         self.assertTrue(self.pg.execute(sql.SQL("SELECT 1 FROM {} WHERE ponto_id=%s")
                                         .format(self.tabela("traseiro_ponto_pendente")), novo).fetchone())
 
+    def test_migracao_de_trechos_recupera_uf_sem_municipio(self):
+        from coletor.fontes.prf import ColetorPRFTrechos
+        from coletor.fontes.normalizacao import inserir_trecho
+        from tests.test_dedup import BaseDedup
+
+        with closing(db.connect(self.copia)) as origem:
+            dados = BaseDedup()
+            dados.con, dados._seq = origem, 0
+            fonte = dados.fonte(ColetorPRFTrechos.FONTE["nome"])
+            artefato = dados.artefato(dados.recurso(fonte))
+            for uf in ("BA", "SC"):
+                registro = dados.registro(artefato, {"ESTADO (UF)": uf}, ident=f"{uf} BR-101 0-10")
+                inserir_trecho(origem, registro, {"via_codigo": "BR-101", "km_inicio": 0, "km_fim": 10})
+            origem.commit()
+            importar(origem, self.pg, self.esquema)
+        legado = self.sql.SQL("UPDATE {} SET uf_sigla=NULL").format(self.tabela("trecho_elegivel"))
+        self.pg.execute(legado)
+        self.pg.execute(self.sql.SQL("SET search_path TO {}").format(self.sql.Identifier(self.esquema)))
+        try:
+            caminho = Path(__file__).parents[1] / "sql/migracoes/0015_uf_trechos.postgres.sql"
+            self.pg.execute(caminho.read_text())
+            self.assertEqual(self.pg.execute("SELECT uf_sigla FROM TRECHO_ELEGIVEL ORDER BY uf_sigla").fetchall(),
+                             [("BA",), ("SC",)])
+        finally:
+            self.pg.execute("RESET search_path")
+
     def test_falha_de_dados_desfaz_esquema_inteiro_sem_expor_valor(self):
         with closing(db.connect(self.copia)) as c:
             c.execute("UPDATE snapshot_publicado SET publicado_em='valor que não é uma data'")

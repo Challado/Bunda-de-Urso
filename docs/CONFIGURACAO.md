@@ -343,3 +343,36 @@ pagina_grande_min = 150
   segundos. O download usa um arquivo já gerado. `api.pse cron dump` verifica
   a cada 15 minutos e gera uma cópia por dia UTC em
   `dados/exportacao/radares.json.gz`, mantendo a cópia anterior se a geração falhar.
+
+## Radares e trechos de fontes governamentais
+
+Os coletores `mogi_sp`, `eptc_poa`, `cet_rio` e `artesp` consultam
+as publicações dos respectivos órgãos e seguem a agenda normal. A edição
+histórica `detran_df_arcgis` fica disponível para coleta manual, pois a
+camada não confirma que os aparelhos ainda estejam em operação.
+
+A atualização do esquema recupera a UF já publicada nos trechos antigos.
+A coleta agendada do DER-MG tenta localizar os radares por rodovia e
+quilômetro na IDE-Sisema. Para antecipar essa etapa, execute a ferramenta
+abaixo como o usuário de execução da API. Sem `--aplicar`, ela informa
+quantos registros poderiam ser localizados.
+
+```bash
+./api.pse ferramenta georreferenciar_oficiais --mg --aplicar
+```
+
+Para as rodovias federais, informe o ZIP de **rotas** do Sistema Nacional de
+Viação do DNIT. Pode ser a URL HTTPS do arquivo em `servicos.dnit.gov.br`
+ou o caminho para a cópia oficial dentro de `[dados] dir`. Preencha
+`snv_rotas` em `[geografia]` para executar o cruzamento após a coleta
+agendada dos trechos da PRF.
+
+```bash
+./api.pse ferramenta georreferenciar_oficiais --snv calibracao/rotas-snv.zip --aplicar
+```
+
+O cruzamento federal exige UF, rodovia e quilometragem compatíveis. O de
+Minas Gerais também confere o município pela malha do IBGE. As posições e
+os traçados calculados ficam identificados como inferidos, com referência à
+malha usada. Os vértices de um trecho elegível indicam onde pode haver
+fiscalização portátil, sem afirmar que há um equipamento instalado.

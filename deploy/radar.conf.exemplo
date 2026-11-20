@@ -108,6 +108,8 @@ gov_iteracoes = 200000
 [geografia]
 # Vazio usa a malha distribuida com o codigo/cache. Pode indicar outra malha.
 malha =
+# ZIP das rotas do DNIT (URL oficial ou arquivo dentro de dados.dir).
+snv_rotas =
 
 [assistente]
 # Interruptor geral: 0 impede TODAS as chamadas de IA, inclusive manutencao antiga.

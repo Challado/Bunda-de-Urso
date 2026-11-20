@@ -617,11 +617,14 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None,
                                     modalidade)
     campos = {"ponto_id": ponto_id, "modalidade_id": modalidade_id,
               "situacao_operacional_id": situacao_id}
+    if d.get("tipo_medicao"):
+        campos["tipo_medicao_id"] = dbmod.domain_id(conn, "TIPO_MEDICAO", d["tipo_medicao"])
     regime_id, _ = _obter_ou_inserir(conn, "REGIME_FISCALIZACAO", campos, {
         "ponto_id": ponto_id,
         "modalidade_id": modalidade_id,
         "situacao_operacional_id": situacao_id,
         "fonte_registro_id": registro_id,
+        "tipo_medicao_id": campos.get("tipo_medicao_id"),
     })
 
     # equipamento + modelo + instalacao
@@ -663,12 +666,17 @@ def inserir_normalizado(conn, registro_id, d, fonte_id=None,
                      (modelo, d.get("numero_serie"), d.get("ano_fabricacao"), equipamento_id))
     instalacao_id = _buscar_por(conn, "INSTALACAO", {
         "ponto_id": ponto_id, "equipamento_id": equipamento_id})
+    funcao_id = dbmod.domain_id(conn, "FUNCAO_EQUIPAMENTO", d["funcao_equipamento"]) if d.get("funcao_equipamento") else None
     if instalacao_id is None:
         instalacao_id = dbmod.insert(conn, "INSTALACAO", {
             "ponto_id": ponto_id,
             "equipamento_id": equipamento_id,
             "situacao_operacional_id": situacao_id,
+            "funcao_equipamento_id": funcao_id,
         })
+    elif funcao_id is not None:
+        conn.execute("UPDATE INSTALACAO SET funcao_equipamento_id=? WHERE id=? AND funcao_equipamento_id IS NULL",
+                     (funcao_id, instalacao_id))
 
     # Numero Inmetro identifica tambem o instrumento, com a fonte que o publicou.
     # Fontes antigas guardavam essa chave apenas no ponto (mantida por compatibilidade).
@@ -718,8 +726,12 @@ def inserir_trecho(conn, registro_id, d, fonte_id=None):
     sentido_id = None
     if d.get("sentido"):
         sentido_id = dbmod.domain_id(conn, "SENTIDO", d["sentido"])
+    uf = str(d.get("uf") or "").strip().upper()
+    if uf and dbmod.scalar(conn, "SELECT 1 FROM UF WHERE sigla=?", (uf,)) is None:
+        uf = None
     trecho_id = dbmod.insert(conn, "TRECHO_ELEGIVEL", {
         "via_id": via_id,
+        "uf_sigla": uf or None,
         "km_inicio": d.get("km_inicio"),
         "km_fim": d.get("km_fim"),
         "sentido_id": sentido_id,

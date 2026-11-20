@@ -1036,7 +1036,7 @@ SELECT t.id AS trecho_id, t.km_inicio AS km_inicio, t.km_fim AS km_fim,
        t.vigencia_inicio AS vigencia_inicio, t.vigencia_fim AS vigencia_fim,
        t.situacao AS situacao, t.registro_fonte_id AS registro_fonte_id,
        v.codigo AS via_codigo, v.nome AS via_nome,
-       s.codigo AS sentido
+       s.codigo AS sentido, t.uf_sigla AS uf_sigla
 FROM TRECHO_ELEGIVEL t
 LEFT JOIN VIA v ON v.id = t.via_id
 LEFT JOIN SENTIDO s ON s.id = t.sentido_id
@@ -1047,10 +1047,10 @@ def _filtros_trecho(filtros):
     clauses, params = [], []
     if filtros.get("uf"):
         clauses.append(
-            "t.id IN (SELECT tm.trecho_id FROM TRECHO_MUNICIPIO tm "
+            "(t.uf_sigla = ? OR t.id IN (SELECT tm.trecho_id FROM TRECHO_MUNICIPIO tm "
             "JOIN MUNICIPIO m ON m.codigo_ibge=tm.municipio_id "
-            "WHERE m.uf_sigla = ?)")
-        params.append(filtros["uf"].upper())
+            "WHERE m.uf_sigla = ?))")
+        params.extend([filtros["uf"].upper()] * 2)
     if filtros.get("municipio_ibge"):
         clauses.append(
             "t.id IN (SELECT trecho_id FROM TRECHO_MUNICIPIO "
@@ -1106,7 +1106,7 @@ def _offset_cursor(cursor):
 def montar_trecho(conn, r):
     tid = r["trecho_id"]
     municipios = []
-    uf = None
+    uf = r["uf_sigla"]
     for m in dbmod.query_all(
             conn, "SELECT tm.municipio_id AS codigo_ibge, m.nome, m.uf_sigla "
             "FROM TRECHO_MUNICIPIO tm LEFT JOIN MUNICIPIO m "
@@ -1116,12 +1116,20 @@ def montar_trecho(conn, r):
                            "uf": m["uf_sigla"]})
         uf = uf or m["uf_sigla"]
     vertices = []
+    evidencias_geometria = set()
+    inferida = False
     for v in dbmod.query_all(
-            conn, "SELECT p.latitude, p.longitude FROM TRECHO_VERTICE tv "
-            "JOIN POSICAO_GEOGRAFICA p ON p.id=tv.posicao_id "
+            conn, "SELECT p.latitude, p.longitude, p.registro_fonte_id, q.codigo "
+            "FROM TRECHO_VERTICE tv JOIN POSICAO_GEOGRAFICA p ON p.id=tv.posicao_id "
+            "LEFT JOIN QUALIDADE_POSICAO q ON q.id=p.qualidade_posicao_id "
             "WHERE tv.trecho_id=? ORDER BY tv.ordem", (tid,)):
         vertices.append({"latitude": v["latitude"],
                          "longitude": v["longitude"]})
+        if v["codigo"] == "inferida":
+            inferida = True
+            if v["registro_fonte_id"] is not None:
+                evidencias_geometria.add(v["registro_fonte_id"])
+    fontes_geometria = _fontes_dos_registros(conn, evidencias_geometria)
     documentos = _documentos(conn, "trecho", tid)
     return {
         "id": "T-%d" % tid,
@@ -1135,7 +1143,9 @@ def montar_trecho(conn, r):
         "sentido": r["sentido"],
         "situacao": r["situacao"],
         "vertices": vertices,
-        "geometria_confirmada": bool(vertices),
+        "geometria_confirmada": bool(vertices) and not inferida,
+        "geometria_inferida": inferida,
+        "fontes_geometria": [f for fonte in fontes_geometria.values() for f in fonte],
         "criterio_inclusao": r["criterio_inclusao"],
         "vigencia_inicio": r["vigencia_inicio"],
         "vigencia_fim": r["vigencia_fim"],
@@ -1161,8 +1171,21 @@ def buscar_trechos(conn, lat=None, lon=None, raio=None, filtros=None,
         cond, bbox_params = _clausula_bbox_vertices(bb)
         clauses.append(cond)
     where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
-    rows = dbmod.query_all(conn, _TRECHO_SQL + where, params + bbox_params)
+    offset = _offset_cursor(cursor)
+    if not usar_loc:
+        total = dbmod.scalar(conn, "SELECT COUNT(*) FROM TRECHO_ELEGIVEL t "
+                             "LEFT JOIN VIA v ON v.id=t.via_id "
+                             "LEFT JOIN SENTIDO s ON s.id=t.sentido_id" + where, params)
+        # A ordem por ID textual mantém os cursores do contrato existente.
+        rows = dbmod.query_all(conn, _TRECHO_SQL + where +
+                              " ORDER BY CAST(t.id AS TEXT) LIMIT ? OFFSET ?",
+                              params + [limite, offset])
+        recorte = [montar_trecho(conn, r) for r in rows]
+        proximo = str(offset + limite) if offset + limite < total else None
+        return recorte, {"total_trechos": total, "retornados": len(recorte),
+                         "proximo_cursor": proximo}
 
+    rows = dbmod.query_all(conn, _TRECHO_SQL + where, params + bbox_params)
     recs = []
     for r in rows:
         trecho = montar_trecho(conn, r)
@@ -1174,7 +1197,6 @@ def buscar_trechos(conn, lat=None, lon=None, raio=None, filtros=None,
     recs.sort(key=lambda t: t["id"])
 
     total = len(recs)
-    offset = _offset_cursor(cursor)
     recorte = recs[offset:offset + limite]
     proximo = None
     if offset + limite < total:

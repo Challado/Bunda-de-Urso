@@ -214,6 +214,7 @@ add(T(29, "REGIME_FISCALIZACAO", [
 add(T(30, "TRECHO_ELEGIVEL", [
     C("id", "ID", nn=True, pk=True),
     C("via_id", "ID", nn=True, fk=("VIA", "id")),
+    C("uf_sigla", "CHAR2", fk=("UF", "sigla")),
     C("km_inicio", "NUM10_3"),
     C("km_fim", "NUM10_3"),
     C("sentido_id", "ID", fk=("SENTIDO", "id")),
