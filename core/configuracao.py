@@ -218,7 +218,7 @@ def _editar(texto, alteracoes):
     texto = texto.replace("# Precedencia: variavel de ambiente > este arquivo > padrao do checkout.",
                           "# RADAR_CONF seleciona este arquivo; os parametros sao lidos somente daqui.")
     secoes, inicio, secao = {}, [], None
-    for linha in texto.splitlines():
+    for _, linha in caminhos.linhas_conf(texto.split("\n")):
         limpo = linha.strip()
         if limpo.startswith("[") and limpo.endswith("]"):
             secao = limpo[1:-1].strip().lower()
@@ -247,7 +247,14 @@ def _editar(texto, alteracoes):
         if linhas:
             linhas.append("")
         linhas.extend(("[" + secao + "]", *itens["comentarios"]))
-        linhas.extend((chave + " = " + str(valor)).rstrip() for chave, valor in itens["valores"].items())
+        for chave, valor in itens["valores"].items():
+            valor = str(valor)
+            if (secao, chave) in caminhos.LISTAS_MULTILINHA:
+                primeira, *resto = valor.split("\n")
+                valor = "\n".join([primeira, *(
+                    "    " + linha if linha and not linha[0].isspace() else linha
+                    for linha in resto)])
+            linhas.append((chave + " = " + valor).rstrip())
     return "\n".join(linhas).rstrip() + "\n"
 
 

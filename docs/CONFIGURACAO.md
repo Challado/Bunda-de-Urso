@@ -296,13 +296,25 @@ são manuais. Gere um token aleatório para cada integração, entregue o token
 diretamente ao responsável e grave somente seu SHA-256 no arquivo. A chave
 de leitura serve à paginação e é independente dos tokens de gestão e da rede.
 
-As listas em `[abuso]` são JSON de uma linha. Os endereços abaixo são exemplos
-reservados para documentação. Preencha com os endereços e agentes aprovados.
+As listas em `[abuso]` aceitam JSON de uma linha ou formatado em várias linhas.
+Indente todas as linhas após `= [`, incluindo o `]` final. Os endereços abaixo
+são reservados para documentação. Preencha com os endereços e agentes aprovados.
+Você pode agrupar regras em listas internas, como `[[{...}], [{...}]]`.
+Os grupos são avaliados na ordem em que aparecem, com até 100 regras por opção.
 
 ```ini
 [abuso]
-bloqueios = [{"rota":"/api/v1/radares/busca","user_agent_regex":"(?i)^ExemploBot/","status":403}]
-liberacoes = [{"rota":"/api/v1/radares/envios","redes":["192.0.2.10-192.0.2.20"],"user_agent_regex":"^ClienteAutorizado/1[.]0$"}]
+bloqueios = [
+    [{"user_agent_regex": "(?i)^ExemploBot/", "status": 403}],
+    [{"redes": ["198.51.100.0/24"], "status": 403}]
+    ]
+liberacoes = [
+    {
+      "rota": "/api/v1/radares/envios",
+      "redes": ["192.0.2.10-192.0.2.20"],
+      "user_agent_regex": "^ClienteAutorizado/1[.]0$"
+    }
+    ]
 janela_segundos = 600
 max_paginas_grandes = 12
 pagina_grande_min = 150

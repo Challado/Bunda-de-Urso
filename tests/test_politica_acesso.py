@@ -65,14 +65,28 @@ class PoliticaAcessoTest(unittest.TestCase):
         self.assertEqual(self.req("/api/v1/status/coletores", HTTP_X_RADAR_LEITURA=chave)[0], 401)
 
     def test_liberacoes_e_bloqueios_com_regex_cidr_e_intervalo(self):
-        self.gravar('[abuso]\n'
-                    'bloqueios = [{"user_agent_regex":"(?i)coletor"}]\n'
-                    'liberacoes = [{"rota":"/api/v1/radares/busca","user_agent_regex":"^Coletor aprovado$","redes":["192.0.2.10-192.0.2.20"]},'
-                    '{"rota":"/api/v1/radares/envios","redes":["2001:db8::/64"]},'
-                    '{"rota":"/api/v1/radares/envios","user_agent_regex":"^ClienteApp/[1-9]$"}]\n')
+        self.gravar('''[abuso]
+bloqueios = [
+    [{"user_agent_regex":"(?i)coletor"}],
+    [{"user_agent_regex":"^bot=v2$","status":429}]
+    ]
+liberacoes =
+    [
+    [{"rota":"/api/v1/radares/busca","user_agent_regex":"^Coletor aprovado$","redes":["192.0.2.10-192.0.2.20"]}],
+    [{"rota":"/api/v1/radares/envios","redes":["2001:db8::/64"]},
+    {"rota":"/api/v1/radares/envios","user_agent_regex":"^ClienteApp/[1-9]$"}]
+    ]
+janela_segundos = 900
+[api]
+limite_consulta = 100
+''')
+        self.assertEqual(caminhos.problemas(), [])
+        self.assertEqual(caminhos.inteiro("abuso", "janela_segundos"), 900)
+        self.assertEqual(politica_acesso.limite(), 100)
         with closing(db.connect(self.banco)) as conn:
             governanca.garantir_esquema(conn)
         self.assertEqual(self.req(HTTP_USER_AGENT="Coletor aprovado", REMOTE_ADDR="192.0.2.21")[0], 403)
+        self.assertEqual(self.req(HTTP_USER_AGENT="bot=v2")[0], 429)
         self.assertEqual(self.req(HTTP_USER_AGENT="Coletor aprovado", REMOTE_ADDR="192.0.2.20")[0], 200)
         self.assertEqual(self.req(query="cursor=2001", HTTP_USER_AGENT="Coletor aprovado",
                                   REMOTE_ADDR="192.0.2.20")[0], 401)
@@ -81,6 +95,15 @@ class PoliticaAcessoTest(unittest.TestCase):
         self.assertEqual(self.req(envio, HTTP_USER_AGENT="ClienteApp/2")[0], 404)
         self.assertEqual(self.req(envio, REMOTE_ADDR="192.0.2.20", HTTP_USER_AGENT="Coletor aprovado")[0], 401)
         self.assertEqual(self.req(envio, REMOTE_ADDR="192.0.2.21", HTTP_X_FORWARDED_FOR="2001:db8::1")[0], 401)
+
+    def test_listas_agrupadas_e_listas_simples_de_uma_linha(self):
+        grupo = '[{"user_agent_regex":"bot","status":429},{"redes":["192.0.2.0/24"]}]'
+        terceira = '[{"user_agent_regex":"robo"}]'
+        regras = politica_acesso.ler_bloqueios(f'[{grupo},{terceira}]')
+        self.assertEqual([regra.status for regra in regras], [429, 403, 403])
+        self.assertEqual(politica_acesso.ler_bloqueios(grupo), regras[:2])
+        with self.assertRaisesRegex(ValueError, "até 100 regras"):
+            politica_acesso.ler_bloqueios(json.dumps([[{"user_agent_regex": "bot"}] * 101]))
 
     def test_cota_resiste_a_troca_de_agente_e_ip_na_mesma_rede(self):
         self.gravar("[abuso]\nmax_paginas_grandes = 2\n")

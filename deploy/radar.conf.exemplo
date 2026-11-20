@@ -78,6 +78,7 @@ timeout_consulta = 60
 chaves_leitura_arquivo = chaves_leitura.sha256
 
 [abuso]
+# As listas JSON podem ocupar várias linhas. Indente as continuações, inclusive ].
 bloqueios = []
 liberacoes = []
 janela_segundos = 600

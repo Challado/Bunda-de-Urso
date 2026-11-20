@@ -140,6 +140,7 @@ for _funcao_ia in ("documentos", "correspondencias", "auditoria", "diagnostico",
     PADROES[("assistente", _funcao_ia)] = "1"
 
 _CACHE = {"chave": None, "valores": {}, "problemas": []}
+LISTAS_MULTILINHA = frozenset({("abuso", "bloqueios"), ("abuso", "liberacoes")})
 
 
 def conf_path():
@@ -150,6 +151,32 @@ def conf_path():
 def existe_conf():
     """True se ha arquivo de configuracao legivel."""
     return os.path.isfile(conf_path())
+
+
+def linhas_conf(linhas):
+    """Agrupa continuações INI indentadas das listas de controle de acesso."""
+    secao = None
+    bloco = []
+    for numero, linha in enumerate(linhas, 1):
+        linha = linha.rstrip("\r\n")
+        texto = linha.strip()
+        recuo = len(linha) - len(linha.lstrip())
+        if bloco:
+            if not texto or (recuo > recuo_chave and not texto.startswith(("#", ";"))):
+                bloco.append(linha)
+                continue
+            yield inicio, "\n".join(bloco).rstrip()
+            bloco = []
+        if texto.startswith("[") and texto.endswith("]"):
+            secao = texto[1:-1].strip().lower()
+        nome, separador, _ = texto.partition("=")
+        if separador and (secao, nome.strip().lower()) in LISTAS_MULTILINHA:
+            bloco = [linha]
+            inicio, recuo_chave = numero, recuo
+        else:
+            yield numero, linha
+    if bloco:
+        yield inicio, "\n".join(bloco).rstrip()
 
 
 def _ler_conf():
@@ -174,7 +201,7 @@ def _ler_conf():
     if mtime is not None:
         try:
             with open(caminho, "r", encoding="utf-8") as f:
-                for numero, linha in enumerate(f, 1):
+                for numero, linha in linhas_conf(f):
                     texto = linha.strip()
                     if not texto or texto[0] in "#;":
                         continue

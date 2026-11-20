@@ -1,4 +1,5 @@
 """Configuracao real em arquivo temporario: permissoes, conflitos e proxima CGI."""
+from configparser import ConfigParser
 from contextlib import closing
 import json
 import os
@@ -59,6 +60,24 @@ class TestConfiguracaoAPI(unittest.TestCase):
 
     def alteracao(self, **valores):
         return {"revisao": configuracao.consultar()["revisao"], "alteracoes": valores}
+
+    def test_salvar_preserva_listas_de_abuso_em_varias_linhas(self):
+        liberacoes = [[{"rota": "/api/v1/radares/envios", "redes": ["192.0.2.0/24"]}]]
+        bloco = json.dumps(liberacoes, indent=2).replace("\n", "\n    ")
+        with self.conf.open("a") as f:
+            f.write("\n[abuso]\nliberacoes = " + bloco + "\njanela_segundos = 900\n")
+        bloqueios = [[{"user_agent_regex": "^bot=v2$"}], [{"redes": ["2001:db8::/64"]}]]
+        configuracao.salvar(self.alteracao(**{"abuso.bloqueios": json.dumps(bloqueios, indent=2)}))
+        status, _, _ = self.requisicao("PUT", self.alteracao(**{"abuso.pagina_grande_min": "170"}))
+        self.assertEqual(status, 200)
+        conf_padrao = ConfigParser(interpolation=None)
+        conf_padrao.read(self.conf)
+        for nome, regras in (("bloqueios", bloqueios), ("liberacoes", liberacoes)):
+            valor = caminhos.valor("abuso", nome)[0]
+            self.assertIn("\n", valor)
+            self.assertEqual(json.loads(valor), regras)
+            self.assertEqual(json.loads(conf_padrao.get("abuso", nome)), regras)
+        self.assertEqual(caminhos.inteiro("abuso", "janela_segundos"), 900)
 
     def test_leitura_exige_admin_e_nao_retorna_segredos(self):
         for papel, esperado in ((None, 401), ("contribuidor", 403), ("moderador", 403), ("admin", 200)):

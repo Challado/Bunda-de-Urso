@@ -93,15 +93,18 @@ class Regra:
 
 
 def _lista(texto):
-    if not isinstance(texto, str) or len(texto) > 24000 or "\n" in texto or "\r" in texto:
-        raise ValueError("A lista deve ser um JSON de uma linha, com até 24 mil caracteres.")
+    if not isinstance(texto, str) or len(texto) > 24000:
+        raise ValueError("A lista deve ser JSON com até 24 mil caracteres.")
     try:
         valores = json.loads(texto)
     except ValueError:
         raise ValueError("Use uma lista JSON.") from None
-    if not isinstance(valores, list) or len(valores) > 100:
+    if not isinstance(valores, list):
+        raise ValueError("Use uma lista JSON.")
+    regras = [regra for item in valores for regra in (item if isinstance(item, list) else [item])]
+    if len(regras) > 100:
         raise ValueError("A lista aceita até 100 regras.")
-    return valores
+    return regras
 
 
 def _redes(textos):

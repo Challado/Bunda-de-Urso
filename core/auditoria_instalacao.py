@@ -20,7 +20,7 @@ from . import caminhos
 def chaves_gravadas(texto):
     """Inclui chaves vazias: vazio e uma escolha explicita de usar o padrao."""
     secao, chaves = None, set()
-    for linha in texto.splitlines():
+    for _, linha in caminhos.linhas_conf(texto.split("\n")):
         linha = linha.strip()
         if not linha or linha.startswith(("#", ";")):
             continue
