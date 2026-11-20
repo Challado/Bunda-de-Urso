@@ -22,13 +22,18 @@ class TestInterfacePublica(unittest.TestCase):
     def test_apenas_limites_publicos_sem_banco(self):
         codigo, _, doc=self.pedir('[interface]\nmapa_min_percentual = 65\nmapa_min_altura_px = 220\n[assistente]\nchave_arquivo = segredo-privado\n')
         self.assertEqual(codigo,200)
-        self.assertEqual(doc,{'sucesso':True,'resultado':{'mapa_min_percentual':65,'mapa_min_altura_px':220}})
+        self.assertTrue(doc['sucesso'])
+        self.assertEqual(doc['resultado']['mapa_min_percentual'],65)
+        self.assertEqual(doc['resultado']['mapa_min_altura_px'],220)
+        self.assertEqual(doc['resultado']['download']['nome'],'radares.json.gz')
         self.assertNotIn('segredo',json.dumps(doc))
 
     def test_padroes_e_limites_para_edicao_manual_invalida(self):
-        self.assertEqual(self.pedir()[2]['resultado'],{'mapa_min_percentual':50,'mapa_min_altura_px':180})
+        padrao=self.pedir()[2]['resultado']
+        self.assertEqual((padrao['mapa_min_percentual'],padrao['mapa_min_altura_px']),(50,180))
         _, _, doc=self.pedir('[interface]\nmapa_min_percentual = 500\nmapa_min_altura_px = -1\n')
-        self.assertEqual(doc['resultado'],{'mapa_min_percentual':90,'mapa_min_altura_px':120})
+        limites=doc['resultado']
+        self.assertEqual((limites['mapa_min_percentual'],limites['mapa_min_altura_px']),(90,120))
         self.assertEqual(self.pedir('[interface]\nmapa_min_percentual = invalido\n')[2]['resultado']['mapa_min_percentual'],50)
 
     def test_metodo_e_formato_incorretos_sao_recusados(self):

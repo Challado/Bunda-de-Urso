@@ -16,7 +16,6 @@ def atender(conn,caminho,metodo,environ,raw):
         if administrativo:
             ctx=gov.contexto_autenticacao(conn,environ); gov.exigir(ctx,'contribuidor')
         else:
-            tr.autenticar(environ)
             local=tr.identidade(conn)
             consultante=tr.ler_cabecalho(environ)
         if metodo not in ('GET','POST','PATCH'):

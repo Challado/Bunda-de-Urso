@@ -291,6 +291,8 @@ function acompanharEnvio(protocolo,geracao,vez){
       if(["processado","rejeitado","falhou"].indexOf(r.estado)<0 && vez<10){
         timerConsulta=setTimeout(function(){acompanharEnvio(protocolo,geracao,vez+1);},3000);
       }
+    }else if(o.status===401 || o.status===403){
+      diz((envioConfirmado?"<b>Envio recebido e salvo.</b> ":"")+"A consulta de andamento exige autorização. Guarde o protocolo e fale com o responsável pelo serviço."+reciboHTML(protocolo),envioConfirmado?"ok":"err");
     }else if(o.status===404)diz("Protocolo não encontrado ou expirado. Confira o link.","err");
     else if(envioConfirmado)mostrarEnvio({protocolo:protocolo,estado:"recebido"},"Não foi possível consultar agora. Guarde o protocolo e tente consultar mais tarde.");
     else diz("Não foi possível consultar este protocolo agora. Confira o link e tente mais tarde."+reciboHTML(protocolo),"err");

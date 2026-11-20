@@ -294,12 +294,13 @@ class TestApiStatus(unittest.TestCase):
         return code,headers,json.loads(body) if isinstance(body,str) else body
 
     def test_rotas_publicas_get_sem_cache(self):
-        for rota in ['/api/v1/status/estados','/api/v1/status/estados/PR','/api/v1/status/coletores']:
+        for rota in ['/api/v1/status/estados','/api/v1/status/estados/PR']:
             code,headers,d=self.req(rota)
             self.assertEqual(code,200)
             self.assertTrue(d['sucesso'])
             self.assertEqual(headers['Cache-Control'],'no-store')
             self.assertEqual(self.req(rota,metodo='POST')[0],405)
+        self.assertEqual(self.req('/api/v1/status/coletores')[0],401)
 
     def test_uf_e_paginacao_invalidas(self):
         self.assertEqual(self.req('/api/v1/status/estados/XX')[0],422)

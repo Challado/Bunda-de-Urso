@@ -147,6 +147,7 @@ def _cron(texto, antigo, raiz, usuario, conf=None):
         '-u','RADAR_BRASIL_HOME','-u','RADAR_DATA_DIR','-u','RADAR_DB','-u','RADAR_WEB_ROOT','-u','RADAR_LOG_DIR',
         'RADAR_CONF='+str(conf or raiz/'radar.conf'), sys.executable, str(raiz / 'api.pse')))
     linhas.extend('* * * * * ' + comando + ' cron ' + tarefa + ' # radar-raiz-web ' + tarefa for tarefa in ('tick', 'fila', 'traseiro'))
+    linhas.append('*/15 * * * * ' + comando + ' cron dump # radar-raiz-web dump')
     return '\n'.join(linhas) + '\n'
 
 
@@ -159,7 +160,7 @@ def _checagens_cron(antigo, raiz, usuario, conf=None, final=True):
                         else _cron(atual, antigo, raiz, usuario, conf))
             correto = atual == esperado
             detalhe = ('nenhuma tarefa de coleta/fila/rede do Radar no root' if nome == 'root'
-                       else 'coleta, fila e rede independentes pela API, uma passada por minuto como '+usuario)
+                       else 'coleta, fila, rede e dump diário agendados como '+usuario)
             if not correto:
                 detalhe = ('ainda ha tarefas de coleta/fila do Radar no root' if nome == 'root'
                            else 'coleta/fila ausentes, duplicadas ou com comando divergente')
@@ -651,7 +652,6 @@ def _aplicar(args, origem, conf, raiz, dados, banco, logs, home, conta, lab, ver
                 (raiz/'api.pse').chmod(0o770)
                 link=raiz/'status-atualizacoes.json'
                 link.unlink(missing_ok=True)
-                link.symlink_to(os.path.relpath(caminhos.status_atualizacoes(),raiz))
                 if home!=raiz:
                     for nome,tarefa in (('radar-tick.sh','cron tick'),('radar-api.pse','')):
                         alvo=home.parent/nome

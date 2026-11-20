@@ -66,7 +66,7 @@ Identidade do consultante (exemplo):
 
 O UUID persiste entre reinícios; cada instalação tem o seu. Não copie a identidade
 para criar uma instalação diferente. A identidade informa origem lógica;
-a autorização depende do modo de acesso da rede, e não do nome da aplicação.
+as rotas HTTP exigem um token válido da rede, enviado como `Authorization: Bearer`. Instalações que usavam acesso livre precisam configurar os tokens de entrada e de saída.
 
 Pedido:
 

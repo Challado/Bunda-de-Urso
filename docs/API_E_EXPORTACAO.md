@@ -1,6 +1,6 @@
 # API de consulta e exportação
 
-A consulta pública é aberta. A base atual é consultada localmente; uma requisição
+A consulta individual está disponível na instância pública, conforme a [política de uso](https://servidor3.lucas.inf.br/openclaw/radar/politica-de-uso.html). A base atual é consultada localmente; uma requisição
 de leitura não dispara downloads de portais externos.
 
 **Endereço da API:** <https://servidor3.lucas.inf.br/openclaw/radar/api.pse>
@@ -37,6 +37,8 @@ o contrato desses parâmetros da API.
 | Endpoint em `rota` | Uso |
 | --- | --- |
 | `/api/v1/radares` | Radares em torno de latitude/longitude, com raio e filtros. |
+| `/api/v1/radares/download` | Arquivo diário completo, em JSON gzip. |
+| `/api/v1/interface` | Configuração pública do mapa, limites e endereço do arquivo diário. |
 | `/api/v1/radares/{id}` | Detalhe de um ponto, por exemplo `P-604`. |
 | `/api/v1/radares/busca` | Busca cadastral por UF, município ou rodovia, sem exigir GPS. |
 | `/api/v1/equipamentos/{id}` | Equipamento físico, por exemplo `E-604`. |
@@ -48,8 +50,8 @@ o contrato desses parâmetros da API.
 | `/api/v1/status` | Estado da base, versão e cobertura. |
 | `/api/v1/ajuda` | Parâmetros, campos, formatos e erros, gerados do código. |
 | `/api/v1/status/estados` e `/api/v1/status/estados/{uf}` | Contagens e detalhes por estado, em JSON. |
-| `/api/v1/status/coletores` | Estado dos leitores e URLs, em JSON. |
-| `/api/v1/atualizacoes/status` | Relatório consolidado das atualizações, em JSON. |
+| `/api/v1/status/coletores` | Diagnóstico de leitores com credencial de moderador. |
+| `/api/v1/atualizacoes/status` | Relatório consolidado com credencial de moderador. |
 | `/health/live` e `/health/ready` | Sinais de vida e prontidão, em JSON. |
 
 Os IDs dependem da base consultada; os exemplos não reservam um ID específico.
@@ -61,8 +63,8 @@ Os IDs dependem da base consultada; os exemplos não reservam um ID específico.
 | `lat`, `lon` | Obrigatórios; latitude -90..90, longitude -180..180. |
 | `raio` | Inteiro de 1 a 1.000.000, em metros. |
 | `formato` | `json`, `ndjson`, `xml`, `txt`, `dif`, `edi` ou `edifact`. Padrão `json`. |
-| `limite` | Itens por página: 1..1000; padrão 100. |
-| `cursor` | Cursor opaco devolvido na página anterior; envie com URL encoding. |
+| `limite` | Itens por página: 1 a 200, sujeito ao teto da instância. Padrão 100. |
+| `cursor` | Cursor devolvido na página anterior. Acima do limite público, exige `X-Radar-Leitura`. |
 | `uf` | Sigla, por exemplo `GO`. |
 | `municipio_ibge` | Código IBGE do município, com 7 dígitos. |
 | `rodovia` | Código da via, por exemplo `GO-060` ou `BR-277`. |
@@ -87,13 +89,12 @@ incluindo registros cuja fonte não publicou GPS:
 curl --fail --get 'https://servidor3.lucas.inf.br/openclaw/radar/api.pse' \
   --data-urlencode 'rota=/api/v1/radares/busca' \
   --data-urlencode 'uf=GO' \
-  --data-urlencode 'limite=1000' \
+  --data-urlencode 'limite=200' \
   --data-urlencode 'formato=json' \
   --output goias-pagina-1.json
 ```
 
-Para consultar todo o cadastro disponível, use a busca sem filtro de UF e
-percorra as páginas. Uma consulta por raio não cobre automaticamente o Brasil.
+Para obter o cadastro completo, baixe [radares.json.gz](https://servidor3.lucas.inf.br/openclaw/radar/api.pse?rota=/api/v1/radares/download). A API entrega a cópia já gerada, com `ETag` e `Last-Modified`. Inclua `If-None-Match` ou `If-Modified-Since` para receber `304` quando a sua cópia ainda estiver atual.
 
 ## Formatos de exportação
 
@@ -264,25 +265,25 @@ DIF/EDIFACT completos não produz automaticamente uma única tabela/mensagem vá
 
 ## Paginação e exportação de todas as páginas
 
-`limite=1000` limita uma página, não o conjunto inteiro. Leia
-`resultado.proximo_cursor`; enquanto não for `null`, envie esse cursor na próxima
-requisição, mantendo os mesmos filtros. O cursor é opaco: não calcule, decodifique
-ou substitua por um número de página. Use URL encoding.
+Leia `resultado.proximo_cursor` para avançar mantendo os filtros. O teto público padrão é de 2.000 registros de deslocamento. Acima dele, a resposta é `401` com o link do arquivo diário. Solicite ao mantenedor uma chave específica de leitura para paginação profunda. Envie-a no cabeçalho `X-Radar-Leitura`.
 
-Exemplo completo: exportar o cadastro disponível de Goiás como um ponto JSON
+Exemplo de integração autorizada: exportar o cadastro de Goiás como um ponto JSON
 por linha, percorrendo a busca cadastral em JSON e produzindo NDJSON no cliente:
 
 ```python
 import json
+import os
 from urllib.parse import urlencode
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 api = "https://servidor3.lucas.inf.br/openclaw/radar/api.pse"
-parametros = {"rota": "/api/v1/radares/busca", "uf": "GO", "limite": 1000, "formato": "json"}
+parametros = {"rota": "/api/v1/radares/busca", "uf": "GO", "limite": 200, "formato": "json"}
 
 with open("goias.ndjson", "w", encoding="utf-8") as destino:
     while True:
-        with urlopen(api + "?" + urlencode(parametros), timeout=60) as resposta:
+        pedido = Request(api + "?" + urlencode(parametros),
+                         headers={"X-Radar-Leitura": os.environ["RADAR_CHAVE_LEITURA"]})
+        with urlopen(pedido, timeout=60) as resposta:
             pagina = json.load(resposta)
         if not pagina.get("sucesso"):
             raise RuntimeError(pagina.get("erro"))

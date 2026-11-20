@@ -32,7 +32,9 @@ class TestFilaCadastros(suporte.BaseGov):
     def test_ack_duravel_sem_banco_e_consulta_nao_expoe_dados_privados(self):
         with patch.object(nucleo,'_conn',side_effect=AssertionError('nao abrir SQLite')):
             r = self.receber({**self.dados,'contato':'contato-privado@example.invalid'})
-            status, headers, corpo = self.pedir(protocolo=r['protocolo'])
+            self.assertEqual(self.pedir(protocolo=r['protocolo'])[0], 401)
+            with patch('core.politica_acesso.liberado', return_value=True):
+                status, headers, corpo = self.pedir(protocolo=r['protocolo'])
         self.assertEqual(status,200)
         self.assertEqual(headers['Cache-Control'],'no-store')
         self.assertEqual(corpo['resultado']['estado'],'recebido')
@@ -215,6 +217,8 @@ class TestFilaCadastros(suporte.BaseGov):
 
     def test_protocolo_invalido_e_payload_invalido_nao_abrem_banco(self):
         with patch.object(nucleo,'_conn',side_effect=AssertionError('sem SQLite')):
-            self.assertEqual(self.pedir(protocolo='../../radar.conf')[0],404)
-            self.assertEqual(self.pedir(protocolo='f'*32)[0],404)
+            self.assertEqual(self.pedir(protocolo='../../radar.conf')[0],401)
+            with patch('core.politica_acesso.liberado', return_value=True):
+                self.assertEqual(self.pedir(protocolo='../../radar.conf')[0],404)
+                self.assertEqual(self.pedir(protocolo='f'*32)[0],404)
             self.assertEqual(self.pedir({'latitude':999,'longitude':0})[0],422)

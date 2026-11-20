@@ -72,6 +72,17 @@ dir = logs
 token_arquivo = api_token
 max_body = 8388608
 proxies_confiaveis =
+limite_consulta = 200
+cursor_publico_max = 2000
+timeout_consulta = 60
+chaves_leitura_arquivo = chaves_leitura.sha256
+
+[abuso]
+bloqueios = []
+liberacoes = []
+janela_segundos = 600
+max_paginas_grandes = 12
+pagina_grande_min = 150
 
 [coleta]
 max_bytes = 52428800

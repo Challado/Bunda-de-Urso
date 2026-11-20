@@ -55,7 +55,9 @@ SECOES = {
                  "lote", "max_bytes", "max_pendentes", "max_instancias", "pares_por_tick", "fontes_por_tick", "sondagem_segundos", "timeout"),
     "logs": ("dir",),
     "sincronizacao": ("clone", "remoto"),
-    "api": ("token_arquivo", "max_body", "proxies_confiaveis"),
+    "api": ("token_arquivo", "max_body", "proxies_confiaveis", "limite_consulta",
+            "cursor_publico_max", "timeout_consulta", "chaves_leitura_arquivo"),
+    "abuso": ("bloqueios", "liberacoes", "janela_segundos", "max_paginas_grandes", "pagina_grande_min"),
     "coleta": ("max_bytes", "timeout", "tentativas", "espera_atualizacao"),
     "consultas": ("regras",),
     "geografia": ("malha",),
@@ -97,6 +99,15 @@ PADROES = {
     ("web", "origem"): "",
     ("api", "max_body"): "8388608",
     ("api", "proxies_confiaveis"): "",
+    ("api", "limite_consulta"): "200",
+    ("api", "cursor_publico_max"): "2000",
+    ("api", "timeout_consulta"): "60",
+    ("api", "chaves_leitura_arquivo"): "chaves_leitura.sha256",
+    ("abuso", "bloqueios"): "[]",
+    ("abuso", "liberacoes"): "[]",
+    ("abuso", "janela_segundos"): "600",
+    ("abuso", "max_paginas_grandes"): "12",
+    ("abuso", "pagina_grande_min"): "150",
     ("coleta", "max_bytes"): "52428800",
     ("coleta", "timeout"): "30",
     ("coleta", "tentativas"): "3",
@@ -275,6 +286,7 @@ def caminho(secao, chave, padrao="", env=None):
     if not bruto:
         return ""
     if (secao, chave) in {("sqlite", "banco"), ("logs", "dir"), ("api", "token_arquivo"),
+                          ("api", "chaves_leitura_arquivo"),
                           ("traseiro", "tokens_arquivo"), ("assistente", "chave_arquivo"), ("geografia", "malha"), ("sincronizacao", "clone")}:
         return dentro_dados(bruto, secao + "." + chave)
     return _absoluto(bruto, origem)
@@ -464,6 +476,7 @@ def validar_operacionais():
         banco()
     log_dir()
     token_arquivo()
+    caminho("api", "chaves_leitura_arquivo")
     caminho("traseiro", "tokens_arquivo")
     caminho("assistente", "chave_arquivo", "assistente_chave")
     caminho("geografia", "malha")

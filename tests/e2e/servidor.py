@@ -25,6 +25,9 @@ def main():
         conf = base / 'radar.conf'
         conf.write_text('[instalacao]\nhome = %s\n[dados]\ndir = %s\nbanco = %s\n[governanca]\nsubmissao_limite = 100\n' %
                         (ROOT, base, base / 'radar.sqlite3'))
+        with conf.open('a') as f:
+            liberado = {"rota": "/api/v1/radares/envios", "redes": ["127.0.0.1"]}
+            f.write("[abuso]\nliberacoes = " + json.dumps([liberado]) + "\n")
         if '--com-gestao' in sys.argv or '--com-traseiro' in sys.argv:
             with conf.open('a') as f:
                 f.write('[web]\n')

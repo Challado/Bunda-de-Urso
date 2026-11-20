@@ -25,6 +25,20 @@ descrita em [Migração para a raiz web](docs/MIGRACAO_RAIZ_WEB.md). A migraçã
 >
 > **🌐 No ar:** a consulta pública roda em <https://servidor3.lucas.inf.br/openclaw/radar/> (mapa e raio por localização); a API responde em <https://servidor3.lucas.inf.br/openclaw/radar/api.pse>.
 
+### Uso da instância pública
+
+O servidor público é destinado a consultas individuais. Empresas, entidades
+com fins lucrativos e integrações de outros sistemas, comerciais ou não,
+devem operar sua própria instância do Bunda de Urso, conforme a licença do
+software. Isso mantém a capacidade do servidor disponível para quem consulta o mapa.
+
+Raspagem, cópia automatizada por paginação e redistribuição sem atribuição podem
+levar à limitação ou ao bloqueio de acesso. Para conversar sobre acesso, use o
+canal de contato. A compilação de dados continua sob CC BY 4.0, com atribuição
+ao Bunda de Urso e respeito às condições das fontes originais.
+
+[Política de uso](https://servidor3.lucas.inf.br/openclaw/radar/politica-de-uso.html) · [Contato](https://servidor.lucas.inf.br/site/contato) · [Licença dos dados](LICENSE-DATA.md)
+
 ## Por que “Bunda de Urso”?
 
 Bunda de Urso nasceu de um daqueles momentos em que a estrada te deixa na mão. Você vem no limite certo, confiando no navegador, no app de alerta, no radarzinho do painel — e, de repente, um flash. Ou pior: você passa por um equipamento que deveria estar ali, marcado, avisado, e não está. Nenhuma placa, nenhum aviso no aplicativo, nada. É aquela sensação de murchar por dentro, de “bunda flácida”, de ter sido deixado sozinho justamente pela informação que prometia te proteger.

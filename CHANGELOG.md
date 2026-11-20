@@ -1,5 +1,11 @@
 # Histórico de alterações
 
+## Política da instância pública
+
+- Publica a política de uso e oferece um arquivo diário comprimido com as fontes e a atribuição do cadastro.
+- Limita a paginação pública, exige chave para consultas profundas e aplica bloqueios e liberações por IP, faixa ou User-Agent.
+- Protege os diagnósticos dos leitores, os relatórios de atualização, a rede e o acompanhamento de envios com credenciais ou a liberação prevista para a rota.
+
 ## Consultas em lote de radares e leitores
 
 - Buscas carregam faixas, limites, instrumentos, documentos e operações só para os pontos da página. Totais e filtros consideram todos os resultados, inclusive os registros vinculados a aliases.

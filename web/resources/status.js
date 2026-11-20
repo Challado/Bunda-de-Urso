@@ -23,7 +23,11 @@
     try {
       const r=await fetch(url,{signal:abort.signal,cache:'no-store',headers:{Accept:'application/json'}});
       const doc=await r.json();
-      if(!r.ok || !doc.sucesso)throw new Error(doc.erro?.mensagem || 'A consulta falhou (HTTP '+r.status+').');
+      if(!r.ok || !doc.sucesso){
+        const falha=new Error(doc.erro?.mensagem || 'A consulta falhou (HTTP '+r.status+').');
+        falha.status=r.status;
+        throw falha;
+      }
       return doc.resultado;
     } catch(e) {if(e.name==='AbortError')throw new Error('A consulta demorou demais. Tente atualizar novamente.');throw e;}
     finally{clearTimeout(timer);}
@@ -220,7 +224,13 @@
       montarLeitores(d);
       if(d.erro_agenda||d.erro_relatorio||d.erro_localidades)erro('erro-leitores',new Error([d.erro_agenda?'Agenda: '+d.erro_agenda:null,d.erro_relatorio?'Relatório: '+d.erro_relatorio:null,d.erro_localidades?'Localização das fontes: '+d.erro_localidades:null].filter(Boolean).join('; ')));
       $('total-leitores').textContent=numero(d.total);$('atualizado-leitores').textContent='Histórico consultado em '+data(d.gerado_em)+'. Horários no fuso deste dispositivo.';filtrar();
-    } catch(e){erro('erro-leitores',e);$('atualizado-leitores').textContent='Histórico não atualizado. Use “Atualizar status” para tentar novamente.';}
+    } catch(e){
+      if(e.status===401 || e.status===403){
+        $('atualizado-leitores').replaceChildren(link('Entre no painel como moderador para consultar os leitores.', 'gestao.html', true));
+        return;
+      }
+      erro('erro-leitores',e);$('atualizado-leitores').textContent='Histórico não atualizado. Use “Atualizar status” para tentar novamente.';
+    }
   }
   let depois=null,carregados=0;
   const uf=new URLSearchParams(location.search).get('uf')?.toUpperCase();

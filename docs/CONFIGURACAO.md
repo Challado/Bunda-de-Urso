@@ -285,3 +285,49 @@ Laboratórios usam somente os destinos temporários e não consultam produção.
 
 `coleta.espera_atualizacao` limita em segundos a espera pela coleta em andamento
 (padrão 300); ao esgotar o prazo, a atualização recupera os arquivos anteriores.
+
+## Política de acesso da instância pública
+
+O servidor limita cada página a `api.limite_consulta` (padrão e máximo de 200).
+Acima de `api.cursor_publico_max` (2.000 por padrão), as consultas paginadas
+exigem `X-Radar-Leitura`. O arquivo `api.chaves_leitura_arquivo` fica dentro
+de `dados.dir` e contém um SHA-256 hexadecimal por linha. Emissão e revogação
+são manuais. Gere um token aleatório para cada integração, entregue o token
+diretamente ao responsável e grave somente seu SHA-256 no arquivo. A chave
+de leitura serve à paginação e é independente dos tokens de gestão e da rede.
+
+As listas em `[abuso]` são JSON de uma linha. Os endereços abaixo são exemplos
+reservados para documentação. Preencha com os endereços e agentes aprovados.
+
+```ini
+[abuso]
+bloqueios = [{"rota":"/api/v1/radares/busca","user_agent_regex":"(?i)^ExemploBot/","status":403}]
+liberacoes = [{"rota":"/api/v1/radares/envios","redes":["192.0.2.10-192.0.2.20"],"user_agent_regex":"^ClienteAutorizado/1[.]0$"}]
+janela_segundos = 600
+max_paginas_grandes = 12
+pagina_grande_min = 150
+```
+
+- Em `redes`, use endereços individuais, CIDR como `192.0.2.0/24` ou
+  intervalos inclusivos. IPv4 e IPv6 são aceitos. `user_agent_regex` permite
+  uma expressão regular de até 256 caracteres. IP e regex podem ser usados
+  separadamente. Quando ambos aparecem na mesma regra, ambos são exigidos.
+- As regras de leitura aceitam as rotas públicas de busca, download, histórico
+  de coleta, trechos, operações, tráfego e cobertura por estado. Para detalhes,
+  use `/api/v1/radares/{id}`, `/api/v1/equipamentos/{id}` ou
+  `/api/v1/status/estados/{uf}`. Uma liberação vale somente para sua rota, tem
+  prioridade sobre o bloqueio manual e a cota, e mantém o teto e a chave da
+  paginação profunda. Um bloqueio sem `rota` vale para todas essas leituras.
+  O bloqueio também pode usar `limite_minimo` e `cursor_minimo` e retorna
+  `403` por padrão ou `429` se configurado. As regras usam o IP reconhecido
+  pela API, que só aceita encaminhamento de proxies confiáveis.
+- Para aprovar acesso ao andamento do cadastro simplificado, use
+  `/api/v1/radares/envios` em `liberacoes`. Os moderadores também podem
+  consultar com a credencial habitual. O recebimento do cadastro é público.
+- A cota agrupa páginas grandes pela chave válida ou pela
+  rede de origem, `/24` no IPv4 e `/64` no IPv6. Ao excedê-la, a API responde
+  `429` com `Retry-After`. Use `max_paginas_grandes = 0` para desativar a cota.
+- `api.timeout_consulta` define o prazo da requisição CGI, com máximo de 60
+  segundos. O download usa um arquivo já gerado. `api.pse cron dump` verifica
+  a cada 15 minutos e gera uma cópia por dia UTC em
+  `dados/exportacao/radares.json.gz`, mantendo a cópia anterior se a geração falhar.

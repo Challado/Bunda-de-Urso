@@ -151,20 +151,19 @@ def tokens():
         erro(503,'tokens_indisponiveis','Prepare o arquivo JSON de tokens da rede dentro de dados.dir.')
 
 def autenticar(environ):
+    esquema, _, valor = (environ.get("HTTP_AUTHORIZATION") or "").partition(" ")
+    if esquema.lower() != "bearer" or not valor or len(valor) > 2048:
+        erro(401, "token_invalido", "Token da rede ausente ou invalido.")
+    try:
+        arquivo = tokens()
+    except gov.GovernancaError:
+        erro(401, "token_invalido", "Token da rede ausente ou invalido.")
+    aceitos = arquivo.get("entrada", []) + ([arquivo["token_rede"]] if arquivo.get("token_rede") else [])
+    if not any(hmac.compare_digest(valor.encode(), token.encode()) for token in aceitos):
+        erro(401, "token_invalido", "Token da rede ausente ou invalido.")
     if not habilitado():
-        erro(503,'desativado','TRASEIRO DE URSO desativado nesta instancia.')
-    modo=caminhos.valor('traseiro','acesso')[0]
-    if modo=='livre':
-        return
-    if modo!='tokens':
-        erro(503,'configuracao_invalida','traseiro.acesso deve ser livre ou tokens.')
-    valor=''
-    auth=environ.get('HTTP_AUTHORIZATION','')
-    valor=valor or (auth[7:] if auth.startswith('Bearer ') else '')
-    arquivo=tokens()
-    aceitos=arquivo.get('entrada',[])+([arquivo['token_rede']] if arquivo.get('token_rede') else [])
-    if not valor or not any(hmac.compare_digest(valor.encode(),t.encode()) for t in aceitos):
-        erro(401,'token_invalido','Token da rede ausente ou invalido.')
+        erro(503, "desativado", "TRASEIRO DE URSO desativado nesta instancia.")
+
 
 def _capacidades(conn,ident,doc):
     novos=set(doc['capacidades']['tipos_evento'])

@@ -7,10 +7,10 @@ const html = fs.readFileSync(path.join(__dirname, "../web/index.html"), "utf8");
 const trecho = html.slice(html.indexOf("  var consultaAtual = null;"),
   html.indexOf("  function usarLocalizacao(){"));
 
-function resposta(ids, proximo = null, total = ids.length) {
+function resposta(ids, proximo = null, total = ids.length, cursorMaximo) {
   return {ok: true, json: async () => ({sucesso: true,
     resultado: {pontos: ids.map(id => ({id})), total_pontos: total,
-      proximo_cursor: proximo, retornados: ids.length}})};
+      proximo_cursor: proximo, retornados: ids.length, cursor_publico_max: cursorMaximo}})};
 }
 function contexto(fetch) {
   const renders = [], festas = [], avisos = [];
@@ -32,15 +32,21 @@ async function main() {
   const ctx = contexto(async url => {
     urls.push(url);
     const cursor = Number(new URL(url, "https://exemplo.invalid").searchParams.get("cursor") || 0);
-    return resposta(ids.slice(cursor, cursor + 1000), cursor + 1000 < ids.length ? String(cursor + 1000) : null, ids.length);
+    return resposta(ids.slice(cursor, cursor + 100), cursor + 100 < ids.length ? String(cursor + 100) : null, ids.length, 2000);
   });
   await ctx.consultar(-23.55, -46.63, 200000);
-  assert.equal(urls.length, 3);
-  assert.ok(urls.every(url => url.includes("limite=1000")));
+  assert.equal(urls.length, 21);
+  assert.ok(urls.every(url => !new URL(url, "https://exemplo.invalid").searchParams.has("limite")));
   assert.equal(ctx.renders.at(-1).pontos.length, 2005);
   assert.equal(ctx.renders.at(-1).meta.retornados, 2005);
   assert.equal(ctx.renders.at(-1).meta.proximo_cursor, null);
   assert.deepEqual(ctx.avisos, [2005]);
+
+  let chamadasPublicas = 0;
+  const limitado = contexto(async () => { chamadasPublicas++; return resposta(["A"], "201", 500, 200); });
+  const recorte = await limitado.carregarPaginas("/api?", () => {}, new AbortController().signal);
+  assert.equal(chamadasPublicas, 1);
+  assert.equal(recorte.meta.proximo_cursor, "201");
 
   let pagina = 0;
   const repetidos = contexto(async () => pagina++ === 0 ? resposta(["A", "B"], "2", 3) : resposta(["B", "C"], null, 3));

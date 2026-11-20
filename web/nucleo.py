@@ -11,6 +11,7 @@ import ipaddress
 import json
 import os
 import re
+import signal
 import sys
 import urllib.parse
 
@@ -22,17 +23,18 @@ from core import consultas
 from core import painel_status
 from core import geo
 from core import governanca
+from core import dump_radares, politica_acesso
 from core.serializers import serialize, is_valido, FORMATOS
 from core.serializers import campos, txt_ser, json_ser, xml_ser, edifact_ser, dif_ser
 
 _cls_txt = txt_ser
 
 STATUS_REASON = {
-    200: "OK", 201: "Created", 202: "Accepted", 400: "Bad Request", 401: "Unauthorized",
+    200: "OK", 201: "Created", 202: "Accepted", 304: "Not Modified", 400: "Bad Request", 401: "Unauthorized",
     403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed",
     409: "Conflict", 413: "Payload Too Large", 422: "Unprocessable Entity",
     429: "Too Many Requests", 503: "Service Unavailable",
-    500: "Internal Server Error",
+    500: "Internal Server Error", 504: "Gateway Timeout",
 }
 
 
@@ -64,8 +66,8 @@ PARAMS = [
     ("sentido", "string", False, "codigo cadastrado", "sentido"),
     ("em", "datetime", False, "ISO8601", "instante de referencia temporal"),
     ("ponto_id", "string", False, "P-<n>", "filtra /api/v1/trafego por ponto"),
-    ("limite", "inteiro", False, "1..1000", "itens por pagina (padrao 100)"),
-    ("cursor", "string", False, "opaco", "cursor estavel de paginacao"),
+    ("limite", "inteiro", False, "1..200", "itens por pagina (padrao 100, limitado pela instancia)"),
+    ("cursor", "inteiro", False, ">=0", "acima do limite público exige X-Radar-Leitura"),
     ("depois", "inteiro", False, ">=0", "ultimo ID numerico exibido no status do estado"),
     ("versao_esquema", "string", False, "string", "versao de contrato"),
 ]
@@ -74,6 +76,7 @@ ENDPOINTS_AJUDA = {
     "/api/v1/intercambio/identidade": ["GET"],
     "/api/v1/intercambio/trocar": ["POST"],
     "/api/v1/interface": ["GET"],
+    "/api/v1/radares/download": ["GET", "HEAD"],
     "/api/v1/status/estados": ["GET"],
     "/api/v1/status/estados/{uf}": ["GET"],
     "/api/v1/status/coletores": ["GET"],
@@ -133,20 +136,21 @@ ENDPOINTS_ADMINISTRATIVOS = {
 }
 
 ENDPOINTS_DESC = {
-    "/api/v1/intercambio/identidade": "Identidade e limites publicos da rede; exige cabecalho X-Interchange-Info e token se configurado.",
+    "/api/v1/intercambio/identidade": "Identidade e limites da rede; exige X-Interchange-Info e token da rede.",
     "/api/v1/intercambio/trocar": "Registro automatico e troca bidirecional de um lote; negocia intervalo e pausas; dados recebidos aguardam validacao local.",
     "/api/v1/interface": "Limites publicos de altura do mapa definidos no radar.conf, sem acesso ao banco.",
     "/api/v1/atualizacoes/status": "Relatorio consolidado das atualizacoes, em JSON e sem acesso ao banco.",
     "/api/v1/status/estados": "Contagem de pontos unicos nas 27 UFs por esfera de fiscalizacao; inclui nao classificados.",
     "/api/v1/status/estados/{uf}": "Detalhes da cobertura por UF, municipios, orgaos, fontes e pontos paginados.",
-    "/api/v1/status/coletores": "Todos os leitores, inclusive nunca executados; ultima tentativa, ultimo sucesso, erros e URLs configuradas.",
+    "/api/v1/status/coletores": "Diagnóstico dos leitores; exige sessão ou token de moderador.",
+    "/api/v1/radares/download": "Arquivo diário radares.json.gz com ETag e Last-Modified.",
     "/api/v1/gestao/radar/{id}/cruzar": "Recruza contribuicao ativa, inclusive verificada, com fontes oficiais locais; gera sugestoes auditadas.",
     "/api/v1/gestao/cruzamentos": "Recruza contribuicoes ativas em lotes de ate 20, com cursor e teto por ID; exige moderador.",
     "/api/v1/radares": "Pontos de fiscalizacao (radar instalado) num raio.",
     "/api/v1/radares/submeter": ("Submissao PUBLICA de radar (sem token): "
                                   "entra como colaborativo/nao verificado e "
                                   "publica na hora; Prefer: respond-async recebe em fila duravel e retorna 202 com protocolo."),
-    "/api/v1/radares/envios/{protocolo}": "Andamento do envio em fila; nao expoe payload, contato ou IP.",
+    "/api/v1/radares/envios/{protocolo}": "Andamento do envio; exige autorização por User-Agent e IP, ou sessão de moderador.",
     "/api/v1/radares/{id}/historico": ("Historico/auditoria PUBLICO de um "
                                         "ponto: quem, quando, tipo, motivo."),
     "/api/v1/login": "Login do painel -> sessao (cookie httpOnly).",
@@ -523,7 +527,14 @@ def _conn():
     path = config.DB_PATH
     if not dbmod.postgres_ativo() and not os.path.exists(path):
         return None
-    return dbmod.connect(path)
+    conn = dbmod.connect(path)
+    try:
+        if dbmod.e_postgres(conn):
+            conn.execute("SELECT set_config('statement_timeout', ?, false)", (str(politica_acesso.timeout() * 1000),))
+    except BaseException:
+        conn.close()
+        raise
+    return conn
 
 
 def _headers_radar(meta, status_code):
@@ -950,9 +961,9 @@ def _gestao(conn, p, metodo, environ, stdin_bytes):
             governanca.exigir(ctx, "contribuidor")
             params = _consulta_params(environ)
             try:
-                limite = int(params.get("limite", config.DEFAULT_LIMITE))
+                limite = int(params.get("limite", politica_acesso.limite_padrao()))
             except (TypeError, ValueError):
-                return _erro(422, "limite_invalido", "limite inteiro 1..1000")
+                return _erro_limite()
             pontos, meta = governanca.listar_pendentes(
                 conn, limite, params.get("cursor"), params.get("status"))
             return _resp({"sucesso": True, "pendentes": pontos,
@@ -1112,27 +1123,146 @@ def _gestao(conn, p, metodo, environ, stdin_bytes):
     return _erro(404, "rota_desconhecida", "rota de gestao nao encontrada")
 
 
+def _tem_credencial(environ):
+    return any((environ.get("HTTP_X_API_TOKEN"), environ.get("HTTP_X_SESSAO"),
+                governanca._cookie(environ, governanca.COOKIE_SESSAO)))
+
+
+def _exigir_equipe(conn, environ):
+    governanca.exigir(governanca.contexto_autenticacao(conn, environ), "moderador")
+
+
+def _erro_bloqueio(status):
+    status, headers, body = _erro(status, "acesso_limitado", "Consulte a política de uso desta instância.")
+    body["erro"]["politica_url"] = politica_acesso.url_politica()
+    if status == 429:
+        headers["Retry-After"] = "60"
+    return status, headers, body
+
+
+def _acesso_publico(rota, metodo, environ, params):
+    categoria = politica_acesso.categoria_rota(rota)
+    if rota in politica_acesso.ROTAS_PAGINADAS and metodo in ("GET", "POST"):
+        limite = _param_limite(params)
+        if limite is None:
+            return _erro_limite()
+        try:
+            bruto = params.get("cursor")
+            if bruto is not None and type(bruto) not in (str, int):
+                raise ValueError()
+            cursor = int(bruto or 0)
+            if cursor < 0 or cursor >= 2**63:
+                raise ValueError()
+        except (ValueError, TypeError, OverflowError):
+            return _erro(422, "cursor_invalido", "Informe um cursor inteiro não negativo.", "cursor")
+    elif categoria in politica_acesso.ROTAS_REGRAS and metodo in ("GET", "HEAD", "POST"):
+        limite = cursor = 0
+    else:
+        return None
+    endereco = _ip_requisicao(environ)
+    agente = environ.get("HTTP_USER_AGENT")
+    liberado = False
+    if categoria in politica_acesso.ROTAS_REGRAS:
+        try:
+            liberado = politica_acesso.liberado(categoria, endereco, agente)
+            bloqueio = None if liberado else politica_acesso.bloqueio(categoria, endereco, agente, limite, cursor)
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return _erro(503, "politica_indisponivel", "Política de acesso temporariamente indisponível.")
+        if bloqueio:
+            return _erro_bloqueio(bloqueio)
+    chave_valida = rota in politica_acesso.ROTAS_PAGINADAS and politica_acesso.chave_leitura_valida(environ)
+    if cursor > politica_acesso.cursor_publico() and not chave_valida:
+        url = politica_acesso.url_dump()
+        status, headers, body = _erro(401, "chave_leitura_obrigatoria",
+                                     "A paginação profunda exige X-Radar-Leitura. Baixe o arquivo diário em " + url,
+                                     "cursor")
+        headers["Link"] = '<' + url + '>; rel="alternate"; type="application/gzip"'
+        body["erro"]["download_url"] = url
+        return status, headers, body
+    if not liberado and rota in politica_acesso.ROTAS_BUSCA:
+        try:
+            espera = politica_acesso.excesso_paginas(environ, endereco, limite, chave_valida)
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            print(f"Falha no contador de acesso: {type(exc).__name__}", file=sys.stderr)
+            return _erro(503, "politica_indisponivel", "Política de acesso temporariamente indisponível.")
+        if espera:
+            status, headers, body = _erro(429, "cota_paginacao", "Limite temporário de páginas grandes atingido.")
+            headers["Retry-After"] = str(espera)
+            body["erro"]["download_url"] = politica_acesso.url_dump()
+            return status, headers, body
+    return None
+
+
+def _relatorio_atualizacoes():
+    from core import atualizacoes, caminhos
+    from pathlib import Path
+    try:
+        estado = json.loads(Path(caminhos.status_atualizacoes()).read_text())
+    except FileNotFoundError:
+        estado = {"versao_esquema": 1, "operacoes": {}, "fontes": {}}
+    except (OSError, ValueError):
+        return _erro(503, "relatorio_indisponivel", "O relatório de atualizações está indisponível.")
+    return _resp(atualizacoes.limpar(estado))
+
+
 def handle_request(environ, stdin_bytes=b""):
     metodo = environ.get("REQUEST_METHOD", "GET").upper()
     caminho = _rota(environ)
-    # Recebimento rapido e andamento nao dependem de SQLite, nem quando ha lock.
-    envio = re.fullmatch(r"/api/v1/radares/envios/(.*)", caminho)
-    assincrono = caminho == "/api/v1/radares/submeter" and "respond-async" in environ.get("HTTP_PREFER", "").lower()
-    if envio or assincrono:
-        from core import fila_cadastros
-        if metodo != ("GET" if envio else "POST"):
-            return _erro(405, "metodo_nao_permitido", "Metodo nao permitido para este envio.")
+    rota = caminho.rstrip("/") or "/"
+    equipe = rota in ("/api/v1/status/coletores", "/api/v1/atualizacoes/status")
+    gestao = rota == "/api/v1/gestao" or rota.startswith("/api/v1/gestao/")
+    recebimentos = rota == politica_acesso.ROTA_ENVIOS or rota.startswith(politica_acesso.ROTA_ENVIOS + "/")
+    consulta_liberada = False
+    if recebimentos:
         try:
-            if envio:
-                resultado = fila_cadastros.consultar(envio.group(1))
-                return _resp({"sucesso": True, "resultado": resultado}, extra_headers={"Cache-Control":"no-store"})
+            consulta_liberada = politica_acesso.liberado(
+                politica_acesso.ROTA_ENVIOS, _ip_requisicao(environ), environ.get("HTTP_USER_AGENT"))
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+    if (equipe or gestao or rota == "/api/v1/minha-senha" or (recebimentos and not consulta_liberada)) and not _tem_credencial(environ):
+        return _erro(401, "autenticacao_obrigatoria", "Informe uma credencial válida para esta rota.")
+    if rota == "/api/v1/intercambio" or rota.startswith("/api/v1/intercambio/"):
+        from core import traseiro
+        try:
+            traseiro.autenticar(environ)
+        except governanca.GovernancaError as exc:
+            return _gov_erro(exc)
+
+    # Recebimento e consultas previamente autorizadas usam a fila durável.
+    assincrono = rota == "/api/v1/radares/submeter" and "respond-async" in environ.get("HTTP_PREFER", "").lower()
+    if recebimentos or assincrono:
+        from core import fila_cadastros
+        if metodo != ("GET" if recebimentos else "POST"):
+            return _erro(405, "metodo_nao_permitido", "Método não permitido para este envio.")
+        try:
+            if recebimentos:
+                if not consulta_liberada:
+                    conn = _conn()
+                    if conn is None:
+                        return _erro(503, "snapshot_indisponivel", "Banco local indisponível.")
+                    try:
+                        _exigir_equipe(conn, environ)
+                    finally:
+                        conn.close()
+                    try:
+                        bloqueio = politica_acesso.bloqueio(politica_acesso.ROTA_ENVIOS,
+                            _ip_requisicao(environ), environ.get("HTTP_USER_AGENT"), 0, 0)
+                    except ValueError as exc:
+                        print(str(exc), file=sys.stderr)
+                        return _erro(503, "politica_indisponivel", "Política de acesso temporariamente indisponível.")
+                    if bloqueio:
+                        return _erro_bloqueio(bloqueio)
+                protocolo = rota.removeprefix(politica_acesso.ROTA_ENVIOS).lstrip("/")
+                resultado = fila_cadastros.consultar(protocolo)
+                return _resp({"sucesso": True, "resultado": resultado})
             if (environ.get("CONTENT_TYPE", "").split(";")[0].strip() != "application/json" or
                     environ.get("HTTP_SEC_FETCH_SITE") == "cross-site"):
-                return _erro(403, "origem_invalida", "Envie JSON pelo formulario de cadastro.")
+                return _erro(403, "origem_invalida", "Envie JSON pelo formulário de cadastro.")
             resultado = fila_cadastros.receber(_corpo_json(stdin_bytes), {
                 "ip": _ip_requisicao(environ), "user_agent": environ.get("HTTP_USER_AGENT"), "quando": _agora()})
             return _resp({"sucesso": True, "resultado": resultado}, 202, {
-                "Cache-Control":"no-store", "Preference-Applied":"respond-async", "Location":resultado["consulta_url"]})
+                "Preference-Applied": "respond-async", "Location": resultado["consulta_url"]})
         except governanca.GovernancaError as exc:
             return _gov_erro(exc)
     # escrita autenticada ANTES do parsing de consulta (corpo pode ser array)
@@ -1156,6 +1286,19 @@ def handle_request(environ, stdin_bytes=b""):
     except ValueError as exc:
         return _erro(400, "delimitador_invalido", str(exc), campo="delimitador")
 
+    recusada = _acesso_publico(rota, metodo, environ, params)
+    if recusada is not None:
+        return recusada
+    if rota == politica_acesso.ROTA_DUMP:
+        if metodo not in ("GET", "HEAD"):
+            return _erro(405, "metodo_nao_permitido", "Use GET ou HEAD para baixar o arquivo diário.")
+        try:
+            return dump_radares.download(environ, metodo)
+        except FileNotFoundError:
+            status, headers, body = _erro(503, "dump_indisponivel", "A primeira cópia diária ainda está em preparação.")
+            headers["Retry-After"] = "900"
+            return status, headers, body
+
     # --- endpoints sem banco -------------------------------------------------
     if caminho.rstrip('/') == '/api/v1/interface':
         if metodo != 'GET':
@@ -1166,21 +1309,12 @@ def handle_request(environ, stdin_bytes=b""):
         limites = {'mapa_min_percentual': (10, 90), 'mapa_min_altura_px': (120, 600)}
         resultado = {chave: max(minimo, min(maximo, caminhos.inteiro('interface', chave)))
                      for chave, (minimo, maximo) in limites.items()}
+        resultado.update(limite_consulta=politica_acesso.limite(), cursor_publico_max=politica_acesso.cursor_publico(),
+                         timeout_consulta_segundos=politica_acesso.timeout(),
+                         politica_url=politica_acesso.url_politica(),
+                         download={"url": politica_acesso.url_dump(), "nome": dump_radares.NOME,
+                                   "disponivel": dump_radares.disponivel(), "periodicidade": "diária"})
         return _resp({'sucesso': True, 'resultado': resultado})
-    if caminho.rstrip('/') == '/api/v1/atualizacoes/status':
-        if metodo != 'GET':
-            return _erro(405, 'metodo_nao_permitido', 'Use GET para consultar o relatorio.')
-        if formato != 'json':
-            return _erro(400,'formato_invalido','O relatorio de atualizacoes usa JSON.')
-        from core import atualizacoes, caminhos
-        from pathlib import Path
-        try:
-            estado=json.loads(Path(caminhos.status_atualizacoes()).read_text())
-        except FileNotFoundError:
-            estado={'versao_esquema':1,'operacoes':{},'fontes':{}}
-        except (OSError, ValueError):
-            return _erro(503,'relatorio_indisponivel','O relatorio de atualizacoes esta indisponivel.')
-        return _resp(atualizacoes.limpar(estado))
     if caminho in ("/api/v1/ajuda", "/api/v1/ajuda/"):
         estrutura = ajuda_estrutura()
         try:
@@ -1216,6 +1350,17 @@ def handle_request(environ, stdin_bytes=b""):
                      "banco local ausente ou nao inicializado")
 
     try:
+        if equipe:
+            try:
+                _exigir_equipe(conn, environ)
+            except governanca.GovernancaError as exc:
+                return _gov_erro(exc)
+            if rota == "/api/v1/atualizacoes/status":
+                if metodo != "GET":
+                    return _erro(405, "metodo_nao_permitido", "Use GET para consultar o relatório.")
+                if formato != "json":
+                    return _erro(400, "formato_invalido", "O relatório de atualizações usa JSON.")
+                return _relatorio_atualizacoes()
         from web.traseiro import atender as atender_traseiro
         mesh = atender_traseiro(conn, caminho.rstrip('/'), metodo, environ, stdin_bytes)
         if mesh is not None:
@@ -1239,7 +1384,7 @@ def handle_request(environ, stdin_bytes=b""):
                     if depois < 0 or limite is None:
                         raise ValueError()
                 except (TypeError, ValueError):
-                    return _erro(422, "paginacao_invalida", "limite 1..1000 e depois inteiro nao negativo.")
+                    return _erro(422, "paginacao_invalida", f"limite 1..{politica_acesso.limite()} e depois inteiro não negativo.")
                 if uf is not None and uf not in painel_status.NOMES:
                     return _erro(422, "uf_invalida", "Informe uma das 27 siglas de UF.")
                 resultado = painel_status.cobertura(conn, uf, limite, depois)
@@ -1285,7 +1430,7 @@ def handle_request(environ, stdin_bytes=b""):
                              "metodo %s nao permitido" % metodo)
             return _atualizacoes(conn, params, formato, delimitador)
 
-        if caminho.startswith("/api/v1/equipamentos"):
+        if caminho == "/api/v1/equipamentos" or caminho.startswith("/api/v1/equipamentos/"):
             if metodo != "GET":
                 return _erro(405, "metodo_nao_permitido",
                              "metodo %s nao permitido" % metodo)
@@ -1307,7 +1452,7 @@ def handle_request(environ, stdin_bytes=b""):
                              "metodo %s nao permitido" % metodo)
             return _busca(conn, params, formato, delimitador)
 
-        if caminho.startswith("/api/v1/radares"):
+        if caminho == "/api/v1/radares" or caminho.startswith("/api/v1/radares/"):
             resto = caminho[len("/api/v1/radares"):].strip("/")
             if resto:
                 return _ponto(conn, resto, formato, delimitador)
@@ -1338,12 +1483,9 @@ def _radares(conn, params, formato, delimitador):
                      "raio inteiro " + config.RAIO_FAIXA_TXT)
     if raio < config.MIN_RAIO or raio > config.MAX_RAIO:
         return _erro(422, "raio_invalido", "raio " + config.RAIO_FAIXA_TXT)
-    try:
-        limite = int(params.get("limite", config.DEFAULT_LIMITE))
-    except (TypeError, ValueError):
-        return _erro(422, "limite_invalido", "limite inteiro 1..1000")
-    if limite < config.MIN_LIMITE or limite > config.MAX_LIMITE:
-        return _erro(422, "limite_invalido", "limite 1..1000")
+    limite = _param_limite(params)
+    if limite is None:
+        return _erro_limite()
 
     filtros = {}
     if params.get("uf"):
@@ -1379,6 +1521,7 @@ def _radares(conn, params, formato, delimitador):
         operacoes.extend(registro.get("operacoes") or [])
     res["operacoes"] = operacoes
     res["total_operacoes"] = len(operacoes)
+    res["cursor_publico_max"] = politica_acesso.cursor_publico()
     ##-- BUNDITA DE URSO #{10} -- Encontrar um ponto nao comprova cobertura completa do territorio. ##
     res["status"] = "parcial" if res["total_pontos"] else "sem_cobertura"
     res["encontrado"] = bool(res["total_pontos"])
@@ -1498,12 +1641,19 @@ def _param_raio(params):
     return raio
 
 
+def _erro_limite():
+    return _erro(422, "limite_invalido", f"limite deve ser inteiro de 1 a {politica_acesso.limite()}.", "limite")
+
+
 def _param_limite(params):
+    valor = params.get("limite", politica_acesso.limite_padrao())
+    if type(valor) not in (str, int):
+        return None
     try:
-        limite = int(params.get("limite", config.DEFAULT_LIMITE))
+        limite = int(valor)
     except (TypeError, ValueError):
         return None
-    if limite < config.MIN_LIMITE or limite > config.MAX_LIMITE:
+    if limite < config.MIN_LIMITE or limite > politica_acesso.limite():
         return None
     return limite
 
@@ -1545,7 +1695,7 @@ def _busca(conn, params, formato, delimitador):
         return _erro(422, "parametro_invalido", str(exc))
     limite = _param_limite(params)
     if limite is None:
-        return _erro(422, "limite_invalido", "limite inteiro 1..1000")
+        return _erro_limite()
     records, res = consultas.buscar_cadastral(
         conn, filtros, limite, params.get("cursor"))
     st = consultas.metadados_base(conn)
@@ -1573,7 +1723,7 @@ def _busca(conn, params, formato, delimitador):
 def _trafego(conn, params, formato, delimitador):
     limite = _param_limite(params)
     if limite is None:
-        return _erro(422, "limite_invalido", "limite inteiro 1..1000")
+        return _erro_limite()
     ponto_id = None
     if params.get("ponto_id"):
         try:
@@ -1612,7 +1762,7 @@ def _trechos(conn, params, formato, delimitador):
             filtros[nome] = str(params[nome])
     limite = _param_limite(params)
     if limite is None:
-        return _erro(422, "limite_invalido", "limite inteiro 1..1000")
+        return _erro_limite()
     lat, lon, raio, erro = _coord(params)
     if erro is not None:
         return erro
@@ -1647,7 +1797,7 @@ def _operacoes(conn, params, formato, delimitador):
         filtros["em"] = str(params["em"])
     limite = _param_limite(params)
     if limite is None:
-        return _erro(422, "limite_invalido", "limite inteiro 1..1000")
+        return _erro_limite()
     lat, lon, raio, erro = _coord(params)
     if erro is not None:
         return erro
@@ -1708,7 +1858,7 @@ def _atualizacoes(conn, params, formato, delimitador):
                          campo="fonte_id")
     limite = _param_limite(params)
     if limite is None:
-        return _erro(422, "limite_invalido", "limite inteiro 1..1000")
+        return _erro_limite()
     records, res = consultas.listar_atualizacoes(
         conn, filtros, limite, params.get("cursor"))
     snaps = consultas.listar_snapshots(conn)
@@ -1748,35 +1898,63 @@ def _fonte_id(conn, ident, formato, delimitador):
 # Entry point CGI
 # ---------------------------------------------------------------------------
 def _emitir(status, headers, corpo):
-    if isinstance(corpo, (dict, list)):
-        corpo = json.dumps(corpo, ensure_ascii=False, separators=(",", ":"),
-                           default=str)
-    if isinstance(corpo, str):
-        corpo_b = corpo.encode("utf-8")
-    else:
-        corpo_b = corpo
+    corpo = _codificar(corpo)
     reason = STATUS_REASON.get(status, "OK")
     out = sys.stdout.buffer
     out.write(("Status: %d %s\r\n" % (status, reason)).encode("ascii"))
     for k, v in headers.items():
         out.write(("%s: %s\r\n" % (k, v)).encode("utf-8"))
-    out.write(("Content-Length: %d\r\n" % len(corpo_b)).encode("ascii"))
+    if "Content-Length" not in headers and status != 304:
+        out.write(("Content-Length: %d\r\n" % len(corpo)).encode("ascii"))
     out.write(b"\r\n")
-    out.write(corpo_b)
+    if isinstance(corpo, dump_radares.Conteudo):
+        corpo.copiar(out)
+    else:
+        out.write(corpo)
     out.flush()
+
+
+def _codificar(corpo):
+    if isinstance(corpo, (dict, list)):
+        corpo = json.dumps(corpo, ensure_ascii=False, separators=(",", ":"), default=str)
+    return corpo.encode("utf-8") if isinstance(corpo, str) else corpo
+
+
+class _PrazoConsulta(BaseException):
+    pass
+
+
+def _esgotar_prazo(_sinal, _frame):
+    raise _PrazoConsulta()
 
 
 def main(environ=None):
     environ = environ if environ is not None else os.environ
+    anterior = signal.signal(signal.SIGALRM, _esgotar_prazo)
     try:
-        n = int(environ.get("CONTENT_LENGTH") or 0)
-    except ValueError:
-        n = 0
-    stdin_bytes = sys.stdin.buffer.read(n) if n > 0 else b""
-    try:
-        status, headers, corpo = handle_request(environ, stdin_bytes)
+        signal.setitimer(signal.ITIMER_REAL, politica_acesso.timeout())
+        try:
+            n = int(environ.get("CONTENT_LENGTH") or 0)
+        except ValueError:
+            n = 0
+        if n > config.API_MAX_BODY:
+            status, headers, corpo = _erro(413, "corpo_grande", "Requisição excede o tamanho permitido.")
+        else:
+            stdin_bytes = sys.stdin.buffer.read(n) if n > 0 else b""
+            status, headers, corpo = handle_request(environ, stdin_bytes)
+        corpo = _codificar(corpo)
+    except _PrazoConsulta:
+        status, headers, corpo = _erro(504, "prazo_excedido", "A consulta excedeu o prazo do servidor. Reduza o recorte e tente novamente.")
     except Exception as exc:                       # noqa: BLE001
-        status, headers, corpo = _erro(500, "erro_interno", str(exc))
+        if getattr(exc, "sqlstate", None) == "57014":
+            status, headers, corpo = _erro(504, "prazo_excedido", "A consulta excedeu o prazo do servidor.")
+        else:
+            import traceback
+            traceback.print_exc()
+            status, headers, corpo = _erro(500, "erro_interno", "Erro ao atender a requisição.")
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, anterior)
     _emitir(status, headers, corpo)
 
 

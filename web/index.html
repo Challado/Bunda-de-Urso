@@ -172,6 +172,7 @@
 <footer class="rodape-site">
   <nav aria-label="Links do projeto">
     <a href="https://github.com/Challado/Bunda-de-Urso" target="_blank" rel="noopener noreferrer">Código no GitHub</a>
+    <a href="politica-de-uso.html">Política de uso</a>
     <a href="https://servidor.lucas.inf.br/site/contato" target="_blank" rel="noopener noreferrer">Contato</a>
   </nav>
 </footer>
@@ -510,6 +511,9 @@
         var proximo = res.proximo_cursor;
         if (proximo != null && proximo !== ""){
           proximo = String(proximo);
+          if (res.cursor_publico_max != null && Number(proximo) > res.cursor_publico_max){
+            return {meta: res, pontos: pontos, documento: d};
+          }
           if (cursores.has(proximo)) throw new Error("A consulta repetiu uma página e ficou incompleta.");
           cursores.add(proximo);
           return pagina(proximo);
@@ -540,7 +544,7 @@
     enquadrar(lat, lon, raio);
     var url = API + "?rota=" + encodeURIComponent("/api/v1/radares") +
       "&lat=" + encodeURIComponent(lat) + "&lon=" + encodeURIComponent(lon) +
-      "&raio=" + encodeURIComponent(raio) + "&formato=json&limite=1000";
+      "&raio=" + encodeURIComponent(raio) + "&formato=json";
     return carregarPaginas(url, function(res, pontos){
       if (numero !== numeroConsulta) return;
       render(res, pontos);

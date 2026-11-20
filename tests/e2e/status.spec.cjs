@@ -1,6 +1,19 @@
 const {test,expect}=require('./fixtures.cjs');
 const {validarCaixasStatus}=require('./caixas-status.cjs');
 
+test.use({comGestao:true});
+test.beforeEach(async({page,credenciaisGestao})=>{
+  const r=await page.request.post('api.pse?rota=/api/v1/login',{data:credenciaisGestao});
+  expect(r.status()).toBe(200);
+});
+
+test('status público mostra a entrada de moderação para o histórico',async({page})=>{
+  await page.context().clearCookies();
+  await page.goto('status.html');
+  await expect(page.locator('#estados tr')).toHaveCount(27);
+  await expect(page.getByRole('link',{name:/entre no painel como moderador/i})).toBeVisible();
+});
+
 test('status: 27 UFs, detalhes em nova aba, leitores e recolhimento',async({page})=>{
   await page.goto('status.html');
   await expect(page.locator('#estados tr')).toHaveCount(27);

@@ -86,6 +86,7 @@ class TestRaizWeb(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertTrue((self.web/'index.html').is_file())
         self.assertTrue((self.web/'gestao.html').is_file())
+        self.assertTrue((self.web/'politica-de-uso.html').is_file())
         self.assertFalse(list((self.web/'resources').glob('*.html')))
         self.assertTrue((self.web/'resources/bunda-de-urso.png').is_file())
         self.assertEqual(json.loads((self.web/'projeto.json').read_text())['url'], '/radar/')
@@ -197,7 +198,8 @@ class TestRaizWeb(unittest.TestCase):
         self.assertNotIn('runuser',novo)
         self.assertIn('env -u RADAR_BRASIL_HOME',novo)
         self.assertIn('RADAR_CONF='+str(self.web/'radar.conf'),novo)
-        self.assertEqual(novo.count('# radar-raiz-web'),3)
+        self.assertEqual(novo.count('# radar-raiz-web'),4)
+        self.assertIn('cron dump # radar-raiz-web dump', novo)
         self.assertEqual(_cron(novo,self.web.parent,self.web,'www-data'),novo)
 
     def test_nginx_privado_idempotente_preserva_handler_cgi(self):
@@ -298,7 +300,7 @@ class TestRaizWeb(unittest.TestCase):
         self.assertEqual(estado,primeiro)
         self.assertEqual(estado['root'],'0 2 * * * /opt/outro-sistema\n')
         self.assertIn('15 * * * * /opt/tarefa-web',estado['www-data'])
-        self.assertEqual(estado['www-data'].count('# radar-raiz-web'),3)
+        self.assertEqual(estado['www-data'].count('# radar-raiz-web'),4)
         self.assertNotIn('runuser',estado['www-data'])
 
     def test_cron_do_servidor3_migra_ambos_e_preserva_sincronizadores(self):

@@ -20,13 +20,19 @@ from .contexto_api import operacao_local
 
 CAMINHOS = {("instalacao", "home"), ("dados", "dir"), ("sqlite", "banco"),
             ("web", "raiz"), ("logs", "dir"), ("sincronizacao", "clone"),
-            ("api", "token_arquivo"), ("geografia", "malha")}
+            ("api", "token_arquivo"), ("api", "chaves_leitura_arquivo"), ("geografia", "malha")}
 CAMINHOS.add(("assistente", "chave_arquivo"))
 CAMINHOS.add(("traseiro", "tokens_arquivo"))
 CAMINHOS.update({("postgres", "pgpass"), ("postgres", "certificado_ca")})
 NUMEROS = {**{("governanca", k): (1, 1000000000)
               for k in caminhos.SECOES["governanca"]},
            ("api", "max_body"): (1024, 67108864),
+           ("api", "limite_consulta"): (1, 200),
+           ("api", "cursor_publico_max"): (0, 100000),
+           ("api", "timeout_consulta"): (1, 60),
+           ("abuso", "janela_segundos"): (60, 86400),
+           ("abuso", "max_paginas_grandes"): (0, 10000),
+           ("abuso", "pagina_grande_min"): (1, 200),
            ("coleta", "max_bytes"): (1024, 1073741824),
            ("coleta", "timeout"): (1, 300),
            ("coleta", "tentativas"): (1, 10),
@@ -148,6 +154,13 @@ def _validar(valores):
         for u in filter(None,[efetivos['api_url']]+[s.strip() for s in efetivos['pares'].split(',')]):
             traseiro.url_publica(u,api=True)
     for par, texto in valores.items():
+        if par in (("abuso", "bloqueios"), ("abuso", "liberacoes")):
+            from .politica_acesso import ler_bloqueios, ler_liberacoes
+            try:
+                (ler_bloqueios if par[1] == "bloqueios" else ler_liberacoes)(texto)
+            except ValueError as exc:
+                _erro(422, "regras_abuso_invalidas", str(exc))
+            continue
         if par == ("consultas", "regras"):
             from coletor.politica_http import ler_regras
 
@@ -247,6 +260,7 @@ def _validar_destinos(alteracoes):
         _erro(422, "motor_invalido", "Use dados.motor=sqlite ou postgres.")
     operacionais = {("logs", "dir"): "logs",
                     ("api", "token_arquivo"): "api_token", ("assistente", "chave_arquivo"): "assistente_chave",
+                    ("api", "chaves_leitura_arquivo"): "chaves_leitura.sha256",
                     ("geografia", "malha"): "", ("sincronizacao", "clone"): ""}
     operacionais[('traseiro','tokens_arquivo')]='traseiro_tokens.json'
     if motor == "postgres":

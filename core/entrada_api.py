@@ -63,7 +63,7 @@ def _local(argumentos):
             from .configuracao import main as configurar
             return configurar(argumentos[1:])
         if argumentos[:1] == ["cron"]:
-            if argumentos[1:2] not in (["tick"], ["fila"], ["traseiro"]):
+            if argumentos[1:2] not in (["tick"], ["fila"], ["traseiro"], ["dump"]):
                 print("Operacao de cron desconhecida.", file=sys.stderr)
                 return 2
             from . import caminhos
@@ -75,6 +75,9 @@ def _local(argumentos):
                 os.dup2(log.fileno(), 2)
                 argumentos = (["fila", "processar"] if argumentos[1] == "fila" else
                               ["traseiro", "sincronizar"] if argumentos[1] == "traseiro" else argumentos[1:])
+        if argumentos == ["dump"]:
+            from .dump_radares import main as gerar_dump
+            return gerar_dump()
         if argumentos[:1] == ["traseiro"]:
             from .traseiro_console import main as traseiro
             return traseiro(argumentos[1:])

@@ -34,7 +34,7 @@ MIN_RAIO = 1
 MAX_RAIO = 1000000     # 1000 km: consulta/zoom de area ampla (era 50000 = 50 km)
 DEFAULT_LIMITE = 100
 MIN_LIMITE = 1
-MAX_LIMITE = 1000
+MAX_LIMITE = 200
 
 # Credencial de ingestao: somente o arquivo configurado, dentro de dados.dir.
 API_TOKEN_FILE_PADRAO = caminhos.token_arquivo()

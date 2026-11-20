@@ -17,6 +17,7 @@ from coletor.fontes.base_lwb import ColetorBaseLWB
 ROOT=Path(__file__).resolve().parents[1]
 RADAR={'latitude':-24.9556,'longitude':-53.4552,'velocidade_geral':80,'uf':'PR','via':'BR-277','km':580.5}
 ADMIN={'escopo':'admin','rotulo':'admin de teste'}
+TOKEN_REDE='teste-rede-'+'0'*32
 
 class No:
     def __init__(self,pasta,nome,**cfg):
@@ -25,6 +26,7 @@ class No:
         self.cfg={'habilitado':'1','acesso':'livre','intervalo_segundos':'1',**{k:str(v) for k,v in cfg.items()}}
         self.salvar()
         with self.ambiente():
+            tr.arquivo_tokens().write_text(json.dumps({'token_rede':TOKEN_REDE}))
             self.conn=db.connect(str(self.banco)); self.identidade=tr.identidade(self.conn)
     def salvar(self):
         self.conf.write_text('[instalacao]\nhome = '+str(ROOT)+'\n[dados]\ndir = '+str(self.dados)+'\nbanco = radar.sqlite3\n[logs]\ndir = logs\n[web]\norigem = https://'+self.nome+'.example.org\nurl = /openclaw/radar/\n[traseiro]\n'+'\n'.join(k+' = '+v for k,v in self.cfg.items())+'\n')
@@ -44,7 +46,9 @@ class No:
         with self.ambiente():
             raw=json.dumps(doc).encode() if doc is not None else b''
             env={'PATH_INFO':rota,'REQUEST_METHOD':metodo or ('POST' if doc is not None else 'GET'),'CONTENT_TYPE':'application/json','CONTENT_LENGTH':str(len(raw))}
-            if info:env['HTTP_X_INTERCHANGE_INFO']=tr.cabecalho(info)
+            if info:
+                env['HTTP_X_INTERCHANGE_INFO']=tr.cabecalho(info)
+                env['HTTP_AUTHORIZATION']='Bearer '+TOKEN_REDE
             env.update(headers or {})
             return nucleo.handle_request(env,raw)
     def fechar(self):self.conn.close()
@@ -99,6 +103,7 @@ class TestTraseiro(unittest.TestCase):
         self.assertEqual(s,401)
     def test_desativado_nao_aceita_pares_nem_faz_rede(self):
         self.a.cfg['habilitado']='0';self.a.salvar()
+        self.assertEqual(self.a.req('/api/v1/intercambio/identidade')[0],401)
         self.assertEqual(self.a.req('/api/v1/intercambio/identidade',info=self.b.info())[0],503)
         with self.a.ambiente(),atendimento_local():self.assertEqual(sync.executar(self.a.conn)['estado'],'desativado')
         self.assertEqual(self.chamadas,[])
@@ -257,7 +262,7 @@ class TestTraseiro(unittest.TestCase):
         self.b.publicar()
         def transporte(req,timeout):
             return self.rede(req.full_url,dados=json.loads(req.data),headers=dict(req.header_items()))
-        doc=cliente.consultar(self.b.info()['api_url'],info,transporte=transporte)
+        doc=cliente.consultar(self.b.info()['api_url'],info,token=TOKEN_REDE,transporte=transporte)
         self.assertEqual(doc['rede']['consultante']['aplicacao'],'Outro produto')
         self.assertEqual(doc['resultado']['eventos'],[]) # Nao envia tipo que o sistema nao aceita.
         self.assertGreater(doc['resultado']['cursor'],0)
@@ -269,7 +274,7 @@ class TestTraseiro(unittest.TestCase):
                 'revisao':1,'acao':'publicar','documento':RADAR}
         def transporte(req,timeout):
             return self.rede(req.full_url,dados=json.loads(req.data),headers=dict(req.header_items()))
-        doc=intercambio.consultar(self.b.info()['api_url'],info,eventos=[evento],transporte=transporte)
+        doc=intercambio.consultar(self.b.info()['api_url'],info,eventos=[evento],token=TOKEN_REDE,transporte=transporte)
         self.assertEqual(doc['resultado']['recebidos'],1)
         self.assertEqual(self.b.cadastro()['estado'],'pendente')
 

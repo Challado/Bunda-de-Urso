@@ -1778,3 +1778,21 @@ def buscar_cadastral(conn, filtros=None, limite=100, cursor=None):
     recs = _montar_pontos(conn, [(r, None) for r in rows], filtros.get("incluir_operacoes", True), visao, ufs)
     return recs, {"total_pontos": total, "retornados": len(recs),
                   "proximo_cursor": str(offset + limite) if offset + limite < total else None}
+
+
+def exportar_cadastral(conn, lote=200):
+    """Projeção pública do cadastro num único snapshot, incluindo inativos."""
+    clausulas, params = _filtros_extra({"incluir_inativos": True}, conn)
+    sql = _PONTO_SQL + (" WHERE " + " AND ".join(clausulas) if clausulas else "")
+    visao = VisaoCanonica(conn)
+    rows = dbmod.query_all(conn, sql + " ORDER BY p.id", params)
+    contexto = _contexto_canonico(conn, rows, visao)
+    pontos = {}
+    for row in rows:
+        row = _linha_canonica(conn, row, visao, contexto)
+        if row is not None:
+            pontos[row["ponto_id"]] = row
+    ids = sorted(pontos)
+    for inicio in range(0, len(ids), lote):
+        recorte = [(pontos[pid], None) for pid in ids[inicio:inicio + lote]]
+        yield from _montar_pontos(conn, recorte, True, visao, contexto[2])
