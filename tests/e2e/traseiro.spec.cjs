@@ -3,13 +3,17 @@ const {randomUUID}=require('node:crypto');
 test.use({comGestao:true,comTraseiro:true,processarFila:false});
 const rota=p=>'api.pse?rota='+encodeURIComponent(p);
 
-test('rede mesh separa pendentes, valida posicao e ensina fonte sem ativa-la automaticamente',async({page,request,credenciaisGestao},info)=>{
+test('rede mesh separa pendentes, valida posicao e ensina fonte sem ativa-la automaticamente',async({page,request,credenciaisGestao,tokenTraseiro},info)=>{
   const origem=randomUUID();
   const instancia={uuid:origem,nome:'Instância de teste',api_url:'https://remoto.example.org/api.pse',protocolo:{nome:'intercambio-instancias',versao:1},aplicacao:'Outro sistema de radares',capacidades:{tipos_evento:['radar.v1','fonte-coleta.v1']},
     configuracao:{intervalo_segundos:300,lote:100,max_bytes:2097152,parada_programada:false,parar_em_segundos:0,retornar_em_segundos:0,anuncio_id:null}};
-  const envio=await request.post(rota('/api/v1/intercambio/trocar'),{headers:{'X-Interchange-Info':Buffer.from(JSON.stringify(instancia)).toString('base64')},data:{depois:0,eventos:[{
+  const destino=rota('/api/v1/intercambio/trocar');
+  const dados={depois:0,eventos:[{
     uuid:randomUUID(),origem,tipo:'radar.v1',chave:'teste-1',revisao:1,acao:'publicar',documento:{latitude:-23.551,longitude:-46.63,uf:'SP',via:'Rua Teste',velocidade_geral:40}
-  }]}});
+  }]};
+  const infoInstancia={'X-Interchange-Info':Buffer.from(JSON.stringify(instancia)).toString('base64')};
+  expect((await request.post(destino,{headers:infoInstancia,data:dados})).status()).toBe(401);
+  const envio=await request.post(destino,{headers:{...infoInstancia,Authorization:'Bearer '+tokenTraseiro},data:dados});
   expect(envio.status()).toBe(200);
   await page.goto('gestao.html');
   await page.locator('#formLogin [name=login]').fill(credenciaisGestao.login);

@@ -34,7 +34,12 @@ def main():
                 if '--com-gestao' in sys.argv:
                     f.write('raiz = %s\n' % base)
                 if '--com-traseiro' in sys.argv:
-                    f.write('origem = https://local.example.org\nurl = /openclaw/radar/\n[traseiro]\nhabilitado = 1\nacesso = livre\nintervalo_segundos = 1\n')
+                    f.write('origem = https://local.example.org\nurl = /openclaw/radar/\n'
+                            '[traseiro]\nhabilitado = 1\nacesso = tokens\nintervalo_segundos = 1\n'
+                            'tokens_arquivo = traseiro_tokens.json\n')
+        if '--com-traseiro' in sys.argv:
+            (base / 'traseiro_tokens.json').write_text(
+                json.dumps({'entrada': [os.environ['RADAR_TEST_TRASEIRO_TOKEN']]}))
         ambiente = {k:v for k,v in os.environ.items() if not k.startswith(('RADAR_', 'OLLAMA_')) and
                     k not in ('REQUEST_METHOD','GATEWAY_INTERFACE','QUERY_STRING','PATH_INFO')}
         ambiente.update(RADAR_CONF=str(conf), PYTHONDONTWRITEBYTECODE='1')
