@@ -292,9 +292,10 @@ th,td {
 .grupo-leitores:not([open])>.filhos-leitores{display:none}
 .resumo-grupo{display:flex;flex-wrap:wrap;gap:5px;font-weight:400;margin-top:7px}
 .resumo-grupo .selo{margin:0}
-.resumo-grupo .filtro-erros-grupo{min-height:32px;border:1px solid #d88b83;text-decoration:underline;text-underline-offset:2px}
-.resumo-grupo .filtro-erros-grupo[aria-pressed="true"],
-#filtro-erros[aria-pressed="true"]{color:white;background:#972a24}
+.resumo-grupo .filtro-status-grupo{min-height:32px;border:1px solid currentColor;text-decoration:underline;text-underline-offset:2px}
+.resumo-grupo .filtro-status-grupo[hidden]{display:none}
+.resumo-grupo .filtro-status-grupo[aria-pressed="true"],
+#filtro-erros[aria-pressed="true"]{color:white;background:var(--azul)}
 .leitor>summary{background:white;font-size:15px}
 .leitor>summary>span:first-child{display:block;margin-bottom:6px}
 .leitor>summary .selo{margin-left:0}

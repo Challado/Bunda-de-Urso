@@ -283,6 +283,14 @@ test('status permite rolar estados, abrir detalhes e recolher leitores',async({p
   await acionar(resumo,info);
   await expect(page.locator('#filtro-leitores')).toBeVisible();
   await expect(page.locator('.estado-leitores')).toHaveCount(27);
+  const pendentes=page.locator('.territorio-federal > summary')
+    .getByRole('button',{name:/^\d+ pendentes$/});
+  await acionar(pendentes,info);
+  await expect(pendentes).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('.leitor:visible').first()).toHaveAttribute('data-categoria','pendentes');
+  await expect(page.locator('.leitor:visible:not([data-categoria="pendentes"])')).toHaveCount(0);
+  await acionar(page.getByRole('button',{name:'Limpar filtros'}),info);
+  await expect(pendentes).toHaveAttribute('aria-pressed','false');
   await page.locator('#filtro-leitores').fill('Fortaleza');
   const ce=page.locator('.estado-leitores[data-uf="CE"]');
   const municipio=ce.locator('.municipio-leitores[data-municipio="2304400"]');

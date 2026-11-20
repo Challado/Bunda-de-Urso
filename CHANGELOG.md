@@ -1,5 +1,9 @@
 # Histórico de alterações
 
+## Filtros das leituras no painel de status
+
+- Os contadores de leitores OK, com erro, pendentes e desativados filtram as caixas de cada grupo. A busca por UF, município, fonte ou situação combina com o contador selecionado. Limpar os filtros restaura a visualização anterior.
+
 ## Mapa oficial da STRANS Teresina
 
 - O leitor de Teresina descobre o KML na página vigente da STRANS e importa códigos, endereços, sentidos e coordenadas publicados. A troca preserva o histórico do leitor anterior.

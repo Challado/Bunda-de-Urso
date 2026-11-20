@@ -4,7 +4,7 @@
   const numero = n => new Intl.NumberFormat('pt-BR').format(n ?? 0);
   const quantidade = v => v == null ? 'Não informado' : numero(v);
   const nomes = {federal:'Federal',estadual:'Estadual / distrital',municipal:'Municipal',nao_classificado:'Sem classificação'};
-  const estadosLeitura = {documentado:'Documentação lida',ok:'Leitura OK',sem_mudanca:'Sem alteração',erro:'Erro na leitura',em_andamento:'Em andamento',interrompido:'Leitura interrompida',nunca_coletado:'Nunca lido'};
+  const estadosLeitura = {documentado:'Documentação lida',ok:'Leitura OK',sem_mudanca:'Sem alteração',erro:'Erro na leitura',em_andamento:'Em andamento',interrompido:'Leitura interrompida',nunca_coletado:'Nunca lido',sem_dados:'Leitura sem dados'};
   const situacoes = {ativo:'Ativo',inativo:'Inativo',manutencao:'Em manutenção',em_instalacao:'Em instalação',suspenso:'Suspenso',desconhecido:'Não informado'};
   const data = s => {
     if (!s) return 'Ainda não registrada';
@@ -61,11 +61,28 @@
   }
   const normalizar = texto => String(texto||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim();
   const chaveLeitor = r => r.id != null ? 'recurso:'+r.id : 'conector:'+r.conector+':'+r.fonte+':'+r.recurso;
-  const temErro = r => r.ativo && ['erro','interrompido'].includes(r.estado);
-  let filtroErros=null, haviaFiltro=false, aberturaAntesFiltro=new Map();
+  const categorias = [
+    ['ok','ok','OK','OK',['ok','leitura ok','leituras ok']],
+    ['erros','falha','com erro','com erro',['erro','erros','com erro','com erros','falha','falhas']],
+    ['pendentes','espera','pendente','pendentes',['pendente','pendentes','atenção']],
+    ['desativados','','desativado','desativados',['desativado','desativados','inativo','inativos']],
+  ];
+  const buscaPorSituacao=new Map(categorias.flatMap(([categoria,,,,termos])=>
+    termos.map(termo=>[normalizar(termo),categoria])));
+  let filtroStatus=null, haviaFiltro=false, aberturaAntesFiltro=new Map(), siglas=new Set();
+  function categoriaLeitor(r) {
+    if(!r.ativo)return 'desativados';
+    if(['erro','interrompido'].includes(r.estado))return 'erros';
+    if(['ok','sem_mudanca'].includes(r.estado)&&r.tipo_coleta!=='documental'&&
+        !r.leitura_atrasada&&!r.ultima_tentativa?.linhas_rejeitadas&&!r.erro_relatorio_coleta&&!r.atencao)return 'ok';
+    return 'pendentes';
+  }
   function aberturas(){return new Map([...$('coletores').querySelectorAll('details[data-chave]')].map(n=>[n.dataset.chave,n.open]));}
-  function alternarFiltroErros(chave) {
-    filtroErros=filtroErros===chave?null:chave;
+  function filtroSelecionado(categoria,grupo) {
+    return filtroStatus?.categoria===categoria&&filtroStatus.grupo===grupo;
+  }
+  function alternarFiltroStatus(categoria,grupo) {
+    filtroStatus=filtroSelecionado(categoria,grupo)?null:{categoria,grupo};
     filtrar();
   }
   function criarLeitor(r,local,prefixo){
@@ -77,7 +94,16 @@
         if(!r.ativo)s.append(el('span','Desativado','selo'));
         if(u?.linhas_rejeitadas>0)s.append(el('span','Com rejeições','selo espera'));
         if(r.leitura_atrasada)s.append(el('span','Leitura atrasada','selo espera'));
-        box.append(s);box.dataset.leitor=chaveLeitor(r);box.dataset.chave=prefixo+'/leitor:'+chaveLeitor(r);box._leitor=r;box.dataset.busca=[r.fonte,r.recurso,nomes[r.esfera],local?.uf,local?.nome_uf,local?.municipio,local?.municipio_ibge,estado,r.estado,r.status_integracao,r.descricao_coleta,documental?'cadastro pendente':'',!r.ativo?'desativado':'ativo',r.leitura_atrasada?'atrasada':''].join(' ');box.dataset.busca=normalizar(box.dataset.busca);
+        box.append(s);
+        box.dataset.leitor=chaveLeitor(r);
+        box.dataset.chave=prefixo+'/leitor:'+chaveLeitor(r);
+        box.dataset.categoria=categoriaLeitor(r);
+        box.dataset.uf=normalizar(local?.uf);
+        box.dataset.busca=normalizar([r.fonte,r.recurso,nomes[r.esfera],local?.uf,local?.nome_uf,
+          local?.municipio,local?.municipio_ibge,estado,r.estado,r.status_integracao,r.descricao_coleta,
+          documental?'cadastro pendente':'',!r.ativo?'desativado':'ativo',
+          r.leitura_atrasada?'leitura atrasada':'',u?.linhas_rejeitadas>0?'com rejeições':''].join(' '));
+        box._leitor=r;
         box.append(campos([['Esfera da fonte',nomes[r.esfera]||r.esfera],['Local da fonte',[local?.municipio,local?.nome_uf||local?.uf].filter(Boolean).join(' — ')||(r.esfera==='federal'?'Brasil — fonte federal':'Localização não informada')],['Última tentativa',data(u?.iniciada_em)],['Conclusão da tentativa',data(u?.terminada_em)],['Última leitura bem-sucedida',data(r.ultimo_sucesso?.terminada_em)],['Agendamento',!r.ativo?'Desativado':r.agendado?'Automático':'Fora da agenda automática'],['Intervalo entre leituras',r.intervalo_s ? numero(Math.round(r.intervalo_s/60))+' minutos' : 'Não informado'],['Integração',r.status_integracao],['Resposta HTTP',u?.http_status],['Tentativas',u?.tentativas],['Linhas recebidas',u?quantidade(u.linhas_recebidas):null],['Linhas rejeitadas',u?quantidade(u.linhas_rejeitadas):null],['Cadastros criados / alterados',u?quantidade(u.registros_criados)+' / '+quantidade(u.registros_alterados):null]]));
         const ul=el('ul',null,'urls');
         for(const [titulo,url] of [['Página da fonte',r.url_institucional],['Endereço da última tentativa (quando registrado)',r.url_ultima_tentativa],['Recurso cadastrado',r.url_recurso],['Endereço configurado para leitura',r.url_configurada]])if(url){const li=el('li');li.append(el('span',titulo+': '),link(url,url));ul.append(li);}
@@ -94,22 +120,22 @@
     const box=el('details',null,'grupo-leitores '+classe),s=el('summary');
     box.dataset.chave=chave;box.dataset.ordem=ordem;
     const resumo=el('span',null,'resumo-grupo');
-    const erros=el('button',null,'selo falha filtro-erros-grupo');
-    erros.type='button';
-    erros.title='Filtrar leitores com erro neste grupo';
-    erros.addEventListener('click',e=>{
-      e.preventDefault();
-      e.stopPropagation();
-      alternarFiltroErros(chave);
-    });
-    box._selos={
-      total:el('span',null,'selo'),
-      ok:el('span',null,'selo ok'),
-      erros,
-      pendentes:el('span',null,'selo espera'),
-      desativados:el('span',null,'selo'),
-    };
-    resumo.append(...Object.values(box._selos));
+    box._total=el('span',null,'selo');
+    resumo.append(box._total);
+    box._filtros=new Map();
+    for(const [categoria,classe,,rotulo] of categorias){
+      const botao=el('button',null,['selo','filtro-status-grupo',classe].filter(Boolean).join(' '));
+      botao.type='button';
+      botao.dataset.filtroStatus=categoria;
+      botao.title='Filtrar leitores '+rotulo+' neste grupo';
+      botao.addEventListener('click',e=>{
+        e.preventDefault();
+        e.stopPropagation();
+        alternarFiltroStatus(categoria,chave);
+      });
+      box._filtros.set(categoria,botao);
+      resumo.append(botao);
+    }
     s.append(el('span',titulo,'titulo-grupo'),resumo);
     box._corpo=el('div',null,'filhos-leitores');box._fontes=new Map();
     box.append(s,box._corpo);return box;
@@ -125,6 +151,7 @@
   }
   function montarLeitores(d){
     const abertas=aberturas();
+    siglas=new Set(d.estados.map(estado=>estado.uf.toLowerCase()));
     const brasil=grupo('federal','Federal — Brasil','territorio-federal');
     const estados=new Map(),municipios=new Map();
     for(const uf of d.estados){
@@ -173,37 +200,42 @@
     for(const n of $('coletores').querySelectorAll('details[data-chave]'))n.open=abertas.has(n.dataset.chave)?abertas.get(n.dataset.chave):n===brasil;
   }
   function resumirGrupo(g){
-    const leitores=new Map([...g.querySelectorAll('.leitor:not([hidden])')].map(n=>[n.dataset.leitor,n._leitor]));
-    const fontes=new Set();let ok=0,falhas=0,pendentes=0,desativados=0;
-    for(const r of leitores.values()){
-      fontes.add(r.fonte_id??r.fonte);
-      if(!r.ativo){desativados++;continue;}
-      if(temErro(r)){falhas++;continue;}
-      if(['ok','sem_mudanca'].includes(r.estado)&&r.tipo_coleta!=='documental'&&!r.leitura_atrasada&&!r.ultima_tentativa?.linhas_rejeitadas&&!r.erro_relatorio_coleta&&!r.atencao)ok++;
-      else pendentes++;
+    const leitores=new Set(),fontes=new Set();
+    const opcoes=new Map(categorias.map(([categoria])=>[categoria,new Set()]));
+    for(const item of g.querySelectorAll('.leitor')){
+      const {leitor,categoria}=item.dataset;
+      if(item._correspondeBusca)opcoes.get(categoria).add(leitor);
+      if(!item.hidden){
+        leitores.add(leitor);
+        fontes.add(item._leitor.fonte_id??item._leitor.fonte);
+      }
     }
-    const selos=g._selos;
-    selos.total.textContent=numero(fontes.size)+' fonte(s) · '+numero(leitores.size)+' leitor(es)';
-    selos.erros.setAttribute('aria-pressed',String(filtroErros===g.dataset.chave));
-    for(const [selo,n,texto] of [[selos.ok,ok,'OK'],[selos.erros,falhas,'com erro'],[selos.pendentes,pendentes,'pendente(s) / atenção'],[selos.desativados,desativados,'desativado(s)']]){
-      selo.hidden=n===0;
-      selo.textContent=n?numero(n)+' '+texto:'';
+    g._total.textContent=numero(fontes.size)+' fonte(s) · '+numero(leitores.size)+' leitor(es)';
+    for(const [categoria,,singular,plural] of categorias){
+      const botao=g._filtros.get(categoria),n=opcoes.get(categoria).size;
+      botao.setAttribute('aria-pressed',String(filtroSelecionado(categoria,g.dataset.chave)));
+      botao.hidden=n===0;
+      botao.textContent=n?numero(n)+' '+(n===1?singular:plural):'';
     }
     return leitores.size;
   }
   function filtrar() {
-    const termo=normalizar($('filtro-leitores').value).trim();
-    const buscaErros=['erro','com erro'].includes(termo);
-    const ativo=Boolean(termo||filtroErros);
-    if(ativo&&!haviaFiltro)aberturaAntesFiltro=aberturas();
+    const termo=normalizar($('filtro-leitores').value);
+    const situacaoBuscada=buscaPorSituacao.get(termo);
     const grupos=[...$('coletores').querySelectorAll('.grupo-leitores')];
-    const escopo=grupos.find(g=>g.dataset.chave===filtroErros);
+    const escopo=grupos.find(g=>g.dataset.chave===filtroStatus?.grupo);
+    if(filtroStatus&&!escopo)filtroStatus=null;
+    const ativo=Boolean(termo||filtroStatus);
+    if(ativo&&!haviaFiltro)aberturaAntesFiltro=aberturas();
     const visiveis=new Set(),todos=new Set();
     for(const item of $('coletores').querySelectorAll('.leitor')){
-      const corresponde=buscaErros||item.dataset.busca.includes(termo);
-      const estadoCorresponde=!(filtroErros||buscaErros)||temErro(item._leitor);
-      todos.add(item.dataset.leitor);item.hidden=!(corresponde&&estadoCorresponde&&(!filtroErros||escopo?.contains(item)));
-      if(!item.hidden)visiveis.add(item.dataset.leitor);
+      const {leitor,categoria,uf,busca}=item.dataset;
+      item._correspondeBusca=situacaoBuscada?categoria===situacaoBuscada:
+        siglas.has(termo)?uf===termo:busca.includes(termo);
+      todos.add(leitor);
+      item.hidden=!(item._correspondeBusca&&
+        (!filtroStatus||categoria===filtroStatus.categoria&&escopo.contains(item)));
+      if(!item.hidden)visiveis.add(leitor);
     }
     for(const grupo of grupos.reverse()){
       const n=resumirGrupo(grupo);grupo.hidden=ativo&&!n;
@@ -214,7 +246,8 @@
       for(const n of $('coletores').querySelectorAll('details[data-chave]'))n.open=aberturaAntesFiltro.get(n.dataset.chave)??n.classList.contains('territorio-federal');
     }
     haviaFiltro=ativo;
-    $('filtro-erros')?.setAttribute('aria-pressed',String(Boolean(filtroErros)));
+    $('filtro-erros').setAttribute('aria-pressed',String(filtroSelecionado('erros','federal')));
+    $('limpar-filtros').hidden=!ativo;
     $('sem-leitores').hidden=visiveis.size>0;
     $('sem-leitores').textContent=ativo?'Nenhum leitor corresponde ao filtro.':'Nenhum leitor disponível.';
     $('resumo-leitores').textContent=numero(visiveis.size)+' de '+numero(todos.size)+' leitores exibidos.';
@@ -280,9 +313,13 @@
       $('modo-leitores').textContent='Voltar ao status público';
     }
     $('filtro-leitores').addEventListener('input',filtrar);
-    $('filtro-erros')?.addEventListener('click',()=>{
-      filtroErros=filtroErros?null:'federal';
+    $('filtro-erros').addEventListener('click',()=>alternarFiltroStatus('erros','federal'));
+    $('limpar-filtros').addEventListener('click',()=>{
+      const busca=$('filtro-leitores');
+      busca.value='';
+      filtroStatus=null;
       filtrar();
+      busca.focus();
     });
     for(const [id,aberto] of [['expandir-leitores',true],['recolher-leitores',false]])$(id).addEventListener('click',()=>{
       for(const grupo of $('coletores').querySelectorAll('details:not([hidden])'))grupo.open=aberto;

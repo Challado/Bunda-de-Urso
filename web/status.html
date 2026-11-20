@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <title>Status do Radar Brasil — Radar Brasil</title>
-<link rel="stylesheet" href="resources/status.css?v=2">
-<script src="resources/status.js?v=3" defer>
+<link rel="stylesheet" href="resources/status.css?v=3">
+<script src="resources/status.js?v=4" defer>
 </script>
 <link rel="stylesheet" href="resources/navegacao.css">
 </head>
@@ -70,11 +70,12 @@
 </p>
 <label class="filtro">Filtrar leitores por estado, município, fonte ou situação<input type="search" id="filtro-leitores" placeholder="Ex.: Goiás, Recife, DNIT, erro">
 </label>
-<p id="resumo-leitores" class="suave">
+<p id="resumo-leitores" class="suave" role="status">
 </p>
-<p class="suave">As caixas se abrem uma dentro da outra: Federal — Brasil → estado → município → fonte → leitura. Clique no cabeçalho de cada caixa para abrir ou recolher. A ausência de fonte cadastrada não significa ausência de radares.</p>
+<p class="suave">Abra as caixas para navegar por estado, município e fonte. Clique em um contador para filtrar os leitores daquele grupo.</p>
 <div class="acoes-leitores">
 <button id="filtro-erros" type="button" aria-pressed="false">Só com erro</button>
+<button id="limpar-filtros" type="button" hidden>Limpar filtros</button>
 <button id="expandir-leitores" type="button">Expandir tudo</button>
 <button id="recolher-leitores" type="button">Recolher tudo</button>
 </div>

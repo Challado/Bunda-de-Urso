@@ -230,3 +230,97 @@ test('contadores de erro filtram a arvore e permitem restaurar a exibicao',async
   await expect(leitores).toHaveCount(2);
   await expect(filtro).toHaveAttribute('aria-pressed','true');
 });
+
+test('todos os contadores filtram os mesmos leitores que contam',async({page})=>{
+  const go={uf:'GO',nome_uf:'Goiás',municipio_ibge:'5208707',municipio:'Goiânia'};
+  const ce={uf:'CE',nome_uf:'Ceará',municipio_ibge:'2304400',municipio:'Fortaleza'};
+  const leitor=(id,recurso,ajustes={})=>({
+    id,recurso,fonte_id:101,fonte:'Agência Municipal',localidades:[go],
+    esfera:'municipal',ativo:true,agendado:true,estado:'ok',tipo_coleta:'cadastro',
+    ...ajustes,
+  });
+  const coletores=[
+    leitor(1,'Leitura normal'),
+    leitor(2,'Mesmo arquivo',{estado:'sem_mudanca'}),
+    leitor(3,'Falha estadual',{estado:'erro'}),
+    leitor(4,'Falha nacional',{estado:'interrompido',esfera:'federal',fonte:'Governo Federal',fonte_id:102,localidades:[]}),
+    leitor(5,'Edital publicado',{tipo_coleta:'documental',estado:'documentado'}),
+    leitor(6,'Edital sem alteração',{tipo_coleta:'documental',estado:'sem_mudanca'}),
+    leitor(7,'Leitor novo',{estado:'nunca_coletado',localidades:[go,ce]}),
+    leitor(8,'Leitor em andamento',{estado:'em_andamento'}),
+    leitor(9,'Leitor sem dados',{estado:'sem_dados'}),
+    leitor(10,'Leitor atrasado',{leitura_atrasada:true}),
+    leitor(11,'Leitor com rejeições',{ultima_tentativa:{linhas_rejeitadas:1}}),
+    leitor(12,'Leitor com atenção',{atencao:true}),
+    leitor(13,'Camada histórica',{estado:'erro',ativo:false}),
+  ];
+  const resultado={estados:[{uf:'CE',nome:'Ceará'},{uf:'GO',nome:'Goiás'}],coletores,total:coletores.length};
+  await page.route('**/api.pse?**',r=>new URL(r.request().url()).searchParams.get('rota')==='/api/v1/status/leituras'
+    ?r.fulfill({json:{sucesso:true,resultado}}):r.continue());
+  await page.goto('status.html');
+
+  const brasil=page.locator('.territorio-federal');
+  const goias=page.locator('.estado-leitores[data-uf="GO"]');
+  const busca=page.locator('#filtro-leitores');
+  const limpar=page.getByRole('button',{name:'Limpar filtros'});
+  const leitores=page.locator('.leitor:visible');
+  const botao=(grupo,nome)=>grupo.locator(':scope > summary').getByRole('button',{name:nome,exact:true});
+  const ids=()=>leitores.evaluateAll(itens=>[...new Set(itens.map(n=>Number(n.dataset.leitor.split(':')[1])))].sort((a,b)=>a-b));
+
+  for(const [nome,esperados] of [
+    ['1 desativado',[13]],['8 pendentes',[5,6,7,8,9,10,11,12]],['2 OK',[1,2]],['2 com erro',[3,4]],
+  ]){
+    const filtro=botao(brasil,nome);
+    await filtro.focus();
+    await filtro.press('Space');
+    await expect(filtro).toHaveAttribute('aria-pressed','true');
+    await expect.poll(ids).toEqual(esperados);
+    await expect(page.locator('#resumo-leitores')).toHaveText(`${esperados.length} de 13 leitores exibidos.`);
+    await filtro.click();
+    await expect(filtro).toHaveAttribute('aria-pressed','false');
+    await expect(goias).not.toHaveAttribute('open');
+  }
+
+  for(const [termo,esperados] of [
+    ['DESATIVADOS',[13]],['pendentes',[5,6,7,8,9,10,11,12]],['ok',[1,2]],['com erros',[3,4]],
+    ['GO',[1,2,3,5,6,7,8,9,10,11,12,13]],['fortaleza',[7]],['rejeicoes',[11]],['Leitura atrasada',[10]],
+  ]){
+    await busca.fill(termo);
+    await expect.poll(ids).toEqual(esperados);
+  }
+  await limpar.click();
+  await expect(busca).toBeFocused();
+  await expect(busca).toHaveValue('');
+  await goias.locator(':scope > summary > .titulo-grupo').click();
+  await expect(goias).toHaveAttribute('open','');
+  const municipio=goias.locator('.municipio-leitores');
+  await municipio.locator(':scope > summary > .titulo-grupo').click();
+  await expect(municipio).toHaveAttribute('open','');
+  const pendentesMunicipio=botao(municipio,'8 pendentes');
+  await pendentesMunicipio.click();
+  await expect.poll(ids).toEqual([5,6,7,8,9,10,11,12]);
+  await pendentesMunicipio.click();
+  const fonte=municipio.locator('.fonte-leitores');
+  await botao(fonte,'1 desativado').click();
+  await expect.poll(ids).toEqual([13]);
+  await expect(botao(fonte,'1 desativado')).toHaveAttribute('aria-pressed','true');
+
+  await botao(brasil,'2 com erro').click();
+  await expect.poll(ids).toEqual([3,4]);
+  await busca.fill('AGENCIA');
+  await expect(botao(brasil,'1 com erro')).toHaveAttribute('aria-pressed','true');
+  await expect.poll(ids).toEqual([3]);
+  await page.locator('#atualizar').click();
+  await expect(botao(brasil,'1 com erro')).toHaveAttribute('aria-pressed','true');
+  await expect.poll(ids).toEqual([3]);
+  await busca.fill('sem correspondência');
+  await expect(page.locator('#sem-leitores')).toBeVisible();
+  await expect(leitores).toHaveCount(0);
+  await expect(limpar).toBeVisible();
+  await limpar.click();
+  await expect(page.locator('#sem-leitores')).toBeHidden();
+  await expect(goias).toHaveAttribute('open','');
+  await expect(municipio).toHaveAttribute('open','');
+  await expect(page.locator('#resumo-leitores')).toHaveText('13 de 13 leitores exibidos.');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+});

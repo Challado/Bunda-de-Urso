@@ -26,9 +26,13 @@ As listas de fontes e órgãos podem incluir o mesmo ponto em mais de uma origem
 
 Em **Status das leituras**, abra os menus aninhados de Brasil (federal),
 estados e municípios. Dentro de cada localidade ficam os órgãos e seus
-leitores. A busca aceita nomes de fontes e localidades. **Só com erro**
-abre os grupos que contêm falhas. O contador de erros de um grupo filtra
-somente os leitores desse grupo. [Leituras das fontes](https://servidor3.lucas.inf.br/openclaw/radar/status.html#leituras)
+leitores. A busca aceita siglas de UF, municípios, fontes e situações. Os
+contadores **OK**, **com erro**, **pendentes** e **desativados** filtram
+os leitores do grupo clicado e respeitam o texto da busca. Pendentes
+incluem, por exemplo, leitores ainda sem coleta, leituras atrasadas e
+leituras com rejeições. **Só com erro** seleciona as falhas no Brasil.
+**Limpar filtros** restaura a lista e as caixas que estavam abertas.
+[Leituras das fontes](https://servidor3.lucas.inf.br/openclaw/radar/status.html#leituras)
 
 O modo público mostra última tentativa, último sucesso (incluindo “sem
 alteração”), agendamento, intervalo, atraso, código HTTP, contagens e
