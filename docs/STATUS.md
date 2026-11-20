@@ -74,8 +74,8 @@ adicionalmente como nunca coletado, mas está desativado. A PRF constava como
 leitura OK com 16 linhas rejeitadas, entre 1.591 recebidas.
 
 Boa Vista, Natal, Joinville (estudos), Belém (portarias), Macapá, Cuiabá,
-DER-AL, Detran-AC e Teresina são leitores de documentação. Suas páginas são
-validadas e os registros ficam preservados, com resultado `documentado`,
+DER-AL, Detran-AC e Teresina eram leitores de documentação na data da revisão.
+As páginas documentais são validadas e os registros ficam preservados, com resultado `documentado`,
 zero radares criados e integração ainda pendente. Uma repetição documental
 mantém o aviso **Cadastro de radares pendente**. Erros HTTP, títulos de erro
 mesmo com HTTP 200, página desconhecida ou extração vazia continuam falhando;

@@ -1,42 +1,20 @@
 # -*- coding: utf-8 -*-
-"""Fonte PI - STRANS Teresina / DER-PI (noticia historica, 2019).
+"""Mapa oficial da STRANS Teresina e leitura dos artefatos históricos.
 
-Pagina de entrada (catalogo, classificacao_evidencia="lista_historica"):
-    https://antigo.pmt.pi.gov.br/2019/04/10/localizacao-dos-radares-sera-
-    divulgada-mensalmente-no-site-da-prefeitura/
-
-Evidencia coletada em 10/10/2026 (curl -sSL -A "RadarBrasil/1.0"):
-   HTTP 200, text/html; charset=UTF-8 (73238 bytes, sha256
-   b2b7fab711787f32ea40a1e0920846c57427786614b3071097a84ba46c0a926e). E uma
-   NOTICIA de 10/04/2019 ("Localizacao dos radares sera divulgada mensalmente
-   no site da Prefeitura"). Ela descreve que Teresina tem dois tipos de radar
-   ("fixos" e "estaticos"), cita o diretor da Strans (Jose Falcao) e afirma que
-   "a lista com a localizacao dos radares sera divulgada mensalmente" e podera
-   ser acessada no site da Prefeitura, em "Links Importantes", na aba
-   "Localizacao de Radares". A noticia NAO traz a lista: ela apenas ANUNCIA o
-   canal. Nao ha CSV/JSON/KML/GeoJSON.
-
-   Fontes atuais verificadas em 10/10/2026: a STRANS
-   (https://strans.teresina.pi.gov.br/) NAO respondeu (falha de conexao); o
-   portal atual da Prefeitura (https://www.teresina.pi.gov.br/, HTTP 200) e o
-   DER-PI (https://www.der.pi.gov.br/, HTTP 200) NAO publicam relacao de
-   equipamentos. Ou seja: o unico registro publico localizado e HISTORICO
-   (2019).
-
-CLASSIFICACAO/TRATAMENTO: e uma noticia HISTORICA (2019) que ANUNCIA a
-divulgacao da lista (sem publica-la), SEM coordenadas, SEM identificadores e
-SEM vigencia confirmada. Conforme a regra "trecho/local de operacao nunca vira
-radar instalado confirmado", `normalizar` devolve None. Motivo registrado:
-`pendente_lai` (dado atual depende de pedido LAI a STRANS/DER-PI). Nada e
-inventado; o conector apenas DOCUMENTA a evidencia.
-
-Aceita arquivo LOCAL (HTML de fixture) para testes offline.
+O leitor atual descobre o KML do mapa na página da Prefeitura. O leitor
+histórico preserva a interpretação da notícia de 2019 que anunciava a lista.
 """
+from html import unescape
+from pathlib import Path
 import os
 import re
 import urllib.parse
+import xml.etree.ElementTree as ET
 
 from coletor import http
+from coletor.base import ColetorBase
+from coletor.fontes import normalizacao as nz
+from coletor.fontes.cariacica_es import ColetorCariacica, MIME_KML, _parse_coords
 from coletor.fontes.documental import ColetorDocumental
 
 MIME_HTML = "text/html; charset=utf-8"
@@ -73,7 +51,7 @@ def _texto(html):
     return " ".join(txt.split())
 
 
-class ColetorTeresinaPI(ColetorDocumental):
+class ColetorTeresinaHistorico(ColetorDocumental):
 
     MARCADORES_DOCUMENTAIS = ('teresina', 'radar')
     DESCRICAO_COLETA = 'Notícia histórica da STRANS Teresina; cadastro atual pendente.'
@@ -218,3 +196,128 @@ def _tipo_recurso(url):
     if re.search(r"\.(?:csv|json|geojson|kml|kmz|xlsx?|ods)$", s):
         return "planilha"
     return "binario"
+
+
+class ColetorTeresinaPI(ColetorBase):
+    """Lê os pontos do mapa publicado pela STRANS na página da Prefeitura."""
+
+    PAGINA = "https://www.teresina.pi.gov.br/strans/localizacao-de-radares/"
+    FONTE = {
+        "nome": "STRANS Teresina - Localizacao de radares",
+        "organizacao": "STRANS Teresina",
+        "tipo_organizacao": "orgao_publico",
+        "esfera": "municipal",
+        "natureza": "oficial",
+        "url_institucional": "https://www.teresina.pi.gov.br/strans/",
+        "documentacao_url": PAGINA,
+        "licenca": "pagina institucional publica",
+        "periodicidade_declarada": "irregular",
+        "situacao": "ativa",
+    }
+    RECURSO = {
+        "nome": "Mapa de fiscalizacao eletronica (KML)",
+        "url_recurso": PAGINA,
+        "formato_origem": "kml",
+        "periodicidade_segundos": 604800,
+        "status_integracao": "ok",
+    }
+
+    _KML = {"k": "http://www.opengis.net/kml/2.2"}
+    _IFRAME = re.compile(r"""<iframe\b[^>]*\ssrc\s*=\s*(['"])(.*?)\1""", re.I | re.S)
+
+    @classmethod
+    def resolver_url(cls):
+        return cls.PAGINA
+
+    @classmethod
+    def _url_kml(cls, pagina):
+        for _, url in cls._IFRAME.findall(pagina.decode("utf-8", "replace")):
+            partes = urllib.parse.urlsplit(unescape(url))
+            if partes.scheme != "https" or partes.netloc != "www.google.com":
+                continue
+            if not re.fullmatch(r"/maps/d/(?:u/\d+/)?embed", partes.path):
+                continue
+            mid = urllib.parse.parse_qs(partes.query).get("mid", [""])[0]
+            if re.fullmatch(r"[A-Za-z0-9_-]{15,100}", mid):
+                return ColetorCariacica.URL_KML % mid
+        raise http.ErroFonte("A página da STRANS não publicou o mapa de radares em Google My Maps.")
+
+    @classmethod
+    def _registros(cls, conteudo):
+        if b"<!DOCTYPE" in conteudo.upper():
+            raise http.ErroFonte("KML da STRANS com DOCTYPE não permitido.")
+        try:
+            raiz = ET.fromstring(conteudo)
+        except ET.ParseError as exc:
+            raise http.ErroFonte("KML inválido da STRANS.") from exc
+        nome_mapa = raiz.findtext("k:Document/k:name", "", cls._KML)
+        if "strans" not in nome_mapa.casefold():
+            raise http.ErroFonte("O KML publicado não foi identificado como o mapa da STRANS.")
+        registros = []
+        for ponto in raiz.findall(".//k:Placemark", cls._KML):
+            titulo = ponto.findtext("k:name", "", cls._KML)
+            linhas = [linha.strip().removeprefix("-").strip()
+                      for linha in titulo.splitlines() if linha.strip()]
+            lat, lon = _parse_coords(ponto.findtext("k:Point/k:coordinates", namespaces=cls._KML))
+            registros.append({
+                "codigo": linhas[0] if linhas else None,
+                "endereco": linhas[1] if len(linhas) >= 2 else None,
+                "latitude": lat,
+                "longitude": lon,
+                "detalhes": linhas[2:],
+                "descricao": ponto.findtext("k:description", "", cls._KML).strip(),
+            })
+        if not registros:
+            raise http.ErroFonte("O mapa da STRANS não trouxe marcações de equipamentos.")
+        return registros
+
+    def carregar(self, origem):
+        if origem and Path(origem).is_file():
+            conteudo = Path(origem).read_bytes()
+        else:
+            url = origem or self.PAGINA
+            partes = urllib.parse.urlsplit(url)
+            if partes.netloc != "www.google.com" or partes.path != "/maps/d/kml":
+                url = self._url_kml(http.baixar(url)[0])
+            conteudo = http.baixar(url)[0]
+        return conteudo, ".kml", MIME_KML, self._registros(conteudo)
+
+    def identificador(self, raw):
+        return raw["codigo"]
+
+    def normalizar(self, idx, raw):
+        codigo = raw["codigo"]
+        if (not re.fullmatch(r"T[A-Z0-9]*\d[A-Z0-9]*", codigo or "", re.I)
+                or not raw["endereco"] or raw["latitude"] is None or raw["longitude"] is None):
+            raise ValueError("Marcação da STRANS sem código, endereço ou coordenada de ponto.")
+        detalhes = [linha for linha in raw["detalhes"] if linha]
+        sentidos = set()
+        for linha in detalhes:
+            sentido = re.fullmatch(
+                r"(NORTE|SUL|LESTE|OESTE)\s*[-/]\s*(NORTE|SUL|LESTE|OESTE)"
+                r"(?:\s+(?:FAIXA\s*)?\d*\s*)?", linha, re.I)
+            if sentido:
+                sentidos.add(" - ".join(sentido.groups()).upper())
+        sentido_original = " / ".join(sorted(sentidos)) or None
+        descricao = raw["descricao"]
+        return {
+            "procedencia": "oficial",
+            "natureza_fonte": "oficial",
+            "confiabilidade": "oficial",
+            "tipo_registro": "ponto_fiscalizacao",
+            "identificador": codigo.upper(),
+            "tipo_identificador": "codigo_equipamento",
+            "latitude": raw["latitude"],
+            "longitude": raw["longitude"],
+            "qualidade": "oficial",
+            "metodo_obtencao": "Mapa oficial da STRANS Teresina (KML)",
+            "uf": "PI",
+            "municipio_nome": "Teresina",
+            "municipio_ibge": "2211001",
+            "via_codigo": raw["endereco"],
+            "via_tipo": "municipal",
+            "sentido": nz.normalizar_sentido(sentido_original),
+            "sentido_original": sentido_original,
+            "situacao": "inativo" if "furtado" in descricao.casefold() else None,
+            "observacoes": " · ".join(filter(None, (descricao, *detalhes))) or None,
+        }

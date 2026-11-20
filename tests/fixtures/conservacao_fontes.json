@@ -2139,7 +2139,7 @@
     },
     {
       "arquivo": "teresina_pi/pagina_fixture.html",
-      "classe": "ColetorTeresinaPI",
+      "classe": "ColetorTeresinaHistorico",
       "gps": [],
       "modulo": "teresina_pi",
       "pontos": 0,

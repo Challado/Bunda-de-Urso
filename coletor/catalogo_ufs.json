@@ -504,22 +504,21 @@
     {
       "uf": "PI",
       "nome_fonte": "STRANS Teresina - servico Localizacao de Radares",
-      "orgao": "STRANS Teresina / DER-PI",
-      "url_pagina": "https://antigo.pmt.pi.gov.br/2019/04/10/localizacao-dos-radares-sera-divulgada-mensalmente-no-site-da-prefeitura/",
-      "classificacao_evidencia": "lista_historica",
+      "orgao": "STRANS Teresina",
+      "url_pagina": "https://www.teresina.pi.gov.br/strans/localizacao-de-radares/",
+      "classificacao_evidencia": "lista_localizacao",
       "tipo_esperado": "cadastro_equipamento",
-      "estado_integracao": "pendente_lai",
-      "nosso_modulo": null,
-      "observacao": "Publicacao de 2019 (historico) ANUNCIA divulgacao mensal da lista (sem publica-la); STRANS fora do ar em 10/10/2026 (strans.teresina.pi.gov.br) e Prefeitura/DER-PI atuais sem cadastro. Solicitar dado atual via LAI (STRANS/DER-PI). Modulo diagnostico: teresina_pi.",
+      "estado_integracao": "implementado",
+      "nosso_modulo": "teresina_pi",
+      "observacao": "O mapa oficial da STRANS tem coordenadas completas, códigos, endereços e sentidos. A lista em PDF da mesma página é referência complementar. O mapa não informa velocidade ou situação operacional para todos os pontos.",
       "cobertura_estadual_confirmada": false,
-      "modulo_diagnostico": "teresina_pi",
       "nome_uf": "Piauí",
       "fontes_estaduais": [],
       "modulos_municipais": [
         {
           "modulo": "teresina_pi",
-          "nome": "STRANS Teresina - Localizacao de radares (noticia 2019)",
-          "url": "https://www.teresina.pi.gov.br/",
+          "nome": "STRANS Teresina - Localizacao de radares",
+          "url": "https://www.teresina.pi.gov.br/strans/localizacao-de-radares/",
           "esfera": "municipal",
           "municipio_ibge": "2211001"
         }

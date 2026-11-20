@@ -111,7 +111,7 @@ class CatalogoUFsTest(unittest.TestCase):
 
     def test_ufs_historicas_nao_implementadas(self):
         por_uf = {e["uf"]: e for e in self.ufs}
-        for uf in ("AC", "PI", "MT", "RR"):
+        for uf in ("AC", "MT", "RR"):
             self.assertIsNone(por_uf[uf]["nosso_modulo"])
             self.assertIn(por_uf[uf]["estado_integracao"],
                           ("pendente", "pendente_lai"))
@@ -135,7 +135,7 @@ class CatalogoUFsTest(unittest.TestCase):
             "SC": "sie_sc_portateis", "AM": "immu_am", "MS": "agetran_ms",
             "PB": "semob_pb", "RO": "semtran_ro",
             "DF": "detran_df", "MA": "detran_ma",
-            "SE": "der_se", "TO": "ageto_to",
+            "PI": "teresina_pi", "SE": "der_se", "TO": "ageto_to",
         }
         for uf, modulo in esperado.items():
             self.assertEqual(por_uf[uf]["nosso_modulo"], modulo,
@@ -155,13 +155,12 @@ class CatalogoUFsTest(unittest.TestCase):
                     cls = AGENDA_PADRAO[fonte["modulo"]]["conector"]
                     self.assertIn(cls.FONTE["esfera"], esferas)
 
-    def test_diagnosticos_4_ufs_finais(self):
-        # AC/AL/RN/PI: conector diagnostico que DOCUMENTA a ausencia de
+    def test_diagnosticos_sem_cadastro(self):
+        # AC/AL/RN: conector diagnostico que DOCUMENTA a ausencia de
         # cadastro (nao ha conector consumivel -> nosso_modulo null).
         por_uf = {e["uf"]: e for e in self.ufs}
         esperado = {
             "AC": ("detran_ac", "pendente_lai"),
-            "PI": ("teresina_pi", "pendente_lai"),
             "AL": ("der_al", "sem_publicacao"),
             "RN": ("natal_rn", "sem_publicacao"),
         }

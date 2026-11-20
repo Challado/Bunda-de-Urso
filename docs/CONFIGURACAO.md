@@ -362,6 +362,13 @@ pagina_grande_min = 150
 Os coletores `mogi_sp`, `eptc_poa`, `cet_rio` e `artesp` consultam
 as publicações dos respectivos órgãos e seguem a agenda normal.
 
+O leitor `teresina_pi` acompanha o mapa que a STRANS publica na página
+municipal. Descobre o identificador do mapa a cada coleta e baixa o KML.
+O PDF na mesma página serve de referência complementar. A coleta preserva
+os códigos, os endereços, as coordenadas e os sentidos publicados. Velocidade
+e situação operacional ficam em branco quando a fonte não as informa.
+[Localização de radares da STRANS](https://www.teresina.pi.gov.br/strans/localizacao-de-radares/)
+
 O leitor `detran_df` usa a lista vigente da página de equipamentos. A revisão
 da URL reaproveita o mesmo recurso e preserva o histórico das leituras.
 A camada histórica `detran_df_arcgis` é um leitor distinto, disponível para

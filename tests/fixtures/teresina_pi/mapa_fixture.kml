@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>STRANS</name>
+    <Folder>
+      <name>STRANS</name>
+      <Placemark>
+        <name>- T1001
+- Av. Ipes, prox ao n. 1361
+- 04 Faixas:
+- LESTE - OESTE FAIXA 1
+- LESTE - OESTE FAIXA 2
+- OESTE - LESTE FAIXA 1
+- OESTE - LESTE FAIXA 2</name>
+        <Point><coordinates>-42.765953,-5.093872,0</coordinates></Point>
+      </Placemark>
+      <Placemark>
+        <name>- T1047
+- AV. AVIADOR ROSSINI MORADA, PROXIMO AO CONDOMINIO PASADENA
+- 04 Faixas:
+- LESTE - OESTE FAIXA 1
+- LESTE - OESTE FAIXA 2
+- OESTE - LESTE FAIXA 1
+- OESTE - LESTE FAIXA 2</name>
+        <description>EQUIPAMENTO FURTADO</description>
+        <Point><coordinates>-42.7609,-5.0313,0</coordinates></Point>
+      </Placemark>
+      <Placemark>
+        <name>- T5405
+- Av. Frei Serafim, prox. ao n. 1976
+- 01 Faixa:
+- OESTE - LESTE FAIXA 3</name>
+        <Point><coordinates>-42.8038,-5.0867,0</coordinates></Point>
+      </Placemark>
+    </Folder>
+  </Document>
+</kml>

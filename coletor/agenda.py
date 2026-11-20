@@ -319,7 +319,7 @@ AGENDA_PADRAO = {
         "ativo": True,
     },
     "teresina_pi": {
-        "rotulo": "Teresina/PI - sem publicacao (pendente LAI)",
+        "rotulo": "STRANS Teresina - Mapa de fiscalizacao eletronica",
         "conector": ColetorTeresinaPI,
         "intervalo_s": SEMANA,
         "url_direta": None,

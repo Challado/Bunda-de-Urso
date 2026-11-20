@@ -1,4 +1,11 @@
-Fixture: STRANS Teresina - noticia de radares (2019, historica)
+Fixture mapa_fixture.kml
+- Três marcações extraídas do KML do mapa da STRANS em 20/11/2026.
+- A página municipal publica o mapa em
+  https://www.teresina.pi.gov.br/strans/localizacao-de-radares/
+- A amostra conserva código, endereço, faixas e coordenadas. T1047 inclui
+  a observação de equipamento furtado.
+
+Fixture pagina_fixture.html: STRANS Teresina - noticia de radares (2019, historica)
 ===============================================================
 
 Arquivo: pagina_fixture.html

@@ -1,5 +1,9 @@
 # Histórico de alterações
 
+## Mapa oficial da STRANS Teresina
+
+- O leitor de Teresina descobre o KML na página vigente da STRANS e importa códigos, endereços, sentidos e coordenadas publicados. A troca preserva o histórico do leitor anterior.
+
 ## Consultas com limite zero
 
 - `limite=0` remove o teto de registros onde esse parâmetro existe, mantendo filtros e posição de início. A busca segue a política de acesso e o intercâmbio segue o orçamento de bytes de cada rodada.
