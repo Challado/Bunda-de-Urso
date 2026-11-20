@@ -27,14 +27,6 @@ FIX = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures",
                    "detran_df")
 JS = os.path.join(FIX, "equipamentos.js")
 
-# Fragmento real da pagina institucional (href real de 10/10/2026).
-HTML_PAGINA = """<html><body>
-<p>O link abaixo atende o art. 6o, par. 3o, inciso I, da Resolucao CONTRAN
-n. 798/2020. Relacao de todos os medidores de velocidade existentes
-DETRAN-DF: <a href="https://geoservicos.detran.df.gov.br/geoserver/styles/lista_equipto/index.html" target="_blank">https://geoservicos.detran.df.gov.br</a></p>
-</body></html>"""
-
-
 def _resp(conteudo, url="https://x/"):
     dados = conteudo if isinstance(conteudo, bytes) else conteudo.encode("utf-8")
     return (dados, {}, url)
@@ -95,26 +87,42 @@ class TestDetranDFNormalizar(unittest.TestCase):
 
 class TestDetranDFDescobrir(unittest.TestCase):
 
-    def test_descobrir_recursos_offline(self):
-        achados = ColetorDetranDF.descobrir_recursos(HTML_PAGINA)
-        self.assertIn("lista", achados)
-        self.assertTrue(achados["lista"].endswith("lista_equipto/index.html"))
-
-    def test_url_dados(self):
-        url = ColetorDetranDF._url_dados(
-            "https://geoservicos.detran.df.gov.br/geoserver/styles/"
-            "lista_equipto/index.html")
-        self.assertTrue(url.endswith("lista_equipto/equipamentos.js"))
-
-    def test_resolver_url_usa_pagina_e_cai_no_fallback(self):
-        with mock.patch.object(detran_df.http, "baixar",
-                               return_value=_resp(HTML_PAGINA)):
+    def test_origem_padrao_e_pagina_direta(self):
+        with mock.patch.object(detran_df.http, "baixar") as baixar:
             url = ColetorDetranDF.resolver_url()
-        self.assertTrue(url.endswith("lista_equipto/equipamentos.js"))
+        self.assertEqual(url, ColetorDetranDF.RECURSO["url_recurso"])
+        self.assertTrue(url.endswith("/lista_equipto/index.html"))
+        baixar.assert_not_called()
+
+    def test_pagina_oficial_descobre_o_arquivo_de_dados(self):
+        lista = ColetorDetranDF.resolver_url()
+        dados = lista.replace("index.html", "equipamentos-atual.json")
+        html = ('<script src="https://terceiro.example/equipamentos.js"></script>'
+                '<script src="./equipamentos-atual.json"></script>')
+        arquivo = '[{"identificacao":"A007","tipo":"DETRAN - RADAR"}]'
         with mock.patch.object(detran_df.http, "baixar",
-                               side_effect=http.ErroFonte("fora")):
-            url = ColetorDetranDF.resolver_url()
-        self.assertEqual(url, ColetorDetranDF.URL_DADOS_FALLBACK)
+                               side_effect=[_resp(html, lista), _resp(arquivo, dados)]) as baixar:
+            _, ext, mime, regs = ColetorDetranDF().carregar(lista)
+        self.assertEqual([c.args[0] for c in baixar.call_args_list], [lista, dados])
+        self.assertEqual((ext, mime, regs[0]["identificacao"]), (".json", "application/json", "A007"))
+
+    def test_pagina_com_cadastro_embutido_e_lida_sem_buscar_js(self):
+        lista = ColetorDetranDF.resolver_url()
+        pagina = ('<html><script>const idiomas = ["pt-BR"];'
+                  'const equipamentos = [{"identificacao":"A007","tipo":"DETRAN - RADAR"}];'
+                  '</script></html>')
+        with mock.patch.object(detran_df.http, "baixar", return_value=_resp(pagina, lista)) as baixar:
+            _, ext, mime, regs = ColetorDetranDF().carregar(None)
+        baixar.assert_called_once_with(lista)
+        self.assertEqual((ext, mime, regs[0]["identificacao"]), (".html", "text/html", "A007"))
+
+    def test_bloqueio_com_200_nao_publica_lista_falsa(self):
+        lista = ColetorDetranDF.resolver_url()
+        negado = '<html><title>Request Rejected</title><script>var erros = [{"erro":1}]</script></html>'
+        with mock.patch.object(detran_df.http, "baixar", return_value=_resp(negado, lista)), \
+                mock.patch.object(detran_df, "_achar_navegador", return_value=None):
+            with self.assertRaisesRegex(http.ErroFonte, "Request Rejected"):
+                ColetorDetranDF().carregar(lista)
 
 
 class TestDetranDFContornoWaf(unittest.TestCase):
@@ -195,6 +203,20 @@ class TestDetranDFContornoWaf(unittest.TestCase):
 
 
 class TestDetranDFSync(unittest.TestCase):
+
+    def test_atualiza_url_antiga_no_mesmo_recurso(self):
+        common.ambiente_temporario()
+        c = ColetorDetranDF(db_path=config.DB_PATH)
+        try:
+            dbmod.init_db(c.conn)
+            chave = c.garantir_referencias()
+            c.conn.execute("UPDATE RECURSO_FONTE SET url_recurso=? WHERE id=?", (c.URL_PAGINA, chave[1]))
+            c.conn.commit()
+            self.assertEqual(c.garantir_referencias(), chave)
+            self.assertEqual(dbmod.scalar(c.conn,
+                "SELECT url_recurso FROM RECURSO_FONTE WHERE id=?", (chave[1],)), c.resolver_url())
+        finally:
+            c.conn.close()
 
     def test_sincronizar_fixture_em_banco_temporario(self):
         common.ambiente_temporario()

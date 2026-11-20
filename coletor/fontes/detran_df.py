@@ -1,53 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Fonte DF - Detran-DF, relacao de medidores de velocidade / fiscalizacao.
+"""Coleta a relação pública de equipamentos do Detran-DF.
 
-Pagina institucional (HTTPS, HTTP 200 em 10/10/2026):
-  https://www.detran.df.gov.br/equipamentos-eletronicos
-
-A pagina ("Equipamentos Eletronicos", art. 6o/7o/9o da Resolucao CONTRAN no
-798/2020) aponta para o unico endereco da "Relacao de todos os medidores de
-velocidade existentes DETRAN-DF":
-
-  https://geoservicos.detran.df.gov.br/geoserver/styles/lista_equipto/index.html
-
-Esse endereco e uma pagina estatica que carrega o arquivo de dados
-
-  https://geoservicos.detran.df.gov.br/geoserver/styles/lista_equipto/equipamentos.js
-
-com um array ``equipamentos`` (colunas reais):
-
-  identificacao | tipo | numero_serie | local_instalacao | levantamento_estudo
-
-``tipo`` assume tres valores: ``DETRAN - RADAR`` (radar de velocidade),
-``DETRAN - LOMBADA ELETRÔNICA`` (medidor de velocidade tipo lombada) e
-``AVANÇO DE SINAL VERMELHO`` (fiscalizacao de avanco de sinal -- NAO e medidor
-de velocidade).  A lista NAO traz coordenadas: a posicao geografica fica NULL
-(nada e inventado a partir do texto do "local_instalacao").
-
---------------------------------------------------------------------------------
-STATUS: IMPLEMENTADO (com contorno de WAF documentado).
-
-O host ``geoservicos.detran.df.gov.br`` esta atras de um WAF F5/BigIP.  Para
-CLIENTE NAO-NAVEGADOR ele RESETA a conexao (``Connection reset by peer``) em
-``equipamentos.js`` -- mesmo repetindo os cabecalhos de um Chrome real e mesmo
-com os cookies de sessao -- e tambem no resto do ``/geoserver`` (``wfs``/
-``wms``/``.txt``/``.htm``).  Apenas ``lista_equipto/index.html`` responde 200, e
-a resposta traz os cookies de sessao F5 (``reverse_proxy``,
-``f5avra..._session_``, ``TS...``).  O ``equipamentos.js`` so passa quando o
-pedido carrega a sessao que o proprio ``index.html`` recebeu.
-
-CONTORNO (verificado em 10/10/2026): baixar com um navegador de verdade, em
-DOIS passos e com um perfil persistente -- (1) abrir o ``index.html`` (o
-navegador ganha os cookies F5) e (2) abrir o ``equipamentos.js`` (ja com a
-sessao).  Renderizado, o ``equipamentos.js`` volta como texto (dentro de
-``<pre>``) e o array completo (407 registros em 10/10/2026) e extraido.
-
-Por isso este modulo: (a) tenta primeiro ``coletor.http.baixar`` (biblioteca
-padrao, regra do projeto); (b) se o WAF resetar, cai no contorno de navegador
-acima.  DEPENDENCIA DE SISTEMA: um Chromium/Chrome headless (``chromium``,
-``chromium-browser`` ou ``google-chrome``) -- mesma natureza da dependencia de
-``pdftotext`` de outras fontes; se ausente, levanta ``ErroFonte`` claro.
-Aceita arquivo LOCAL (fixture de ``equipamentos.js``) para testes offline.
+A entrada é a página oficial da listagem. O coletor lê o cadastro publicado
+no HTML ou em seu arquivo de dados. O leitor de JavaScript e o fluxo por
+Chromium continuam disponíveis para a publicação e os artefatos antigos.
 """
 import html
 import json
@@ -56,6 +12,8 @@ import re
 import shutil
 import subprocess
 import tempfile
+from urllib.parse import urljoin, urlsplit
+
 from core import caminhos
 
 from coletor import http, politica_http
@@ -64,8 +22,12 @@ from coletor.fontes import normalizacao as nz
 
 MIME_JS = "application/javascript"
 
-PADRAO_GEOSERVICOS = re.compile(
-    r"https://geoservicos\.detran\.df\.gov\.br/[^\"'\s<>]+", re.I)
+HOST_LISTA = "geoservicos.detran.df.gov.br"
+DIRETORIO_LISTA = "/geoserver/styles/lista_equipto/"
+URL_LISTA = "https://" + HOST_LISTA + DIRETORIO_LISTA + "index.html"
+_DADOS = re.compile(r"\b(?:const|let|var)\s+equipamentos\s*=\s*", re.I)
+_SCRIPT = re.compile(r"""<script\b[^>]*?\bsrc\s*=\s*(['"])(.*?)\1""", re.I | re.S)
+
 
 # Navegadores aceitos no contorno de WAF (F5 BigIP), em ordem de preferencia.
 _NAVEGADORES = ("chromium", "chromium-browser", "google-chrome",
@@ -140,7 +102,7 @@ class ColetorDetranDF(ColetorBase):
     }
     RECURSO = {
         "nome": "Lista de equipamentos eletronicos de fiscalizacao (JS)",
-        "url_recurso": "https://www.detran.df.gov.br/equipamentos-eletronicos",
+        "url_recurso": URL_LISTA,
         "formato_origem": "js",
         "periodicidade_segundos": 2592000,     # ~30 dias
         # Contorno de WAF por navegador (2 passos) quando o cliente nao passa.
@@ -148,106 +110,127 @@ class ColetorDetranDF(ColetorBase):
     }
 
     URL_PAGINA = "https://www.detran.df.gov.br/equipamentos-eletronicos"
-    URL_LISTA_FALLBACK = ("https://geoservicos.detran.df.gov.br/geoserver/"
-                          "styles/lista_equipto/index.html")
-    URL_DADOS_FALLBACK = ("https://geoservicos.detran.df.gov.br/geoserver/"
-                          "styles/lista_equipto/equipamentos.js")
-
-    # -- descoberta --------------------------------------------------------
-    @classmethod
-    def descobrir_recursos(cls, html_texto):
-        """Mapeia a pagina -> {lista: URL da listagem no geoservicos}."""
-        for m in PADRAO_GEOSERVICOS.finditer(html_texto or ""):
-            url = m.group(0)
-            if "lista_equipto" in url:
-                return {"lista": url}
-        return {}
-
-    @staticmethod
-    def _url_dados(lista_url):
-        """.../lista_equipto/index.html -> .../lista_equipto/equipamentos.js."""
-        base = lista_url.split("?", 1)[0]
-        if "/" in base:
-            base = base.rsplit("/", 1)[0]
-        return base + "/equipamentos.js"
+    URL_LISTA_FALLBACK = URL_LISTA
+    URL_DADOS_FALLBACK = urljoin(URL_LISTA, "equipamentos.js")
 
     @classmethod
     def resolver_url(cls):
-        """URL do arquivo de dados descoberta na pagina; fallback fixo."""
-        try:
-            texto = http.baixar(cls.URL_PAGINA)[0].decode("utf-8", "replace")
-            lista = cls.descobrir_recursos(texto).get("lista")
-            if lista:
-                return cls._url_dados(lista)
-        except Exception:                                   # noqa: BLE001
-            pass
-        return cls.URL_DADOS_FALLBACK
+        return cls.URL_LISTA_FALLBACK
 
-    # -- contorno de WAF ---------------------------------------------------
+    def garantir_referencias(self):
+        fonte_id, recurso_id = super().garantir_referencias()
+        self.conn.execute(
+            "UPDATE RECURSO_FONTE SET url_recurso=? WHERE id=? AND url_recurso IN (?,?)",
+            (self.URL_LISTA_FALLBACK, recurso_id, self.URL_PAGINA, self.URL_DADOS_FALLBACK))
+        self.conn.commit()
+        return fonte_id, recurso_id
+
+    @staticmethod
+    def _pagina(url):
+        caminho = urlsplit(url).path.lower()
+        return caminho.endswith(("/", ".html", ".htm"))
+
     @classmethod
-    def _texto_via_navegador(cls, dados_url):
-        """Contorno do WAF F5: 2 passos (index.html -> equipamentos.js).
+    def _url_dados(cls, lista, texto):
+        """Segue arquivos de equipamentos publicados na própria página."""
+        arquivos = []
+        for _, endereco in _SCRIPT.findall(texto):
+            url = urljoin(lista, html.unescape(endereco))
+            destino = urlsplit(url)
+            nome = destino.path.rsplit("/", 1)[-1].lower()
+            if (destino.scheme == "https" and destino.netloc == HOST_LISTA
+                    and destino.path.startswith(DIRETORIO_LISTA)
+                    and re.fullmatch(r"(?:dados[-_])?equip(?:amentos|tos)[\w.-]*\.(?:js|json)", nome)):
+                arquivos.append(url)
+        return list(dict.fromkeys(arquivos)) or [urljoin(lista, "equipamentos.js")]
 
-        Passo 1 abre o ``index.html`` num perfil persistente (o navegador
-        absorve os cookies de sessao F5); passo 2 abre o ``equipamentos.js``
-        nesse mesmo perfil, agora aceito.  Devolve o texto do recurso.
-        """
+    @classmethod
+    def _ler_publicacao(cls, origem, obter):
+        texto, url = obter(origem)
+        if cls._extrair_registros(texto):
+            return texto
+
+        titulo = re.search(r"<title[^>]*>(.*?)</title>", texto, re.I | re.S)
+        detalhe = " ".join(html.unescape(titulo[1]).split())[:100] if titulo else "sem lista de equipamentos"
+        if re.search(r"request rejected|acesso negado|requisi[cç][aã]o negada", detalhe, re.I):
+            raise http.ErroFonte(f"Detran-DF devolveu página de bloqueio ({detalhe}): {url}")
+
+        destino = urlsplit(url)
+        if cls._pagina(url) and destino.netloc == HOST_LISTA and destino.path.startswith(DIRETORIO_LISTA):
+            for recurso in cls._url_dados(url, texto):
+                try:
+                    return cls._ler_arquivo(recurso, obter)
+                except (http.ErroFonte, OSError) as exc:
+                    detalhe = str(exc)
+        raise http.ErroFonte(f"Detran-DF não devolveu uma lista válida ({detalhe}): {url}")
+
+    @classmethod
+    def _ler_arquivo(cls, recurso, obter):
+        dados, url = obter(recurso)
+        if not cls._extrair_registros(dados):
+            raise http.ErroFonte(f"Arquivo de equipamentos sem registros válidos: {url}")
+        return dados
+
+    @classmethod
+    def _texto_via_navegador(cls, url):
         navegador = _achar_navegador()
         if not navegador:
-            raise http.ErroFonte(
-                "WAF F5 desta fonte exige navegador e nao ha Chromium/Chrome "
-                "headless instalado (instale 'chromium'): %s" % dados_url)
-        lista = dados_url.rsplit("/", 1)[0] + "/index.html"
+            raise http.ErroFonte("Chromium/Chrome indisponível para ler a publicação do Detran-DF")
         with tempfile.TemporaryDirectory(prefix="detran_df_", dir=caminhos.temporarios()) as perfil:
-            _dump_dom(navegador, lista, perfil)          # passo 1: sessao F5
-            bruto = _dump_dom(navegador, dados_url, perfil)   # passo 2: dados
-        texto = _texto_do_pre(bruto)
-        if not cls._extrair_registros(texto):
-            titulo = re.search(r'<title[^>]*>(.*?)</title>', bruto, re.I | re.S)
-            detalhe = re.sub(r'\s+', ' ', html.unescape(titulo.group(1))).strip()[:180] if titulo else 'sem lista de equipamentos'
-            raise http.ErroFonte(
-                "contorno de navegador nao devolveu lista valida (%s): %s" % (detalhe, dados_url))
-        return texto
+            def obter(endereco):
+                return _texto_do_pre(_dump_dom(navegador, endereco, perfil)), endereco
 
-    # -- carregar ----------------------------------------------------------
+            if not cls._pagina(url):
+                obter(urljoin(url, "index.html"))
+            return cls._ler_publicacao(url, obter)
+
     def carregar(self, origem):
-        if origem and os.path.exists(origem):
-            with open(origem, "r", encoding="utf-8") as f:
-                texto = f.read()
+        if origem and os.path.isfile(origem):
+            with open(origem, encoding="utf-8-sig") as arquivo:
+                texto = arquivo.read()
         else:
-            url = origem or self.resolver_url()
-            if "detran.df.gov.br/equipamentos-eletronicos" in url:
-                url = self.resolver_url()
+            url = self.resolver_url() if not origem or origem == self.URL_PAGINA else origem
+
+            def obter(endereco):
+                corpo, _, destino = http.baixar(endereco)
+                return corpo.decode("utf-8-sig", "replace"), destino
+
             try:
-                conteudo, _headers, _final = http.baixar(url)
-                texto = conteudo.decode("utf-8", "replace")
-                if not self._extrair_registros(texto):
-                    raise http.ErroFonte('Resposta HTTP sem lista valida de equipamentos: %s' % url)
+                texto = self._ler_publicacao(url, obter)
             except (http.ErroFonte, OSError) as erro_http:
-                # WAF F5 reseta cliente nao-navegador -> contorno de navegador
                 try:
                     texto = self._texto_via_navegador(url)
                 except (http.ErroFonte, OSError) as erro_browser:
-                    raise http.ErroFonte('Download HTTP falhou: %s; navegador falhou: %s' % (erro_http, erro_browser)) from erro_browser
+                    raise http.ErroFonte(f"Download HTTP falhou: {erro_http}; navegador falhou: {erro_browser}") from erro_browser
         registros = self._extrair_registros(texto)
         if not registros:
-            raise http.ErroFonte('Fonte Detran-DF sem lista valida de equipamentos; coleta recusada.')
-        return texto, ".js", MIME_JS, registros
+            raise http.ErroFonte("Fonte Detran-DF sem lista válida de equipamentos")
+        inicio = texto.lstrip()[:1]
+        ext, mime = {"<": (".html", "text/html"), "{": (".json", "application/json"),
+                     "[": (".json", "application/json")}.get(inicio, (".js", MIME_JS))
+        return texto, ext, mime, registros
 
-    # -- parsing -----------------------------------------------------------
     @staticmethod
     def _extrair_registros(texto):
-        """Extrai o array JSON embutido no JS (``const equipamentos = [...]``)."""
+        """Lê o array publicado sem interpretar código JavaScript."""
         if not texto:
             return []
-        ini, fim = texto.find("["), texto.rfind("]")
-        if ini < 0 or fim < ini:
+        texto = texto.lstrip()
+        declaracao = _DADOS.search(texto)
+        if declaracao:
+            texto = texto[declaracao.end():]
+        if not texto.startswith(("[", "{")):
             return []
         try:
-            dados = json.loads(texto[ini:fim + 1])
+            dados, _ = json.JSONDecoder().raw_decode(texto)
         except ValueError:
             return []
-        return dados if isinstance(dados, list) else []
+        if isinstance(dados, dict):
+            dados = dados.get("equipamentos")
+        if isinstance(dados, list) and all(
+                isinstance(r, dict) and r.get("identificacao") and "tipo" in r for r in dados):
+            return dados
+        return []
 
     # -- normalizar --------------------------------------------------------
     def identificador(self, raw):
