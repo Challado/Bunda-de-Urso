@@ -296,7 +296,9 @@ Laboratórios usam somente os destinos temporários e não consultam produção.
 
 ## Política de acesso da instância pública
 
-O servidor limita cada página a `api.limite_consulta` (padrão e máximo de 200).
+O servidor limita pedidos com `limite` positivo a `api.limite_consulta` (padrão
+e máximo de 200). O valor `limite=0` retorna todos os resultados, respeitando
+os filtros, o cursor e a cota das buscas de radares.
 Acima de `api.cursor_publico_max` (2.000 por padrão), as consultas paginadas
 exigem `X-Radar-Leitura`. O arquivo `api.chaves_leitura_arquivo` fica dentro
 de `dados.dir` e contém um SHA-256 hexadecimal por linha. Emissão e revogação

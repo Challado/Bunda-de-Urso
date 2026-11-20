@@ -106,6 +106,32 @@ class TestEndpoints(unittest.TestCase):
         self.assertEqual(status, 200, corpo if isinstance(corpo, str) else corpo)
         return json.loads(corpo), headers
 
+    def test_limite_zero_respeita_filtros_e_cursor(self):
+        casos = [
+            ("/api/v1/radares", "lat=-24.9556&lon=-53.4552&raio=1000", "pontos"),
+            ("/api/v1/radares/busca", "rodovia=BR-277", "pontos"),
+            ("/api/v1/radares/busca", "uf=PR", "pontos"),
+            ("/api/v1/trechos", "uf=PR", "trechos"),
+            ("/api/v1/trechos", "lat=-24.95&lon=-53.45&raio=1000", "trechos"),
+            ("/api/v1/operacoes", "", "operacoes"),
+            ("/api/v1/atualizacoes", "", "atualizacoes"),
+        ]
+        for rota, filtros, campo in casos:
+            with self.subTest(rota=rota, filtros=filtros):
+                consulta = (filtros + "&" if filtros else "") + "limite="
+                normal = self._json(rota, consulta + "1")[0]["resultado"]
+                todos = self._json(rota, consulta + "0")[0]["resultado"]
+                seguintes = self._json(rota, consulta + "0&cursor=1")[0]["resultado"]
+                self.assertTrue(todos[campo])
+                self.assertEqual(todos[campo][:1], normal[campo])
+                self.assertEqual(todos[campo][1:], seguintes[campo])
+                self.assertIsNone(todos["proximo_cursor"])
+                self.assertIsNone(seguintes["proximo_cursor"])
+        status, _, doc = self._req("/api/v1/status/estados/PR", "limite=0")
+        self.assertEqual(status, 200)
+        self.assertEqual(len(doc["resultado"]["pontos"]), doc["resultado"]["estado"]["total"])
+        self.assertIsNone(doc["resultado"]["proximo_depois"])
+
     # -- /trechos ----------------------------------------------------------
     def test_trechos_json(self):
         doc, _h = self._json("/api/v1/trechos", "formato=json")

@@ -93,6 +93,17 @@ class TestTraseiro(unittest.TestCase):
         self.assertEqual(corpo['rede']['consultante']['uuid'],self.a.info()['uuid'])
         self.assertEqual(db.scalar(self.b.conn,'SELECT COUNT(*) FROM TRASEIRO_INSTANCIA'),1)
         self.assertEqual(db.scalar(self.b.conn,'SELECT COUNT(*) FROM PONTO_FISCALIZACAO'),0)
+    def test_trocar_limite_zero_remove_o_teto_de_eventos(self):
+        self.b.cfg['lote']='1'
+        self.b.salvar()
+        self.b.publicar(chave='radar-1')
+        self.b.publicar(chave='radar-2')
+        status, _, corpo = self.b.req('/api/v1/intercambio/trocar',
+            {'eventos': [], 'depois': 0, 'limite': 0}, info=self.a.info())
+        self.assertEqual(status, 200, corpo)
+        self.assertEqual(len(corpo['resultado']['eventos']), 2)
+        self.assertFalse(corpo['resultado']['mais'])
+
     def test_tokens_de_rede_nao_sao_tokens_de_moderacao(self):
         self.b.cfg['acesso']='tokens';self.b.salvar()
         with self.b.ambiente():tr.arquivo_tokens().write_text(json.dumps({'entrada':['x'*32],'saida':{}}))

@@ -120,6 +120,25 @@ limite_consulta = 100
         with patch('core.politica_acesso.time.time', return_value=1201):
             self.assertEqual(self.req(query="cursor=100&limite=200", REMOTE_ADDR="192.0.2.4")[0], 200)
 
+    def test_limite_zero_retorna_mais_de_200_pontos(self):
+        with closing(db.connect(self.banco)) as conn:
+            governanca.garantir_esquema(conn)
+            conn.executemany("INSERT INTO PONTO_FISCALIZACAO (id) VALUES (?)",
+                             [(pid,) for pid in range(1, 206)])
+            conn.commit()
+        status, _, corpo = self.req(query="limite=0&cursor=1")
+        self.assertEqual(status, 200)
+        resultado = json.loads(corpo)["resultado"]
+        self.assertEqual([p["id"] for p in resultado["pontos"]], [f"P-{i}" for i in range(2, 206)])
+        self.assertIsNone(resultado["proximo_cursor"])
+
+    def test_consulta_sem_limite_usa_a_cota_de_paginas_grandes(self):
+        self.gravar("[abuso]\nmax_paginas_grandes = 1\n")
+        with closing(db.connect(self.banco)) as conn:
+            governanca.garantir_esquema(conn)
+        self.assertEqual(self.req(query="limite=0", REMOTE_ADDR="192.0.2.4")[0], 200)
+        self.assertEqual(self.req(query="limite=0", REMOTE_ADDR="192.0.2.4")[0], 429)
+
     def test_dump_diario_publico_condicional_sem_consultar_banco_no_http(self):
         with closing(db.connect(self.banco)) as conn:
             governanca.garantir_esquema(conn)

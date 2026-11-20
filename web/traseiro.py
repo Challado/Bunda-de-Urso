@@ -34,10 +34,10 @@ def atender(conn,caminho,metodo,environ,raw):
         query=urllib.parse.parse_qs(environ.get('QUERY_STRING',''))
         try:
             depois=int(query.get('depois',['0'])[0]); limite=int(query.get('limite',[str(tr.numero('lote'))])[0])
-            if depois<0 or not 1<=limite<=1000:
+            if depois<0 or not 0<=limite<=1000:
                 raise ValueError()
         except (ValueError,TypeError):
-            tr.erro(422,'cursor_invalido','Use depois>=0 e limite entre 1 e 1000.')
+            tr.erro(422,'cursor_invalido','Use depois>=0 e limite entre 0 e 1000.')
         if administrativo:
             if partes==[''] and metodo=='GET':
                 resultado=tr.status(conn)
@@ -101,7 +101,7 @@ def trocar(conn,par,local,dados):
     if ultima and (tr.datetime.datetime.now(tr.datetime.timezone.utc)-tr.datetime.datetime.fromisoformat(ultima)).total_seconds()<intervalo:
         return {'adiado':True,'intervalo_segundos':intervalo}
     cursor=dados.get('depois',0); limite=dados.get('limite',tr.numero('lote'))
-    if type(cursor) is not int or not 0<=cursor<2**63 or type(limite) is not int or not 1<=limite<=1000:
+    if type(cursor) is not int or not 0<=cursor<2**63 or type(limite) is not int or not 0<=limite<=1000:
         tr.erro(422,'cursor_invalido','Cursor/limite invalidos.')
     # Reserva atomica impede duas chamadas simultaneas de furarem o intervalo.
     atualizada=conn.execute('UPDATE TRASEIRO_INSTANCIA SET ultima_consulta_recebida=? WHERE uuid=? AND ultima_consulta_recebida IS NOT DISTINCT FROM ?',

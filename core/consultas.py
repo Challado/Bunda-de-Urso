@@ -260,7 +260,7 @@ def buscar_pontos(conn, lat, lon, raio, filtros=None, limite=100, cursor=None):
                          for pid in visao.membros("ponto", r["ponto_id"]) for rg in regimes.get(pid, ()))]
     total = len(dentro)
     offset = max(0, _offset_cursor(cursor))
-    recorte = dentro[offset:offset + limite]
+    recorte = dentro[offset:offset + limite if limite else None]
     records = _montar_pontos(conn, [(r, round(dist, 3)) for dist, r in recorte],
                             filtros.get("incluir_operacoes", True), visao, ufs, regimes)
     # Contagem de instrumentos de todo o resultado, inclusive aliases.
@@ -271,7 +271,7 @@ def buscar_pontos(conn, lat, lon, raio, filtros=None, limite=100, cursor=None):
         "total_pontos": total,
         "total_equipamentos": len(equipamentos),
         "retornados": len(records),
-        "proximo_cursor": str(offset + limite) if offset + limite < total else None,
+        "proximo_cursor": str(offset + limite) if limite and offset + limite < total else None,
         "total_inferidos": sum(r["qualidade"] == georesolver.QUALIDADE_INFERIDA for _, r in dentro),
     }
 
@@ -1179,9 +1179,9 @@ def buscar_trechos(conn, lat=None, lon=None, raio=None, filtros=None,
         # A ordem por ID textual mantém os cursores do contrato existente.
         rows = dbmod.query_all(conn, _TRECHO_SQL + where +
                               " ORDER BY CAST(t.id AS TEXT) LIMIT ? OFFSET ?",
-                              params + [limite, offset])
+                              params + [dbmod.limite_sql(conn, limite), offset])
         recorte = [montar_trecho(conn, r) for r in rows]
-        proximo = str(offset + limite) if offset + limite < total else None
+        proximo = str(offset + limite) if limite and offset + limite < total else None
         return recorte, {"total_trechos": total, "retornados": len(recorte),
                          "proximo_cursor": proximo}
 
@@ -1197,9 +1197,9 @@ def buscar_trechos(conn, lat=None, lon=None, raio=None, filtros=None,
     recs.sort(key=lambda t: t["id"])
 
     total = len(recs)
-    recorte = recs[offset:offset + limite]
+    recorte = recs[offset:offset + limite if limite else None]
     proximo = None
-    if offset + limite < total:
+    if limite and offset + limite < total:
         proximo = str(offset + limite)
     return recorte, {"total_trechos": total, "retornados": len(recorte),
                      "proximo_cursor": proximo}
@@ -1376,9 +1376,9 @@ def buscar_operacoes(conn, lat=None, lon=None, raio=None, filtros=None,
     rows.sort(key=lambda r: "O-%d" % r["operacao_id"])
     total = len(rows)
     offset = _offset_cursor(cursor)
-    recorte = _montar_operacoes(conn, rows[offset:offset + limite])
+    recorte = _montar_operacoes(conn, rows[offset:offset + limite if limite else None])
     proximo = None
-    if offset + limite < total:
+    if limite and offset + limite < total:
         proximo = str(offset + limite)
     return recorte, {"total_operacoes": total, "retornados": len(recorte),
                      "proximo_cursor": proximo}
@@ -1665,9 +1665,9 @@ def listar_atualizacoes(conn, filtros=None, limite=100, cursor=None):
         " ORDER BY ac.iniciada_em DESC, ac.id DESC", params)
     total = len(rows)
     offset = _offset_cursor(cursor)
-    recorte = rows[offset:offset + limite]
+    recorte = rows[offset:offset + limite if limite else None]
     proximo = None
-    if offset + limite < total:
+    if limite and offset + limite < total:
         proximo = str(offset + limite)
     records = [montar_execucao(conn, r) for r in recorte]
     return records, {"total_atualizacoes": total, "retornados": len(records),
@@ -1679,7 +1679,7 @@ def listar_snapshots(conn, limite=50):
     for s in dbmod.query_all(
             conn, "SELECT id, identificador_versao, publicado_em, status, "
             "resumo_validacao, anterior_id FROM SNAPSHOT_PUBLICADO "
-            "ORDER BY publicado_em DESC, id DESC LIMIT ?", (limite,)):
+            "ORDER BY publicado_em DESC, id DESC LIMIT ?", (dbmod.limite_sql(conn, limite),)):
         out.append({
             "id": "SN-%d" % s["id"],
             "identificador_versao": s["identificador_versao"],
@@ -1742,9 +1742,9 @@ def buscar_trafego(conn, limite=100, ponto_id=None, cursor=None):
         conn, _TRAFEGO_SQL + where + " ORDER BY o.id DESC", params)
     total = len(rows)
     offset = _offset_cursor(cursor)
-    recorte = rows[offset:offset + limite]
+    recorte = rows[offset:offset + limite if limite else None]
     proximo = None
-    if offset + limite < total:
+    if limite and offset + limite < total:
         proximo = str(offset + limite)
     recs = [montar_observacao_trafego(conn, r) for r in recorte]
     return recs, {"total_observacoes": total, "retornados": len(recs),
@@ -1783,7 +1783,7 @@ def buscar_cadastral(conn, filtros=None, limite=100, cursor=None):
                 JOIN pagina ON pagina.id=p.id
             ) selecionados ON 1=1
             ORDER BY selecionados.ponto_id
-        """, [*params, limite, offset])
+        """, [*params, dbmod.limite_sql(conn, limite), offset])
         total = pagina[0]["quantidade"]
         rows = [r for r in pagina if r["ponto_id"] is not None]
     else:
@@ -1796,10 +1796,10 @@ def buscar_cadastral(conn, filtros=None, limite=100, cursor=None):
             if row is not None and (not uf_filtro or _uf_do_ponto(row, ufs) == uf_filtro):
                 canonicos[row["ponto_id"]] = row
         total = len(canonicos)
-        rows = [canonicos[pid] for pid in sorted(canonicos)[offset:offset + limite]]
+        rows = [canonicos[pid] for pid in sorted(canonicos)[offset:offset + limite if limite else None]]
     recs = _montar_pontos(conn, [(r, None) for r in rows], filtros.get("incluir_operacoes", True), visao, ufs)
     return recs, {"total_pontos": total, "retornados": len(recs),
-                  "proximo_cursor": str(offset + limite) if offset + limite < total else None}
+                  "proximo_cursor": str(offset + limite) if limite and offset + limite < total else None}
 
 
 def exportar_cadastral(conn, lote=200):

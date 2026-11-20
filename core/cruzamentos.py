@@ -96,7 +96,7 @@ def cruzar(conn, ponto_id, ctx, ip=None):
 
 
 def cruzar_lote(conn, dados, ctx, ip=None):
-    """Paginacao por ID com teto fixo: nao perde registros se a fila mudar."""
+    """Paginação por ID com corte estável, inclusive quando limite=0."""
     gov.garantir_esquema(conn)
     if not isinstance(dados, dict) or set(dados) - {"cursor", "ate_id", "limite"}:
         raise gov.GovernancaError(422, "parametro_invalido", "Envie cursor, ate_id e limite, se necessários.")
@@ -104,17 +104,18 @@ def cruzar_lote(conn, dados, ctx, ip=None):
         if chave in dados and (type(dados[chave]) is not int or not 0 <= dados[chave] <= 2**63 - 1):
             raise gov.GovernancaError(422, "parametro_invalido", "%s deve ser inteiro não negativo." % chave)
     limite = dados.get("limite", 20)
-    if not 1 <= limite <= 20:
-        raise gov.GovernancaError(422, "limite_invalido", "O limite deve ser de 1 a 20.")
+    if not 0 <= limite <= 20:
+        raise gov.GovernancaError(422, "limite_invalido", "O limite deve ser de 0 a 20.")
     cursor = dados.get("cursor", 0)
     teto = dados.get("ate_id")
     if teto is None:
         teto = db.scalar(conn, "SELECT COALESCE(MAX(id),0) FROM PONTO_FISCALIZACAO")
+    teto_pagina = db.limite_sql(conn, limite + 1 if limite else 0)
     ids = [r[0] for r in conn.execute(
         "SELECT id FROM PONTO_FISCALIZACAO WHERE id>? AND id<=? "
         "AND procedencia='colaborativo' AND removido_em IS NULL "
         "AND (verificacao_status IS NULL OR verificacao_status<>'desabilitado') "
-        "ORDER BY id LIMIT ?", (cursor, teto, limite + 1))]
-    resultados = [cruzar(conn, pid, ctx, ip) for pid in ids[:limite]]
+        "ORDER BY id LIMIT ?", (cursor, teto, teto_pagina))]
+    resultados = [cruzar(conn, pid, ctx, ip) for pid in ids[:limite or None]]
     return {"resultados": resultados, "processados": len(resultados), "ate_id": teto,
-            "proximo_cursor": ids[limite - 1] if len(ids) > limite else None}
+            "proximo_cursor": ids[limite - 1] if limite and len(ids) > limite else None}

@@ -349,10 +349,11 @@ def publicar(conn,tipo,chave,documento,acao='publicar',catalogar=True):
     return seq
 
 def pagina(conn,depois=0,limite=None,max_bytes=None,tipos=None):
-    limite=min(numero('lote'),limite or numero('lote'))
-    if type(depois) is not int or depois<0 or limite<1:
-        erro(422,'cursor_invalido','Cursor inteiro nao negativo e limite positivo.')
-    candidatos=conn.execute('SELECT * FROM TRASEIRO_EVENTO WHERE seq>? ORDER BY seq LIMIT ?',(depois,limite)).fetchall()
+    if type(depois) is not int or depois<0 or (limite is not None and (type(limite) is not int or limite<0)):
+        erro(422,'cursor_invalido','Cursor e limite devem ser inteiros não negativos.')
+    teto = numero('lote') if limite is None else min(numero('lote'), limite)
+    candidatos=conn.execute('SELECT * FROM TRASEIRO_EVENTO WHERE seq>? ORDER BY seq LIMIT ?',
+                            (depois, dbmod.limite_sql(conn, teto)))
     rows=[]; tamanho=0
     for row in candidatos:
         n=len(json_doc(_envelope(row)).encode())+1
@@ -397,7 +398,13 @@ def exportar_pontos(conn):
 
 def listar(conn,tipo,depois=0,limite=100):
     tabela='TRASEIRO_CADASTRO' if tipo=='cadastros' else 'TRASEIRO_FONTE'
-    rows=conn.execute('SELECT c.*,e.origem,e.chave,e.documento,e.acao,e.revisao,e.recebido_em,i.nome AS instancia_nome,i.api_url AS instancia_url FROM '+tabela+' c LEFT JOIN TRASEIRO_EVENTO e ON e.seq=c.evento_id LEFT JOIN TRASEIRO_INSTANCIA i ON i.uuid=e.origem WHERE c.id>? ORDER BY c.id LIMIT ?',(depois,min(200,max(1,limite)))).fetchall()
+    teto = dbmod.limite_sql(conn, min(200, limite) if limite >= 0 else 1)
+    rows = conn.execute(
+        'SELECT c.*,e.origem,e.chave,e.documento,e.acao,e.revisao,e.recebido_em,'
+        'i.nome AS instancia_nome,i.api_url AS instancia_url FROM ' + tabela +
+        ' c LEFT JOIN TRASEIRO_EVENTO e ON e.seq=c.evento_id '
+        'LEFT JOIN TRASEIRO_INSTANCIA i ON i.uuid=e.origem '
+        'WHERE c.id>? ORDER BY c.id LIMIT ?', (depois, teto)).fetchall()
     return [{**dict(r),'documento':json.loads(r['documento'])} for r in rows]
 
 @gravacao

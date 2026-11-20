@@ -181,7 +181,8 @@ A → B → C → A preserva UUID/origem/revisão; C não recria o evento como s
 seu. A camada de dados decide que entidades precisam de revisão humana; receber
 um evento ou uma declaração de origem não torna seu conteúdo oficial.
 
-O limite de bytes inclui os dados e os metadados. O adaptador limita documentos
+`limite=0` remove o teto da quantidade de eventos na resposta. O limite de
+bytes continua valendo e inclui os dados e os metadados. O adaptador limita documentos
 a 32 KiB e lotes/catálogos ao orçamento anunciado. Payload inválido ou conflito
 recusa o lote inteiro. Não se altera cursor após recusa. Instâncias e eventos
 desconhecidos não devem causar execução de código recebido.

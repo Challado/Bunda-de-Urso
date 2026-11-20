@@ -113,7 +113,7 @@ def validar_pedido(pedido,consultado):
         raise ErroIntercambio('Lote excede limite do consultado.')
     if type(pedido.get('depois',0)) is not int or not 0<=pedido.get('depois',0)<2**63:
         raise ErroIntercambio('Cursor invalido.')
-    if type(pedido.get('limite',1)) is not int or not 1<=pedido.get('limite',1)<=1000:
+    if type(pedido.get('limite',1)) is not int or not 0<=pedido.get('limite',1)<=1000:
         raise ErroIntercambio('Limite de pagina invalido.')
     for evento in eventos:
         if not isinstance(evento,dict) or evento.get('tipo') not in consultado['capacidades']['tipos_evento']:

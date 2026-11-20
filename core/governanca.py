@@ -1114,9 +1114,9 @@ def listar_pendentes(conn, limite=100, cursor=None, status=None):
         offset = int(cursor) if cursor else 0
     except (TypeError, ValueError):
         offset = 0
-    recorte = ids[offset:offset + limite]
+    recorte = ids[offset:offset + limite if limite else None]
     pontos = [_resumo_ponto(conn, pid) for pid in recorte]
-    proximo = str(offset + limite) if offset + limite < total else None
+    proximo = str(offset + limite) if limite and offset + limite < total else None
     return pontos, {"total": total, "retornados": len(pontos),
                     "proximo_cursor": proximo}
 

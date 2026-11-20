@@ -64,7 +64,7 @@ Os IDs dependem da base consultada; os exemplos não reservam um ID específico.
 | `lat`, `lon` | Obrigatórios; latitude -90..90, longitude -180..180. |
 | `raio` | Inteiro de 1 a 1.000.000, em metros. |
 | `formato` | `json`, `ndjson`, `xml`, `txt`, `dif`, `edi` ou `edifact`. Padrão `json`. |
-| `limite` | Itens por página: 1 a 200, sujeito ao teto da instância. Padrão 100. |
+| `limite` | Use `0` para todos os resultados a partir do cursor. Valores positivos de 1 a 200 seguem o teto da instância. Padrão 100. |
 | `cursor` | Cursor devolvido na página anterior. Acima do limite público, exige `X-Radar-Leitura`. |
 | `uf` | Sigla, por exemplo `GO`. |
 | `municipio_ibge` | Código IBGE do município, com 7 dígitos. |
@@ -265,6 +265,11 @@ com o consumidor. Para paginação, processe cada documento; concatenar arquivos
 DIF/EDIFACT completos não produz automaticamente uma única tabela/mensagem válida.
 
 ## Paginação e exportação de todas as páginas
+
+Em qualquer consulta que aceite `limite`, envie `limite=0` para remover o teto
+de registros. Os filtros e o ponto de partida (`cursor` ou `depois`) continuam
+valendo. A consulta sem teto conta na cota de páginas grandes das buscas de
+radares. Para baixar toda a base pública já compactada, use o arquivo diário.
 
 Leia `resultado.proximo_cursor` para avançar mantendo os filtros. O teto público padrão é de 2.000 registros de deslocamento. Acima dele, a resposta é `401` com o link do arquivo diário. Solicite ao mantenedor uma chave específica de leitura para paginação profunda. Envie-a no cabeçalho `X-Radar-Leitura`.
 

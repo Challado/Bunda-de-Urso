@@ -66,7 +66,7 @@ PARAMS = [
     ("sentido", "string", False, "codigo cadastrado", "sentido"),
     ("em", "datetime", False, "ISO8601", "instante de referencia temporal"),
     ("ponto_id", "string", False, "P-<n>", "filtra /api/v1/trafego por ponto"),
-    ("limite", "inteiro", False, "1..200", "itens por pagina (padrao 100, limitado pela instancia)"),
+    ("limite", "inteiro", False, "0..200", "itens por página (padrão 100); 0 retorna todos os resultados a partir do cursor"),
     ("cursor", "inteiro", False, ">=0", "acima do limite público exige X-Radar-Leitura"),
     ("depois", "inteiro", False, ">=0", "ultimo ID numerico exibido no status do estado"),
     ("versao_esquema", "string", False, "string", "versao de contrato"),
@@ -147,7 +147,7 @@ ENDPOINTS_DESC = {
     "/api/v1/status/coletores": "Diagnóstico dos leitores; exige sessão ou token de moderador.",
     "/api/v1/radares/download": "Arquivo diário radares.json.gz com ETag e Last-Modified.",
     "/api/v1/gestao/radar/{id}/cruzar": "Recruza contribuicao ativa, inclusive verificada, com fontes oficiais locais; gera sugestoes auditadas.",
-    "/api/v1/gestao/cruzamentos": "Recruza contribuicoes ativas em lotes de ate 20, com cursor e teto por ID; exige moderador.",
+    "/api/v1/gestao/cruzamentos": "Recruza contribuições ativas em lotes de até 20 ou todas com limite=0; exige moderador.",
     "/api/v1/radares": "Pontos de fiscalizacao (radar instalado) num raio.",
     "/api/v1/radares/submeter": ("Submissao PUBLICA de radar (sem token): "
                                   "entra como colaborativo/nao verificado e "
@@ -965,8 +965,10 @@ def _gestao(conn, p, metodo, environ, stdin_bytes):
             params = _consulta_params(environ)
             try:
                 limite = int(params.get("limite", politica_acesso.limite_padrao()))
+                if limite < 0:
+                    raise ValueError()
             except (TypeError, ValueError):
-                return _erro_limite()
+                return _erro(422, "limite_invalido", "Informe um limite inteiro não negativo.", "limite")
             pontos, meta = governanca.listar_pendentes(
                 conn, limite, params.get("cursor"), params.get("status"))
             return _resp({"sucesso": True, "pendentes": pontos,
@@ -1158,8 +1160,14 @@ def _acesso_publico(rota, metodo, environ, params):
                 raise ValueError()
         except (ValueError, TypeError, OverflowError):
             return _erro(422, "cursor_invalido", "Informe um cursor inteiro não negativo.", "cursor")
+        limite_pedido = limite or float("inf")
+    elif rota.startswith("/api/v1/status/estados/") and metodo == "GET":
+        limite = _param_limite(params)
+        if limite is None:
+            return _erro_limite()
+        limite_pedido, cursor = limite or float("inf"), 0
     elif categoria in politica_acesso.ROTAS_REGRAS and metodo in ("GET", "HEAD", "POST"):
-        limite = cursor = 0
+        limite_pedido = cursor = 0
     else:
         return None
     endereco = _ip_requisicao(environ)
@@ -1168,7 +1176,7 @@ def _acesso_publico(rota, metodo, environ, params):
     if categoria in politica_acesso.ROTAS_REGRAS:
         try:
             liberado = politica_acesso.liberado(categoria, endereco, agente)
-            bloqueio = None if liberado else politica_acesso.bloqueio(categoria, endereco, agente, limite, cursor)
+            bloqueio = None if liberado else politica_acesso.bloqueio(categoria, endereco, agente, limite_pedido, cursor)
         except ValueError as exc:
             print(str(exc), file=sys.stderr)
             return _erro(503, "politica_indisponivel", "Política de acesso temporariamente indisponível.")
@@ -1185,7 +1193,7 @@ def _acesso_publico(rota, metodo, environ, params):
         return status, headers, body
     if not liberado and rota in politica_acesso.ROTAS_BUSCA:
         try:
-            espera = politica_acesso.excesso_paginas(environ, endereco, limite, chave_valida)
+            espera = politica_acesso.excesso_paginas(environ, endereco, limite_pedido, chave_valida)
         except (OSError, ValueError, TypeError, KeyError) as exc:
             print(f"Falha no contador de acesso: {type(exc).__name__}", file=sys.stderr)
             return _erro(503, "politica_indisponivel", "Política de acesso temporariamente indisponível.")
@@ -1387,7 +1395,7 @@ def handle_request(environ, stdin_bytes=b""):
                     if depois < 0 or limite is None:
                         raise ValueError()
                 except (TypeError, ValueError):
-                    return _erro(422, "paginacao_invalida", f"limite 1..{politica_acesso.limite()} e depois inteiro não negativo.")
+                    return _erro(422, "paginacao_invalida", f"limite 0..{politica_acesso.limite()} e depois inteiro não negativo.")
                 if uf is not None and uf not in painel_status.NOMES:
                     return _erro(422, "uf_invalida", "Informe uma das 27 siglas de UF.")
                 resultado = painel_status.cobertura(conn, uf, limite, depois)
@@ -1645,7 +1653,9 @@ def _param_raio(params):
 
 
 def _erro_limite():
-    return _erro(422, "limite_invalido", f"limite deve ser inteiro de 1 a {politica_acesso.limite()}.", "limite")
+    return _erro(422, "limite_invalido",
+                 f"limite deve ser inteiro de 0 a {politica_acesso.limite()}. Use 0 para todos os resultados.",
+                 "limite")
 
 
 def _param_limite(params):
@@ -1656,7 +1666,7 @@ def _param_limite(params):
         limite = int(valor)
     except (TypeError, ValueError):
         return None
-    if limite < config.MIN_LIMITE or limite > politica_acesso.limite():
+    if not 0 <= limite <= politica_acesso.limite():
         return None
     return limite
 
@@ -1864,7 +1874,7 @@ def _atualizacoes(conn, params, formato, delimitador):
         return _erro_limite()
     records, res = consultas.listar_atualizacoes(
         conn, filtros, limite, params.get("cursor"))
-    snaps = consultas.listar_snapshots(conn)
+    snaps = consultas.listar_snapshots(conn, limite=0 if limite == 0 else 50)
     st = consultas.metadados_base(conn)
     resultado = {
         "encontrado": bool(res["total_atualizacoes"]),

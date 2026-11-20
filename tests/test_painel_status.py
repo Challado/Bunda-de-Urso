@@ -335,7 +335,7 @@ class TestApiStatus(unittest.TestCase):
 
     def test_uf_e_paginacao_invalidas(self):
         self.assertEqual(self.req('/api/v1/status/estados/XX')[0],422)
-        for query in ['limite=0','limite=1001','depois=-1','depois=abc']:
+        for query in ['limite=-1','limite=1001','depois=-1','depois=abc']:
             self.assertEqual(self.req('/api/v1/status/estados/PR',query)[0],422)
         self.assertEqual(self.req('/api/v1/status/estados/PR','formato=xml')[0],400)
 

@@ -144,13 +144,13 @@ def cobertura(conn, uf=None, limite=100, depois=0):
             orgaos[nome] += 1
         for f in p["fontes"]:
             fontes.setdefault(f["id"], dict(f, pontos=0))["pontos"] += 1
-    pagina = [p for p in pontos if int(p["id"][2:]) > depois][:limite + 1]
+    pagina = [p for p in pontos if int(p["id"][2:]) > depois][:limite + 1 if limite else None]
     return dict(resultado, estado=next(e for e in estados if e["uf"] == uf),
                 municipios=[{"nome": n, "pontos": v} for n, v in sorted(municipios.items())],
                 organizacoes=[{"nome": n, "pontos": v} for n, v in sorted(orgaos.items())],
                 fontes=atualizacoes.limpar(sorted(fontes.values(), key=lambda f: f["nome"])),
-                pontos=atualizacoes.limpar(pagina[:limite]),
-                proximo_depois=int(pagina[limite - 1]["id"][2:]) if len(pagina) > limite else None)
+                pontos=atualizacoes.limpar(pagina[:limite or None]),
+                proximo_depois=int(pagina[limite - 1]["id"][2:]) if limite and len(pagina) > limite else None)
 
 
 @lru_cache(maxsize=1)

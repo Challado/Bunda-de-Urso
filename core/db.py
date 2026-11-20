@@ -108,6 +108,11 @@ def e_postgres(conn):
     return not isinstance(conn, sqlite3.Connection)
 
 
+def limite_sql(conn, limite):
+    """Representação SQL de um limite de linhas, com zero para todos."""
+    return limite or (None if e_postgres(conn) else -1)
+
+
 def tabela_existe(conn, tabela):
     if e_postgres(conn):
         return bool(scalar(conn, "SELECT to_regclass(?) IS NOT NULL", (tabela.lower(),)))
