@@ -1,24 +1,24 @@
-# Relatorios das atualizacoes
+# Relatórios das atualizações
 
-Ao aplicar o instalador como root, o aplicativo disponibiliza
-`<instalacao.home>/status-atualizacoes.json`. E um link para
-`<dados.dir>/atualizacoes/status.json`: o estado e os relatorios individuais
-permanecem fora da arvore substituida, inclusive quando ha recuperacao de backup.
-Os caminhos seguem o `radar.conf`. Os relatorios nao ficam na pasta web.
+O instalador imprime os caminhos do status consolidado e do log de
+bootstrap. O consolidado fica em `atualizacoes/status.json` dentro de
+`[dados] dir`. Os relatórios ficam no diretório operacional configurado,
+que é preservado durante a atualização dos fontes.
 
-No servidor3:
+A tabela usa `<dados.dir>` e `<logs.dir>` para os caminhos resolvidos a
+partir do `radar.conf`. Por padrão, o diretório de logs é `<dados.dir>/logs`.
 
 | Arquivo | Conteudo |
 |---|---|
-| `/openclaw/bin/radar/status-atualizacoes.json` | Estado consolidado de instalacao, bootstrap, coletas por recurso, agenda e processamento da fila. |
-| `/var/lib/radar-brasil/atualizacoes/instalacao-<id>.json` | Etapas, comandos, stdout/stderr, checagens, versoes, destinos, backup, observacoes e recuperacao. |
-| `/var/lib/radar-brasil/atualizacoes/bootstrap-<id>.json` | Dependencias, download, verificadores, saida completa do `.sh`, etapa da falha e codigo de saida original. |
-| `/var/lib/radar-brasil/atualizacoes/coleta-<execucao_id>.json` | Fonte/recurso, origem, hash, bytes, contadores, rejeicoes individuais e excecoes com traceback. |
-| `/var/lib/radar-brasil/atualizacoes/sync-<id>.json` | Coleta manual, incluindo tentativas HTTP que falharam. |
-| `/var/lib/radar-brasil/atualizacoes/tick-<id>.json` | Passada com coletas ou erros, decisoes de todas as fontes e falhas de pos-processamento. |
-| `/var/lib/radar-brasil/atualizacoes/fila-<id>.json` | Processamento com falhas/rejeicoes: protocolo, tentativa e causa. |
-| `/var/log/openclaw/radar/atualizacoes.log` | Eventos em JSON por linha: tentativas HTTP, saidas de comandos e tracebacks completos. |
-| `/var/log/openclaw/radar/bootstrap.log` | Transcricao do instalador com horario, etapa e ID em cada linha. |
+| `<dados.dir>/atualizacoes/status.json` | Estado consolidado da instalação, do bootstrap, das coletas por recurso, da agenda e da fila. |
+| `<dados.dir>/atualizacoes/instalacao-<id>.json` | Etapas, checagens, versões, destinos, backup, observações e recuperação. |
+| `<dados.dir>/atualizacoes/bootstrap-<id>.json` | Dependências, download, verificadores, saída completa do instalador, etapa da falha e código de saída. |
+| `<dados.dir>/atualizacoes/coleta-<execucao_id>.json` | Fonte, recurso, origem, hash, bytes, contagens, rejeições e exceções. |
+| `<dados.dir>/atualizacoes/sync-<id>.json` | Coleta manual, incluindo tentativas HTTP que falharam. |
+| `<dados.dir>/atualizacoes/tick-<id>.json` | Coletas ou erros da rodada, decisões de agendamento e falhas de pós-processamento. |
+| `<dados.dir>/atualizacoes/fila-<id>.json` | Protocolo, tentativa e causa de falhas ou rejeições. |
+| `<logs.dir>/atualizacoes.log` | Eventos em JSON por linha, com tentativas HTTP, saídas de comandos e exceções. |
+| `<logs.dir>/bootstrap.log` | Transcrição do instalador com horário, etapa e ID em cada linha. |
 
 Os logs entram no logrotate existente: semanal, oito rotacoes, compressao.
 Os JSONs individuais permanecem no diretorio de dados; nao sao expurgados
@@ -27,11 +27,20 @@ um arquivo historico por minuto.
 
 ## Como analisar
 
+No servidor3, com os caminhos padrão do layout atual:
+
 ```sh
-cat /openclaw/bin/radar/status-atualizacoes.json
-tail -n 100 /var/log/openclaw/radar/bootstrap.log
-tail -n 100 /var/log/openclaw/radar/atualizacoes.log
+cd /var/www/html/openclaw/radar
+cat dados/atualizacoes/status.json
+tail -n 100 dados/logs/bootstrap.log
+tail -n 100 dados/logs/atualizacoes.log
 ```
+
+Pelo navegador, abra o diagnóstico com a sessão de moderador ou
+administrador. A mesma credencial permite consultar
+`api.pse?rota=/api/v1/atualizacoes/status`. A rota retorna HTTP 401 sem
+credencial e 503 se o relatório ainda estiver indisponível.
+[Painel de status e diagnóstico](STATUS.md)
 
 O consolidado tem `operacoes`, `fontes` e `resumo`. A chave de `fontes` e o ID do
 recurso, pois uma fonte pode ter publicacoes independentes. Cada item identifica
@@ -94,7 +103,9 @@ configuracao/caminhos nao podem ser lidos com seguranca, publica um diario
 emergencial temporario e imprime o caminho. Falhas de gravacao sao avisadas no
 stderr; nao desfazem uma coleta ja confirmada no banco.
 
-Nao registra ambiente inteiro, arquivos de chaves, pedidos de cadastro nem a
-saida de `configuracao mostrar`. Credenciais reconheciveis em mensagens/URLs sao
-ocultadas. Logs e JSONs sao locais, 0660, fora do webroot. Simular ou verificar
-com o instalador nao cria o diario de instalacao.
+O diário omite o ambiente completo, os arquivos de chaves, os pedidos de
+cadastro e a saída de `configuracao mostrar`. Credenciais reconhecíveis em
+mensagens e URLs são ocultadas. Logs e JSONs são arquivos privados. Quando
+`[dados] dir` está sob a raiz web, a proteção HTTP da instalação cobre esses
+arquivos. A simulação e a verificação do instalador dispensam o diário de
+instalação.

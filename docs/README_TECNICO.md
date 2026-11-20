@@ -14,19 +14,20 @@ O projeto é dividido em **duas partes independentes**:
 
 ## Stack
 
-- **Linguagem:** Python 3. A aplicação usa a biblioteca padrão. O migrador
-  PostgreSQL usa o driver opcional Psycopg 3 (`psycopg`).
+- **Linguagem:** Python 3. O modo SQLite usa a biblioteca padrão. O modo
+  PostgreSQL e seu migrador usam Psycopg 3 (`psycopg`).
 - **Banco:** relacional, com exigência de 3FN para o modelo canônico e
   [revisão das dependências](NORMALIZACAO_RELACIONAL.md). O motor é selecionado em `radar.conf`.
   A [migração para PostgreSQL](MIGRACAO_POSTGRES.md) prepara um esquema e
   valida a cópia das tabelas. A consulta geográfica usa *bounding box* em
   SQL e distância Haversine na aplicação.
 - **Web:** **CGI** no padrão da casa — `fcgiwrap` + `nginx` executando um
-  arquivo **`.pse`** (entry point fino); toda a lógica mora fora do webroot.
+  arquivo **`.pse`** (entry point fino). Em produção, o acesso HTTP é limitado
+  às páginas, aos recursos públicos e às rotas da API.
   **O que é `.pse`:** é só uma **extensão de arquivo** — a convenção histórica
   deste servidor para scripts executáveis do site (`cnpj.pse`, `frase.pse`,
   `pythoninfo.pse`, `api.pse`...), equivalente a um `.cgi`. A API **não** é um
-  servidor nem um framework: é um **programa Python 3 (só stdlib)** que o nginx
+  servidor nem um framework: é um **programa Python 3** que o nginx
   executa **sob demanda** via **fcgiwrap** (FastCGI→CGI), **sem daemon e sem
   porta própria** — cada requisição sobe o processo, responde e termina. Como o
   `fcgiwrap` daqui não define `PATH_INFO`, a rota vai no parâmetro `rota`
@@ -36,7 +37,8 @@ O projeto é dividido em **duas partes independentes**:
 
 ```
 core/                    pesquisa/comum aos dois lados
-  config.py              caminhos e variáveis de ambiente
+  caminhos.py            seleção do radar.conf e resolução de caminhos
+  config.py              parâmetros operacionais lidos do radar.conf
   db.py                  conexão com o banco ativo, inicialização do esquema, consultas
   geo.py                 Haversine + bounding box (sem dependências)
   consultas.py           consulta read-only (bbox em SQL + Haversine)
@@ -62,12 +64,13 @@ As operações da aplicação entram por `api.pse`: requisições CGI, console,
 coleta agendada e manutenção. `web/api.pse` e o wrapper `deploy/api.pse`
 usam o mesmo despachante em `core/entrada_api.py`.
 
-No próprio servidor, os comandos são locais:
+Em um checkout novo, crie a configuração local antes de executar os comandos.
+Em produção, use o `api.pse` instalado com o usuário que executa o Radar.
 
 ```bash
+cp -n deploy/radar.conf.exemplo radar.conf
 python3 web/api.pse ferramenta inicializar_banco
 python3 web/api.pse ferramenta radar_admin listar-usuarios
-python3 web/api.pse sync --fonte antt --arquivo tests/fixtures/antt_radares_fixture.json
 python3 web/api.pse tick --help
 ```
 
@@ -101,46 +104,40 @@ python3 web/api.pse ferramenta inicializar_banco
 
 ### 2. Coletor / sincronização
 
-Aceita arquivo local (testes sem rede) ou baixa da URL publicada:
+O coletor aceita arquivos locais dentro de `[dados] dir`. Sem `--arquivo`,
+busca a publicação oficial e guarda o arquivo bruto por SHA-256.
 
 ```bash
-# ANTT a partir de uma fixture local
-python3 -m coletor.sync --fonte antt --arquivo tests/fixtures/antt_radares_fixture.json
-
-# Recife a partir do CSV
-python3 -m coletor.sync --fonte recife --arquivo tests/fixtures/recife_equipamentos.csv
-
-# sem --arquivo baixa da URL do portal oficial (urllib), com cache por sha256
-python3 -m coletor.sync --fonte antt
-
-# banco alternativo
-python3 -m coletor.sync --fonte antt --arquivo fixture.json --db /caminho/radar.sqlite3
+mkdir -p dados
+cp tests/fixtures/antt_radares_fixture.json dados/
+python3 web/api.pse sync --fonte antt --arquivo "$PWD/dados/antt_radares_fixture.json"
+python3 web/api.pse sync --fonte antt --help
 ```
 
-Variáveis de ambiente: `RADAR_DATA_DIR` (padrão `dados/`), `RADAR_DB`
-(padrão `dados/radar.sqlite3`), `RADAR_BRASIL_HOME`.
+Para trabalhar em outra base, aponte `RADAR_CONF` para o arquivo de
+configuração correspondente. Veja os parâmetros dos motores no
+[guia de configuração](CONFIGURACAO.md).
 
 ### 3. API / CGI
 
 O entry point é `web/api.pse`. Para testar fora do nginx (simulando o CGI):
 
 ```bash
-export RADAR_DB=/tmp/radar.sqlite3
-python3 -m coletor.sync --fonte antt --arquivo tests/fixtures/antt_radares_fixture.json
-
 REQUEST_METHOD=GET \
-QUERY_STRING='lat=-24.9555&lon=-53.4552&raio=5000&formato=txt&delimitador=%7C' \
-PATH_INFO='/api/v1/radares' python3 web/api.pse
+QUERY_STRING='rota=/api/v1/radares&lat=-24.9555&lon=-53.4552&raio=5000&formato=txt&delimitador=%7C&limite=0' \
+python3 web/api.pse
 ```
 
 Endpoint → parâmetros (spec §10): `lat`, `lon` (obrigatórios em `/radares`),
 `raio` (1..1000000, até 1000 km; padrão 1000), `formato` (`json|ndjson|xml|txt|edi|edifact|dif`),
-`delimitador` (só `txt`), `limite` (1..1000, padrão 100), `cursor`, `uf`,
+`delimitador` (só `txt`), `limite` (0 para todos, positivos até o teto da
+instância, padrão 100), `cursor`, `uf`,
 `municipio_ibge`, `rodovia`, `incluir_inativos`, etc. `GET` e `POST`
 (JSON ou form) devolvem o mesmo resultado.
 
-Endpoints: `/api/v1/radares`, `/api/v1/radares/{id}`, `/api/v1/ajuda`,
-`/api/v1/status`, `/api/v1/fontes`, `/health/live`, `/health/ready`.
+O [guia da API](API_E_EXPORTACAO.md) reúne as rotas, os formatos, a paginação
+e o download completo. `GET /api/v1/ajuda` retorna a referência da
+versão instalada.
 
 ### 4. Testes
 

@@ -1,6 +1,6 @@
 # BUNDA DE URSO
 
-**Documentação:** [API e exportação — JSON, NDJSON, XML, TXT, DIF e EDIFACT](docs/API_E_EXPORTACAO.md) · [Rede e intercâmbio](docs/INTERCAMBIO_INSTANCIAS.md) · [Histórico](CHANGELOG.md)
+**Documentação** · [API e exportação](docs/API_E_EXPORTACAO.md) · [Configuração](docs/CONFIGURACAO.md) · [Status das fontes](docs/STATUS.md) · [Rede e intercâmbio](docs/INTERCAMBIO_INSTANCIAS.md) · [Histórico](CHANGELOG.md)
 
 
 O `radar.conf` fica junto da API. `RADAR_CONF` pode indicar outro arquivo.
@@ -97,7 +97,7 @@ O projeto separa duas responsabilidades:
 1. **Coletor e normalizador:** processo independente que descobre recursos oficiais, baixa documentos, interpreta formatos, valida campos, registra alterações e alimenta o banco relacional.
 2. **Aplicação web/API:** interface de consulta que lê o banco local, sem consultar portais governamentais a cada requisição.
 
-A implementação é em **Python 3, só stdlib** (`urllib`, `sqlite3`, `csv`, `json`, `xml.etree`) — sem pip, sem dependência externa. Não utiliza `import cgi`.
+A aplicação usa **Python 3** e sua biblioteca padrão para o funcionamento com SQLite. A operação com PostgreSQL requer Psycopg 3 (`psycopg`).
 
 ### O que é o “`.pse`”? (o servidor web, explicado)
 
@@ -105,7 +105,7 @@ Quem esbarra em `api.pse` não tem como adivinhar o que é — e não precisa: *
 
 Na prática, a API é:
 
-- um **programa Python 3** (só a biblioteca padrão), guardado **fora** da pasta pública;
+- um **programa Python 3** publicado como `api.pse`, com acesso HTTP aos arquivos operacionais bloqueado;
 - que o **nginx** executa **sob demanda** via **`fcgiwrap`** (o adaptador FastCGI→CGI do servidor);
 - **sem servidor de aplicação, sem daemon e sem porta própria** — cada requisição sobe o processo, responde (*JSON*, *XML*, *TXT*, *NDJSON*, *EDIFACT* ou *DIF*) e termina;
 - com a **rota no parâmetro `rota`**, porque o `fcgiwrap` deste servidor não define `PATH_INFO`:
@@ -208,15 +208,16 @@ O tipo de equipamento (fixo, portátil), a função (controlador, redutor), o se
 
 ## API e formatos
 
-**[Guia completo de consulta e exportação](docs/API_E_EXPORTACAO.md)**: exemplos de `/radares`, NDJSON linha a linha, 32 colunas TXT, paginação e download de todas as páginas.
+O guia cobre consultas com `limite=0`, o arquivo diário `radares.json.gz` e os formatos JSON, NDJSON, XML, TXT, DIF e EDIFACT. [Guia de consulta e exportação](docs/API_E_EXPORTACAO.md)
 
 A API web (arquivo `.pse`: **nginx + fcgiwrap + Python**, explicado acima) oferece consultas por latitude, longitude e raio (até **1000 km**); identificação do equipamento; UF, rodovia e quilômetro; além de fontes, atualizações, situação do serviço, operações, trechos e tráfego.
 
-Os endpoints da API são:
+Principais endpoints da API:
 
 - `/api/v1/radares`
 - `/api/v1/radares/{id}`
 - `/api/v1/radares/busca`
+- `/api/v1/radares/download` (arquivo diário da base pública)
 - `/api/v1/equipamentos/{id}`
 - `/api/v1/fontes` e `/api/v1/fontes/{id}`
 - `/api/v1/atualizacoes`
@@ -224,6 +225,8 @@ Os endpoints da API são:
 - `/api/v1/trechos`
 - `/api/v1/trafego`
 - `/api/v1/status`
+- `/api/v1/status/estados` e `/api/v1/status/estados/{uf}`
+- `/api/v1/status/leituras` (fontes oficiais) e `/api/v1/status/coletores` (diagnóstico da equipe)
 - `/api/v1/ajuda`
 - `/api/v1/radares/submeter` (submissão pública, sem token)
 - `/api/v1/radares/{id}/historico` (auditoria pública do ponto)
@@ -282,9 +285,9 @@ admin = bloqueios/tokens/usuários).
 
 ## Atualizações, observabilidade e auditoria
 
-O coletor pode ser agendado via systemd, com verificações periódicas, cache persistente e atualização incremental. O resolvedor geográfico possui execução independente. A periodicidade deve respeitar a publicação efetiva de cada fonte e suas limitações de acesso.
+No servidor3, a coleta, a fila, a rede e a geração do arquivo diário são agendadas no crontab do `www-data`. As fontes têm periodicidades próprias e a coleta reutiliza o cache persistente. [Configuração](docs/CONFIGURACAO.md)
 
-Registrar logs de download, parsing, validação, importação, deduplicação, alterações, falhas, idade do cache e cobertura territorial. Relatórios devem distinguir equipamentos com GPS oficial, posição referencial, posição derivada, candidato em revisão e sem coordenada.
+A página de status mostra a cobertura por UF e as leituras oficiais. A equipe pode consultar as falhas detalhadas e os relatórios da instalação, da agenda e da fila. [Status](docs/STATUS.md) · [Relatórios de atualização](docs/RELATORIOS_ATUALIZACOES.md)
 
 Os dados devem permitir rastrear cada resposta da API até a publicação original. Isso é indispensável para correção de erros e transparência pública.
 
@@ -305,36 +308,36 @@ Integração com outros sistemas: [protocolo de Intercâmbio de Instâncias](doc
 
 A especificação funcional é o `ESPECIFICACAO_v1.1.txt`; a referência técnica do código está em `docs/README_TECNICO.md`, `docs/LOCALIZADOR_GEOGRAFICO_V1_4.md`, `docs/CRUZAMENTO_DE_CAMPOS.md` e `docs/REQUISITOS_VIGENTES_2026-10-10.md`.
 
-Sem pip, sem instalação: basta ter Python 3. Gera as DDLs, sincroniza uma fonte e serve a API:
+Para testar em um checkout novo com SQLite:
 
 ```bash
-python3 tools/build_schema.py
-python3 -m coletor.sync --fonte antt
-python3 -m coletor.sync --fonte recife --arquivo tests/fixtures/recife_equipamentos.csv
+cp -n deploy/radar.conf.exemplo radar.conf
+mkdir -p dados
+cp tests/fixtures/antt_radares_fixture.json dados/
+python3 web/api.pse sync --fonte antt --arquivo "$PWD/dados/antt_radares_fixture.json"
 ```
 
-**Caminhos: um arquivo só.** A instalação (código, banco, dados, webroot, logs,
-espelho de dados) é declarada em **`/etc/radar-brasil/radar.conf`** e lida por
-`core/caminhos.py`. Precedência: variável de ambiente > `.conf` > padrão do
-checkout. Nenhum script decide diretório por conta própria — quem escrever
-caminho fixo é reprovado por `.github/scripts/verificar_caminhos.py`. Modelo,
-chaves e diagnóstico em [`docs/CONFIGURACAO.md`](docs/CONFIGURACAO.md):
+O `radar.conf` define caminhos, serviços e motor do banco. A API lê o arquivo
+da raiz do checkout ou, em produção, o arquivo ao lado do `api.pse` instalado.
+`RADAR_CONF` permite selecionar outro arquivo para a execução. Os caminhos
+dos arquivos operacionais são resolvidos dentro de `[dados] dir`.
 
 ```bash
-python3 deploy/conf_radar.py            # caminhos efetivos e de onde vieram
-python3 deploy/conf_radar.py --verificar
+python3 web/api.pse configuracao mostrar
 ```
 
-Variáveis de ambiente equivalentes: `RADAR_BRASIL_HOME`, `RADAR_DATA_DIR`,
-`RADAR_DB`, `RADAR_WEB_ROOT`, `RADAR_WEB_URL`, `RADAR_LOG_DIR`,
-`RADAR_SYNC_CLONE`, `RADAR_SYNC_REMOTO` (e `RADAR_CONF` para apontar outro
-arquivo). O entry point web é `web/api.pse`; os testes rodam com:
+No servidor3, o instalador do repositório privado aplica as atualizações.
+Em um servidor já preparado, use `bash instalar-servidor3.sh --aplicar
+--sem-pacotes --sem-reprocessamento` como root para atualizar o código e o
+esquema, adiando tarefas de reprocessamento. [Guia de configuração](docs/CONFIGURACAO.md)
+
+Para rodar os testes:
 
 ```bash
 python3 -m unittest discover -s tests
 ```
 
-O ambiente web requer Nginx, fcgiwrap, Python e permissão controlada de acesso ao banco local. Antes de colocar em produção, testar autenticação administrativa, configurações, permissões, atualização, formatos e recuperação de falhas.
+O ambiente web usa Nginx, fcgiwrap, Python e um usuário com acesso ao banco configurado.
 
 ## Validação automática (CI)
 

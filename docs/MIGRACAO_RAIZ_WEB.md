@@ -59,7 +59,7 @@ não se seguem links simbólicos e não se listam diretórios. Não existem
 redirecionamentos para páginas em `resources/`: as páginas são acessadas
 diretamente na raiz. O descritor do projeto aponta para a home do site. O relatório
 é consultado em `api.pse?rota=/api/v1/atualizacoes/status`, que lê o JSON dentro
-de `dados.dir`, sem abrir SQLite.
+de `dados.dir` após autenticar um moderador ou administrador.
 A configuração do nginx pertence ao operador. O instalador não edita seus
 arquivos nem instala, inicia, reinicia ou recarrega o nginx. Apenas confere a
 sintaxe existente e consulta as URLs por HTTP. Se arquivos privados estiverem
@@ -83,7 +83,8 @@ existe serviço root ou cron de atualização remota.
 
 O instalador baixa o código público e executa a instalação pela API local. Ele
 confere por HTTP a proteção da configuração e das pastas privadas,
-pausa as entradas, aguarda os coletores e faz backup SQLite consistente.
+pausa as entradas, aguarda os coletores e faz uma cópia consistente do banco
+ativo. O instalador usa o motor selecionado no `radar.conf`.
 
 A atualização não provoca recarga do nginx. As sondas consultam arquivos reais
 com URLs únicas e cabeçalhos sem cache. Só continua quando os privados retornam
@@ -95,8 +96,9 @@ Logs, tokens, chaves e caches legados são migrados para a raiz de dados, e os
 caminhos dos artefatos são corrigidos. A leitura de destinos antigos só existe
 no contexto da migração local; nunca é liberada por variável de ambiente ou HTTP.
 
-Os agendamentos de coleta e processamento da fila são transferidos do crontab
-do root para o crontab do **www-data**. Jobs de outros sistemas são preservados
+Os agendamentos do Radar são transferidos do crontab do root para o crontab
+do **www-data**. A coleta, a fila e a rede têm entradas a cada minuto.
+A geração do arquivo diário é verificada a cada 15 minutos. Jobs de outros sistemas são preservados
 nos dois crontabs. O cron executa a API como seu próprio usuário, sem selecionar
 identidade por configuração. O instalador prepara permissões para o usuário CGI,
 atualiza logrotate e testa a API com essa identidade. Logrotate usa o proprietário
@@ -104,14 +106,15 @@ e grupo reais da pasta de logs, sem campos de identidade no `radar.conf`.
 
 A transferência também ocorre ao atualizar o layout antigo, sem exigir
 `--migrar-raiz-web`. A checagem final e `--verificar` conferem separadamente
-`cron.root` e `cron.www-data`: não pode restar coletor/fila no root e devem
-existir exatamente as duas entradas atualizadas no usuário web. Uma falha de
+`cron.root` e `cron.www-data`. As tarefas do Radar devem constar apenas no
+crontab do usuário web, sem entradas duplicadas. Uma falha de
 leitura ou escrita reprova a instalação; os dois crontabs têm backup.
 `--sem-cron` desativa explicitamente essa gestão. Os sincronizadores privados
 do servidor3 permanecem separados, sem alterações.
 
 Relatórios e logs ficam em `dados.dir/atualizacoes` e `dados.dir/logs` (ou na
-subpasta de logs configurada). A rota `api.pse?rota=/api/v1/atualizacoes/status` publica o consolidado. Backups anteriores permanecem nas origens para recuperação.
+subpasta de logs configurada). Backups anteriores permanecem nas origens
+para recuperação. [Relatórios de atualização](RELATORIOS_ATUALIZACOES.md)
 Falhas anteriores à publicação recuperam arquivos/configuração; depois de
 publicar a API, a instalação nova é preservada para não perder envios recebidos.
 Consulte o relatório e reaplique após corrigir a causa. Nunca há restauração

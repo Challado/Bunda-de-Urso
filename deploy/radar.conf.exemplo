@@ -7,8 +7,8 @@
 #   OUTRO:  RADAR_CONF=/caminho/alternativo (util para teste)
 #
 # RADAR_CONF seleciona o arquivo. Somente este arquivo fornece os parametros.
-# Sem este arquivo nada quebra — o programa usa os diretorios do proprio
-# repositorio (bom para desenvolvimento e CI).
+# Crie radar.conf a partir deste modelo para testar no checkout.
+# A API requer que o arquivo selecionado exista.
 #
 # dados.dir relativo resolve contra a pasta DESTE arquivo.
 # Banco, logs, tokens, chaves, malha e clone ficam sempre dentro de dados.dir.

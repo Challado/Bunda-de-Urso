@@ -1,10 +1,8 @@
 # Status de cobertura e leitores
 
-Após a atualização habitual por `instalar-servidor3.sh`, abra
-`https://servidor3.lucas.inf.br/openclaw/radar/status.html`.
-A página fica fora da home, dos menus e da indexação sugerida aos buscadores.
-Seu endereço é público; não exige login. Clicar no estado abre
-`status-estado.html?uf=TO` em outra aba. GitHub e contato ficam no rodapé.
+O painel de cobertura é público e acessível pelo endereço direto. Clicar
+em um estado abre os detalhes em outra aba. GitHub e contato ficam no
+rodapé. [Painel de status](https://servidor3.lucas.inf.br/openclaw/radar/status.html)
 
 A tabela numera de 1 a 27 todos os estados e o DF, por nome, inclusive sem
 cadastros. Conta **pontos únicos publicados**, não linhas recebidas, faixas,
@@ -26,30 +24,40 @@ O detalhe do estado mostra municípios, órgãos/publicadores, fontes e uma list
 paginada de pontos (100 por página), com links para o detalhe de cada radar.
 As listas de fontes e órgãos podem incluir o mesmo ponto em mais de uma origem.
 
-O painel recolhível de leituras inclui todos os recursos cadastrados e os
-conectores agendados ainda sem histórico. Mostra última tentativa, último sucesso
-(incluindo “sem alteração”), agendamento, intervalo, atraso, HTTP, contadores,
-erros de execução e validação, páginas oficiais e endereços configurados.
-O diário operacional complementa a última tentativa com a URL utilizada e a
-interrupção, quando registradas para a mesma execução; uma entrada antiga do
-diário não substitui a tentativa mais recente no banco. Falhas de leitura do
-diário ou da agenda são informadas sem ocultar o histórico disponível.
-Credenciais são ocultadas, e textos de fontes/erros são renderizados como texto.
+Em **Status das leituras**, abra os menus aninhados de Brasil (federal),
+estados e municípios. Dentro de cada localidade ficam os órgãos e seus
+leitores. A busca aceita nomes de fontes e localidades. **Só com erro**
+abre os grupos que contêm falhas. O contador de erros de um grupo filtra
+somente os leitores desse grupo. [Leituras das fontes](https://servidor3.lucas.inf.br/openclaw/radar/status.html#leituras)
 
-Tudo passa por `api.pse`, sem baixar fontes ou iniciar coletas ao abrir a tela:
+O modo público mostra última tentativa, último sucesso (incluindo “sem
+alteração”), agendamento, intervalo, atraso, código HTTP, contagens e
+links oficiais do catálogo. Inclui leitores ainda sem histórico.
+
+**Diagnóstico da equipe** abre o painel com uma sessão de moderador ou
+administrador. Mostra as mensagens de erro e os endereços configurados
+ou efetivamente usados. O diário complementa a última tentativa quando
+o ID da execução coincide com o do banco. Se a sessão expirar, o painel
+mostra as informações públicas e oferece o link para entrar novamente.
+[Diagnóstico da equipe](https://servidor3.lucas.inf.br/openclaw/radar/status.html?diagnostico=1#leituras)
+
+Abrir ou atualizar a página consulta o histórico armazenado pela API.
 
 | Rota GET (JSON) | Resultado |
 |---|---|
 | `/api/v1/status/estados` | 27 UFs, totais nacionais, sem UF e critério |
 | `/api/v1/status/estados/{uf}` | Estado, municípios, órgãos, fontes e pontos |
-| `/api/v1/status/coletores` | Todos os leitores, erros e histórico mais recente |
+| `/api/v1/status/leituras` | Leituras públicas das fontes oficiais |
+| `/api/v1/status/coletores` | Diagnóstico técnico, com sessão ou token de moderador ou administrador |
+| `/api/v1/atualizacoes/status` | Relatório consolidado, com a mesma credencial |
 
-No nginx use, por exemplo, `api.pse?rota=/api/v1/status/estados/TO`.
-O detalhe aceita `limite=1..1000` e `depois`, o ID numérico retornado em
-`proximo_depois`; sem mais registros esse campo vem nulo. Respostas não ficam em
-cache. A tela tem atualização manual e prazo para a requisição, com nova
-tentativa em caso de falha. Nenhum caminho da instalação é fixado no front;
-o diário é localizado por `core.caminhos`, conforme `radar.conf`.
+Use `api.pse?rota=/api/v1/status/estados/TO`. O detalhe aceita `limite=0`
+para todos os pontos após `depois`. Valores positivos seguem o teto da
+instância, por padrão 200, e valores acima do teto retornam HTTP 422. Passe
+o ID numérico de `proximo_depois` em `depois` para continuar a paginação.
+O campo vem nulo na última página. As respostas do painel usam
+`Cache-Control: no-store`. As rotas protegidas retornam HTTP 401 sem
+credencial. [Relatórios de atualização](RELATORIOS_ATUALIZACOES.md)
 
 O instalador existente publica os dois HTMLs, CSS, JavaScript e implementação
 da API, preservando configuração, banco e rotinas específicas do servidor.

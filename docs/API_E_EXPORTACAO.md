@@ -264,12 +264,39 @@ campos e escapes específicos. Integrações EDIFACT precisam combinar esse perf
 com o consumidor. Para paginação, processe cada documento; concatenar arquivos
 DIF/EDIFACT completos não produz automaticamente uma única tabela/mensagem válida.
 
-## Paginação e exportação de todas as páginas
+## Download diário da base pública
+
+`GET /api/v1/radares/download` entrega `radares.json.gz`, gerado uma vez por
+dia UTC. Consulte `/api/v1/interface` para obter o endereço e o indicador
+`download.disponivel`. A primeira geração pode demorar até o próximo
+agendamento. Enquanto o arquivo estiver indisponível, a rota retorna HTTP 503.
+
+```sh
+api='https://servidor3.lucas.inf.br/openclaw/radar/api.pse'
+url="$api?rota=/api/v1/radares/download"
+curl --fail --location --output radares.json.gz "$url"
+gzip -dc radares.json.gz | jq '{gerado_em, snapshot_id, total_pontos, atribuicao}'
+```
+
+O arquivo contém um objeto JSON com `pontos`, incluindo os cadastros públicos
+inativos, `fontes`, `atribuicao`, `total_pontos`, `gerado_em` e a identificação
+do snapshot. Para confirmar se há uma cópia nova, use `HEAD` ou reenvie o
+`ETag` anterior em `If-None-Match`. A rota também aceita `If-Modified-Since`
+com o valor de `Last-Modified`. Uma cópia igual à consultada retorna HTTP 304.
+
+A rota reutiliza o arquivo pronto e aplica a política de acesso da instância.
+Ela é a opção de menor carga para uma cópia integral autorizada. Mantenha a
+atribuição e os vínculos às fontes ao usar os registros.
+[Política de uso da instância](https://servidor3.lucas.inf.br/openclaw/radar/politica-de-uso.html)
+
+## Paginação e consultas sem teto
 
 Em qualquer consulta que aceite `limite`, envie `limite=0` para remover o teto
 de registros. Os filtros e o ponto de partida (`cursor` ou `depois`) continuam
 valendo. A consulta sem teto conta na cota de páginas grandes das buscas de
-radares. Para baixar toda a base pública já compactada, use o arquivo diário.
+radares. Por exemplo, `rota=/api/v1/radares/busca&uf=GO&limite=0` consulta
+todo o resultado cadastral para Goiás. A rota `/api/v1/radares` continua
+exigindo coordenadas e aplicando o raio.
 
 Leia `resultado.proximo_cursor` para avançar mantendo os filtros. O teto público padrão é de 2.000 registros de deslocamento. Acima dele, a resposta é `401` com o link do arquivo diário. Solicite ao mantenedor uma chave específica de leitura para paginação profunda. Envie-a no cabeçalho `X-Radar-Leitura`.
 
@@ -319,10 +346,12 @@ Os cabeçalhos `X-Radar-Snapshot-ID`, `X-Radar-Base-Updated-At`,
 auditar a resposta, especialmente no TXT. As contagens de cabeçalho não substituem
 a paginação descrita acima.
 
-Erros de parâmetros usam HTTP 400/422; ponto inexistente usa 404; base indisponível
-usa 503. O corpo de erro é JSON (`sucesso=false`, objeto `erro`), mesmo se você
-solicitou outro formato. Verifique HTTP e Content-Type antes de interpretar um
-arquivo como exportação bem sucedida.
+Erros de parâmetros usam HTTP 400 ou 422. As rotas de diagnóstico retornam
+401 sem credencial. O bloqueio de leitura pode retornar 403 ou 429, e a cota
+de páginas grandes retorna 429 com `Retry-After`. Ponto inexistente retorna
+404 e base indisponível retorna 503. Confira o código HTTP e o
+`Content-Type` antes de ler o arquivo. Em caso de erro, a API retorna JSON
+com `sucesso=false` e um objeto `erro`.
 
 ## Escrita e rede são operações diferentes
 

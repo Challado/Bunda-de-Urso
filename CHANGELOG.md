@@ -1,5 +1,16 @@
 # Histórico de alterações
 
+## Consultas com limite zero
+
+- `limite=0` remove o teto de registros onde esse parâmetro existe, mantendo filtros e posição de início. A busca segue a política de acesso e o intercâmbio segue o orçamento de bytes de cada rodada.
+
+## Leituras públicas e fontes oficiais
+
+- A página de status usa um resumo público das fontes oficiais. A equipe pode abrir o diagnóstico detalhado com a credencial do painel de gestão.
+- Cada coletor pode ajustar timeout, tentativas, tamanho da resposta, User-Agent e validação do certificado HTTPS por fonte ou URL. Por padrão, a validação do certificado começa desligada.
+- O Detran-DF usa a lista oficial de equipamentos e mantém o histórico do leitor. A camada ArcGIS histórica fica disponível para coleta manual.
+- Foram integradas publicações oficiais da CET-Rio, Mogi das Cruzes, EPTC de Porto Alegre e ARTESP. O cruzamento de trechos usa a UF e pode recorrer às malhas da IDE-Sisema, do IBGE e do SNV/DNIT, com indicação de geometria inferida.
+
 ## Política da instância pública
 
 - Publica a política de uso e oferece um arquivo diário comprimido com as fontes e a atribuição do cadastro.

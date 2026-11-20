@@ -14,17 +14,17 @@ O verificador `.github/scripts/verificar_caminhos.py` reprova quem tentar.
 
 ## O arquivo
 
-Modelo pronto: `deploy/radar.conf.exemplo`. Instalação:
+Para iniciar um checkout local, use o modelo `deploy/radar.conf.exemplo`.
 
 ```bash
-install -d -m 0755 /etc/radar-brasil
-install -m 0644 deploy/radar.conf.exemplo /etc/radar-brasil/radar.conf
-editor /etc/radar-brasil/radar.conf
-python3 deploy/conf_radar.py --verificar
+cp -n deploy/radar.conf.exemplo radar.conf
+mkdir -p dados
+editor radar.conf
+python3 web/api.pse configuracao mostrar
 ```
 
-`deploy/conf_radar.py --instalar` também cria o arquivo, mas **nunca sobrescreve**:
-se já existir, grava `radar.conf.novo` ao lado para revisão.
+Em produção, o instalador coloca o arquivo junto do `api.pse`. Veja a
+[migração para a raiz web](MIGRACAO_RAIZ_WEB.md) para instalações antigas.
 
 ## Chaves
 
@@ -38,7 +38,7 @@ se já existir, grava `radar.conf.novo` ao lado para revisão.
 | `postgres.pgpass`, `.sslmode`, `.certificado_ca`, `.connect_timeout` | arquivo de senha, modo TLS, CA opcional e tempo de conexão em segundos |
 | `web.raiz` | webroot servido pelo nginx/fcgiwrap |
 | `web.url` | prefixo público da consulta |
-| `logs.dir` | logs do Radar |
+| `logs.dir` | logs do Radar dentro de `dados.dir`, por padrão `logs` |
 
 Extras:
 
@@ -46,8 +46,8 @@ Extras:
   relativos, como `sqlite.banco` e `postgres.pgpass`, são resolvidos dentro de `dados.dir`;
 * `~` é expandido;
 * `sqlite.banco` vazio usa `radar.sqlite3`;
-* chave ou seção desconhecida **não derruba** nada: vira aviso em
-  `python3 deploy/conf_radar.py --mostrar`.
+* chaves e seções desconhecidas aparecem como aviso em
+  `python3 web/api.pse configuracao mostrar`.
 
 ## Configuração do banco
 
@@ -67,26 +67,25 @@ continua usando a conexão existente de `[postgres]`.
 * `core/config.py` — reexporta `DATA_DIR`, `RAW_DIR`, `STAGING_DIR`, `DB_PATH`
   vindos da porta. Nada de caminho novo ali.
 * `core/manutencao/*.py` — `--db` seleciona um arquivo dentro de `dados.dir` nas instalações SQLite.
-* `deploy/radar-tick.sh` — chama o `radar-api.pse` instalado ao lado, com
-  `cron tick`. A API resolve a configuração e abre o log; o shell não tem outro parser.
-* `deploy/api.pse` e `web/api.pse` — descobrem a raiz do código pelo `.conf`;
-  o do webroot tenta `RADAR_BRASIL_HOME` → `.conf` → vizinhança; o do checkout
-  tenta `RADAR_BRASIL_HOME` → o próprio checkout → `.conf` (teste nunca importa
-  código de produção por acidente).
-* `deploy/conf_radar.py` — `--mostrar` (efetivo + origem de cada chave),
-  `--verificar` (existência, escrita, dono, `core/`, `api.pse`),
-  `--instalar`, `--exemplo`.
+* No servidor3, o crontab do `www-data` chama o `api.pse` instalado com
+  `cron tick`, `cron fila`, `cron traseiro` e `cron dump`.
+* `deploy/api.pse` é a entrada instalada. Usa `[instalacao] home` para
+  localizar o código. `web/api.pse` usa o código do próprio checkout quando
+  disponível. Ambos leem os parâmetros do `radar.conf` selecionado.
+* `api.pse configuracao` reúne as operações `mostrar`, `verificar`,
+  `instalar` e `exemplo`, além dos comandos de alteração.
 
 ## Diagnóstico
 
 ```bash
-python3 deploy/conf_radar.py            # onde o programa acha que tudo está
-python3 deploy/conf_radar.py --verificar
+python3 web/api.pse configuracao mostrar
 python3 .github/scripts/verificar_caminhos.py
 ```
 
-Saída do `--mostrar` traz, por chave, o valor efetivo e a origem
-(`ambiente (VAR)`, o caminho do `.conf` ou `padrao`).
+A saída de `mostrar` indica o valor efetivo e a origem de cada chave, que
+pode ser o arquivo selecionado ou o padrão da aplicação. Para conferir a
+instalação pronta, rode `api.pse configuracao verificar` com a mesma conta
+que executa a API.
 
 ## Como isso quebrava antes
 
@@ -103,46 +102,37 @@ Com o `.conf`, caminho deixa de ser opinião de cada script: é configuração.
 
 ## Trocar de servidor
 
-1. `git clone` do código no novo destino;
-2. `install -d /etc/radar-brasil && install -m 0644 deploy/radar.conf.exemplo /etc/radar-brasil/radar.conf`;
-3. ajustar `home`, `dados.dir`, `dados.motor`, a seção do motor ativo, `web.raiz` e `logs.dir`;
-4. `python3 <home>/deploy/conf_radar.py --verificar`;
-5. copiar o `api.pse` para o webroot e o `radar-tick.sh` para o diretório do cron.
+1. Clone o projeto e localize o instalador da sua implantação.
+2. Coloque o `radar.conf` na raiz onde ficará o `api.pse`. Ajuste
+   `instalacao.home`, `dados.dir`, `dados.motor`, a seção do motor ativo,
+   `web.raiz`, `web.url` e `web.origem`.
+3. Transfira o diretório de dados existente e dê acesso a ele à conta que
+   executará o Radar. Preserve o arquivo ou a conexão do motor ativo.
+4. Aplique o instalador e rode `api.pse configuracao verificar` com a conta
+   da aplicação.
 
 Nada no código muda entre servidores.
 
 ## Leitura e salvamento pela API
 
-A tela **Administração → Configuração** usa exclusivamente
-`api.pse?rota=/api/v1/gestao/configuracao` (GET/PUT). Exige sessão ou token **admin**;
-moderador e contribuidor não acessam configurações. Cada seção é recolhível e começa
-aberta. Mostra o valor gravado, o valor em uso e sua origem. Variáveis de ambiente
-continuam tendo precedência explícita e impedem salvar um valor que ficaria oculto.
+A aba **Configuração** do painel de gestão usa
+`api.pse?rota=/api/v1/gestao/configuracao` (GET e PUT) e exige sessão ou
+token de administrador. Mostra o valor gravado, o valor em uso e sua origem.
+Nas seções de banco, mostra apenas o motor ativo.
 
-O painel pode salvar parâmetros operacionais: limites de requisição/download,
-proxies confiáveis e parâmetros de governança. Caminhos, usuários,
-destinos de instalação e credenciais são exibidos, com alteração somente pela API
-local. Isso impede que a conta do painel troque o código que o cron executa como root.
-O instalador cria `<web.raiz>/radar.conf` como link simbólico para o arquivo
-configurado em `/etc`. A API verifica o destino do link antes de ler ou salvar.
-A pasta da configuração fica em `2770`, grupo do CGI (`www-data` no servidor3),
-e `radar.conf` em `0660`. O processo CGI grava diretamente, sem elevação de
-privilégios nem subprocesso de salvamento. A substituição atômica ocorre no destino
-em `/etc`, preservando o link. A regra antiga `sudoers.d/radar-configuracao` é removida;
-o aplicativo não exige nem executa sudo/visudo.
+O painel salva parâmetros como limites de requisição, proxies confiáveis,
+regras de coleta e opções de governança. Use a API local para ajustar
+caminhos, destinos e arquivos de credenciais. No layout atual, o CGI
+grava o `radar.conf` diretamente ao lado de `api.pse`, com as permissões
+preparadas pelo instalador. O Nginx permanece sob gestão do operador.
+O instalador verifica se o acesso HTTP ao arquivo está bloqueado.
 
-Antes de criar o link, o instalador identifica o server do radar na configuração
-ativa do nginx por `web.origem` ou pela raiz que contém `web.raiz`, e acrescenta um
-bloqueio HTTP exato para `<web.url>/radar.conf`. Guarda os arquivos alterados no
-backup, valida `nginx -t` e recarrega nginx. O conteúdo continua acessível ao processo
-CGI, mas o download direto retorna 404. A checagem externa confirma também esse
-bloqueio. A configuração do nginx é recuperada se a instalação falhar.
-
-O salvamento usa trava entre processos, revisão SHA-256 contra edição concorrente,
-arquivo temporário e substituição atômica. Guarda `radar.conf.anterior` e os metadados
-em `radar.conf.auditoria.jsonl` ao lado do arquivo; nenhum valor de token é retornado.
-Novos processos CGI e novas passadas do cron leem a configuração atualizada.
-Caminhos são configuração: **alterá-los não move arquivos**.
+O salvamento usa trava entre processos, revisão SHA-256 contra edição concorrente
+e substituição atômica. Guarda `radar.conf.anterior` e
+`radar.conf.auditoria.jsonl` em `<dados.dir>/configuracao/`. O registro de
+auditoria inclui os nomes das chaves alteradas. Novas chamadas da API e do
+cron leem a configuração atualizada. Alterar caminhos pelo painel ou pela
+API local requer mover os arquivos separadamente.
 
 No terminal:
 
@@ -167,7 +157,7 @@ Seções adicionais no modelo `deploy/radar.conf.exemplo`:
 | `coleta` | `max_bytes`, `timeout`, `tentativas`, `verificar_ssl` |
 | `consultas` | regras por fonte e por URL para as consultas externas dos coletores |
 | `governanca` | correspondência por proximidade, bloqueios, submissões, sessão e PBKDF2 |
-| `geografia` | `malha` opcional |
+| `geografia` | `malha` e `snv_rotas` opcionais |
 | `assistente` | URL e modelo do assistente usado em manutenção local |
 
 Senhas, `RADAR_API_TOKEN` e a senha inicial de administração continuam credenciais
@@ -194,9 +184,10 @@ mais específico prevalece e, no empate, vale a regra da fonte selecionada.
 - **User-Agent** pode usar a identificação padrão do cliente, sortear um
   User-Agent de navegador por execução da coleta ou enviar um valor personalizado.
 
-A ANTT usa pelo menos 60 segundos para atividades, revisão e catálogo e
-120 segundos para o arquivo por padrão. Para ajustar pelo terminal, use
-a seção abaixo no `radar.conf`. Mantenha o JSON das regras em uma linha.
+O coletor da ANTT procura a edição mais recente nas atividades do conjunto
+e também consulta o catálogo CKAN. Por padrão, reserva pelo menos 60 segundos
+para atividades, revisão e catálogo e 120 segundos para o arquivo. Para
+ajustar pelo terminal, use a seção abaixo no `radar.conf`. [Atividades da ANTT](https://dados.antt.gov.br/dataset/activity/radar)
 
 ```ini
 [coleta]
@@ -206,21 +197,32 @@ verificar_ssl = 0
 regras = [{"fonte":"antt","timeout":180,"tentativas":2,"verificar_ssl":true},{"fonte":"antt","url":"https://dados.antt.gov.br/dataset/activity/radar","timeout":90,"user_agent":"sistema"}]
 ```
 
+Se a validação global estiver ligada, uma regra
+`{"fonte":"der_rj","verificar_ssl":false}` na lista existente permite que o
+DER-RJ seja consultado durante um problema no certificado. A regra
+restringe a alteração a esse leitor. Depois de salvar, rode a coleta manual
+como o usuário da aplicação e confira a tentativa nova no status.
+
+```sh
+cd /var/www/html/openclaw/radar
+runuser -u www-data -- ./api.pse sync --fonte der_rj
+```
+
 ## Atualização coordenada
 
 O instalador `.sh` e o perfil do servidor3 ficam no repositório privado de dados.
 Ele baixa uma revisão validada do código e chama `api.pse instalacao`; por padrão
 apenas simula. Usa o `radar.conf` existente e não o substitui por um modelo.
 
-Ao aplicar, guarda código, páginas, configuração e um backup consistente do SQLite
-na pasta `backups/instalacao/` dos dados. Pausa novas chamadas do coletor e da API,
-aguarda a coleta em andamento terminar, prepara o código, aplica migrações
-aditivas pela API, testa a prontidão e só então instala o wrapper novo. Em falha,
-restaura código, páginas e configuração automaticamente; preserva o banco atual.
+Ao aplicar no layout atual, guarda código, páginas, configuração e uma cópia
+consistente do banco ativo em `<dados.dir>/backups/raiz-web/`. Pausa novas
+chamadas da API, aguarda o coletor e a fila, prepara o código e aplica
+migrações. O relatório registra o ponto da falha e se houve recuperação
+automática. [Atualização na raiz web](MIGRACAO_RAIZ_WEB.md)
 
-A operação modifica somente a linha do coletor no crontab de root. O envio ao
-repositório privado e seus scripts pertencem ao servidor3, ficam fora do aplicativo
-e não são migrados nem alterados pelo instalador.
+A operação retira as tarefas do Radar do crontab do root e instala coleta,
+fila, rede e geração do arquivo diário no crontab do `www-data`. Preserva
+as tarefas dos outros sistemas e os sincronizadores privados.
 
 Reaplicar preserva a configuração e os dados. Backups de instalação não são podados.
 `--restaurar <backup>` recupera arquivos da instalação, preservando o banco e os outros
@@ -253,7 +255,7 @@ temporária; o arquivo definitivo só é gravado ao aplicar, depois do backup. S
 
 Ao aplicar, diretórios operacionais ausentes são criados e recebem grupo e
 permissões adequados, inclusive os pais novos para permitir acesso pelo CGI.
-São recriados também a regra do logrotate, link de configuração do painel, páginas e entradas
+São preparados também a regra do logrotate, configuração do painel, páginas e entradas
 da API/coletor. Pastas ausentes ou com permissões divergentes impedem o resultado
 de "já atualizado", mesmo quando a revisão não mudou. Um destino vazio do código
 pode ser preenchido; arquivos e pastas de outros aplicativos continuam protegidos.
@@ -265,8 +267,8 @@ o backup também guardam essa lista e `recuperacao_automatica`. Os arquivos ante
 são recuperados em falha, mas pastas preparadas podem permanecer. O banco existente
 é preservado e um banco ausente não é substituído silenciosamente por uma base vazia.
 
-A regra do logrotate informa `su` com `instalacao.usuario` e `instalacao.grupo`
-do `radar.conf`, permitindo rotacionar a pasta de logs gravável pelo grupo do CGI.
+A regra do logrotate usa o proprietário e o grupo da pasta de logs para
+rotacioná-la com as permissões do usuário da aplicação.
 A validação usa `logrotate --debug`, sem girar os arquivos. Em falha, o relatório
 registra o comando, código de saída e mensagens de erro (saída limitada a 16 KiB por
 canal). A recuperação também restaura a regra anterior: se ela não existia antes da
@@ -281,9 +283,9 @@ ao ler o crontab não é tratada como ausência de crontab.
 O perfil privado pode preparar dependências ausentes via apt e iniciar serviços
 inativos. A API valida nginx, serviços, arquivos, permissões, rotação de logs,
 configuração, gravação do painel como o usuário real do CGI e consultas ao banco.
-No nginx acrescenta somente o bloqueio HTTP do link de configuração; preserva as
-demais rotas e configurações dos sites. Pacotes instalados e serviços iniciados
-não são revertidos pela recuperação dos arquivos do aplicativo.
+Para o Nginx, verifica a sintaxe e faz sondagens HTTP. A configuração e
+o serviço ficam sob responsabilidade do operador. A recuperação de arquivos
+do aplicativo mantém os pacotes e os demais serviços preparados.
 
 `web.origem` é a origem HTTP(S) opcional do site, sem prefixo de caminho, por exemplo
 `https://exemplo.org`. Com `web.url`, permite conferir prontidão da API e os bytes da
@@ -350,16 +352,21 @@ pagina_grande_min = 150
   rede de origem, `/24` no IPv4 e `/64` no IPv6. Ao excedê-la, a API responde
   `429` com `Retry-After`. Use `max_paginas_grandes = 0` para desativar a cota.
 - `api.timeout_consulta` define o prazo da requisição CGI, com máximo de 60
-  segundos. O download usa um arquivo já gerado. `api.pse cron dump` verifica
-  a cada 15 minutos e gera uma cópia por dia UTC em
-  `dados/exportacao/radares.json.gz`, mantendo a cópia anterior se a geração falhar.
+  segundos. O download usa um arquivo já gerado. No servidor3, o agendamento
+  chama `api.pse cron dump` a cada 15 minutos e publica uma cópia por dia UTC
+  em `<dados.dir>/exportacao/radares.json.gz`. Se a geração falhar, mantém a
+  cópia anterior.
 
 ## Radares e trechos de fontes governamentais
 
 Os coletores `mogi_sp`, `eptc_poa`, `cet_rio` e `artesp` consultam
-as publicações dos respectivos órgãos e seguem a agenda normal. A edição
-histórica `detran_df_arcgis` fica disponível para coleta manual, pois a
-camada não confirma que os aparelhos ainda estejam em operação.
+as publicações dos respectivos órgãos e seguem a agenda normal.
+
+O leitor `detran_df` usa a lista vigente da página de equipamentos. A revisão
+da URL reaproveita o mesmo recurso e preserva o histórico das leituras.
+A camada histórica `detran_df_arcgis` é um leitor distinto, disponível para
+coleta manual. A camada contém registros antigos cuja operação atual
+precisa de confirmação. [Lista oficial do Detran-DF](https://geoservicos.detran.df.gov.br/geoserver/styles/lista_equipto/index.html)
 
 A atualização do esquema recupera a UF já publicada nos trechos antigos.
 A coleta agendada do DER-MG tenta localizar os radares por rodovia e

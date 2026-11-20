@@ -37,8 +37,10 @@ As operações passam por `web/api.pse` e exigem sessão ou token com escopo
 - `POST /api/v1/gestao/cruzamentos`, corpo `{}`: inicia uma passagem pelas
   contribuições ativas, em lotes de até 20. Retorna `resultado.resultados`,
   `processados`, `ate_id` e `proximo_cursor`. Enquanto houver cursor, envie
-  `{"cursor": <proximo_cursor>, "ate_id": <ate_id>}`. `limite` opcional aceita
-  1 a 20. IDs novos acima do teto ficam para a próxima execução.
+  `{"cursor": <proximo_cursor>, "ate_id": <ate_id>}`. Valores positivos de
+  `limite` vão de 1 a 20. Use `limite=0` para cruzar todos os itens restantes
+  até `ate_id` na mesma chamada. IDs novos acima de `ate_id` ficam para a
+  próxima execução. O painel continua enviando lotes curtos.
 - `POST /api/v1/gestao/correspondencias/{id}`: confirma a decisão revisada,
   usando `status` igual a `oficial_vence` ou `colaborativo_vence` e `motivo`.
 

@@ -1,5 +1,9 @@
 # Cobertura estadual e municipal — 22/10/2026
 
+Este levantamento retrata os conectores na data acima. As integrações
+posteriores constam no histórico e no catálogo de leituras da instância.
+[Status das leituras](https://servidor3.lucas.inf.br/openclaw/radar/status.html#leituras) · [Histórico de alterações](../CHANGELOG.md)
+
 O Brasil tem 26 estados e o Distrito Federal. O catalogo de fontes abrange as 27 UFs; **a coleta ainda nao cobre todos os radares estaduais nem todos os municipios**. Inmetro e fontes federais sao camadas independentes e nao substituem cadastro de cada orgao.
 
 A tabela conta conectores que importam dados. Fontes somente documentais/diagnosticas nao contam como cobertura. Um conector estadual pode publicar apenas locais elegiveis ou parte do seu inventario.
