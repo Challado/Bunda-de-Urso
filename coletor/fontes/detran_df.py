@@ -67,9 +67,13 @@ def _dump_dom(navegador, url, perfil, timeout=90):
     atualizacoes.evento("navegador.consulta", url=url, fonte=opcoes["fonte"], timeout=timeout,
                        max_bytes=opcoes["max_bytes"], modo_user_agent=opcoes["modo_user_agent"],
                        verificar_ssl=opcoes["verificar_ssl"])
+    # O Chromium ainda usa os diretórios XDG para o Crashpad, mesmo com
+    # --user-data-dir. A conta do cron pode não ter uma home gravável.
+    ambiente = dict(os.environ, XDG_CONFIG_HOME=os.path.join(perfil, "config"),
+                    XDG_CACHE_HOME=os.path.join(perfil, "cache"))
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                              timeout=timeout)
+                              timeout=timeout, env=ambiente)
     except subprocess.TimeoutExpired as exc:
         raise http.ErroFonte('Navegador excedeu %s segundos ao abrir %s' % (timeout, url)) from exc
     if proc.returncode:

@@ -202,6 +202,8 @@ class TestDetranDFContornoWaf(unittest.TestCase):
         self.assertEqual(rodar.call_args.kwargs["timeout"], 150)
         self.assertIn("--user-agent=RadarLab/2.0", rodar.call_args.args[0])
         self.assertNotIn("--ignore-certificate-errors", rodar.call_args.args[0])
+        self.assertEqual(rodar.call_args.kwargs["env"]["XDG_CONFIG_HOME"], "/perfil/config")
+        self.assertEqual(rodar.call_args.kwargs["env"]["XDG_CACHE_HOME"], "/perfil/cache")
 
 
 class TestDetranDFSync(unittest.TestCase):
