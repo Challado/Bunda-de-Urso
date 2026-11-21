@@ -1,31 +1,20 @@
 # BUNDA DE URSO
 
-**Documentação** · [API e exportação](docs/API_E_EXPORTACAO.md) · [Configuração](docs/CONFIGURACAO.md) · [Status das fontes](docs/STATUS.md) · [Rede e intercâmbio](docs/INTERCAMBIO_INSTANCIAS.md) · [Histórico](CHANGELOG.md)
+O Bunda de Urso é um cadastro aberto de radares e outros equipamentos de
+fiscalização eletrônica de trânsito no Brasil. Você pode buscar radares perto
+de uma localização, consultar os detalhes e conferir a origem dos dados.
 
-
-O `radar.conf` fica junto da API. `RADAR_CONF` pode indicar outro arquivo.
-`[dados] dir` reúne os arquivos operacionais do Radar e `[dados] motor`
-seleciona a configuração em `[postgres]` ou `[sqlite]`. A instalação
-transfere os agendamentos do Radar ao crontab do `www-data`.
-
-A instalação com `radar.conf` junto aos scripts e caminhos relativos está
-descrita em [Migração para a raiz web](docs/MIGRACAO_RAIZ_WEB.md). A migração
-é feita pelo instalador privado, preservando o banco e preparando www-data.
-## Cadastro nacional aberto, rastreável e auditável de radares e fiscalização eletrônica de trânsito
+[Abrir o mapa](https://servidor3.lucas.inf.br/openclaw/radar/) · [API e exportação](docs/API_E_EXPORTACAO.md) · [Status das fontes](docs/STATUS.md) · [Histórico de alterações](CHANGELOG.md)
 
 [![Validação](https://github.com/Challado/Bunda-de-Urso/actions/workflows/testes.yml/badge.svg)](https://github.com/Challado/Bunda-de-Urso/actions/workflows/testes.yml)
-
-[Histórico de alterações](CHANGELOG.md) · [Acessar Radar Brasil](https://servidor3.lucas.inf.br/openclaw/radar/) · [Código no GitHub](https://github.com/Challado/Bunda-de-Urso)
 
 ![Bunda de Urso — a bunda do urso com o radar tatuado](docs/bunda-de-urso.png)
 
 > **O nome é uma provocação; o propósito é sério.**
 
 > **🤖 Autoria:** este repositório — código, documentação e este README — foi **feito pelo Jarvis**, o assistente de IA (OpenClaw). Detalhes na seção [Autoria e proveniência](#autoria-e-proveniência), no fim.
->
-> **🌐 No ar:** a consulta pública roda em <https://servidor3.lucas.inf.br/openclaw/radar/> (mapa e raio por localização); a API responde em <https://servidor3.lucas.inf.br/openclaw/radar/api.pse>.
 
-### Uso da instância pública
+## Uso da instância pública
 
 O servidor público é destinado a consultas individuais. Empresas, entidades
 com fins lucrativos e integrações de outros sistemas, comerciais ou não,
@@ -316,10 +305,11 @@ cp tests/fixtures/antt_radares_fixture.json dados/
 python3 web/api.pse sync --fonte antt --arquivo "$PWD/dados/antt_radares_fixture.json"
 ```
 
-O `radar.conf` define caminhos, serviços e motor do banco. A API lê o arquivo
-da raiz do checkout ou, em produção, o arquivo ao lado do `api.pse` instalado.
-`RADAR_CONF` permite selecionar outro arquivo para a execução. Os caminhos
-dos arquivos operacionais são resolvidos dentro de `[dados] dir`.
+O `radar.conf` fica na raiz do checkout ou, em produção, ao lado do
+`api.pse` instalado. Para usar outro arquivo, indique o caminho com
+`RADAR_CONF`. Na seção `[dados]`, a opção `dir` define onde ficam os
+arquivos operacionais, e `motor` indica qual seção da configuração será
+usada para o banco, `[postgres]` ou `[sqlite]`.
 
 ```bash
 python3 web/api.pse configuracao mostrar
@@ -329,6 +319,10 @@ No servidor3, o instalador do repositório privado aplica as atualizações.
 Em um servidor já preparado, use `bash instalar-servidor3.sh --aplicar
 --sem-pacotes --sem-reprocessamento` como root para atualizar o código e o
 esquema, adiando tarefas de reprocessamento. [Guia de configuração](docs/CONFIGURACAO.md)
+
+O instalador também prepara o crontab do `www-data`. Se você ainda usa
+o layout antigo, o guia explica como mover a instalação para a raiz web
+preservando o banco existente. [Migração para a raiz web](docs/MIGRACAO_RAIZ_WEB.md)
 
 Para rodar a suíte completa, incluindo os testes do instalador:
 
