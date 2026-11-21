@@ -26,7 +26,7 @@ class TestRelatorioRestrito(unittest.TestCase):
             self.assertEqual(corpo['operacoes']['bootstrap']['estado'],'ok')
             self.assertEqual(corpo['operacoes']['bootstrap']['token'],'[oculto]')
 
-    def test_relatorio_corrompido_e_metodo_de_escrita_nao_sao_aceitos(self):
+    def test_relatorio_corrompido_falha_por_get_e_post(self):
         with tempfile.TemporaryDirectory() as pasta:
             arquivo=Path(pasta)/'status.json'
             arquivo.write_text('{invalido')
@@ -35,4 +35,4 @@ class TestRelatorioRestrito(unittest.TestCase):
                 env={'REQUEST_METHOD':'GET','QUERY_STRING':'rota=/api/v1/atualizacoes/status',
                      'HTTP_X_SESSAO':'sessao-de-teste'}
                 self.assertEqual(handle_request(env)[0],503)
-                self.assertEqual(handle_request(dict(env,REQUEST_METHOD='POST'))[0],405)
+                self.assertEqual(handle_request(dict(env,REQUEST_METHOD='POST'))[0],503)

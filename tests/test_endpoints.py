@@ -281,10 +281,12 @@ class TestEndpoints(unittest.TestCase):
         # Uma verificacao atribuida a outra fonte nao e inventada como Inmetro.
         self.assertNotIn("INMETRO", ver["fonte"]["nome"])
 
-    def test_equipamento_metodo_nao_permitido(self):
-        status, _h, _c = self._req("/api/v1/equipamentos/E-1", "",
-                                   metodo="POST")
-        self.assertEqual(status, 405)
+    def test_equipamento_post_aceita_formato_no_corpo(self):
+        rota = "/api/v1/equipamentos/E-1"
+        esperado = self._req(rota, "formato=txt")
+        self.assertEqual(esperado[0], 200)
+        self.assertEqual(self._req(rota, metodo="POST", corpo=b'{"formato":"txt"}',
+                                   ctype="application/json"), esperado)
 
     def test_equipamento_txt(self):
         status, headers, corpo = self._req(
@@ -306,9 +308,13 @@ class TestEndpoints(unittest.TestCase):
         self.assertIn("status", a)
         self.assertIn("fonte", a)
 
-    def test_atualizacoes_metodo_nao_permitido(self):
-        status, _h, _c = self._req("/api/v1/atualizacoes", "", metodo="POST")
-        self.assertEqual(status, 405)
+    def test_atualizacoes_post_aplica_limite_e_formato(self):
+        rota = "/api/v1/atualizacoes"
+        esperado = self._req(rota, "limite=1&formato=txt")
+        self.assertEqual(esperado[0], 200)
+        self.assertEqual(self._req(rota, "limite=2", metodo="POST",
+                                   corpo=b"limite=1&formato=txt",
+                                   ctype="application/x-www-form-urlencoded"), esperado)
 
     def test_atualizacoes_txt(self):
         status, headers, corpo = self._req(

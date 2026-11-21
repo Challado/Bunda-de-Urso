@@ -681,6 +681,35 @@ class TestAjuda(BaseGov):
         self.assertIn("GOVERNANCA DA INGESTAO", corpo)
         self.assertIn("/api/v1/gestao/tokens", corpo)
 
+    def test_transporte_get_post_preserva_leitura_escrita_e_permissoes(self):
+        login, senha = self._admin()
+        rota_login = "/api/v1/login"
+        credenciais = {"login": login, "senha": senha}
+        self.assertEqual(self._req("GET", rota_login, credenciais)[0], 405)
+        seletor = {"HTTP_X_RADAR_METODO": "POST"}
+        self.assertEqual(self._req("GET", rota_login, credenciais, headers=seletor,
+                                   ctype="application/x-www-form-urlencoded")[0], 403)
+        self.assertEqual(self._req("GET", rota_login, credenciais, headers={
+            **seletor, "HTTP_SEC_FETCH_SITE": "cross-site"})[0], 403)
+        status, headers, _ = self._req("GET", rota_login, credenciais, headers=seletor)
+        self.assertEqual((status, headers["Cache-Control"]), (200, "no-store"))
+        sessao = {"HTTP_COOKIE": headers["Set-Cookie"].split(";")[0]}
+        rota = "/api/v1/gestao/bloqueios"
+        bloqueio = {"tipo": "zona_sombra", "latitude": -24.9555,
+                    "longitude": -53.4552, "motivo": "Verificação do transporte"}
+        self.assertEqual(self._req("GET", rota, bloqueio, headers=seletor)[0], 401)
+        self.assertEqual(self._doc(self._req("GET", rota, bloqueio, headers=sessao))["bloqueios"], [])
+        status, _, criado = self._req("GET", rota, bloqueio, headers={**sessao, **seletor})
+        self.assertEqual(status, 201)
+        ler = {**sessao, "HTTP_X_RADAR_METODO": "GET"}
+        self.assertEqual(len(self._doc(self._req("POST", rota, headers=ler))["bloqueios"]), 1)
+        desativar = rota + "/" + str(criado["bloqueio_id"])
+        apagar = {**sessao, "HTTP_X_RADAR_METODO": "DELETE"}
+        self.assertEqual(self._req("POST", desativar, headers=apagar)[0], 200)
+        self.assertEqual(self._doc(self._req("POST", rota, headers=ler))["bloqueios"], [])
+        todos = self._req("POST", rota, {"incluir_inativos": True}, headers=ler)
+        self.assertEqual(len(self._doc(todos)["bloqueios"]), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

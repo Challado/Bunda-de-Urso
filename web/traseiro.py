@@ -1,10 +1,9 @@
 """Rotas mesh e gestao; sincronizacao externa acontece somente no cron."""
-import urllib.parse
 from core import traseiro as tr, governanca as gov
 
 
 def atender(conn,caminho,metodo,environ,raw):
-    from .nucleo import _corpo_json, _resp, _gov_erro
+    from .nucleo import _corpo_json, _gov_erro, _parse_params, _resp
     publico='/api/v1/intercambio'
     gestao='/api/v1/gestao/traseiro'
     administrativo=caminho==gestao or caminho.startswith(gestao+'/')
@@ -31,17 +30,17 @@ def atender(conn,caminho,metodo,environ,raw):
         else:
             dados={}
         local=tr.identidade(conn)
-        query=urllib.parse.parse_qs(environ.get('QUERY_STRING',''))
-        try:
-            depois=int(query.get('depois',['0'])[0]); limite=int(query.get('limite',[str(tr.numero('lote'))])[0])
-            if depois<0 or not 0<=limite<=1000:
-                raise ValueError()
-        except (ValueError,TypeError):
-            tr.erro(422,'cursor_invalido','Use depois>=0 e limite entre 0 e 1000.')
         if administrativo:
             if partes==[''] and metodo=='GET':
                 resultado=tr.status(conn)
             elif partes[0] in ('cadastros','fontes') and len(partes)==1 and metodo=='GET':
+                params=_parse_params(environ,raw)
+                try:
+                    depois=int(params.get('depois',0)); limite=int(params.get('limite',tr.numero('lote')))
+                    if depois<0 or not 0<=limite<=1000:
+                        raise ValueError()
+                except (ValueError,TypeError):
+                    tr.erro(422,'cursor_invalido','Use depois>=0 e limite entre 0 e 1000.')
                 itens=tr.listar(conn,partes[0],depois,limite)
                 resultado={'itens':itens,'depois':itens[-1]['id'] if itens else depois}
             elif partes==['fontes'] and metodo=='POST':

@@ -1,5 +1,9 @@
 # Histórico de alterações
 
+## Métodos GET e POST na API
+
+- Todas as consultas aceitam os dois métodos. Operações de escrita podem usar GET ou POST como transporte com o cabeçalho `X-Radar-Metodo` e o corpo JSON da operação.
+
 ## Filtros das leituras no painel de status
 
 - Os contadores de leitores OK, com erro, pendentes e desativados filtram as caixas de cada grupo. A busca por UF, município, fonte ou situação combina com o contador selecionado. Limpar os filtros restaura a visualização anterior.

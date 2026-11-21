@@ -234,7 +234,6 @@ Principais endpoints da API:
 - `/api/v1/minha-senha` (troca da própria senha)
 - `/api/v1/gestao/*` (pendentes, radar, correspondências, bloqueios, tokens, usuários — exige sessão ou `X-Api-Token`)
 - `/api/v1/gestao/eu` (contexto da sessão: login/papel — o painel usa para decidir o que exibir)
-- `/api/v1/admin/sincronizar` e `/api/v1/admin/rollback`
 - `/health/live` e `/health/ready` (também em `/api/v1/health/live|ready`)
 
 Os retornos incluem **TXT delimitado em linha única por registro** (delimitador configurável por GET/POST), JSON, NDJSON, XML, DIF (Data Interchange Format) e EDI/EDIFACT no perfil bilateral do projeto. O perfil EDIFACT precisa de homologação com cada consumidor; não se declara interoperabilidade universal.

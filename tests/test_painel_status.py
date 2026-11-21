@@ -323,8 +323,10 @@ class TestApiStatus(unittest.TestCase):
             self.assertEqual(code,200)
             self.assertTrue(d['sucesso'])
             self.assertEqual(headers['Cache-Control'],'no-store')
-            self.assertEqual(self.req(rota,metodo='POST')[0],405)
+            self.assertEqual(self.req(rota,metodo='POST')[0],200)
+        self.assertEqual(self.req('/api/v1/status/leituras',metodo='POST')[0],200)
         self.assertEqual(self.req('/api/v1/status/coletores')[0],401)
+        self.assertEqual(self.req('/api/v1/status/coletores',metodo='POST')[0],401)
 
     def test_status_publico_carrega_leitores_sem_credencial(self):
         code, headers, d = self.req('/api/v1/status/leituras')

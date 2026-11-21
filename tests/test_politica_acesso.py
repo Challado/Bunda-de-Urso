@@ -155,8 +155,13 @@ limite_consulta = 100
         with patch.object(nucleo, "_conn", side_effect=AssertionError("abriu banco")):
             status, headers, corpo = self.req(rota)
             self.assertEqual(status,200)
+            status_post, headers_post, corpo_post = self.req(rota, metodo="POST")
             saida = io.BytesIO()
             corpo.copiar(saida)
+            saida_post = io.BytesIO()
+            corpo_post.copiar(saida_post)
+            self.assertEqual((status_post, headers_post, saida_post.getvalue()),
+                             (status, headers, saida.getvalue()))
             dados = json.loads(gzip.decompress(saida.getvalue()))
             self.assertEqual([p["id"] for p in dados["pontos"]], ["P-1"])
             self.assertIn("licenca", dados["atribuicao"])

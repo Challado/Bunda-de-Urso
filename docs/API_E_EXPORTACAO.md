@@ -8,8 +8,53 @@ de leitura não dispara downloads de portais externos.
 **Ajuda gerada pelo próprio código:**
 <https://servidor3.lucas.inf.br/openclaw/radar/api.pse?rota=/api/v1/ajuda&formato=json>
 
-Nesta instalação, selecione o endpoint pelo parâmetro `rota`. Isso funciona com
-o CGI genérico e não exige outra configuração no nginx.
+Na entrada CGI, use `rota` na URL. Em POST, a API também aceita `rota`
+no corpo quando a URL não especifica um caminho.
+
+## GET e POST
+
+As consultas aceitam GET com parâmetros na URL ou POST com parâmetros na
+URL, em um objeto JSON ou em um formulário `application/x-www-form-urlencoded`.
+Quando o mesmo filtro vem nos dois lugares, vale o corpo do POST.
+
+```sh
+curl --fail 'https://servidor3.lucas.inf.br/openclaw/radar/api.pse?rota=/api/v1/atualizacoes' \
+  --data-urlencode 'fonte_id=24' --data-urlencode 'limite=10'
+```
+
+Os métodos originais continuam selecionando a operação nas rotas que
+servem tanto para consulta quanto para escrita. Em `/api/v1/gestao/bloqueios`,
+GET lista os bloqueios e POST cadastra um bloqueio. Para listar via POST,
+envie `X-Radar-Metodo: GET`. Use o mesmo cabeçalho para consultar `/api/v1/radares`
+via POST quando o cliente também envia `X-Api-Token`.
+
+Clientes limitados a GET e POST podem indicar a operação original no
+cabeçalho `X-Radar-Metodo`. Use `POST`, `PUT`, `PATCH` ou `DELETE`
+conforme a ajuda da rota. Para escrita via GET, envie
+`Content-Type: application/json` e os parâmetros no corpo JSON. Esse
+modo requer um cliente que envie corpo em GET, como `curl`. Use as mesmas
+credenciais e permissões da operação original. Envie senhas e chaves nos
+campos ou cabeçalhos previstos para a operação.
+
+O exemplo abaixo executa uma etapa do cruzamento em lote via GET com uma
+credencial de moderador.
+
+```sh
+curl --fail --request GET \
+  'https://servidor3.lucas.inf.br/openclaw/radar/api.pse?rota=/api/v1/gestao/cruzamentos' \
+  -H 'X-Radar-Metodo: POST' -H 'Content-Type: application/json' \
+  -H "X-Api-Token: $RADAR_TOKEN" --data-binary '{"limite":1}'
+```
+
+```sh
+curl --fail --request POST \
+  'https://servidor3.lucas.inf.br/openclaw/radar/api.pse?rota=/api/v1/gestao/radar/P-604' \
+  -H 'X-Radar-Metodo: GET' -H "X-Api-Token: $RADAR_TOKEN"
+```
+
+A ajuda da API lista os métodos originais em `endpoints` e
+`endpoints_administrativos`. O campo `metodos_transporte` inclui os
+métodos aceitos com o cabeçalho de seleção.
 
 ## Consulta rápida de radares
 

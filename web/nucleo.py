@@ -28,6 +28,8 @@ from core.serializers import serialize, is_valido, FORMATOS
 from core.serializers import campos, txt_ser, json_ser, xml_ser, edifact_ser, dif_ser
 
 _cls_txt = txt_ser
+METODOS_CONSULTA = ("GET", "POST")
+METODOS_ESCRITA = ("POST", "PUT", "PATCH", "DELETE")
 
 STATUS_REASON = {
     200: "OK", 201: "Created", 202: "Accepted", 304: "Not Modified", 400: "Bad Request", 401: "Unauthorized",
@@ -115,8 +117,6 @@ ENDPOINTS_ADMINISTRATIVOS = {
     "/api/v1/gestao/assistente/chave": ["PUT", "DELETE"],
     "/api/v1/gestao/assistente/relatorios/{id}": ["GET"],
     "/api/v1/gestao/configuracao": ["GET", "PUT"],
-    "/api/v1/admin/sincronizar": ["POST"],
-    "/api/v1/admin/rollback": ["POST"],
     "/api/v1/gestao/pendentes": ["GET"],
     "/api/v1/gestao/radar/{id}": ["GET", "PATCH"],
     "/api/v1/gestao/radar/{id}/verificar": ["POST"],
@@ -135,6 +135,26 @@ ENDPOINTS_ADMINISTRATIVOS = {
     "/api/v1/gestao/usuarios/{id}": ["PATCH"],
     "/api/v1/gestao/usuarios/{id}/senha": ["POST"],
 }
+
+_METODOS_POR_ROTA = {
+    **ENDPOINTS_AJUDA, **ENDPOINTS_ADMINISTRATIVOS,
+    "/api/v1/health/live": ["GET"],
+    "/api/v1/health/ready": ["GET"],
+    "/api/v1/radares/envios": ["GET"],
+}
+_METODOS_POR_MODELO = [
+    (re.compile("/".join("[^/]+" if parte.startswith("{") else re.escape(parte)
+                         for parte in rota.split("/"))), metodos)
+    for rota, metodos in _METODOS_POR_ROTA.items() if "{" in rota
+]
+_AJUDA_TRANSPORTE = (
+    "GET usa a URL. POST aceita parâmetros de consulta na URL ou no corpo "
+    "(JSON ou application/x-www-form-urlencoded), com precedência do corpo. "
+    "Em URLs CGI, informe rota na URL ou, em um POST sem rota na URL, no corpo. "
+    "Para selecionar a operação com GET ou POST, use o cabeçalho "
+    "X-Radar-Metodo: GET, POST, PUT, PATCH ou DELETE. Para escrita via GET, "
+    "envie Content-Type: application/json e os dados no corpo."
+)
 
 ENDPOINTS_DESC = {
     "/api/v1/intercambio/identidade": "Identidade e limites da rede; exige X-Interchange-Info e token da rede.",
@@ -308,6 +328,9 @@ def ajuda_estrutura():
         "endpoints": ENDPOINTS_AJUDA,
         "endpoints_descricao": ENDPOINTS_DESC,
         "endpoints_administrativos": ENDPOINTS_ADMINISTRATIVOS,
+        "transporte_get_post": _AJUDA_TRANSPORTE,
+        "metodos_transporte": {rota: sorted(set(metodos) | set(METODOS_CONSULTA))
+                               for rota, metodos in _METODOS_POR_ROTA.items()},
         "parametros_por_endpoint": ENDPOINTS_PARAMS,
         "parametros": [
             {"nome": n, "tipo": t, "obrigatorio": o, "aceitos": a,
@@ -361,7 +384,7 @@ def ajuda_estrutura():
 def ajuda_texto():
     linhas = ["RADAR BRASIL - AJUDA v%s" % config.API_VERSION, ""]
     linhas.extend(COMO_FUNCIONA_PSE)
-    linhas.append("ENDPOINTS:")
+    linhas.extend([_AJUDA_TRANSPORTE, "", "ENDPOINTS (métodos da operação):"])
     for ep, metodos in ENDPOINTS_AJUDA.items():
         linhas.append("  %-28s %-10s %s" % (
             ep, "/".join(metodos), ENDPOINTS_DESC.get(ep, "")))
@@ -576,6 +599,34 @@ def _rota(environ):
     return caminho
 
 
+def _metodos_da_rota(rota):
+    if rota in _METODOS_POR_ROTA:
+        return _METODOS_POR_ROTA[rota]
+    for padrao, metodos in _METODOS_POR_MODELO:
+        if padrao.fullmatch(rota):
+            return metodos
+    return ()
+
+
+def _metodo_efetivo(rota, metodo, environ):
+    metodos = _metodos_da_rota(rota)
+    pedido = (environ.get("HTTP_X_RADAR_METODO") or "").strip().upper()
+    if pedido:
+        if metodo not in METODOS_CONSULTA or pedido not in metodos or pedido == "HEAD":
+            return None
+        if metodo == "GET" and pedido in METODOS_ESCRITA:
+            ctype = environ.get("CONTENT_TYPE", "").split(";", 1)[0].strip().lower()
+            if ctype != "application/json" or environ.get("HTTP_SEC_FETCH_SITE") == "cross-site":
+                raise governanca.GovernancaError(
+                    403, "origem_invalida", "Envie a operação GET com JSON no corpo e cabeçalho X-Radar-Metodo.")
+        return pedido
+    if metodo == "POST" and "GET" in metodos and "POST" not in metodos:
+        return "GET"
+    if metodos and metodo not in metodos:
+        return None
+    return metodo
+
+
 def _token_escrita(environ):
     """Valida o token de escrita (cabecalho X-Api-Token).
 
@@ -699,7 +750,7 @@ def _ingestao_radares(environ, stdin_bytes):
         "erros": erros,
     }
     status = 200 if aceitos > 0 else 422
-    return status, {"Content-Type": "application/json; charset=utf-8"}, corpo
+    return status, {"Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store"}, corpo
 
 
 # ---------------------------------------------------------------------------
@@ -763,11 +814,6 @@ def _ip_requisicao(environ):
     except ValueError:
         pass
     return remoto
-
-
-def _consulta_params(environ):
-    return dict(urllib.parse.parse_qsl(environ.get("QUERY_STRING", ""),
-                                       keep_blank_values=True))
 
 
 def _dispatch_governanca(conn, caminho, metodo, environ, stdin_bytes):
@@ -962,7 +1008,7 @@ def _gestao(conn, p, metodo, environ, stdin_bytes):
             if metodo != "GET":
                 return _erro(405, "metodo_nao_permitido", "metodo %s nao permitido" % metodo)
             governanca.exigir(ctx, "contribuidor")
-            params = _consulta_params(environ)
+            params = _parse_params(environ, stdin_bytes)
             try:
                 limite = int(params.get("limite", politica_acesso.limite_padrao()))
                 if limite < 0:
@@ -1025,7 +1071,7 @@ def _gestao(conn, p, metodo, environ, stdin_bytes):
             if len(partes) == 1:
                 if metodo == "GET":
                     governanca.exigir(ctx, "moderador")
-                    params = _consulta_params(environ)
+                    params = _parse_params(environ, stdin_bytes)
                     incluir = str(params.get("incluir_inativos", "")).lower() in ("1", "true", "sim")
                     return _resp({"sucesso": True,
                                   "bloqueios": governanca.listar_bloqueios(conn, incluir)})
@@ -1218,8 +1264,12 @@ def _relatorio_atualizacoes():
 
 
 def handle_request(environ, stdin_bytes=b""):
-    metodo = environ.get("REQUEST_METHOD", "GET").upper()
+    metodo_http = environ.get("REQUEST_METHOD", "GET").upper()
     caminho = _rota(environ)
+    if caminho == "/" and metodo_http == "POST":
+        rota_corpo = _parse_params(environ, stdin_bytes).get("rota")
+        if isinstance(rota_corpo, str) and rota_corpo.startswith("/api/v1/"):
+            caminho = rota_corpo
     rota = caminho.rstrip("/") or "/"
     equipe = rota in ("/api/v1/status/coletores", "/api/v1/atualizacoes/status")
     gestao = rota == "/api/v1/gestao" or rota.startswith("/api/v1/gestao/")
@@ -1239,6 +1289,12 @@ def handle_request(environ, stdin_bytes=b""):
             traseiro.autenticar(environ)
         except governanca.GovernancaError as exc:
             return _gov_erro(exc)
+    try:
+        metodo = _metodo_efetivo(rota, metodo_http, environ)
+    except governanca.GovernancaError as exc:
+        return _gov_erro(exc)
+    if metodo is None:
+        return _erro(405, "metodo_nao_permitido", "Método não permitido para esta operação.")
 
     # Recebimento e consultas previamente autorizadas usam a fila durável.
     assincrono = rota == "/api/v1/radares/submeter" and "respond-async" in environ.get("HTTP_PREFER", "").lower()

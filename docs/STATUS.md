@@ -47,7 +47,7 @@ mostra as informações públicas e oferece o link para entrar novamente.
 
 Abrir ou atualizar a página consulta o histórico armazenado pela API.
 
-| Rota GET (JSON) | Resultado |
+| Rota GET ou POST (JSON) | Resultado |
 |---|---|
 | `/api/v1/status/estados` | 27 UFs, totais nacionais, sem UF e critério |
 | `/api/v1/status/estados/{uf}` | Estado, municípios, órgãos, fontes e pontos |

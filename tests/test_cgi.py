@@ -115,6 +115,14 @@ class TestCgi(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertGreaterEqual(json.loads(resp)["resultado"]["total_pontos"], 1)
 
+    def test_post_formulario_com_rota_no_corpo_e_precedencia(self):
+        corpo = (b"rota=%2Fapi%2Fv1%2Fradares&lat=-24.9555&lon=-53.4552"
+                 b"&raio=5000&formato=json")
+        status, _, resp = self._req("", "lat=200", metodo="POST", corpo=corpo,
+                                     ctype="application/x-www-form-urlencoded")
+        self.assertEqual(status, 200)
+        self.assertGreaterEqual(json.loads(resp)["resultado"]["total_pontos"], 1)
+
     def test_ponto_por_id(self):
         status, _h, corpo = self._req("/api/v1/radares/P-1")
         self.assertEqual(status, 200)
